@@ -113,6 +113,33 @@ export function freshOtpOutstanding(): boolean {
   return Boolean(row && row.expiresAt > Date.now() && row.attempts < MAX_ATTEMPTS);
 }
 
+// A master code shorter than this is ignored outright: it is a standing
+// password-equivalent, so a guessable one (e.g. "123456") must never activate.
+const MASTER_OTP_MIN_LEN = 8;
+
+/**
+ * Optional shared sign-in code (ADMIN_MASTER_OTP): while set, this exact code
+ * is accepted in place of the emailed/texted one so testers without access to
+ * the admin inbox can complete two-step login. The admin password is still
+ * required first. Stateless like TOTP — checking it never consumes the emailed
+ * code's attempts. Remove the env var to revoke it immediately.
+ */
+export function verifyMasterOtp(rawCode: string): boolean {
+  const master = (process.env.ADMIN_MASTER_OTP || '').trim();
+  if (!master) return false;
+  if (master.length < MASTER_OTP_MIN_LEN) {
+    console.warn(`ADMIN_MASTER_OTP is set but shorter than ${MASTER_OTP_MIN_LEN} characters — ignoring it.`);
+    return false;
+  }
+  const submitted = (rawCode || '').trim();
+  if (!submitted) return false;
+  // Hash both sides so timingSafeEqual gets equal-length buffers.
+  return crypto.timingSafeEqual(
+    crypto.createHash('sha256').update(`master:${submitted}`).digest(),
+    crypto.createHash('sha256').update(`master:${master}`).digest()
+  );
+}
+
 export type OtpVerdict = 'ok' | 'wrong' | 'expired' | 'too_many';
 
 /** Check a submitted code. Single-use: the stored code is deleted on success. */

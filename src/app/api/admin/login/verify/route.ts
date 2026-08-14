@@ -6,7 +6,7 @@ import {
   PREAUTH_COOKIE_NAME,
   SESSION_TTL_MS,
 } from '@/lib/auth';
-import { verifyOtpCode } from '@/lib/otp';
+import { verifyMasterOtp, verifyOtpCode } from '@/lib/otp';
 import { verifyTotp } from '@/lib/totp';
 import { clientIp, isRateLimited, recordStrike } from '@/lib/ratelimit';
 import type { ApiErrorResponse } from '@/lib/types';
@@ -45,11 +45,12 @@ export async function POST(req: Request) {
       // Malformed body -> wrong code below.
     }
 
-    // Accept an authenticator-app (TOTP) code first: it is stateless, so trying
-    // it never consumes the emailed code's limited attempts. Falls through to
-    // the emailed/texted code otherwise — either is accepted.
-    const totpOk = verifyTotp(code);
-    const verdict = totpOk ? 'ok' : verifyOtpCode(code);
+    // Accept the stateless codes first (authenticator app, then the optional
+    // ADMIN_MASTER_OTP tester code): trying them never consumes the emailed
+    // code's limited attempts. Falls through to the emailed/texted code
+    // otherwise — any of them is accepted.
+    const statelessOk = verifyTotp(code) || verifyMasterOtp(code);
+    const verdict = statelessOk ? 'ok' : verifyOtpCode(code);
     if (verdict === 'ok') {
       const res = NextResponse.json({ ok: true });
       res.cookies.set(COOKIE_NAME, createSessionToken(), {
