@@ -13,8 +13,10 @@ import {
   type OrderStatus,
 } from '@/lib/orders';
 import LogoutButton from './LogoutButton';
+import { isTotpEnrolled } from '@/lib/totp';
 import MaintenancePanel from './MaintenancePanel';
 import ScanLinkPanel from './ScanLinkPanel';
+import TotpPanel from './TotpPanel';
 import TransferActions from './TransferActions';
 
 export const dynamic = 'force-dynamic';
@@ -264,6 +266,11 @@ export default async function AdminDashboardPage() {
       <div className="card glow-card anim-fade-up">
         <div className="card-title">Door scanner access</div>
         <ScanLinkPanel />
+      </div>
+
+      <div className="card glow-card anim-fade-up">
+        <div className="card-title">Sign-in security · authenticator app</div>
+        <TotpPanel initialEnrolled={isTotpEnrolled()} />
       </div>
     </div>
   );

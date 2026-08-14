@@ -9,7 +9,15 @@ import {
   PREAUTH_TTL_MS,
   SESSION_TTL_MS,
 } from '@/lib/auth';
-import { createOtpCode, deliverOtpCode, freshOtpOutstanding, otpDestinationHint, otpEnabled } from '@/lib/otp';
+import {
+  createOtpCode,
+  deliverOtpCode,
+  freshOtpOutstanding,
+  otpDestinationHint,
+  otpEnabled,
+  otpHasDeliveryChannel,
+} from '@/lib/otp';
+import { isTotpEnrolled } from '@/lib/totp';
 import { clientIp, isRateLimited, recordStrike } from '@/lib/ratelimit';
 import type { ApiErrorResponse } from '@/lib/types';
 
@@ -74,39 +82,35 @@ export async function POST(req: Request) {
       return res;
     }
 
-    // If a fresh, unexhausted code is already outstanding, do NOT mint/send a
-    // new one — just re-enter the code step. This stops a caller who has the
-    // password from scripting /login to flood the admin inbox/phone (and reset
-    // the 6-guess limit) on every request. The separately-throttled "Resend"
-    // button covers a genuinely lost code.
-    if (freshOtpOutstanding()) {
-      const res = NextResponse.json({ ok: true, otpRequired: true, emailHint: otpDestinationHint() });
-      res.cookies.set(PREAUTH_COOKIE_NAME, createPreauthToken(), {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: Math.floor(PREAUTH_TTL_MS / 1000),
-      });
-      return res;
-    }
-
-    const code = createOtpCode();
-    const isDev = process.env.NODE_ENV !== 'production';
-    if (isDev) {
-      console.log(`[dev only] Admin sign-in code: ${code}`);
-    }
-    const delivery = await deliverOtpCode(code);
-    // In development the code is printed to the server console, so broken
-    // delivery shouldn't block sign-in. In production it must fail closed.
-    if (!delivery.sent && !isDev) {
-      return NextResponse.json(
-        {
-          error:
-            'Your password is correct, but the sign-in code could not be sent by email or SMS. Check the SMTP/Twilio settings, or set ADMIN_OTP=off to sign in with password only.',
-        } satisfies ApiErrorResponse,
-        { status: 502 }
-      );
+    // Send a code only when there is a channel to send it on (email/SMS). If the
+    // ONLY second factor is an authenticator app, there is nothing to send — the
+    // code comes from the phone — so we skip straight to the code step.
+    if (otpHasDeliveryChannel()) {
+      // If a fresh, unexhausted code is already outstanding, do NOT mint/send a
+      // new one — just re-enter the code step. This stops a caller who has the
+      // password from scripting /login to flood the admin inbox/phone (and reset
+      // the 6-guess limit) on every request. The throttled "Resend" button
+      // covers a genuinely lost code.
+      if (!freshOtpOutstanding()) {
+        const code = createOtpCode();
+        const isDev = process.env.NODE_ENV !== 'production';
+        if (isDev) {
+          console.log(`[dev only] Admin sign-in code: ${code}`);
+        }
+        const delivery = await deliverOtpCode(code);
+        // In development the code is printed to the server console, so broken
+        // delivery shouldn't block sign-in. In production it must fail closed —
+        // UNLESS an authenticator app is enrolled, which needs no delivery.
+        if (!delivery.sent && !isDev && !isTotpEnrolled()) {
+          return NextResponse.json(
+            {
+              error:
+                'Your password is correct, but the sign-in code could not be sent by email or SMS. Check the SMTP/Twilio settings, use your authenticator app, or set ADMIN_OTP=off to sign in with password only.',
+            } satisfies ApiErrorResponse,
+            { status: 502 }
+          );
+        }
+      }
     }
 
     const res = NextResponse.json({

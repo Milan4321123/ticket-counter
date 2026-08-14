@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isPreauthRequest } from '@/lib/auth';
-import { createOtpCode, deliverOtpCode, otpDestinationHint, otpEnabled } from '@/lib/otp';
+import { createOtpCode, deliverOtpCode, otpDestinationHint, otpEnabled, otpHasDeliveryChannel } from '@/lib/otp';
 import { rateLimit } from '@/lib/ratelimit';
 import type { ApiErrorResponse } from '@/lib/types';
 
@@ -17,6 +17,13 @@ export async function POST() {
       return NextResponse.json({ error: 'Two-step login is not configured.' } satisfies ApiErrorResponse, {
         status: 400,
       });
+    }
+    // Authenticator-only setups have nothing to resend — the code is on the phone.
+    if (!otpHasDeliveryChannel()) {
+      return NextResponse.json(
+        { error: 'Open your authenticator app for the current code — there is no email or SMS to resend.' } satisfies ApiErrorResponse,
+        { status: 400 }
+      );
     }
     // One resend per 45 seconds, shared across everyone (there is one code slot).
     if (!rateLimit('otp-resend', 1, 45_000)) {

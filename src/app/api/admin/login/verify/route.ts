@@ -7,6 +7,7 @@ import {
   SESSION_TTL_MS,
 } from '@/lib/auth';
 import { verifyOtpCode } from '@/lib/otp';
+import { verifyTotp } from '@/lib/totp';
 import { clientIp, isRateLimited, recordStrike } from '@/lib/ratelimit';
 import type { ApiErrorResponse } from '@/lib/types';
 
@@ -44,7 +45,11 @@ export async function POST(req: Request) {
       // Malformed body -> wrong code below.
     }
 
-    const verdict = verifyOtpCode(code);
+    // Accept an authenticator-app (TOTP) code first: it is stateless, so trying
+    // it never consumes the emailed code's limited attempts. Falls through to
+    // the emailed/texted code otherwise — either is accepted.
+    const totpOk = verifyTotp(code);
+    const verdict = totpOk ? 'ok' : verifyOtpCode(code);
     if (verdict === 'ok') {
       const res = NextResponse.json({ ok: true });
       res.cookies.set(COOKIE_NAME, createSessionToken(), {
