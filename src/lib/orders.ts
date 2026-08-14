@@ -253,26 +253,60 @@ function withItemsSummary(rows: OrderRow[]): OrderListRow[] {
   });
 }
 
-export function listOrders(opts: { query?: string; limit?: number } = {}): OrderListRow[] {
+/** Admin-facing order filter buckets (the chips on /admin/orders). */
+export type OrderFilter = 'all' | 'awaiting' | 'paid' | 'closed';
+
+const FILTER_SQL: Record<Exclude<OrderFilter, 'all'>, string> = {
+  awaiting: `status = 'claimed' AND payment_mode = 'transfer'`,
+  paid: `status = 'paid'`,
+  closed: `status IN ('cancelled', 'failed')`,
+};
+
+export function listOrders(
+  opts: { query?: string; limit?: number; filter?: OrderFilter } = {}
+): OrderListRow[] {
   const db = getDb();
   const limit = Math.min(opts.limit ?? 200, 1000);
-  let rows: OrderRow[];
+  const conditions: string[] = [];
+  const args: (string | number)[] = [];
   if (opts.query && opts.query.trim()) {
     // Let admins paste a bank-transfer reference ("TICKETS-AB12CD34" or the
     // student form "TICKETS-S-AB12CD34") as-is — the hex part matches the
     // order id (LIKE is case-insensitive for ASCII).
     const q = `%${opts.query.trim().replace(/^TICKETS-(S-)?/i, '')}%`;
-    rows = db
-      .prepare(
-        `SELECT ${ORDER_COLS} FROM orders
-         WHERE buyer_name LIKE ? OR buyer_email LIKE ? OR id LIKE ?
-         ORDER BY created_at DESC LIMIT ?`
-      )
-      .all(q, q, q, limit) as OrderRow[];
-  } else {
-    rows = db.prepare(`SELECT ${ORDER_COLS} FROM orders ORDER BY created_at DESC LIMIT ?`).all(limit) as OrderRow[];
+    conditions.push(`(buyer_name LIKE ? OR buyer_email LIKE ? OR id LIKE ?)`);
+    args.push(q, q, q);
   }
+  if (opts.filter && opts.filter !== 'all') {
+    conditions.push(`(${FILTER_SQL[opts.filter]})`);
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const rows = db
+    .prepare(`SELECT ${ORDER_COLS} FROM orders ${where} ORDER BY created_at DESC LIMIT ?`)
+    .all(...args, limit) as OrderRow[];
   return withItemsSummary(rows);
+}
+
+/** How many orders fall in each admin filter bucket (for the chip labels). */
+export function countOrdersByFilter(query?: string): Record<OrderFilter, number> {
+  const db = getDb();
+  let where = '';
+  const args: string[] = [];
+  if (query && query.trim()) {
+    const q = `%${query.trim().replace(/^TICKETS-(S-)?/i, '')}%`;
+    where = `WHERE (buyer_name LIKE ? OR buyer_email LIKE ? OR id LIKE ?)`;
+    args.push(q, q, q);
+  }
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS all_n,
+              COALESCE(SUM(CASE WHEN ${FILTER_SQL.awaiting} THEN 1 ELSE 0 END), 0) AS awaiting_n,
+              COALESCE(SUM(CASE WHEN ${FILTER_SQL.paid} THEN 1 ELSE 0 END), 0) AS paid_n,
+              COALESCE(SUM(CASE WHEN ${FILTER_SQL.closed} THEN 1 ELSE 0 END), 0) AS closed_n
+       FROM orders ${where}`
+    )
+    .get(...args) as { all_n: number; awaiting_n: number; paid_n: number; closed_n: number };
+  return { all: row.all_n, awaiting: row.awaiting_n, paid: row.paid_n, closed: row.closed_n };
 }
 
 export interface TierStats {

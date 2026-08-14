@@ -2,9 +2,23 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { isAdminRequest } from '@/lib/auth';
 import { formatMoney } from '@/lib/money';
-import { expireOverdueTransferReservations, listOrders, paymentReference, type OrderStatus } from '@/lib/orders';
+import {
+  countOrdersByFilter,
+  expireOverdueTransferReservations,
+  listOrders,
+  paymentReference,
+  type OrderFilter,
+  type OrderStatus,
+} from '@/lib/orders';
 import TransferActions from '../TransferActions';
 import ResendButton from './ResendButton';
+
+const FILTERS: { key: OrderFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'awaiting', label: 'Awaiting transfer' },
+  { key: 'paid', label: 'Paid' },
+  { key: 'closed', label: 'Cancelled / failed' },
+];
 
 export const dynamic = 'force-dynamic';
 
@@ -23,14 +37,17 @@ function StatusBadge({ status }: { status: OrderStatus }) {
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string | string[] }>;
+  searchParams: Promise<{ q?: string | string[]; filter?: string | string[] }>;
 }) {
   if (!(await isAdminRequest())) redirect('/admin/login');
 
   const params = await searchParams;
   const query = typeof params.q === 'string' ? params.q : '';
+  const rawFilter = typeof params.filter === 'string' ? params.filter : 'all';
+  const filter: OrderFilter = FILTERS.some((f) => f.key === rawFilter) ? (rawFilter as OrderFilter) : 'all';
   expireOverdueTransferReservations();
-  const orders = listOrders({ query });
+  const orders = listOrders({ query, filter });
+  const counts = countOrdersByFilter(query);
 
   return (
     <div className="container section">
@@ -59,6 +76,7 @@ export default async function AdminOrdersPage({
         className="anim-fade-up anim-d1"
         style={{ display: 'flex', gap: 10, marginBottom: 8, maxWidth: 560 }}
       >
+        {filter !== 'all' && <input type="hidden" name="filter" value={filter} />}
         <input
           type="search"
           name="q"
@@ -71,10 +89,25 @@ export default async function AdminOrdersPage({
           Search
         </button>
       </form>
-      <p className="muted small anim-fade-up anim-d2" style={{ marginBottom: 20 }}>
+      <p className="muted small anim-fade-up anim-d2" style={{ marginBottom: 16 }}>
         Tip: paste a reference straight from your bank statement (like <span className="mono">TICKETS-AB12CD34</span>)
         to find its order.
       </p>
+
+      <div className="chip-row anim-fade-up anim-d2">
+        {FILTERS.map((f) => {
+          const href = `/admin/orders?${new URLSearchParams({
+            ...(query ? { q: query } : {}),
+            ...(f.key !== 'all' ? { filter: f.key } : {}),
+          }).toString()}`;
+          return (
+            <Link key={f.key} href={href} className={`chip${filter === f.key ? ' chip-active' : ''}`}>
+              {f.label}
+              <span className="chip-count">{counts[f.key]}</span>
+            </Link>
+          );
+        })}
+      </div>
 
       {query && (
         <p className="muted small">
@@ -117,15 +150,16 @@ export default async function AdminOrdersPage({
                       <td>{o.itemsSummary}</td>
                       <td>{formatMoney(o.totalCents, o.currency)}</td>
                       <td>
-                        <StatusBadge status={o.status} />
+                        {o.paymentMode === 'transfer' && o.status === 'claimed' ? (
+                          <span className="badge badge-amber" style={{ whiteSpace: 'nowrap' }}>
+                            awaiting transfer
+                          </span>
+                        ) : (
+                          <StatusBadge status={o.status} />
+                        )}
                         {o.paymentMode === 'mock' ? (
                           <span className="badge badge-amber" style={{ marginLeft: 6 }}>
                             test
-                          </span>
-                        ) : null}
-                        {o.paymentMode === 'transfer' && o.status === 'claimed' ? (
-                          <span className="badge badge-amber" style={{ marginLeft: 6 }}>
-                            awaiting transfer
                           </span>
                         ) : null}
                       </td>

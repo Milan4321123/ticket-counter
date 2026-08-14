@@ -1018,6 +1018,147 @@ summary {
   letter-spacing: -0.01em;
 }
 
+/* Accent top-edge for a stat card that needs the admin's eyes. */
+.stat-card-alert {
+  border-color: rgba(251, 191, 36, 0.45);
+  background:
+    linear-gradient(180deg, rgba(251, 191, 36, 0.07), transparent 55%),
+    var(--bg-card);
+}
+
+.stat-sub {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  margin-top: 2px;
+}
+
+/* ---------- Capacity / progress meters (admin) ---------- */
+/* The number always lives in text next to the bar — the bar is a glance aid,
+   never the only carrier of the value. */
+
+.meter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.meter-track {
+  flex: 1;
+  height: 8px;
+  min-width: 60px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  overflow: hidden;
+}
+
+.meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.6s var(--ease-out);
+}
+
+.meter-fill-green {
+  background: var(--green);
+}
+
+.meter-fill-amber {
+  background: var(--amber);
+}
+
+.meter-num {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* ---------- Filter chips (admin orders) ---------- */
+
+.chip-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background 0.15s ease;
+}
+
+.chip:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.chip-active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.chip-count {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.chip-active .chip-count {
+  background: rgba(139, 92, 246, 0.25);
+}
+
+/* ---------- "Action needed" panel (admin dashboard) ---------- */
+
+.action-card {
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  background:
+    linear-gradient(180deg, rgba(251, 191, 36, 0.06), transparent 60%),
+    var(--bg-card);
+}
+
+.action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 14px 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.action-row:first-of-type {
+  border-top: none;
+}
+
+.action-row-who {
+  min-width: 180px;
+}
+
+.action-row-amount {
+  font-size: 1.15rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 /* Small pulsing live indicator. */
 
 .pulse-dot {
