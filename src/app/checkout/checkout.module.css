@@ -1,0 +1,60 @@
+.fieldError {
+  color: var(--red);
+  font-size: 0.85rem;
+  margin: 6px 0 0;
+}
+
+.qtyList > :global(.qty-row):last-of-type {
+  border-bottom: none;
+}
+
+.summaryBlock {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.payDisabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.paypalBox {
+  min-height: 110px;
+}
+
+.hint {
+  margin: 10px 0 0;
+}
+
+.loadingRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+}
+
+/* Checkmarked perks shown above the bank-transfer reserve button. */
+
+.perkList {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.perkList li {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  color: var(--text-dim);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.perkList li::before {
+  content: '✓';
+  flex: none;
+  color: var(--green);
+  font-weight: 700;
+}
