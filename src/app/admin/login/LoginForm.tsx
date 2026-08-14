@@ -19,6 +19,7 @@ export default function LoginForm() {
   const [resendBusy, setResendBusy] = useState(false);
   const [resendIn, setResendIn] = useState(0);
   const codeRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
   // While on the code step: focus the input and tick the resend countdown.
   useEffect(() => {
@@ -30,14 +31,21 @@ export default function LoginForm() {
 
   async function submitPassword(e: React.FormEvent) {
     e.preventDefault();
-    if (busy || password.length === 0) return;
+    // Read the DOM directly: browser autofill can put a value in the box
+    // without firing onChange, leaving React state empty.
+    const pw = passwordRef.current?.value ?? password;
+    if (busy) return;
+    if (pw.length === 0) {
+      setError('Please enter the admin password.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
       const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ password: pw }),
       });
       const data = (await res.json().catch(() => null)) as
         | { ok?: boolean; otpRequired?: boolean; emailHint?: string; error?: string }
@@ -244,6 +252,7 @@ export default function LoginForm() {
         <label htmlFor="admin-password">Admin password</label>
         <input
           id="admin-password"
+          ref={passwordRef}
           className="input"
           type="password"
           value={password}
@@ -253,7 +262,7 @@ export default function LoginForm() {
           placeholder="Enter the admin password"
         />
       </div>
-      <button type="submit" className="btn btn-primary btn-block" disabled={busy || password.length === 0}>
+      <button type="submit" className="btn btn-primary btn-block" disabled={busy}>
         {busy ? <span className="spinner" aria-hidden /> : null}
         {busy ? 'Signing in…' : 'Sign in'}
       </button>
