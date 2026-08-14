@@ -165,13 +165,14 @@ export async function POST(req: Request) {
         }
         throw e;
       }
-      // Best-effort: the order page shows the same payment instructions.
-      try {
-        const emailResult = await sendTransferInstructionsEmail(order.id);
-        console.log(`Transfer instructions email for order ${order.id}:`, emailResult);
-      } catch (e) {
-        console.error(`Transfer instructions email for order ${order.id} threw unexpectedly:`, e);
-      }
+      // Fire-and-forget: NEVER block the reservation response on SMTP. The seats
+      // are already claimed above and the order page shows the same bank details,
+      // so the buyer must not wait for (or be failed by) a slow email server.
+      // On Render this runs a persistent Node process, so the send completes in
+      // the background after the response is sent.
+      void sendTransferInstructionsEmail(order.id)
+        .then((emailResult) => console.log(`Transfer instructions email for order ${order.id}:`, emailResult))
+        .catch((e) => console.error(`Transfer instructions email for order ${order.id} threw unexpectedly:`, e));
     }
 
     let paypalOrderId: string | null = null;

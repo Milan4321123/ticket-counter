@@ -20,6 +20,11 @@ function createTransporter() {
     auth: process.env.SMTP_USER
       ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS || '' }
       : undefined,
+    // Hard caps so a stalled SMTP connection (blocked port, slow host) can never
+    // hang a request for minutes — it fails fast and the caller carries on.
+    connectionTimeout: 10_000, // TCP connect
+    greetingTimeout: 10_000, // wait for server greeting
+    socketTimeout: 20_000, // inactivity
   });
 }
 

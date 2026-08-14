@@ -142,6 +142,9 @@ export async function sendOtpEmail(code: string): Promise<{ sent: boolean; reaso
       port,
       secure: port === 465,
       auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 20_000,
     });
     await transport.sendMail({
       from: process.env.EMAIL_FROM,
