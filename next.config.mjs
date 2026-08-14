@@ -14,7 +14,9 @@ const csp = [
   `object-src 'none'`,
   `frame-ancestors 'self'`,
   `form-action 'self' https://www.paypal.com`,
-  `script-src 'self' 'unsafe-inline' ${PAYPAL}`,
+  // 'unsafe-eval' is dev-only: next dev's hot-reload runtime needs eval, and
+  // without it every page's JS dies silently (dead buttons). Never in prod.
+  `script-src 'self' 'unsafe-inline'${isProd ? '' : " 'unsafe-eval'"} ${PAYPAL}`,
   `style-src 'self' 'unsafe-inline'`,
   `img-src 'self' data: blob: ${PAYPAL} https://*.paypal.com`,
   `font-src 'self' data:`,
