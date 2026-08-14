@@ -1,0 +1,19 @@
+# Dependencies & build output
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# Local database (orders, tickets, check-ins) — never commit
+data/
+
+# Secrets — never commit. Use .env.example as the template, and set real
+# values in your host's dashboard (e.g. Render → Environment).
+.env
+.env.local
+.env*.local
+
+# Local editor / tooling config
+.claude/
+.DS_Store

@@ -1,0 +1,38 @@
+{
+  "_comment": "EDIT THIS FILE with your real event details. Prices are in cents (2500 = $25.00).",
+  "eventName": "October Live in Concert",
+  "artist": "Featured Singer (TBD)",
+  "description": "Join us for an unforgettable night of live music. Doors open one hour before showtime. All sales are final; tickets are non-transferable unless approved by the organizer.",
+  "dateDisplay": "Saturday, October 17, 2026 · Doors 6:00 PM · Show 7:00 PM",
+  "venue": "Venue Name, City (TBD)",
+  "currency": "EUR",
+  "totalCapacity": 600,
+  "salesOpen": true,
+  "maxTicketsPerOrder": 8,
+  "_bankTransferComment": "Fill in YOUR bank account for pay-by-bank-transfer. Buyers see these details. iban must be filled or checkout shows 'payment not configured'. bic/bankName may stay empty.",
+  "bankTransfer": {
+    "accountHolder": "Milan Adhikari",
+    "iban": "DE61 5004 0048 0393 5483 00",
+    "bic": "COBADEFFXXX",
+    "bankName": "Commerzbank",
+    "payWithinDays": 5
+  },
+  "tiers": [
+    {
+      "id": "general",
+      "name": "General Admission",
+      "priceCents": 2500,
+      "cap": 500,
+      "studentOnly": false,
+      "description": "Standard entry to the show."
+    },
+    {
+      "id": "student",
+      "name": "Student",
+      "priceCents": 1500,
+      "cap": 100,
+      "studentOnly": true,
+      "description": "Discounted ticket for students. A valid student ID must be shown at the entrance."
+    }
+  ]
+}
