@@ -133,10 +133,12 @@ export function verifyMasterOtp(rawCode: string): boolean {
   }
   const submitted = (rawCode || '').trim();
   if (!submitted) return false;
+  // Case-insensitive: phone keyboards love to auto-capitalize the first letter
+  // (or everything), and a shared tester code should survive that.
   // Hash both sides so timingSafeEqual gets equal-length buffers.
   return crypto.timingSafeEqual(
-    crypto.createHash('sha256').update(`master:${submitted}`).digest(),
-    crypto.createHash('sha256').update(`master:${master}`).digest()
+    crypto.createHash('sha256').update(`master:${submitted.toLowerCase()}`).digest(),
+    crypto.createHash('sha256').update(`master:${master.toLowerCase()}`).digest()
   );
 }
 
