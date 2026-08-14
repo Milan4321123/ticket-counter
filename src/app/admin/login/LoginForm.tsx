@@ -115,10 +115,13 @@ export default function LoginForm() {
   }
 
   function onCodeChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const digits = e.target.value.replace(/\D/g, '').slice(0, 6);
-    setCode(digits);
-    // Submit as soon as all 6 digits are in — no extra click needed.
-    if (digits.length === 6) void verifyCode(digits);
+    // Besides the 6-digit emailed/authenticator code, a longer alphanumeric
+    // team code (ADMIN_MASTER_OTP) may be in use — so allow letters and dashes.
+    const cleaned = e.target.value.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 64);
+    setCode(cleaned);
+    // Submit as soon as all 6 digits are in — no extra click needed. Longer
+    // team codes are submitted with the button/Enter instead.
+    if (/^\d{6}$/.test(cleaned)) void verifyCode(cleaned);
   }
 
   async function resend() {
@@ -182,18 +185,17 @@ export default function LoginForm() {
             className="input input-code"
             value={code}
             onChange={onCodeChange}
-            inputMode="numeric"
-            pattern="[0-9]*"
-            maxLength={6}
+            maxLength={64}
             autoComplete="one-time-code"
             autoFocus
             spellCheck={false}
+            autoCapitalize="off"
             placeholder="••••••"
             disabled={busy}
-            aria-label="6-digit sign-in code"
+            aria-label="Sign-in code"
           />
         </div>
-        <button type="submit" className="btn btn-primary btn-block" disabled={busy || code.length !== 6}>
+        <button type="submit" className="btn btn-primary btn-block" disabled={busy || code.length < 6}>
           {busy ? <span className="spinner" aria-hidden /> : null}
           {busy ? 'Checking code…' : 'Verify and sign in'}
         </button>
