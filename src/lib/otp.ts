@@ -1,0 +1,166 @@
+// Server-only: one-time codes for the admin two-step login.
+//
+// Flow: correct password -> a 6-digit code is generated, stored hashed with a
+// 10-minute expiry, and emailed to ADMIN_EMAIL. The session cookie is only
+// issued after the code is verified. Codes are single-use with a hard attempt
+// limit, and generating a new code invalidates the previous one.
+import crypto from 'crypto';
+import nodemailer from 'nodemailer';
+import { getDb } from './db';
+import { getEventConfig } from './config';
+import { isEmailConfigured } from './email';
+import { adminPhones, isSmsConfigured, maskPhone, sendOtpSms } from './sms';
+
+const OTP_TTL_MS = 10 * 60_000;
+const MAX_ATTEMPTS = 6;
+
+/** Admin inboxes that receive login codes (comma-separated ADMIN_EMAIL). */
+export function adminEmails(): string[] {
+  return (process.env.ADMIN_EMAIL || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function emailChannelReady(): boolean {
+  return isEmailConfigured() && adminEmails().length > 0;
+}
+
+/**
+ * Two-step login is on when codes can actually be delivered by EITHER channel —
+ * email (ADMIN_EMAIL + SMTP) or SMS (ADMIN_PHONE + Twilio). Set ADMIN_OTP=off to
+ * explicitly fall back to password-only (e.g. while debugging delivery).
+ */
+export function otpEnabled(): boolean {
+  if (process.env.ADMIN_OTP === 'off') return false;
+  return emailChannelReady() || isSmsConfigured();
+}
+
+/**
+ * Human-readable, masked description of where the code is being sent, for the
+ * pre-login screen — e.g. "your email (a•••@gmail.com) and phone (+49•••••1234)".
+ * Never reveals the full address/number.
+ */
+export function otpDestinationHint(): string {
+  const parts: string[] = [];
+  if (emailChannelReady()) parts.push(`email (${maskEmail(adminEmails()[0] ?? '')})`);
+  if (isSmsConfigured()) parts.push(`phone (${maskPhone(adminPhones()[0] ?? '')})`);
+  if (parts.length === 0) return 'the admin';
+  return parts.join(' and ');
+}
+
+/**
+ * Deliver a freshly-generated code over every configured channel (email and/or
+ * SMS), in parallel. Reports success if AT LEAST ONE channel accepted it, plus
+ * which channels worked so the caller can decide whether to fail closed.
+ */
+export async function deliverOtpCode(code: string): Promise<{
+  sent: boolean;
+  channels: { email: boolean; sms: boolean };
+}> {
+  const eventName = getEventConfig().eventName;
+  const [emailRes, smsRes] = await Promise.all([
+    emailChannelReady() ? sendOtpEmail(code) : Promise.resolve({ sent: false }),
+    isSmsConfigured() ? sendOtpSms(code, eventName) : Promise.resolve({ sent: false }),
+  ]);
+  const channels = { email: emailRes.sent, sms: smsRes.sent };
+  return { sent: channels.email || channels.sms, channels };
+}
+
+/** "adhikarimilan4321@gmail.com" -> "a•••@gmail.com" (safe to show pre-login). */
+export function maskEmail(email: string): string {
+  const [local, domain] = email.split('@');
+  if (!domain) return '•••';
+  return `${local.slice(0, 1)}•••@${domain}`;
+}
+
+function hashCode(code: string): string {
+  return crypto.createHash('sha256').update(`otp:${code}`).digest('hex');
+}
+
+/** Generate, store (hashed), and return a fresh 6-digit code. */
+export function createOtpCode(): string {
+  const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+  getDb()
+    .prepare(
+      `INSERT INTO admin_otp (id, code_hash, expires_at, attempts) VALUES (1, ?, ?, 0)
+       ON CONFLICT(id) DO UPDATE SET code_hash = excluded.code_hash, expires_at = excluded.expires_at, attempts = 0`
+    )
+    .run(hashCode(code), Date.now() + OTP_TTL_MS);
+  return code;
+}
+
+/**
+ * True when a still-valid, not-yet-exhausted code is already stored. The login
+ * route uses this to AVOID minting+sending a new code on every POST: without it,
+ * anyone who knows the password could script /api/admin/login to fire unlimited
+ * OTP emails/texts (an inbox flood + Twilio bill) and reset the 6-attempt guard
+ * on each call. While a fresh code is outstanding, the buyer already has what
+ * they need; the "Resend" button (separately cooldown-limited) covers a lost code.
+ */
+export function freshOtpOutstanding(): boolean {
+  const row = getDb()
+    .prepare(`SELECT expires_at AS expiresAt, attempts FROM admin_otp WHERE id = 1`)
+    .get() as { expiresAt: number; attempts: number } | undefined;
+  return Boolean(row && row.expiresAt > Date.now() && row.attempts < MAX_ATTEMPTS);
+}
+
+export type OtpVerdict = 'ok' | 'wrong' | 'expired' | 'too_many';
+
+/** Check a submitted code. Single-use: the stored code is deleted on success. */
+export function verifyOtpCode(rawCode: string): OtpVerdict {
+  const code = (rawCode || '').replace(/\D/g, '');
+  const db = getDb();
+  const tx = db.transaction((): OtpVerdict => {
+    const row = db.prepare(`SELECT code_hash AS codeHash, expires_at AS expiresAt, attempts FROM admin_otp WHERE id = 1`).get() as
+      | { codeHash: string; expiresAt: number; attempts: number }
+      | undefined;
+    if (!row || row.expiresAt <= Date.now()) return 'expired';
+    if (row.attempts >= MAX_ATTEMPTS) return 'too_many';
+    db.prepare(`UPDATE admin_otp SET attempts = attempts + 1 WHERE id = 1`).run();
+    const ok =
+      code.length === 6 &&
+      crypto.timingSafeEqual(Buffer.from(hashCode(code), 'hex'), Buffer.from(row.codeHash, 'hex'));
+    if (!ok) return row.attempts + 1 >= MAX_ATTEMPTS ? 'too_many' : 'wrong';
+    db.prepare(`DELETE FROM admin_otp WHERE id = 1`).run();
+    return 'ok';
+  });
+  return tx();
+}
+
+/** Email the code to every configured admin inbox. Never throws. */
+export async function sendOtpEmail(code: string): Promise<{ sent: boolean; reason?: string }> {
+  try {
+    const recipients = adminEmails();
+    if (!isEmailConfigured() || recipients.length === 0) {
+      return { sent: false, reason: 'email-not-configured' };
+    }
+    const eventName = getEventConfig().eventName;
+    const port = Number(process.env.SMTP_PORT || 587);
+    const transport = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port,
+      secure: port === 465,
+      auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
+    });
+    await transport.sendMail({
+      from: process.env.EMAIL_FROM,
+      to: recipients.join(', '),
+      subject: `${code} is your admin sign-in code`,
+      text:
+        `Your one-time code for the ${eventName} admin panel is: ${code}\n\n` +
+        `It expires in 10 minutes. If you did not try to sign in, someone knows your admin password — change it now.`,
+      html:
+        `<div style="font-family:Arial,Helvetica,sans-serif;max-width:420px;margin:0 auto;padding:24px;color:#111">` +
+        `<p style="margin:0 0 8px;font-size:14px;color:#555">${eventName} — admin sign-in</p>` +
+        `<p style="margin:0 0 16px;font-size:34px;font-weight:bold;letter-spacing:6px">${code}</p>` +
+        `<p style="margin:0;font-size:13px;color:#555">This code expires in 10 minutes.<br>` +
+        `If you did not try to sign in, someone knows your admin password — change it immediately.</p>` +
+        `</div>`,
+    });
+    return { sent: true };
+  } catch (e) {
+    console.error('Sending admin OTP email failed:', e instanceof Error ? e.message : e);
+    return { sent: false, reason: 'send-failed' };
+  }
+}
