@@ -8,6 +8,7 @@ import {
   getEventTiers,
   getEventVideos,
   listEventPosts,
+  listEventQuestions,
   mediaUrl,
   parseCropRect,
   parsePageDesign,
@@ -32,11 +33,12 @@ import { FAQ_SUGGESTIONS_EVENT } from './faqBridge';
 import MediaPanel from './MediaPanel';
 import PageContentPanel from './PageContentPanel';
 import PublishPanel from './PublishPanel';
+import QuestionsPanel from './QuestionsPanel';
 import TiersEditor from './TiersEditor';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Edit event — Organizer portal' };
+export const metadata = { title: 'Edit event — Organizer portal', robots: { index: false, follow: false } };
 
 /** Section heading inside a tab: title + one plain-language helper line. */
 function SectionHead({ title, hint }: { title: string; hint: string }) {
@@ -77,6 +79,10 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
   ];
   const faqs = getEventFaqs(event.id);
   const posts = listEventPosts(event.id);
+  // Real questions from real buyers, waiting on the organizer — not the FAQ
+  // they write in advance, which is PageContentPanel's job.
+  const openQuestions = listEventQuestions(event.id, 'open');
+  const answeredQuestionCount = listEventQuestions(event.id, 'answered').length;
   const design = parsePageDesign(event.pageDesign);
   const stats = getStats(event.id);
   // Buyers already holding a paid ticket — the number the Danger Zone puts in
@@ -137,7 +143,14 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
     { key: 'basics', label: 'Basics', status: basicsDone ? ('done' as const) : ('todo' as const) },
     { key: 'tickets', label: 'Tickets', status: ticketsDone ? ('done' as const) : ('todo' as const) },
     { key: 'media', label: 'Photos & videos', status: photosDone ? ('done' as const) : ('todo' as const) },
-    { key: 'page', label: 'Page & content', status: 'neutral' as const },
+    // Otherwise this tab is pure polish and never nags — but a buyer waiting
+    // for an answer is a real job, and the dot is the only way to see it from
+    // the tab strip.
+    {
+      key: 'page',
+      label: 'Page & content',
+      status: openQuestions.length > 0 ? ('todo' as const) : ('neutral' as const),
+    },
     { key: 'publish', label: 'Publish', status: publishDone ? ('done' as const) : ('todo' as const) },
   ];
 
@@ -236,9 +249,11 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
       </div>
     ),
     // Everything here is polish on top of a working event, so nothing is
-    // marked as needing work and the tab opens fully collapsed.
+    // marked as needing work and the tab opens fully collapsed — unless
+    // visitors are waiting on an answer, which is the one thing in this tab
+    // with someone on the other end of it.
     page: (
-      <EditorSectionGroup>
+      <EditorSectionGroup initialOpen={openQuestions.length > 0 ? 'questions' : null}>
         <EditorSection
           id="design"
           title="Page design"
@@ -274,6 +289,28 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
             faqs={faqs.map((f) => ({ question: f.question, answer: f.answer }))}
             maxPhotos={MAX_PHOTOS_PER_EVENT}
             maxVideos={MAX_VIDEOS_PER_EVENT}
+          />
+        </EditorSection>
+
+        {/* Deliberately right below the FAQ, because the two are easy to mix
+            up: the FAQ above is what the organizer writes in advance, this is
+            what buyers actually asked and nobody has answered yet. Answering
+            here publishes to the same Questions section of the event page. */}
+        <EditorSection
+          id="questions"
+          title="Visitor questions"
+          hint="Questions buyers asked on your page that the assistant could not answer — your reply goes live and teaches it."
+          status={openQuestions.length > 0 ? 'todo' : 'optional'}
+          badge={
+            openQuestions.length > 0 ? (
+              <span className="badge badge-amber">{openQuestions.length} open</span>
+            ) : undefined
+          }
+        >
+          <QuestionsPanel
+            eventId={event.id}
+            questions={openQuestions.map((q) => ({ id: q.id, question: q.question, askedAt: q.askedAt }))}
+            answeredCount={answeredQuestionCount}
           />
         </EditorSection>
       </EditorSectionGroup>

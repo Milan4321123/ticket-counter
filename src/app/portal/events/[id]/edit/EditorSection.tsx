@@ -58,6 +58,7 @@ export default function EditorSection({
   title,
   hint,
   status = 'none',
+  badge,
   className,
   revealOn,
   children,
@@ -67,6 +68,13 @@ export default function EditorSection({
   title: string;
   hint: string;
   status?: SectionStatus;
+  /**
+   * Takes the header's badge slot instead of the status badge, for a count
+   * that says more than "To do" does. The header is a three-column grid with
+   * the chevron pinned to the last one, so there is room for exactly one badge
+   * — this replaces it rather than sitting beside it.
+   */
+  badge?: ReactNode;
   /** Extra card classes, e.g. the publish card's glow. */
   className?: string;
   /**
@@ -120,9 +128,13 @@ export default function EditorSection({
           onClick={() => group?.toggle(id)}
         >
           <span className="card-title">{title}</span>
-          {status === 'done' && <span className="badge badge-green">Done</span>}
-          {status === 'todo' && <span className="badge badge-amber">To do</span>}
-          {status === 'optional' && <span className="badge editor-section-badge">Optional</span>}
+          {badge ?? (
+            <>
+              {status === 'done' && <span className="badge badge-green">Done</span>}
+              {status === 'todo' && <span className="badge badge-amber">To do</span>}
+              {status === 'optional' && <span className="badge editor-section-badge">Optional</span>}
+            </>
+          )}
           <svg className="editor-section-chevron" viewBox="0 0 20 20" aria-hidden focusable="false">
             <path
               d="M5.5 7.5 10 12l4.5-4.5"

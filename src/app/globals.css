@@ -3440,13 +3440,18 @@ summary {
 
 /* ---------- Event editor category tabs ---------- */
 
+/* WRAPS — it must never scroll sideways.
+   As a horizontal scroller this showed "Basics, Tickets, Photos…" and hid the
+   rest past the right edge, on the exact screen size where a sideways scrollbar
+   is invisible. Organizers could not see that Page, Publish and the rest even
+   existed, so they filled in the two sections they could see and stopped.
+   Wrapping to two or three rows of bubbles costs a little height and makes the
+   whole job visible at once, which is the only thing that matters here. */
 .editor-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 4px;
   margin-bottom: 18px;
-  scrollbar-width: thin;
 }
 
 .editor-tab {
@@ -3518,11 +3523,54 @@ summary {
 }
 
 @media (max-width: 640px) {
+  /* Tighter bubbles so a phone fits two or three per row instead of pushing
+     the last ones onto lines of their own. The full-bleed margins that used to
+     live here existed only to make the sideways scroll reach the screen edge —
+     with wrapping there is nothing left to scroll. */
   .editor-tabs {
-    margin-left: -20px;
-    margin-right: -20px;
-    padding-left: 20px;
-    padding-right: 20px;
+    gap: 6px;
+  }
+
+  .editor-tab {
+    padding: 8px 13px;
+    font-size: 0.84rem;
+  }
+}
+
+/* ---------- Step footer under each editor panel ----------
+   The tabs say where you are; this says where to go next. Someone who has just
+   filled in Basics should not have to work out for themselves that Tickets is
+   the next job — the button names it. */
+
+.editor-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.editor-stepper-count {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  font-weight: 600;
+  /* Sits in the middle on a wide screen; on a phone the two buttons take the
+     row and this drops under them rather than squeezing them. */
+  order: 0;
+}
+
+@media (max-width: 520px) {
+  .editor-stepper {
+    justify-content: center;
+  }
+
+  .editor-stepper-count {
+    order: 1;
+    width: 100%;
+    text-align: center;
   }
 }
 

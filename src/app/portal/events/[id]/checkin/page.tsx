@@ -6,10 +6,11 @@ import { organizerPlanActive } from '@/lib/organizers';
 import PlanExpired from '../../../PlanExpired';
 import PortalNav from '../../../PortalNav';
 import { requirePortalOrganizer } from '../../../guard';
+import ScanLinkCard from './ScanLinkCard';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Door check-in — Organizer portal' };
+export const metadata = { title: 'Door check-in — Organizer portal', robots: { index: false, follow: false } };
 
 /**
  * Door check-in for ONE of the organizer's own events, right inside the
@@ -51,12 +52,15 @@ export default async function PortalCheckinPage({ params }: { params: Promise<{ 
           <CheckinClient unauthorizedHref="/portal/login" />
         </div>
 
-        <p className="muted small anim-fade-up anim-d2" style={{ marginTop: 20 }}>
-          For door staff without your login, create a scanner link from the{' '}
-          <Link href={`/portal/events/${event.id}/orders`} style={{ color: 'var(--brand-text)', fontWeight: 600 }}>
-            Orders page
-          </Link>
-          . Or head{' '}
+        {/* Handing the door to someone else is a check-in job, so the links live
+            on the check-in page rather than a tab about money. */}
+        <div className="card anim-fade-up anim-d2" style={{ marginTop: 22 }}>
+          <div className="card-title">Scanner links for door staff</div>
+          <ScanLinkCard eventId={event.id} />
+        </div>
+
+        <p className="muted small anim-fade-up anim-d3" style={{ marginTop: 20 }}>
+          Head{' '}
           <Link href={`/portal/events/${event.id}/edit`} style={{ color: 'var(--brand-text)', fontWeight: 600 }}>
             back to {event.name}
           </Link>

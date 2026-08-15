@@ -65,17 +65,49 @@ export default function EditorTabs({
         ))}
       </div>
 
-      {tabs.map((t) => (
-        <div
-          key={t.key}
-          id={`editor-panel-${t.key}`}
-          role="tabpanel"
-          aria-labelledby={`editor-tab-${t.key}`}
-          className={`editor-panel${active === t.key ? '' : ' is-hidden'}`}
-        >
-          {panels[t.key]}
-        </div>
-      ))}
+      {tabs.map((t, i) => {
+        const prev = tabs[i - 1];
+        const next = tabs[i + 1];
+        return (
+          <div
+            key={t.key}
+            id={`editor-panel-${t.key}`}
+            role="tabpanel"
+            aria-labelledby={`editor-tab-${t.key}`}
+            className={`editor-panel${active === t.key ? '' : ' is-hidden'}`}
+          >
+            {panels[t.key]}
+
+            {/* Where to go once this section is filled in. The next section is
+                named rather than called "Next", so it reads as a plan instead
+                of a mystery — and the count tells someone how much is left,
+                which the tabs alone never did. */}
+            <div className="editor-stepper">
+              {prev ? (
+                <button type="button" className="btn btn-sm" onClick={() => select(prev.key)}>
+                  ← {prev.label}
+                </button>
+              ) : (
+                <span />
+              )}
+              <span className="editor-stepper-count">
+                Step {i + 1} of {tabs.length}
+              </span>
+              {next ? (
+                <button
+                  type="button"
+                  className="btn btn-brand btn-sm"
+                  onClick={() => select(next.key)}
+                >
+                  Next: {next.label} →
+                </button>
+              ) : (
+                <span />
+              )}
+            </div>
+          </div>
+        );
+      })}
     </>
   );
 }

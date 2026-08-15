@@ -41,7 +41,7 @@ const VIDEO_TYPES = ['video/mp4', 'video/webm'];
 // lib/imageVariants VARIANTS). If these ever drift from those, the preview
 // stops being the truth — which is the entire point of it.
 const COVER_ASPECT = 1600 / 740;
-const CARD_ASPECT = 800 / 500;
+const CARD_ASPECT = 800 / 1000;
 
 export default function MediaPanel({
   eventId,
