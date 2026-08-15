@@ -143,6 +143,19 @@ export default function PrivacyPage() {
             </p>
           </div>
 
+          <div className="card anim-fade-up anim-d3">
+            <h2 className="card-title">The microphone button</h2>
+            <p style={{ marginBottom: 0 }}>
+              Wherever you see a mic, using it is entirely your choice — every one of those boxes
+              can be typed into instead, and nothing is recorded until you tap it. When you do, the
+              recording is sent to Google&rsquo;s Gemini service, which turns it into text and sends
+              the text back. That is the only thing the audio is used for: we do not save the
+              recording to disk, we do not keep it in our database, and we do not log it. It exists
+              for the few seconds the request takes and is then gone — only the words you can see
+              and edit remain.
+            </p>
+          </div>
+
           <div className="card glow-card anim-fade-up anim-d3">
             <h2 className="card-title">Ask us anything</h2>
             <p style={{ marginBottom: 0 }}>
