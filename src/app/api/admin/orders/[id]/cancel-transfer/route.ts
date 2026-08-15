@@ -1,14 +1,16 @@
 import { NextResponse } from 'next/server';
-import { isAdminRequest } from '@/lib/auth';
 import { getEventById } from '@/lib/events';
 import { releaseClaim } from '@/lib/inventory';
 import { currentOrganizer } from '@/lib/organizers';
 import { getOrder } from '@/lib/orders';
 import type { ApiErrorResponse } from '@/lib/types';
 
-/** Platform admin, or the organizer who owns the order's event. */
+/**
+ * ONLY the organizer who owns the order's event — the platform owner has no
+ * business putting someone else's seats back on sale, and no longer has the
+ * buyer list that made this reachable in the first place.
+ */
 async function mayManageOrder(orderId: string): Promise<boolean> {
-  if (await isAdminRequest()) return true;
   const organizer = await currentOrganizer();
   if (!organizer) return false;
   const order = getOrder(orderId);
@@ -18,10 +20,9 @@ async function mayManageOrder(orderId: string): Promise<boolean> {
 }
 
 /**
- * The organizer (or platform admin) cancels an awaiting-transfer reservation
- * (buyer changed their mind / will never pay), releasing its seats. Only
- * transfer orders still in 'claimed' can be cancelled — never anything that
- * may involve PayPal money.
+ * The organizer cancels an awaiting-transfer reservation (buyer changed their
+ * mind / will never pay), releasing its seats. Only transfer orders still in
+ * 'claimed' can be cancelled — never anything that may involve PayPal money.
  */
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

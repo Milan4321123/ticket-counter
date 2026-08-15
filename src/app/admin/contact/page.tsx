@@ -8,7 +8,7 @@ import MarkHandledButton from './MarkHandledButton';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Applications & page requests — Admin' };
+export const metadata = { title: 'Applications & page requests — Admin', robots: { index: false, follow: false } };
 
 /** The optional application details, in the order they are asked for. */
 function applicationDetails(r: ContactRequestRow): [string, string][] {

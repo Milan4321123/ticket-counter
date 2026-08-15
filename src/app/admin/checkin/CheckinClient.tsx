@@ -32,8 +32,15 @@ const RESULT_BADGE: Record<CheckinResponse['result'], string> = {
   wrong_event: 'badge-red',
 };
 
+/**
+ * The door scanner. Shows the holder's name on a valid scan, which is exactly
+ * what door staff need and exactly why the PLATFORM OWNER no longer has a
+ * check-in screen: this component is rendered only by the organizer's own
+ * portal page and by /scan, both of which are scoped to a single event. The
+ * folder is historical — there is no /admin/checkin route any more.
+ */
 export default function CheckinClient({
-  unauthorizedHref = '/admin/login',
+  unauthorizedHref = '/portal/login',
 }: {
   /** Where to send the user when the session is no longer valid (401). */
   unauthorizedHref?: string;

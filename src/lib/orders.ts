@@ -25,6 +25,12 @@ export interface OrderRow {
   createdAt: string;
   paidAt: string | null;
   captureId: string | null;
+  /**
+   * When buyerName/buyerEmail were overwritten because the event is long past
+   * (lib/retention.ts). Non-null means the two fields above are placeholders,
+   * not a person — nothing may be emailed to them.
+   */
+  buyerErasedAt: string | null;
 }
 
 /**
@@ -43,6 +49,27 @@ export function paymentReference(orderId: string): string {
     ? getOrderItems(orderId).some((it) => getEventTier(order.eventId, it.tierId)?.studentOnly)
     : false;
   return (hasStudent ? 'TICKETS-S-' : 'TICKETS-') + orderId.slice(0, 8).toUpperCase();
+}
+
+/**
+ * The order a payment reference points at, or null.
+ *
+ * The inverse of paymentReference(): the reference carries the first 8 hex
+ * characters of the order id, so a buyer who quotes their reference identifies
+ * their own order without anyone having to look them up by name. That is what
+ * lets the platform's support backstop work at all now that the owner cannot
+ * see a list of buyers.
+ *
+ * Fails closed: junk, a truncated reference, or the (practically impossible)
+ * case of two ids sharing a prefix all return null rather than a guess.
+ */
+export function getOrderByPaymentReference(reference: string): OrderRow | null {
+  const key = reference.trim().replace(/^TICKETS-(S-)?/i, '').replace(/[^0-9a-fA-F]/g, '');
+  if (key.length !== 8) return null;
+  const rows = getDb()
+    .prepare(`SELECT ${ORDER_COLS} FROM orders WHERE id LIKE ? || '%' LIMIT 2`)
+    .all(key.toLowerCase()) as OrderRow[];
+  return rows.length === 1 ? rows[0] : null;
 }
 
 export interface OrderItemRow {
@@ -72,7 +99,8 @@ const ORDER_COLS = `
   payment_mode AS paymentMode,
   created_at AS createdAt,
   paid_at AS paidAt,
-  capture_id AS captureId
+  capture_id AS captureId,
+  buyer_erased_at AS buyerErasedAt
 `;
 
 const TICKET_COLS = `
@@ -500,6 +528,98 @@ export function getStats(eventId?: string): Stats {
 /** Per-event stats (same shape as getStats — the event scoping made explicit). */
 export function getEventStats(eventId: string): Stats {
   return getStats(eventId);
+}
+
+/**
+ * One event's sales, counted rather than listed.
+ *
+ * Every field here is an aggregate ON PURPOSE: this is what the PLATFORM owner
+ * is allowed to see about an event he does not run. He needs to know the
+ * business is working — how many sold, how much money moved, how many walked
+ * through the door — and none of that requires knowing who bought. The buyers
+ * themselves belong to the organizer, who sees them in their own portal.
+ */
+export interface EventSalesSummary {
+  ordersPaid: number;
+  ticketsSold: number;
+  revenueCents: number;
+  checkedIn: number;
+  awaitingOrders: number;
+  awaitingCents: number;
+}
+
+const EMPTY_SALES_SUMMARY: EventSalesSummary = {
+  ordersPaid: 0,
+  ticketsSold: 0,
+  revenueCents: 0,
+  checkedIn: 0,
+  awaitingOrders: 0,
+  awaitingCents: 0,
+};
+
+/**
+ * Sales totals for every event on the platform, keyed by event id — two
+ * grouped queries rather than one per event, so the admin overview stays a
+ * couple of statements however many events exist. Counting rules match
+ * getStats(): revenue is real money only, ticketsSold counts every paid seat
+ * (test-mode ones hold capacity until purged).
+ *
+ * Events with no orders are simply absent; read through summaryFor().
+ */
+export function listEventSalesSummaries(): Map<string, EventSalesSummary> {
+  const db = getDb();
+  const byEvent = new Map<string, EventSalesSummary>();
+  const entry = (eventId: string): EventSalesSummary => {
+    let row = byEvent.get(eventId);
+    if (!row) {
+      row = { ...EMPTY_SALES_SUMMARY };
+      byEvent.set(eventId, row);
+    }
+    return row;
+  };
+
+  const orderRows = db
+    .prepare(
+      `SELECT event_id AS eventId,
+              COALESCE(SUM(CASE WHEN status = 'paid' AND payment_mode != 'mock' THEN 1 ELSE 0 END), 0) AS ordersPaid,
+              COALESCE(SUM(CASE WHEN status = 'paid' AND payment_mode != 'mock' THEN total_cents ELSE 0 END), 0) AS revenueCents,
+              COALESCE(SUM(CASE WHEN ${FILTER_SQL.awaiting} THEN 1 ELSE 0 END), 0) AS awaitingOrders,
+              COALESCE(SUM(CASE WHEN ${FILTER_SQL.awaiting} THEN total_cents ELSE 0 END), 0) AS awaitingCents
+       FROM orders WHERE event_id IS NOT NULL GROUP BY event_id`
+    )
+    .all() as { eventId: string; ordersPaid: number; revenueCents: number; awaitingOrders: number; awaitingCents: number }[];
+  for (const r of orderRows) {
+    const row = entry(r.eventId);
+    row.ordersPaid = r.ordersPaid;
+    row.revenueCents = r.revenueCents;
+    row.awaitingOrders = r.awaitingOrders;
+    row.awaitingCents = r.awaitingCents;
+  }
+
+  const ticketRows = db
+    .prepare(
+      `SELECT o.event_id AS eventId,
+              COALESCE(SUM(CASE WHEN o.status = 'paid' THEN 1 ELSE 0 END), 0) AS ticketsSold,
+              COALESCE(SUM(CASE WHEN t.checked_in_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS checkedIn
+       FROM tickets t JOIN orders o ON o.id = t.order_id
+       WHERE o.event_id IS NOT NULL GROUP BY o.event_id`
+    )
+    .all() as { eventId: string; ticketsSold: number; checkedIn: number }[];
+  for (const r of ticketRows) {
+    const row = entry(r.eventId);
+    row.ticketsSold = r.ticketsSold;
+    row.checkedIn = r.checkedIn;
+  }
+
+  return byEvent;
+}
+
+/** An event's totals, or an all-zero summary when it has never sold anything. */
+export function summaryFor(
+  summaries: Map<string, EventSalesSummary>,
+  eventId: string
+): EventSalesSummary {
+  return summaries.get(eventId) ?? EMPTY_SALES_SUMMARY;
 }
 
 // ---------------- Operational recovery ----------------

@@ -240,15 +240,8 @@ export function scanTokenRemainingSeconds(token: string): number {
   return Math.max(60, Math.floor((exp - Date.now()) / 1000));
 }
 
-/**
- * Who may use the check-in API on this request: the platform admin (any
- * event), an event-scoped scanner cookie, or nobody. Organizer sessions are
- * handled separately by the check-in route (ownership must be checked against
- * the ticket's event).
- */
-export async function isScanRequest(): Promise<{ kind: 'admin' } | { kind: 'scan'; eventId: string } | null> {
-  if (await isAdminRequest()) return { kind: 'admin' };
-  const store = await cookies();
-  const scan = verifyScanToken(store.get(SCAN_COOKIE_NAME)?.value ?? null);
-  return scan ? { kind: 'scan', eventId: scan.eventId } : null;
-}
+// There is deliberately no "the platform admin may check in any ticket" helper
+// here any more. Check-in names the ticket holder, so a platform-wide scanning
+// authority was a platform-wide read of every organizer's buyers. The check-in
+// route now accepts exactly two event-scoped credentials — the organizer's own
+// session and a scanner cookie — and verifies the scan cookie itself.

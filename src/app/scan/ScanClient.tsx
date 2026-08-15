@@ -55,7 +55,7 @@ export default function ScanClient({ eventName }: { eventName: string | null }) 
           return;
         }
         // No key in the URL: probe the check-in API once to see whether a
-        // scanner cookie or admin session is already in place (401 = no).
+        // scanner cookie is already in place (401 = no).
         const probe = await fetch('/api/admin/checkin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

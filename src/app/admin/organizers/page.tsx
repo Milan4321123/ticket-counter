@@ -12,7 +12,7 @@ import OrganizerActions from './OrganizerActions';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Organizers — Admin' };
+export const metadata = { title: 'Organizers — Admin', robots: { index: false, follow: false } };
 
 export default async function AdminOrganizersPage() {
   if (!(await isAdminRequest())) redirect('/admin/login');

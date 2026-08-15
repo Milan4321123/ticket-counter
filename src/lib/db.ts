@@ -68,6 +68,24 @@ CREATE TABLE IF NOT EXISTS organizers (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Self-service "I forgot my password" codes for ORGANIZERS. Deliberately NOT
+-- admin_otp: that single row is the platform owner's own login, and the two
+-- must never share a table, a lifetime, or an attempt counter.
+--
+-- The code is stored hashed (never in the clear), expires within minutes, is
+-- single-use via used_at, and dies with the account: ON DELETE CASCADE means a
+-- deleted organizer cannot leave a working code behind.
+CREATE TABLE IF NOT EXISTS organizer_password_reset (
+  id TEXT PRIMARY KEY,
+  organizer_id TEXT NOT NULL REFERENCES organizers(id) ON DELETE CASCADE,
+  code_hash TEXT NOT NULL,
+  expires_at INTEGER NOT NULL, -- unix ms
+  attempts INTEGER NOT NULL DEFAULT 0,
+  used_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_organizer_password_reset_org ON organizer_password_reset(organizer_id);
+
 CREATE TABLE IF NOT EXISTS events (
   id TEXT PRIMARY KEY,
   organizer_id TEXT NOT NULL REFERENCES organizers(id),
@@ -322,6 +340,17 @@ function migrateToPlatform(db: Database.Database): void {
   if (!orderCols.includes('buyer_reminder_sent_at')) {
     db.exec(`ALTER TABLE orders ADD COLUMN buyer_reminder_sent_at TEXT`);
   }
+  // When this order's buyer_name/buyer_email were overwritten because the event
+  // is long past (see lib/retention.ts). NULL means "still identifiable" — it
+  // is the stamp that makes the erasure sweep idempotent, and the partial index
+  // keeps that sweep off a full table scan once most orders are erased.
+  if (!orderCols.includes('buyer_erased_at')) {
+    db.exec(`ALTER TABLE orders ADD COLUMN buyer_erased_at TEXT`);
+  }
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_orders_pending_erasure
+     ON orders(event_id) WHERE buyer_erased_at IS NULL`
+  );
 
   // An organizer-account application has to carry enough for the owner to judge
   // it without a round of emails first. Every field is optional and free text —

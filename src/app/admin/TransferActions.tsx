@@ -23,9 +23,15 @@ type Done = 'paid' | 'cancelled' | null;
 
 /**
  * Actions for one awaiting-bank-transfer reservation. Marking an order paid
- * is a deliberate two-step confirm: the admin must type the last 4 characters
- * of the payment reference as read off the bank statement, so a stray click
- * can never issue tickets.
+ * is a deliberate two-step confirm: the organizer must type the last 4
+ * characters of the payment reference as read off the bank statement, so a
+ * stray click can never issue tickets.
+ *
+ * ORGANIZER-ONLY, despite the folder. It lives under /app/admin because that is
+ * where it was written, and the organizer portal imports it from here — but no
+ * admin page renders it any more, and the routes it calls now accept only the
+ * organizer who owns the event. The platform owner cannot confirm a transfer he
+ * has no way of seeing arrive: the money goes to the organizer's bank account.
  */
 export default function TransferActions({
   orderId,

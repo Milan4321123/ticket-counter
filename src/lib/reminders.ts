@@ -175,6 +175,10 @@ export async function runTransferReminderSweep(force = false): Promise<{ emailed
  * hasn't. Stamped in buyer_reminder_sent_at so it can never send twice, and it
  * naturally stops once the organizer confirms the payment or the reservation
  * expires (both leave the 'claimed' state).
+ *
+ * Orders whose buyer details were erased after the event (lib/retention.ts) are
+ * skipped: there is no longer an address to write to, and a long-past event has
+ * nothing left to remind anyone about.
  */
 async function sweepBuyerReminders(): Promise<number> {
   const db = getDb();
@@ -186,6 +190,7 @@ async function sweepBuyerReminders(): Promise<number> {
        WHERE o.status = 'claimed'
          AND o.payment_mode = 'transfer'
          AND o.buyer_reminder_sent_at IS NULL
+         AND o.buyer_erased_at IS NULL
          AND o.created_at < datetime('now', ?)
        ORDER BY o.created_at ASC
        LIMIT 100`
