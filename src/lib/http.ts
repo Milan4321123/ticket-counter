@@ -12,9 +12,12 @@ export class BodyTooLargeError extends Error {
  * Read and JSON-parse a request body, refusing anything over `maxBytes`
  * (default 16 KB — every request this app accepts is tiny). Next.js App Router
  * does NOT cap body size by default, so without this a single malicious
- * multi-megabyte POST could pin memory/CPU during a flood. We check the
- * Content-Length header first (cheap rejection) and also cap the actual bytes
- * read in case the header lies.
+ * multi-megabyte POST could pin memory/CPU during a flood.
+ *
+ * The Content-Length header is only a cheap early rejection — it can lie or
+ * be absent entirely (chunked bodies), so the real limit is enforced on the
+ * bytes AS THEY STREAM IN: the read is aborted the moment the running total
+ * exceeds `maxBytes`, never buffering the whole body first.
  *
  * Throws BodyTooLargeError when oversized, or SyntaxError on invalid JSON —
  * callers already catch parse failures and treat them as a bad request.
@@ -25,13 +28,35 @@ export async function readJsonLimited(req: Request, maxBytes = 16 * 1024): Promi
     throw new BodyTooLargeError();
   }
 
-  const buf = await req.arrayBuffer();
-  if (buf.byteLength > maxBytes) {
-    throw new BodyTooLargeError();
-  }
-  if (buf.byteLength === 0) {
+  if (!req.body) {
     // Mirror req.json()'s behaviour on an empty body: invalid JSON.
     throw new SyntaxError('Unexpected end of JSON input');
+  }
+
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {});
+      throw new BodyTooLargeError();
+    }
+    chunks.push(value);
+  }
+
+  if (total === 0) {
+    // Mirror req.json()'s behaviour on an empty body: invalid JSON.
+    throw new SyntaxError('Unexpected end of JSON input');
+  }
+  const buf = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    buf.set(chunk, offset);
+    offset += chunk.byteLength;
   }
   return JSON.parse(new TextDecoder().decode(buf));
 }

@@ -1,12 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getEventConfig, getTier, getPaymentMode, hasPaypalCredentials, isTransferConfigured } from '@/lib/config';
-import { claimInventory, getAvailability, SoldOutError } from '@/lib/inventory';
-import {
-  createOrder,
-  expireOverdueTransferReservations,
-  markOrderFailed,
-  setPaypalOrderId,
-} from '@/lib/orders';
+import { getPaymentMode, hasPaypalCredentials } from '@/lib/config';
+import { getEventById, getEventTier, type EventRow } from '@/lib/events';
+import { getAvailability, SoldOutError } from '@/lib/inventory';
+import { createOrder, expireOverdueTransferReservations, markOrderFailed, setPaypalOrderId } from '@/lib/orders';
 import { createPaypalOrder } from '@/lib/paypal';
 import { sendTransferInstructionsEmail } from '@/lib/email';
 import { clientIp, rateLimit } from '@/lib/ratelimit';
@@ -26,9 +22,10 @@ interface ValidatedOrder {
   totalQuantity: number;
 }
 
-function validateBody(raw: unknown, maxTicketsPerOrder: number): ValidatedOrder | string {
+function validateBody(raw: unknown, event: EventRow): ValidatedOrder | string {
   if (!raw || typeof raw !== 'object') return 'Please fill in your details and try again.';
   const body = raw as Partial<CreateOrderRequest>;
+  const maxTicketsPerOrder = event.maxPerOrder;
 
   // Strip control characters (newlines, tabs, NUL, etc.) and collapse runs of
   // whitespace so the name is always single-line wherever it is later rendered
@@ -58,7 +55,7 @@ function validateBody(raw: unknown, maxTicketsPerOrder: number): ValidatedOrder 
     if (!it || typeof it !== 'object' || typeof it.tierId !== 'string') {
       return 'Please select at least one ticket.';
     }
-    const tier = getTier(it.tierId);
+    const tier = getEventTier(event.id, it.tierId);
     if (!tier) return 'One of the selected ticket types is not available.';
     if (seenTiers.has(it.tierId)) return 'Each ticket type can only appear once in an order.';
     seenTiers.add(it.tierId);
@@ -84,8 +81,6 @@ export async function POST(req: Request) {
       return apiError(429, 'INTERNAL', 'Too many attempts — please wait a minute and try again.');
     }
 
-    const config = getEventConfig();
-
     let raw: unknown;
     try {
       raw = await readJsonLimited(req);
@@ -96,29 +91,39 @@ export async function POST(req: Request) {
       return apiError(400, 'VALIDATION', 'Please fill in your details and try again.');
     }
 
-    const validated = validateBody(raw, config.maxTicketsPerOrder);
+    // Which event is being bought? Only published events with open sales sell.
+    const eventId =
+      raw && typeof raw === 'object' && typeof (raw as Partial<CreateOrderRequest>).eventId === 'string'
+        ? (raw as CreateOrderRequest).eventId
+        : '';
+    const event = eventId ? getEventById(eventId) : null;
+    if (!event || event.status !== 'published') {
+      return apiError(404, 'NOT_FOUND', 'We could not find that event — it may no longer be available.');
+    }
+    if (!event.salesOpen) {
+      return apiError(403, 'SALES_CLOSED', 'Ticket sales are currently closed for this event.');
+    }
+
+    const validated = validateBody(raw, event);
     if (typeof validated === 'string') {
       return apiError(400, 'VALIDATION', validated);
     }
 
-    if (!config.salesOpen) {
-      return apiError(403, 'SALES_CLOSED', 'Ticket sales are currently closed.');
-    }
-
     // Global backstop against distributed/spoofed-IP floods. 300 valid order
-    // creations per minute is far above any human peak for a 600-seat event.
+    // creations per minute is far above any human peak.
     if (!rateLimit('orders:all', 300, 60_000)) {
       return apiError(429, 'INTERNAL', 'The site is very busy right now — please try again in a minute.');
     }
 
-    // Free any seats held by transfer reservations whose payment never came.
-    expireOverdueTransferReservations();
+    // Free any seats held by this event's transfer reservations whose payment
+    // never came.
+    expireOverdueTransferReservations(event.id);
 
-    // Soft availability check (the hard, atomic check happens at capture time).
-    const avail = getAvailability();
+    // Soft availability check (the hard, atomic check happens at claim time).
+    const avail = getAvailability(event.id);
     for (const it of validated.items) {
       const tierAvail = avail.tiers[it.tierId];
-      const tierName = getTier(it.tierId)?.name ?? it.tierId;
+      const tierName = getEventTier(event.id, it.tierId)?.name ?? it.tierId;
       if (!tierAvail || tierAvail.remaining < it.quantity) {
         const remaining = tierAvail?.remaining ?? 0;
         const msg =
@@ -140,31 +145,32 @@ export async function POST(req: Request) {
     if (mode === 'paypal' && !hasPaypalCredentials()) {
       return apiError(500, 'INTERNAL', 'Payment is not configured yet — please try again later or contact the organizer.');
     }
-    if (mode === 'transfer' && !isTransferConfigured()) {
+    // Bank details live on the EVENT: buyers transfer straight to the organizer.
+    if (mode === 'transfer' && (!event.bankIban.trim() || !event.bankAccountHolder.trim())) {
       return apiError(500, 'INTERNAL', 'Payment is not configured yet — please try again later or contact the organizer.');
     }
 
-    const order = createOrder({
-      buyerName: validated.buyerName,
-      buyerEmail: validated.buyerEmail,
-      items: validated.items,
-      currency: config.currency,
-      paymentMode: mode,
-    });
+    // For transfer orders createOrder also reserves the seats immediately —
+    // the buyer's bank transfer takes days, and the reservation must hold
+    // until the organizer confirms the money (or it expires via
+    // expireOverdueTransferReservations).
+    let order;
+    try {
+      order = createOrder({
+        eventId: event.id,
+        buyerName: validated.buyerName,
+        buyerEmail: validated.buyerEmail,
+        items: validated.items,
+        paymentMode: mode,
+      });
+    } catch (e) {
+      if (e instanceof SoldOutError) {
+        return apiError(409, 'SOLD_OUT', 'Those tickets were taken just before you — please adjust your order.');
+      }
+      throw e;
+    }
 
     if (mode === 'transfer') {
-      // Reserve the seats NOW — the buyer's bank transfer takes days, and the
-      // reservation must hold until the organizer confirms the money (or it
-      // expires via expireOverdueTransferReservations).
-      try {
-        claimInventory(order.id);
-      } catch (e) {
-        if (e instanceof SoldOutError) {
-          markOrderFailed(order.id, 'cancelled');
-          return apiError(409, 'SOLD_OUT', 'Those tickets were taken just before you — please adjust your order.');
-        }
-        throw e;
-      }
       // Fire-and-forget: NEVER block the reservation response on SMTP. The seats
       // are already claimed above and the order page shows the same bank details,
       // so the buyer must not wait for (or be failed by) a slow email server.
@@ -182,7 +188,7 @@ export async function POST(req: Request) {
           totalCents: order.totalCents,
           currency: order.currency,
           referenceId: order.id,
-          description: config.eventName,
+          description: event.name,
         });
         setPaypalOrderId(order.id, paypalOrderId);
       } catch (e) {

@@ -9,6 +9,11 @@ interface ScanLink {
   qrDataUrl: string;
 }
 
+export interface ScanLinkEventOption {
+  id: string;
+  name: string;
+}
+
 const PRESETS = [
   { hours: 12, label: '12 hours' },
   { hours: 24, label: '24 hours' },
@@ -21,14 +26,15 @@ function validityLabel(hours: number): string {
 }
 
 /** Create / revoke time-limited door-scanner links (no admin password needed at the door). */
-export default function ScanLinkPanel() {
+export default function ScanLinkPanel({ events }: { events: ScanLinkEventOption[] }) {
   const [busy, setBusy] = useState<number | 'revoke' | null>(null);
+  const [eventId, setEventId] = useState('');
   const [link, setLink] = useState<ScanLink | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   async function createLink(hours: number) {
-    if (busy !== null) return;
+    if (busy !== null || !eventId) return;
     setBusy(hours);
     setError(null);
     setNotice(null);
@@ -36,7 +42,7 @@ export default function ScanLinkPanel() {
       const res = await fetch('/api/admin/scan-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hours }),
+        body: JSON.stringify({ eventId, hours }),
       });
       const data = (await res.json().catch(() => null)) as
         | { url?: string; hours?: number; qrDataUrl?: string; error?: string }
@@ -85,21 +91,42 @@ export default function ScanLinkPanel() {
     <div>
       <p className="muted small" style={{ marginTop: 0 }}>
         Door staff scan tickets at the entrance without the admin password: create a time-limited scanner link and
-        share it with them. Anyone who opens it can check tickets in — and nothing else. Links switch off by
-        themselves when the time is up.
+        share it with them. Anyone who opens it can check tickets in for that one event — and nothing else. Links
+        switch off by themselves when the time is up.
       </p>
 
       {notice && <div className="notice notice-success">{notice}</div>}
       {error && <div className="notice notice-error">{error}</div>}
 
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <label className="muted small" htmlFor="scan-link-event">
+          Event
+        </label>
+        <select
+          id="scan-link-event"
+          className="input"
+          style={{ maxWidth: 320 }}
+          value={eventId}
+          onChange={(e) => setEventId(e.target.value)}
+          disabled={busy !== null}
+        >
+          <option value="">Choose an event…</option>
+          {events.map((ev) => (
+            <option key={ev.id} value={ev.id}>
+              {ev.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
         {PRESETS.map((p) => (
           <button
             key={p.hours}
             type="button"
             className="btn btn-sm"
             onClick={() => void createLink(p.hours)}
-            disabled={busy !== null}
+            disabled={busy !== null || !eventId}
           >
             {busy === p.hours ? 'Creating…' : `New link · valid ${p.label}`}
           </button>

@@ -1,7 +1,10 @@
-// Server-only: order + ticket persistence and lifecycle.
+// Server-only: order + ticket persistence and lifecycle. Every order belongs
+// to ONE event (orders.event_id); prices and tier names always come from that
+// event's rows in event_tiers — never from the browser.
 import crypto from 'crypto';
 import { getDb } from './db';
-import { getEventConfig, getPaymentMode, getTier } from './config';
+import { getPaymentMode } from './config';
+import { getEventById, getEventTier, getEventTiers } from './events';
 import { claimInventory } from './inventory';
 import { generateTicketCode, normalizeTicketCode } from './tickets';
 import type { CheckinResponse } from './types';
@@ -11,6 +14,7 @@ export type PaymentMethod = 'paypal' | 'mock' | 'transfer';
 
 export interface OrderRow {
   id: string;
+  eventId: string;
   paypalOrderId: string | null;
   status: OrderStatus;
   buyerName: string;
@@ -30,10 +34,14 @@ export interface OrderRow {
  *
  * Orders containing any student ticket get an "S-" marker (TICKETS-S-XXXXXXXX
  * instead of TICKETS-XXXXXXXX) so student sales are recognizable directly on
- * the bank statement and in the admin panel.
+ * the bank statement and in the admin panel. Whether a tier is student-only
+ * comes from the ORDER'S EVENT (event_tiers).
  */
 export function paymentReference(orderId: string): string {
-  const hasStudent = getOrderItems(orderId).some((it) => getTier(it.tierId)?.studentOnly);
+  const order = getOrder(orderId);
+  const hasStudent = order
+    ? getOrderItems(orderId).some((it) => getEventTier(order.eventId, it.tierId)?.studentOnly)
+    : false;
   return (hasStudent ? 'TICKETS-S-' : 'TICKETS-') + orderId.slice(0, 8).toUpperCase();
 }
 
@@ -54,6 +62,7 @@ export interface TicketRow {
 
 const ORDER_COLS = `
   id,
+  event_id AS eventId,
   paypal_order_id AS paypalOrderId,
   status,
   buyer_name AS buyerName,
@@ -75,21 +84,31 @@ const TICKET_COLS = `
 `;
 
 /**
- * Create a local 'pending' order. Prices are ALWAYS looked up from the server
- * config here — never trust amounts sent by the browser.
+ * Create a local order for an event. Prices are ALWAYS looked up from the
+ * event's tiers here — never trust amounts sent by the browser. The currency
+ * is the event's currency.
+ *
+ * Bank-transfer orders reserve their seats IMMEDIATELY (created 'pending',
+ * then claimed in the same call): the buyer's transfer takes days and the
+ * seats must hold until the organizer confirms the money or the reservation
+ * expires. If the claim fails the order is cancelled and SoldOutError
+ * propagates — the caller can tell the buyer nothing was reserved.
  */
 export function createOrder(params: {
+  eventId: string;
   buyerName: string;
   buyerEmail: string;
   items: { tierId: string; quantity: number }[];
-  currency: string;
   paymentMode: PaymentMethod;
 }): OrderRow {
   const db = getDb();
   const id = crypto.randomUUID();
 
+  const event = getEventById(params.eventId);
+  if (!event) throw new Error('Unknown event');
+
   const resolved = params.items.map((it) => {
-    const tier = getTier(it.tierId);
+    const tier = getEventTier(event.id, it.tierId);
     if (!tier) throw new Error(`Unknown ticket type: ${it.tierId}`);
     if (!Number.isInteger(it.quantity) || it.quantity < 1) {
       throw new Error(`Invalid quantity for ${it.tierId}`);
@@ -100,15 +119,24 @@ export function createOrder(params: {
 
   const tx = db.transaction(() => {
     db.prepare(
-      `INSERT INTO orders (id, status, buyer_name, buyer_email, total_cents, currency, payment_mode)
-       VALUES (?, 'pending', ?, ?, ?, ?, ?)`
-    ).run(id, params.buyerName, params.buyerEmail, totalCents, params.currency, params.paymentMode);
+      `INSERT INTO orders (id, event_id, status, buyer_name, buyer_email, total_cents, currency, payment_mode)
+       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?)`
+    ).run(id, event.id, params.buyerName, params.buyerEmail, totalCents, event.currency, params.paymentMode);
     const ins = db.prepare(
       `INSERT INTO order_items (order_id, tier_id, quantity, unit_price_cents) VALUES (?, ?, ?, ?)`
     );
     for (const it of resolved) ins.run(id, it.tierId, it.quantity, it.unitPriceCents);
   });
   tx();
+
+  if (params.paymentMode === 'transfer') {
+    try {
+      claimInventory(id); // pending -> claimed, or throws SoldOutError
+    } catch (e) {
+      markOrderFailed(id, 'cancelled');
+      throw e;
+    }
+  }
 
   return getOrder(id)!;
 }
@@ -187,6 +215,7 @@ export function finalizePaidOrder(orderId: string, captureId: string | null): Ti
 }
 
 export interface TicketWithOrder extends TicketRow {
+  eventId: string;
   orderStatus: OrderStatus;
   buyerName: string;
   buyerEmail: string;
@@ -198,7 +227,7 @@ export function getTicketByCode(rawCode: string): TicketWithOrder | null {
   const row = getDb()
     .prepare(
       `SELECT t.code, t.order_id AS orderId, t.tier_id AS tierId, t.created_at AS createdAt,
-              t.checked_in_at AS checkedInAt, o.status AS orderStatus,
+              t.checked_in_at AS checkedInAt, o.event_id AS eventId, o.status AS orderStatus,
               o.buyer_name AS buyerName, o.buyer_email AS buyerEmail,
               o.payment_mode AS paymentMode
        FROM tickets t JOIN orders o ON o.id = t.order_id
@@ -208,13 +237,23 @@ export function getTicketByCode(rawCode: string): TicketWithOrder | null {
   return row ?? null;
 }
 
-/** Atomic door check-in: each ticket can be used exactly once. */
-export function checkInTicket(rawCode: string): CheckinResponse {
+/**
+ * Atomic door check-in: each ticket can be used exactly once.
+ *
+ * When `scope.eventId` is set (event-scoped scanner links), a valid ticket
+ * that belongs to a DIFFERENT event is refused with 'wrong_event' — and no
+ * ticket details are returned, so one event's door staff never see another
+ * event's buyer data.
+ */
+export function checkInTicket(rawCode: string, scope?: { eventId?: string }): CheckinResponse {
   const db = getDb();
   const tx = db.transaction((): CheckinResponse => {
     const row = getTicketByCode(rawCode);
     if (!row) return { result: 'not_found' };
-    const tier = getTier(row.tierId);
+    if (scope?.eventId && row.eventId !== scope.eventId) {
+      return { result: 'wrong_event' };
+    }
+    const tier = getEventTier(row.eventId, row.tierId);
     const ticket = {
       code: row.code,
       tierId: row.tierId,
@@ -235,7 +274,7 @@ export function checkInTicket(rawCode: string): CheckinResponse {
   return tx();
 }
 
-// ---------------- Admin queries ----------------
+// ---------------- Admin/portal queries ----------------
 
 export interface OrderListRow extends OrderRow {
   itemsSummary: string; // e.g. "2× General Admission, 1× Student"
@@ -246,14 +285,14 @@ function withItemsSummary(rows: OrderRow[]): OrderListRow[] {
   return rows.map((o) => {
     const items = getOrderItems(o.id);
     const itemsSummary = items
-      .map((it) => `${it.quantity}× ${getTier(it.tierId)?.name ?? it.tierId}`)
+      .map((it) => `${it.quantity}× ${getEventTier(o.eventId, it.tierId)?.name ?? it.tierId}`)
       .join(', ');
     const ticketCount = items.reduce((s, it) => s + it.quantity, 0);
     return { ...o, itemsSummary, ticketCount };
   });
 }
 
-/** Admin-facing order filter buckets (the chips on /admin/orders). */
+/** Admin/portal order filter buckets (the chips on the orders pages). */
 export type OrderFilter = 'all' | 'awaiting' | 'paid' | 'closed';
 
 const FILTER_SQL: Record<Exclude<OrderFilter, 'all'>, string> = {
@@ -263,14 +302,22 @@ const FILTER_SQL: Record<Exclude<OrderFilter, 'all'>, string> = {
 };
 
 export function listOrders(
-  opts: { query?: string; limit?: number; filter?: OrderFilter } = {}
+  opts: { eventId?: string; organizerId?: string; query?: string; limit?: number; filter?: OrderFilter } = {}
 ): OrderListRow[] {
   const db = getDb();
   const limit = Math.min(opts.limit ?? 200, 1000);
   const conditions: string[] = [];
   const args: (string | number)[] = [];
+  if (opts.eventId) {
+    conditions.push(`event_id = ?`);
+    args.push(opts.eventId);
+  }
+  if (opts.organizerId) {
+    conditions.push(`event_id IN (SELECT id FROM events WHERE organizer_id = ?)`);
+    args.push(opts.organizerId);
+  }
   if (opts.query && opts.query.trim()) {
-    // Let admins paste a bank-transfer reference ("TICKETS-AB12CD34" or the
+    // Let organizers paste a bank-transfer reference ("TICKETS-AB12CD34" or the
     // student form "TICKETS-S-AB12CD34") as-is — the hex part matches the
     // order id (LIKE is case-insensitive for ASCII).
     const q = `%${opts.query.trim().replace(/^TICKETS-(S-)?/i, '')}%`;
@@ -287,16 +334,28 @@ export function listOrders(
   return withItemsSummary(rows);
 }
 
-/** How many orders fall in each admin filter bucket (for the chip labels). */
-export function countOrdersByFilter(query?: string): Record<OrderFilter, number> {
+/** How many orders fall in each filter bucket (for the chip labels). */
+export function countOrdersByFilter(
+  query?: string,
+  scope: { eventId?: string; organizerId?: string } = {}
+): Record<OrderFilter, number> {
   const db = getDb();
-  let where = '';
+  const conditions: string[] = [];
   const args: string[] = [];
+  if (scope.eventId) {
+    conditions.push(`event_id = ?`);
+    args.push(scope.eventId);
+  }
+  if (scope.organizerId) {
+    conditions.push(`event_id IN (SELECT id FROM events WHERE organizer_id = ?)`);
+    args.push(scope.organizerId);
+  }
   if (query && query.trim()) {
     const q = `%${query.trim().replace(/^TICKETS-(S-)?/i, '')}%`;
-    where = `WHERE (buyer_name LIKE ? OR buyer_email LIKE ? OR id LIKE ?)`;
+    conditions.push(`(buyer_name LIKE ? OR buyer_email LIKE ? OR id LIKE ?)`);
     args.push(q, q, q);
   }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   const row = db
     .prepare(
       `SELECT COUNT(*) AS all_n,
@@ -323,6 +382,7 @@ export interface Stats {
   /** Money CONFIRMED received (real payments only — test-mode excluded). */
   revenueCents: number;
   checkedIn: number;
+  /** Per-tier breakdown. Only meaningful for a single event ([] platform-wide). */
   perTier: TierStats[];
   /** Reservations whose bank transfer is still on its way. */
   awaitingTransferOrders: number;
@@ -334,72 +394,92 @@ export interface Stats {
   mockRevenueCents: number;
 }
 
-export function getStats(): Stats {
+/**
+ * Sales stats for one event (pass its id) or the whole platform (omit it).
+ * Platform-wide numbers sum across events; perTier is [] there because tier
+ * keys are only unique within an event.
+ */
+export function getStats(eventId?: string): Stats {
   const db = getDb();
+  const scope = eventId ? `AND event_id = ?` : '';
+  const scopeArgs: string[] = eventId ? [eventId] : [];
+  const ticketScope = eventId ? `AND o.event_id = ?` : '';
+
   const paid = db
     .prepare(
       `SELECT COUNT(*) AS n, COALESCE(SUM(total_cents), 0) AS revenue
-       FROM orders WHERE status = 'paid' AND payment_mode != 'mock'`
+       FROM orders WHERE status = 'paid' AND payment_mode != 'mock' ${scope}`
     )
-    .get() as { n: number; revenue: number };
+    .get(...scopeArgs) as { n: number; revenue: number };
   const mock = db
     .prepare(
       `SELECT COUNT(*) AS n, COALESCE(SUM(total_cents), 0) AS revenue
-       FROM orders WHERE status = 'paid' AND payment_mode = 'mock'`
+       FROM orders WHERE status = 'paid' AND payment_mode = 'mock' ${scope}`
     )
-    .get() as { n: number; revenue: number };
+    .get(...scopeArgs) as { n: number; revenue: number };
   const mockTickets = (
     db
       .prepare(
         `SELECT COUNT(*) AS n FROM tickets t JOIN orders o ON o.id = t.order_id
-         WHERE o.status = 'paid' AND o.payment_mode = 'mock'`
+         WHERE o.status = 'paid' AND o.payment_mode = 'mock' ${ticketScope}`
       )
-      .get() as { n: number }
+      .get(...scopeArgs) as { n: number }
   ).n;
   const ticketsSold = (
-    db.prepare(`SELECT COUNT(*) AS n FROM tickets t JOIN orders o ON o.id = t.order_id WHERE o.status = 'paid'`).get() as {
-      n: number;
-    }
+    db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM tickets t JOIN orders o ON o.id = t.order_id
+         WHERE o.status = 'paid' ${ticketScope}`
+      )
+      .get(...scopeArgs) as { n: number }
   ).n;
   const checkedIn = (
-    db.prepare(`SELECT COUNT(*) AS n FROM tickets WHERE checked_in_at IS NOT NULL`).get() as { n: number }
+    db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM tickets t JOIN orders o ON o.id = t.order_id
+         WHERE t.checked_in_at IS NOT NULL ${ticketScope}`
+      )
+      .get(...scopeArgs) as { n: number }
   ).n;
+
   // Per tier: 'sold' counts every paid seat (mock included — they hold
   // capacity until purged); revenue counts REAL money only, matching the
-  // dashboard's headline revenue.
-  const perTierRows = db
-    .prepare(
-      `SELECT oi.tier_id AS tierId, COALESCE(SUM(oi.quantity), 0) AS sold,
-              COALESCE(SUM(CASE WHEN o.payment_mode != 'mock' THEN oi.quantity * oi.unit_price_cents ELSE 0 END), 0) AS revenueCents
-       FROM order_items oi JOIN orders o ON o.id = oi.order_id
-       WHERE o.status = 'paid'
-       GROUP BY oi.tier_id`
-    )
-    .all() as { tierId: string; sold: number; revenueCents: number }[];
-  const soldMap = new Map(perTierRows.map((r) => [r.tierId, r]));
-
-  const perTier: TierStats[] = getEventConfig().tiers.map((t) => ({
-    tierId: t.id,
-    name: t.name,
-    sold: soldMap.get(t.id)?.sold ?? 0,
-    cap: t.cap,
-    revenueCents: soldMap.get(t.id)?.revenueCents ?? 0,
-  }));
+  // headline revenue.
+  let perTier: TierStats[] = [];
+  if (eventId) {
+    const perTierRows = db
+      .prepare(
+        `SELECT oi.tier_id AS tierId, COALESCE(SUM(oi.quantity), 0) AS sold,
+                COALESCE(SUM(CASE WHEN o.payment_mode != 'mock' THEN oi.quantity * oi.unit_price_cents ELSE 0 END), 0) AS revenueCents
+         FROM order_items oi JOIN orders o ON o.id = oi.order_id
+         WHERE o.status = 'paid' AND o.event_id = ?
+         GROUP BY oi.tier_id`
+      )
+      .all(eventId) as { tierId: string; sold: number; revenueCents: number }[];
+    const soldMap = new Map(perTierRows.map((r) => [r.tierId, r]));
+    perTier = getEventTiers(eventId).map((t) => ({
+      tierId: t.tierKey,
+      name: t.name,
+      sold: soldMap.get(t.tierKey)?.sold ?? 0,
+      cap: t.cap,
+      revenueCents: soldMap.get(t.tierKey)?.revenueCents ?? 0,
+    }));
+  }
 
   const awaiting = db
     .prepare(
       `SELECT COUNT(*) AS n, COALESCE(SUM(total_cents), 0) AS cents
-       FROM orders WHERE status = 'claimed' AND payment_mode = 'transfer'`
+       FROM orders WHERE status = 'claimed' AND payment_mode = 'transfer' ${scope}`
     )
-    .get() as { n: number; cents: number };
+    .get(...scopeArgs) as { n: number; cents: number };
   const awaitingTickets = (
     db
       .prepare(
         `SELECT COALESCE(SUM(oi.quantity), 0) AS n
          FROM order_items oi JOIN orders o ON o.id = oi.order_id
-         WHERE o.status = 'claimed' AND o.payment_mode = 'transfer'`
+         WHERE o.status = 'claimed' AND o.payment_mode = 'transfer' ${ticketScope}`
       )
-      .get() as { n: number }
+      .get(...scopeArgs) as { n: number }
   ).n;
 
   return {
@@ -415,6 +495,11 @@ export function getStats(): Stats {
     mockTicketsSold: mockTickets,
     mockRevenueCents: mock.revenue,
   };
+}
+
+/** Per-event stats (same shape as getStats — the event scoping made explicit). */
+export function getEventStats(eventId: string): Stats {
+  return getStats(eventId);
 }
 
 // ---------------- Operational recovery ----------------
@@ -461,35 +546,41 @@ export function getStalePendingPaypalOrders(olderThanMinutes: number, limit = 50
 
 /**
  * Transfer reservations awaiting the buyer's bank transfer, oldest first —
- * the organizer's to-confirm worklist.
+ * the organizer's to-confirm worklist. Scoped to one event when eventId is
+ * given, platform-wide otherwise.
  */
-export function listAwaitingTransferOrders(): OrderListRow[] {
+export function listAwaitingTransferOrders(eventId?: string): OrderListRow[] {
+  const scope = eventId ? `AND event_id = ?` : '';
+  const args: string[] = eventId ? [eventId] : [];
   const rows = getDb()
     .prepare(
       `SELECT ${ORDER_COLS} FROM orders
-       WHERE status = 'claimed' AND payment_mode = 'transfer'
+       WHERE status = 'claimed' AND payment_mode = 'transfer' ${scope}
        ORDER BY created_at ASC`
     )
-    .all() as OrderRow[];
+    .all(...args) as OrderRow[];
   return withItemsSummary(rows);
 }
 
 /**
  * Cancel transfer reservations whose payment never arrived, releasing their
- * seats. Runs lazily from checkout/admin page loads. The cutoff is
- * payWithinDays + 2 grace days: buyers are told the shorter deadline, and the
- * grace absorbs weekends/slow banks so a transfer sent on the last day does
- * not die in transit. Returns the number of reservations expired.
+ * seats. Runs lazily from checkout/admin page loads. The cutoff is each
+ * EVENT'S payWithinDays + 2 grace days: buyers are told the shorter deadline,
+ * and the grace absorbs weekends/slow banks so a transfer sent on the last day
+ * does not die in transit. Scoped to one event when eventId is given.
+ * Returns the number of reservations expired.
  */
-export function expireOverdueTransferReservations(): number {
-  const days = (getEventConfig().bankTransfer?.payWithinDays ?? 5) + 2;
+export function expireOverdueTransferReservations(eventId?: string): number {
+  const scope = eventId ? `AND event_id = ?` : '';
+  const args: string[] = eventId ? [eventId] : [];
   return getDb()
     .prepare(
       `UPDATE orders SET status = 'cancelled'
-       WHERE status = 'claimed' AND payment_mode = 'transfer'
-         AND created_at < datetime('now', ?)`
+       WHERE status = 'claimed' AND payment_mode = 'transfer' ${scope}
+         AND created_at < datetime('now',
+           '-' || (COALESCE((SELECT e.pay_within_days FROM events e WHERE e.id = orders.event_id), 5) + 2) || ' days')`
     )
-    .run(`-${days} days`).changes;
+    .run(...args).changes;
 }
 
 // Reservations expire on a multi-DAY timescale, so there is no reason to run
@@ -512,12 +603,12 @@ export function expireOverdueTransferReservationsThrottled(): void {
 }
 
 /**
- * Admin confirmed the money arrived on the bank statement: finalize the order
- * and mint tickets. Idempotent for already-paid orders. If the reservation
- * had already expired (status 'cancelled') the seats are re-claimed first —
- * so a transfer that arrived late still gets its tickets while stock lasts;
- * when the event has sold out in the meantime this throws SoldOutError and
- * the buyer must be refunded instead.
+ * The organizer confirmed the money arrived on their bank statement: finalize
+ * the order and mint tickets. Idempotent for already-paid orders. If the
+ * reservation had already expired (status 'cancelled') the seats are
+ * re-claimed first — so a transfer that arrived late still gets its tickets
+ * while stock lasts; when the event has sold out in the meantime this throws
+ * SoldOutError and the buyer must be refunded instead.
  */
 export function markTransferOrderPaid(orderId: string): TicketRow[] {
   const db = getDb();

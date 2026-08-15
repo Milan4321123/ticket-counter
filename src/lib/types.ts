@@ -1,6 +1,7 @@
 // Shared API request/response shapes. Safe for both server and client imports.
 
 export interface CreateOrderRequest {
+  eventId: string;
   buyerName: string;
   buyerEmail: string;
   items: { tierId: string; quantity: number }[];
@@ -39,7 +40,7 @@ export interface CheckinTicketInfo {
 }
 
 export interface CheckinResponse {
-  result: 'ok' | 'already_checked_in' | 'not_found' | 'not_paid' | 'mock_ticket';
+  result: 'ok' | 'already_checked_in' | 'not_found' | 'not_paid' | 'mock_ticket' | 'wrong_event';
   checkedInAt?: string; // set for 'already_checked_in'
   ticket?: CheckinTicketInfo;
 }

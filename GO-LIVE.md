@@ -1,32 +1,31 @@
-# Go-Live Guide — from your computer to selling real tickets
+# Go-Live Guide — from your computer to a live ticket platform
 
-This guide takes you from "the site runs on my laptop" to "people are buying tickets at my own web address", step by step. No prior hosting experience needed. Set aside a quiet hour, and do the steps in order.
+This guide takes you from "the site runs on my laptop" to "organizers are selling tickets at my own web address", step by step. No prior hosting experience needed. Set aside a quiet hour, and do the steps in order.
 
 A quick map of what you're about to set up:
 
-1. [A domain](#1-buy-a-domain) — your web address.
-2. [Hosting on Render](#2-put-the-site-on-the-internet-render) — the computer that runs the site 24/7.
+1. [Name your platform and buy a domain](#1-name-your-platform-and-buy-a-domain)
+2. [Hosting on Render](#2-put-the-site-on-the-internet-render) — the computer that runs the site 24/7, with a persistent disk.
 3. [SendGrid](#3-set-up-email-sendgrid) — so ticket emails actually arrive.
-4. [The admin panel: security and the hidden address](#4-the-admin-panel-security-and-the-hidden-address) — what protects it, plus the optional secret URL.
-5. [A full test run](#5-test-run-before-you-announce-anything) — before you announce.
-6. [The event-day runbook](#6-event-day-runbook) — what to do at the door.
-7. [Money handling](#7-money-where-it-goes-and-how-to-read-the-dashboard) — where it goes and how to read the dashboard.
+4. [The admin panel: security and the hidden address](#4-the-admin-panel-security-and-the-hidden-address)
+5. [Your first organizer (and the migrated event)](#5-your-first-organizer-and-the-migrated-event)
+6. [A full test run](#6-test-run-before-you-announce-anything) — before you announce.
+7. [The event-day runbook](#7-event-day-runbook) — what happens at the door.
+8. [Money handling](#8-money-who-gets-what) — who gets what.
 
 ---
 
-## 1. Buy a domain
+## 1. Name your platform and buy a domain
 
-Your domain is the address people type, e.g. `oktober-konzert.com` or `tickets-yourband.de`.
+You're launching a platform, so it needs a name — the name organizers will recommend to each other and buyers will see on their tickets. Keep it short, easy to say out loud, and not tied to one event or one artist.
 
-1. Go to any domain registrar — Namecheap, Cloudflare, IONOS, GoDaddy, and Porkbun are all fine.
-2. Search for a name you like and buy it. A normal `.com` or `.de` costs about **10–15 EUR per year**.
-3. That's it for now — you'll connect it to the site in step 2.7.
-
-Tip: keep it short and easy to say out loud — you'll be telling people this address in person and on posters.
+1. Pick the name and set it as the `PLATFORM_NAME` environment variable (step 2.4) — it appears in the site header, page titles, and emails.
+2. Go to any domain registrar — Namecheap, Cloudflare, IONOS, GoDaddy, and Porkbun are all fine — and buy the matching domain. A normal `.com` or `.de` costs about **10–15 EUR per year**. Ideally the domain *is* the platform name (e.g. `nachtkasse.com` → platform name "Nachtkasse").
+3. That's it for now — you'll connect the domain to the site in step 2.6.
 
 ## 2. Put the site on the internet (Render)
 
-We recommend **[Render](https://render.com)** (its sibling **Railway** works very similarly). Render runs your site 24/7, gives it HTTPS automatically, and — crucially — offers a **persistent disk**, which this site needs for its database.
+We recommend **[Render](https://render.com)** (its sibling **Railway** works very similarly). Render runs your site 24/7, gives it HTTPS automatically, and — crucially — offers a **persistent disk**, which this platform needs for its data.
 
 ### 2.1 Put the project folder on GitHub first
 
@@ -38,7 +37,7 @@ Render installs your site from GitHub, so the project folder needs to live there
   ```bash
   git init
   git add .
-  git commit -m "Ticket site"
+  git commit -m "Ticket platform"
   git branch -M main
   git remote add origin https://github.com/YOUR-USERNAME/YOUR-REPO.git
   git push -u origin main
@@ -46,7 +45,7 @@ Render installs your site from GitHub, so the project folder needs to live there
 
   (Create the empty repository on github.com first — the "…or push an existing repository" box there shows you these exact lines with your names filled in.)
 
-Don't worry: your `.env.local` file with passwords is ignored by git and never uploaded. Secrets go into Render's settings instead, in step 2.5.
+Don't worry: your `.env.local` file with passwords is ignored by git and never uploaded. Secrets go into Render's settings instead, in step 2.4.
 
 ### 2.2 Create the web service
 
@@ -55,15 +54,15 @@ Don't worry: your `.env.local` file with passwords is ignored by git and never u
 3. Fill in:
    - **Build command:** `npm install && npm run build`
    - **Start command:** `npm start`
-4. Pick an instance type. The smallest **paid** tier is right for a 600-person sale — the free tier goes to sleep between visits and doesn't keep a disk.
+4. Pick an instance type. The smallest **paid** tier is the right starting point — the free tier goes to sleep between visits and doesn't keep a disk.
 
 ### 2.3 Attach a persistent disk — do not skip this
 
-**CRITICAL:** the SQLite database with every order, ticket, and check-in lives on this disk. Without it, every restart or deploy would wipe your sales.
+**CRITICAL:** the disk holds the SQLite database (every organizer, event, order, ticket, and check-in) **and all uploaded event photos**. Without it, every restart or deploy would wipe the platform clean.
 
 1. In the service settings, find **Disks** and click **Add disk**.
-2. **Mount path:** `/data` — a size of 1 GB is plenty.
-3. In the next step you'll set the environment variable `DATA_DIR=/data`, which tells the site to keep its database there.
+2. **Mount path:** `/data`. Size it with photos in mind: each event can carry up to 12 photos of up to 5 MB — **5 GB** is a comfortable start and can be grown later.
+3. In the next step you'll set the environment variable `DATA_DIR=/data`, which tells the site to keep everything there.
 
 ### 2.4 Set the environment variables
 
@@ -71,12 +70,14 @@ In the service's **Environment** tab, add these (values without quotes unless sh
 
 | Key | Value |
 | --- | --- |
+| `PLATFORM_NAME` | Your platform's name from step 1, e.g. `Nachtkasse` |
 | `PAYMENT_MODE` | `transfer` |
 | `NEXT_PUBLIC_BASE_URL` | `https://yourdomain.com` — your real address from step 1, with `https://` |
 | `DATA_DIR` | `/data` |
 | `APP_SECRET` | A long random string, 40+ characters. On a Mac, run `openssl rand -hex 32` in Terminal and paste the result. Never reuse a password here. |
 | `ADMIN_PASSWORD` | A strong password, **at least 10 characters** — the site refuses weak or placeholder passwords in production. |
 | `ADMIN_EMAIL` | Your email address — admin sign-in codes are sent here. |
+| `ANTHROPIC_API_KEY` | *(optional)* An API key from [console.anthropic.com](https://console.anthropic.com) — switches on the AI page designer for your organizers. Leave it out and they use the manual theme picker. |
 | `ADMIN_GATE_PATH` | *(optional)* A secret word like `backstage-88907cbe`. When set, `/admin` shows a 404 to everyone; you unlock it by visiting `https://yourdomain.com/backstage-88907cbe` once per device. See step 4. |
 | `ADMIN_PHONE` | *(optional)* Your mobile in full international format, e.g. `+4915155551234`. When set (with the Twilio keys below), your admin sign-in code is also texted to you. See step 4. |
 | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM` | *(optional)* From your Twilio account — needed only if you want the login code by SMS. |
@@ -84,24 +85,39 @@ In the service's **Environment** tab, add these (values without quotes unless sh
 | `SMTP_PORT` | `587` |
 | `SMTP_USER` | `apikey` (literally that word — see step 3) |
 | `SMTP_PASS` | Your SendGrid API key (from step 3) |
-| `EMAIL_FROM` | `Event Tickets <tickets@yourdomain.com>` — must be the address you verify in step 3 |
+| `EMAIL_FROM` | `Your Platform <tickets@yourdomain.com>` — must be the address you verify in step 3 |
 
-Double-check `event.config.json` in the project too: your real event name, date, venue, prices, and — most importantly — **your real IBAN** under `bankTransfer`. That file is part of the project, so changes to it are uploaded via GitHub (commit + push), after which Render redeploys automatically.
+Note what is *not* in this list anymore: event details and bank accounts. Those now live in the database — each organizer enters their own event details and **their own IBAN** in their portal. You never configure anyone's bank details.
 
 ### 2.5 Deploy
 
-Click **Create Web Service** / **Deploy**. Render builds the site (a few minutes) and gives you a temporary address like `https://something.onrender.com`. Open it — your site should be live there.
+Click **Create Web Service** / **Deploy**. Render builds the site (a few minutes) and gives you a temporary address like `https://something.onrender.com`. Open it — your platform should be live there (an empty feed at first is normal).
+
+### 2.5b If video uploads fail after deploying, it's an upload size limit
+
+Organizers upload videos up to 60 MB. Several hosting setups quietly cut off big uploads long before that, and the symptom is confusing: small clips upload fine, real phone videos fail with *"The upload did not come through."*
+
+The app itself is already configured correctly (`middlewareClientMaxBodySize` in `next.config.mjs`). What can still block it is whatever sits *in front* of the app:
+
+| If you host behind… | Raise this |
+| --- | --- |
+| Render, Railway, Fly.io | Usually fine out of the box — no change needed |
+| Your own **nginx** | `client_max_body_size 80m;` (the default is **1 MB** and will break uploads immediately) |
+| Your own **Caddy** | `request_body { max_size 80MB }` |
+| Cloudflare proxy (orange cloud) | Free plan caps uploads at **100 MB** — fine for 60 MB videos, but note it applies before your server sees anything |
+
+If you ever want a different video limit, change `MAX_VIDEO_BYTES` in `src/lib/media.ts`, keep `middlewareClientMaxBodySize` comfortably above it, and raise the proxy limit to match.
 
 ### 2.6 Connect your domain
 
 1. In Render: **Settings → Custom Domains → Add** and enter your domain.
 2. Render shows you a **CNAME** record. In your domain registrar's DNS settings, add exactly that record (usually: type `CNAME`, name `www` or `@`, value `something.onrender.com`).
 3. Wait a bit (minutes to a few hours). Render then issues an HTTPS certificate **automatically** — no configuration, no cost.
-4. When `https://yourdomain.com` shows your site with a lock icon in the browser, update nothing else — you already set `NEXT_PUBLIC_BASE_URL` to this address.
+4. When `https://yourdomain.com` shows your site with a lock icon in the browser, you're done — you already set `NEXT_PUBLIC_BASE_URL` to this address.
 
 ## 3. Set up email (SendGrid)
 
-Ticket emails must not land in spam. **[SendGrid](https://sendgrid.com)** is a service built for exactly this, with a free tier (100 emails/day) that covers most single events.
+Ticket emails must not land in spam. **[SendGrid](https://sendgrid.com)** is a service built for exactly this, with a free tier (100 emails/day) that covers a small platform's start. Once several organizers sell at the same time, watch that daily limit — the first paid tier is cheap and removes it.
 
 1. Create a SendGrid account.
 2. **Verify your sender.** In SendGrid: **Settings → Sender Authentication**.
@@ -113,11 +129,11 @@ Ticket emails must not land in spam. **[SendGrid](https://sendgrid.com)** is a s
    - `SMTP_PASS` is the **API key** you just created (starts with `SG.`).
 5. Enter these in Render (step 2.4) and redeploy if it doesn't restart by itself.
 
-The same email setup powers three things at once: payment instructions to buyers, the QR-ticket emails, and your own admin sign-in codes.
+The same email setup powers everything at once: payment instructions to buyers, the QR-ticket emails, and your own admin sign-in codes — for every organizer on the platform.
 
 ## 4. The admin panel: security and the hidden address
 
-Your admin panel lives at `https://yourdomain.com/admin` — same site, same domain. First, understand what actually protects it: **knowing the URL is not access.** Anyone who finds the login form still needs:
+Your admin panel lives at `https://yourdomain.com/admin` — and it now controls a whole platform, not just one event, so its security matters even more. First, understand what actually protects it: **knowing the URL is not access.** Anyone who finds the login form still needs:
 
 1. your **admin password**, and
 2. the **one-time code** that is emailed to *your* inbox at that moment, and
@@ -130,7 +146,7 @@ Password + emailed code is the real protection. Your part of the deal: **keep `A
 - `/admin` shows the site's normal "page not found" to everyone — bots and curious visitors never even see a login form.
 - To unlock it on *your* device, visit `https://yourdomain.com/<your-gate-path>` once (e.g. `/backstage-88907cbe`). That silently sets a 30-day cookie and takes you to the login. After that, `/admin` works normally on that device; when it ever shows 404 again (new phone, cleared cookies, 30 days passed), just open the unlock link once more.
 - Treat the gate path like a password: don't post it anywhere, and pick something unguessable (add a random suffix, not just `secret-admin`). If it ever leaks, change the value in Render's environment settings — old cookies become invalid instantly, because they're cryptographically tied to your `APP_SECRET`.
-- Scanner links for door staff are **not affected** — staff never need the unlock URL.
+- Organizer portal logins and scanner links are **not affected** — organizers and door staff never need the unlock URL.
 - Leave `ADMIN_GATE_PATH` empty to switch the feature off and use plain `/admin` again.
 
 One honest caveat: this hides the door, it doesn't strengthen the lock. The password + emailed code remain what actually keeps people out.
@@ -145,51 +161,93 @@ By default the 6-digit sign-in code arrives by email. If you'd also like it text
 - **Failed sign-ins are rate-limited**, both per device and overall, so password- and code-guessing bots get locked out for 15 minutes after a handful of tries.
 - **Requesting sign-in codes is throttled** — repeatedly hitting the login page won't flood your inbox/phone with codes (or run up a Twilio bill); while a code is still valid, the same one stays in effect until you use it or it expires.
 
-## 5. Test run before you announce anything
+## 5. Your first organizer (and the migrated event)
 
-Do one complete dress rehearsal on the real site. Have your phone and your inbox ready.
+Organizers can sign themselves up at `/organizers/signup` (you just switch the account on), or **you** create the account by hand. Either way the account is free — your money comes per event, when they publish one; see [PLATFORM.md](PLATFORM.md) for the whole playbook. The short version of creating one yourself:
 
-1. **Buy like a buyer.** On `https://yourdomain.com`, reserve 1 ticket using your own name and email.
-2. **Check the instructions email.** Within a minute you should get "Reserved: your tickets …" with the amount, your IBAN, and a reference like `TICKETS-AB12CD34`. Check the spam folder too — if it's there, revisit step 3.2 (domain authentication helps).
-3. **Confirm the payment in the admin panel.** Log in at `/admin` (password, then the emailed code). Your reservation sits under **Awaiting bank transfer**. Click **Payment received** and type the **last 4 characters of the reference** — exactly what you'll later read off your real bank statement. (You know no money actually moved; the site doesn't — that's fine for the test. No need to transfer yourself 1 EUR.)
-4. **Check the ticket email.** The QR-ticket email should arrive; open its button link — your order page with the QR code.
-5. **Test the door scanner.** In the admin area, create a **scanner link**, open it on a second phone if you have one, and scan the QR ticket from the first phone's screen. You should see **VALID — welcome!** Scan the same ticket again: **ALREADY USED**. That's the once-only protection working.
-6. **Clean up — read this part carefully.**
-   - If your dashboard shows a warning about **test-mode orders** (from playing with the site before configuring payment), click **Delete test orders**. That button only removes *test-mode (mock)* orders — pretend purchases with no real money behind them.
-   - Your dress-rehearsal order from step 1 is a **real bank-transfer order**, so that button does not touch it — real orders are deliberately never deletable. Because you marked it paid, it now counts in your stats as 1 paid order with money you never actually received. That's the honest cost of a full rehearsal: just remember "my numbers start at 1 order / one ticket too high", or:
-   - **Zero-footprint alternative:** run steps 1–2 only, then in the admin panel click **Cancel** on the reservation instead of confirming it. The seats are released and nothing is counted — you just don't get to rehearse the ticket email and scanner with a real ticket that way.
-7. **Back up the database** once now, so you know how: download/copy the contents of the `/data` disk (Render's disk tab or a one-off job). Repeat before event day.
+1. Sign in at `/admin` and open **`/admin/organizers`**.
+2. Create the account: name and email. Accounts never expire, so there is no plan date to pick.
+3. Copy the **one-time password** the site shows you and send it to the organizer along with their login link:
 
-When all of this works, announce your ticket link.
+   ```
+   https://yourdomain.com/portal/login
+   ```
 
-## 6. Event-day runbook
+4. From there they do everything themselves: create their event, upload photos, set tiers and prices, enter **their own IBAN**, and publish.
+
+### If you ran the old single-event version
+
+The earlier version of this site sold tickets for exactly one event, configured in `event.config.json`. The platform migrates that automatically on first start with your existing database:
+
+- Your original event now lives as the **first published event** on the platform, with its tiers, bank details, and **all existing orders and tickets** intact — buyers' order pages and tickets keep working at the same addresses.
+- It is owned by a seeded **"platform owner" organizer account** (using the first address from your `ADMIN_EMAIL`). That account **cannot log in yet** — it has no password on purpose.
+- To manage the migrated event from the portal, open `/admin/organizers`, find the platform-owner account, click **reset password**, and use the fresh password at `/portal/login`. While you're in the portal, give the event a proper street address (the migration reuses the old venue text) so the "Open in Maps" link points somewhere real.
+
+Fresh installs without an old database simply start with an empty platform — nothing to migrate.
+
+## 6. Test run before you announce anything
+
+Do one complete dress rehearsal on the real site, wearing all four hats: admin, organizer, buyer, door staff. Have your phone and your inbox ready.
+
+1. **As admin:** create a test organizer account for yourself (use your own email).
+2. **As organizer:** log in at `/portal/login` and create a small test event — a photo, one or two tiers, your own IBAN. The Publish tab shows the event fee card with your own bank details and an `EVENT-…` reference; go back to **`/admin/organizers` → Event fees**, click *Fee received* and type the last 4 characters of that reference, then publish. Check it appears in the feed and its page at `/e/…` looks right (address link, photos, video).
+3. **As buyer:** reserve 1 ticket using your own name and email. Within a minute you should get the payment-instructions email with the amount, the IBAN, and a reference like `TICKETS-AB12CD34`. Check the spam folder too — if it's there, revisit step 3.2 (domain authentication helps).
+4. **As organizer again:** your reservation appears in the portal's awaiting-transfer list. Confirm it as paid — exactly what you'll later do while reading your real bank statement. (You know no money actually moved; the site doesn't — that's fine for the test.)
+5. **Check the ticket email.** The QR-ticket email should arrive; open its button link — the order page with the QR code.
+6. **As door staff:** from the portal, create a **scanner link** for the test event, open it on a second phone if you have one, and scan the QR ticket from the first phone's screen. You should see **VALID**. Scan the same ticket again: **ALREADY USED**. That's the once-only protection working.
+7. **Clean up.** Cancel any leftover open reservations, then unpublish or archive the test event so it disappears from the feed. (Confirmed test orders stay in the books — real orders are deliberately never deletable — so remember your stats start one test ticket high, or skip step 4 and cancel the reservation instead if you want a zero-footprint test.)
+8. **Take a backup** once now, so you know how — see the next section. Do it before you have anything to lose, not after.
+
+When all of this works, you're ready to onboard your first paying organizer.
+
+## 6b. Backups — the one thing you must not skip
+
+Every organizer, order and issued ticket lives in a single file on the server's disk. The app is not the risk; losing that file is. A ticketing platform that cannot say who paid is finished, so treat this as part of going live, not as housekeeping.
+
+Take one with:
+
+```bash
+npm run backup
+```
+
+That writes a database snapshot **and** a compressed copy of the uploaded photos and videos into `data/backups/`, then verifies the snapshot opens cleanly and prints the row counts so you can see it worked. It runs safely while the site is live — it uses SQLite's own online-snapshot command, so nobody gets an error mid-purchase.
+
+Two things worth knowing:
+
+- **Never back up by copying `tickets.db` with `cp` while the app is running.** You can catch the file mid-write, and recent orders live in a separate `-wal` file that a plain copy misses. The command above handles both.
+- **The photos are not in the database.** A database-only backup restores events whose images are all broken, which is why the default includes them.
+
+**Automate it.** On Render, add a **Cron Job** service pointing at the same repo and disk, schedule `0 3 * * *` (3am daily), command `npm run backup`. Then copy the newest file off the server periodically — a backup that only exists on the machine you are protecting against is not a backup.
+
+**To restore:** stop the app, copy a `tickets-*.db` file to `data/tickets.db`, delete any `tickets.db-wal` and `tickets.db-shm` sitting beside it, unpack the matching `uploads-*.tar.gz` into `data/`, and start the app.
+
+## 7. Event-day runbook
+
+Event day belongs to the **organizer**, not to you — share this section with them (or point them at their portal's help text). What matters:
 
 The evening before:
 
-- In the admin panel, **create scanner links** for your door staff — set the validity long enough to cover the whole night (e.g. 24 hours). Send each person the link, or have them scan the link's QR code from your screen. Staff with a scanner link can *only* check tickets in — they can't see your dashboard, orders, or revenue, and there's no password to leak.
-- Make sure everyone's **phone is charged** (bring a power bank), knows the venue wifi, and has mobile data as backup — the scanner needs an internet connection to verify tickets.
-- Take a **fresh backup** of the database (step 5.7).
+- The organizer creates **scanner links** for their door staff in the portal — with a validity long enough to cover the whole night (e.g. 24 hours). Each staff member gets the link by message, or scans its QR code straight off the organizer's screen. A scanner link opens the check-in screen for **that one event only** — no portal, no buyer lists, no revenue, and no password to leak.
+- Everyone's **phone charged** (bring a power bank), venue wifi known, mobile data as backup — the scanner needs an internet connection to verify tickets.
 
 At the door:
 
 - Staff open their scanner link and scan each guest's QR code — from a phone screen or a printout, both work.
-- **Camera won't cooperate, or the QR is scratched/dim?** Type the short code printed under it (like `K7KQ-M3XP`) — capitalization, spaces, and dashes don't matter. This manual entry is the built-in fallback; it's exactly as valid as scanning.
+- **Camera won't cooperate, or the QR is scratched or dim?** Type the short code printed under it (like `K7KQ-M3XP`) — capitalization, spaces, and dashes don't matter. Manual entry is exactly as valid as scanning.
 - What the results mean:
-  - **VALID — welcome!** (green): let them in. For **student tickets** the screen reminds staff to check a valid student ID.
-  - **ALREADY USED** (amber): this exact ticket was scanned before, with the time shown. Usually a shared screenshot or an accidental double-scan seconds ago (check the time — if it was 10 seconds ago at your own door, it was you). Otherwise, whoever scanned it first is inside.
-  - **TEST ticket — do not admit** (red): a leftover from test mode; no real payment behind it. These are also blocked automatically — this result exists so nobody talks their way in with one.
-  - **Order not paid** (red): a reservation whose bank transfer was never confirmed. Do not admit; send the person to the organizer — you can check the statement and mark the order paid on the spot from your own phone if the money did arrive.
+  - **VALID** (green): let them in. For **student tickets** the screen reminds staff to check a valid student ID.
+  - **ALREADY USED** (amber): this exact ticket was scanned before, with the time shown. Usually a shared screenshot or an accidental double-scan seconds ago (check the time — 10 seconds ago at your own door means it was you). Otherwise, whoever scanned it first is inside.
+  - **Wrong event** (red): a real ticket — but for a *different* event on the platform. Do not admit; the guest is at the wrong door or the wrong night.
+  - **Order not paid** (red): a reservation whose bank transfer was never confirmed. Do not admit; send the person to the organizer, who can check their statement and confirm the order on the spot from their own phone if the money did arrive.
+  - **Test ticket** (red): a leftover from test mode; no real payment behind it. Do not admit.
   - **Ticket not found** (red): a typo, or a code that never existed. Re-type it carefully once before drawing conclusions.
-- If a scanner phone is lost or a link ends up in the wrong hands, one click on **revoke scanner links** in the admin panel kills every scanner link instantly. Create fresh ones for your staff afterwards.
+- If a scanner phone is lost or a link ends up in the wrong hands, the organizer **revokes their scanner links** with one click and issues fresh ones.
 
-## 7. Money: where it goes and how to read the dashboard
+## 8. Money: who gets what
 
-- **Ticket money lands directly in your bank account** — the one whose IBAN is in `event.config.json`. There is no middleman holding your money and no payout schedule: each buyer's transfer arrives like any other transfer, with their reference in the purpose line.
-- On the dashboard:
-  - **Awaiting bank transfer** — reservations whose money is still on its way. The sum tells you how much should be appearing on your statement over the next days. Compare statement and list, confirm matches with **Payment received**.
-  - **Revenue (real payments)** — money you have confirmed received. This only grows when *you* mark orders paid, so it never counts money that isn't actually in your account.
-  - References starting with **`TICKETS-S-`** are orders that include student tickets — you can tally student sales straight off your bank statement.
-- **Refunds are manual bank transfers back.** The site never moves money, so it can't refund either — you simply transfer the amount back to the buyer's account (you can see it on your statement, next to their payment). Do this for: cancelled events, payments that arrived after a sell-out, or your own goodwill policy — whatever you announced.
-- After the event, keep the database backup and your bank statements together — that's your complete, auditable record of the sale.
+- **Ticket money goes directly to each organizer's own bank account** — the IBAN they entered in their portal. It never passes through you or the platform: no middleman, no payout schedule, each buyer's transfer arrives on the organizer's statement with a personal reference in the purpose line. References starting with `TICKETS-S-` contain student tickets — organizers can tally those straight off the statement.
+- **Your money is the event fees** — one fee per event, sized to the venue: €1 for every 10 tickets it holds, minimum €15, so a 500-person event costs €50 (`PLATFORM_FEE_PER_CUSTOMER_CENTS` / `PLATFORM_FEE_MIN_CENTS`). It is transferred to your own account with that event's `EVENT-…` reference, before it can be published. You confirm each one under **Event fees** in `/admin/organizers`, which unlocks publishing and emails the organizer. Accounts themselves are free and never expire, so there is nothing to renew.
+- **Refunds are between organizer and buyer.** The platform never moves money, so it can't refund either — the organizer simply transfers the amount back. You, the platform owner, never refund ticket money, because you never had it. The full support playbook is in [PLATFORM.md](PLATFORM.md).
+- After each event, the organizer's bank statements plus your database backup are the complete, auditable record of the sale.
 
-Have a great show!
+Have a great launch!

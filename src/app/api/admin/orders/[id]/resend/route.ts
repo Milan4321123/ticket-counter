@@ -1,18 +1,33 @@
 import { NextResponse } from 'next/server';
 import { isAdminRequest } from '@/lib/auth';
 import { sendTicketEmail } from '@/lib/email';
+import { getEventById } from '@/lib/events';
+import { currentOrganizer } from '@/lib/organizers';
+import { getOrder } from '@/lib/orders';
 import type { ApiErrorResponse } from '@/lib/types';
 
+/** Platform admin, or the organizer who owns the order's event. */
+async function mayManageOrder(orderId: string): Promise<boolean> {
+  if (await isAdminRequest()) return true;
+  const organizer = await currentOrganizer();
+  if (!organizer) return false;
+  const order = getOrder(orderId);
+  if (!order) return false;
+  const event = getEventById(order.eventId);
+  return Boolean(event && event.organizerId === organizer.id);
+}
+
+/** Re-send the buyer's ticket email (admin or the owning organizer). */
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    if (!(await isAdminRequest())) {
+    const { id } = await params;
+    if (!(await mayManageOrder(id))) {
       return NextResponse.json(
-        { error: 'Please sign in to the admin area first.' } satisfies ApiErrorResponse,
+        { error: 'Please sign in first.' } satisfies ApiErrorResponse,
         { status: 401 }
       );
     }
 
-    const { id } = await params;
     const result = await sendTicketEmail(id);
     return NextResponse.json(result);
   } catch {

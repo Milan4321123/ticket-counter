@@ -20,6 +20,7 @@ const RESULT_LABEL: Record<CheckinResponse['result'], string> = {
   not_found: 'Not found',
   not_paid: 'Not paid',
   mock_ticket: 'Test ticket',
+  wrong_event: 'Different event',
 };
 
 const RESULT_BADGE: Record<CheckinResponse['result'], string> = {
@@ -28,6 +29,7 @@ const RESULT_BADGE: Record<CheckinResponse['result'], string> = {
   not_found: 'badge-red',
   not_paid: 'badge-red',
   mock_ticket: 'badge-red',
+  wrong_event: 'badge-red',
 };
 
 export default function CheckinClient({
@@ -266,6 +268,14 @@ export default function CheckinClient({
             <div className={styles.resultDetail}>
               This ticket belongs to an unpaid order
               {result.ticket?.buyerName ? ` (${result.ticket.buyerName})` : ''}.
+            </div>
+          </div>
+        )}
+        {!netError && result?.result === 'wrong_event' && (
+          <div className={`notice notice-error ${styles.result}`}>
+            <div className={styles.resultTitle}>Different event</div>
+            <div className={styles.resultDetail}>
+              This ticket belongs to a different event — it is not valid at this door.
             </div>
           </div>
         )}

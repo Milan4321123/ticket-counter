@@ -8,7 +8,7 @@
 //   paid      -> money verified, tickets minted
 //   failed / cancelled -> terminal, seats released
 import { getDb } from './db';
-import { getEventConfig } from './config';
+import { getEventById, getEventTiers, getPrimaryEvent } from './events';
 
 export interface TierAvailability {
   tierId: string;
@@ -34,75 +34,93 @@ export class SoldOutError extends Error {
 /** Statuses that hold seats. 'capturing' still holds — money may be moving. */
 const RESERVING_STATUSES = "('claimed', 'capturing', 'paid')";
 
-export function getAvailability(): Availability {
+const EMPTY_AVAILABILITY: Availability = { totalCap: 0, totalSold: 0, totalRemaining: 0, tiers: {} };
+
+/** Live seat availability for ONE event (caps from events + event_tiers). */
+export function getAvailability(eventId: string): Availability {
   const db = getDb();
-  const cfg = getEventConfig();
+  const event = getEventById(eventId);
+  if (!event) throw new Error('Unknown event');
+  const eventTiers = getEventTiers(eventId);
   const rows = db
     .prepare(
       `SELECT oi.tier_id AS tierId, COALESCE(SUM(oi.quantity), 0) AS sold
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
-       WHERE o.status IN ${RESERVING_STATUSES}
+       WHERE o.status IN ${RESERVING_STATUSES} AND o.event_id = ?
        GROUP BY oi.tier_id`
     )
-    .all() as { tierId: string; sold: number }[];
+    .all(eventId) as { tierId: string; sold: number }[];
 
   const soldByTier = new Map(rows.map((r) => [r.tierId, r.sold]));
   const tiers: Record<string, TierAvailability> = {};
   let totalSold = 0;
-  for (const t of cfg.tiers) {
-    const sold = soldByTier.get(t.id) ?? 0;
+  for (const t of eventTiers) {
+    const sold = soldByTier.get(t.tierKey) ?? 0;
     totalSold += sold;
-    tiers[t.id] = { tierId: t.id, cap: t.cap, sold, remaining: Math.max(0, t.cap - sold) };
+    tiers[t.tierKey] = { tierId: t.tierKey, cap: t.cap, sold, remaining: Math.max(0, t.cap - sold) };
+  }
+  // Seats sold against tiers that were later deleted still occupy capacity.
+  for (const [tierId, sold] of soldByTier) {
+    if (!tiers[tierId]) totalSold += sold;
   }
 
-  const totalRemaining = Math.max(0, cfg.totalCapacity - totalSold);
+  const totalRemaining = Math.max(0, event.totalCapacity - totalSold);
   // A tier can never have more remaining than the event as a whole.
   for (const t of Object.values(tiers)) t.remaining = Math.min(t.remaining, totalRemaining);
 
-  return { totalCap: cfg.totalCapacity, totalSold, totalRemaining, tiers };
+  return { totalCap: event.totalCapacity, totalSold, totalRemaining, tiers };
 }
 
-// Short-lived cache for the DISPLAY path only. The homepage and checkout page
-// are server-rendered on every request and each calls availability; during an
+// Short-lived cache for the DISPLAY path only. Event pages and checkout are
+// server-rendered on every request and each calls availability; during an
 // on-sale spike (hundreds of loads/second) recomputing the aggregate every
 // time needlessly blocks the single Node thread. A ~1s stale "tickets left"
 // count is invisible to buyers, and it is NEVER used to decide a reservation —
 // claimInventory() below always reads live, transactional data. So this cache
 // cannot cause overselling.
-let availCache: { at: number; value: Availability } | null = null;
+const availCache = new Map<string, { at: number; value: Availability }>();
 const AVAIL_CACHE_MS = 1000;
 
-export function getAvailabilityCached(): Availability {
+/**
+ * Cached availability for display. Omitting eventId is the legacy single-event
+ * path: it uses the primary (oldest) event, and reports everything as sold out
+ * when the platform has no events at all rather than crashing the page.
+ */
+export function getAvailabilityCached(eventId?: string): Availability {
+  const id = eventId ?? getPrimaryEvent()?.id;
+  if (!id) return EMPTY_AVAILABILITY;
   const now = Date.now();
-  if (availCache && now - availCache.at < AVAIL_CACHE_MS) return availCache.value;
-  const value = getAvailability();
-  availCache = { at: now, value };
+  const hit = availCache.get(id);
+  if (hit && now - hit.at < AVAIL_CACHE_MS) return hit.value;
+  const value = getAvailability(id);
+  availCache.set(id, { at: now, value });
   return value;
 }
 
 /**
- * Atomically reserve the order's tickets against tier + total caps.
- * Call this BEFORE capturing payment; if it throws SoldOutError the buyer
- * has not been charged. Idempotent for orders already claimed/capturing.
+ * Atomically reserve the order's tickets against its event's tier + total
+ * caps. Call this BEFORE capturing payment; if it throws SoldOutError the
+ * buyer has not been charged. Idempotent for orders already claimed/capturing.
  */
 export function claimInventory(orderId: string): void {
   const db = getDb();
   const tx = db.transaction(() => {
-    const order = db.prepare(`SELECT status FROM orders WHERE id = ?`).get(orderId) as
-      | { status: string }
+    const order = db.prepare(`SELECT status, event_id AS eventId FROM orders WHERE id = ?`).get(orderId) as
+      | { status: string; eventId: string | null }
       | undefined;
     if (!order) throw new Error('Order not found');
     if (order.status === 'claimed' || order.status === 'capturing') return; // already reserved
     if (order.status !== 'pending') {
       throw new Error(`Order is not claimable (status: ${order.status})`);
     }
+    if (!order.eventId) throw new Error('Order has no event');
 
     const items = db
       .prepare(`SELECT tier_id AS tierId, quantity FROM order_items WHERE order_id = ?`)
       .all(orderId) as { tierId: string; quantity: number }[];
 
-    const avail = getAvailability();
+    const avail = getAvailability(order.eventId);
     let totalQty = 0;
     for (const it of items) {
       totalQty += it.quantity;

@@ -45,7 +45,16 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
-  serverExternalPackages: ['better-sqlite3'],
+  // Both ship native binaries and must stay outside the bundler.
+  serverExternalPackages: ['better-sqlite3', 'sharp'],
+  experimental: {
+    // This app has a middleware, and Next.js silently TRUNCATES request bodies
+    // at 10 MB in that case — a 40 MB video upload then arrives cut in half and
+    // fails multipart parsing with an unhelpful error. Must stay comfortably
+    // above MAX_VIDEO_BYTES (60 MB) plus the multipart envelope. The upload
+    // routes still enforce the real per-file caps on the streamed bytes.
+    middlewareClientMaxBodySize: '68mb',
+  },
   // Never leak the framework version in the Server/X-Powered-By headers.
   poweredByHeader: false,
   async headers() {

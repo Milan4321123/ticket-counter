@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import CheckPaymentButton from '@/components/CheckPaymentButton';
 import CopyButton from '@/components/CopyButton';
 import PrintButton from '@/components/PrintButton';
-import { getBankTransferConfig, getEventConfig, getTier } from '@/lib/config';
+import { getEventById, getEventTiers } from '@/lib/events';
 import { formatMoney } from '@/lib/money';
 import { getOrder, getOrderItems, getTicketsForOrder, paymentReference } from '@/lib/orders';
 import { ticketQrDataUrl } from '@/lib/tickets';
@@ -21,6 +21,12 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const order = getOrder(id);
   if (!order) notFound();
 
+  // Every order belongs to an event — its name, venue, and bank details all
+  // come from there.
+  const event = getEventById(order.eventId);
+  const eventVenue = event ? [event.venueName, event.city].filter(Boolean).join(', ') : '';
+  const checkoutHref = event ? `/e/${event.slug}/checkout` : '/';
+
   if (order.status === 'capturing') {
     return (
       <div className="container container-narrow section">
@@ -37,7 +43,17 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   }
 
   if (order.paymentMode === 'transfer' && (order.status === 'claimed' || order.status === 'pending')) {
-    const bank = getBankTransferConfig();
+    // The organizer's bank details live on the event.
+    const bank =
+      event && event.bankIban.trim() && event.bankAccountHolder.trim()
+        ? {
+            accountHolder: event.bankAccountHolder,
+            iban: event.bankIban,
+            bic: event.bankBic,
+            bankName: event.bankName,
+            payWithinDays: event.payWithinDays,
+          }
+        : null;
     const reference = paymentReference(order.id);
     const isStudentOrder = reference.includes('-S-');
     const amountPlain = (order.totalCents / 100).toFixed(2);
@@ -53,6 +69,11 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     return (
       <div className="container container-narrow section">
         <h1 className="page-title anim-fade-up">Your reservation</h1>
+        {event ? (
+          <p className="muted anim-fade-up" style={{ margin: '-8px 0 16px' }}>
+            {[event.name, event.dateDisplay, eventVenue].filter(Boolean).join(' · ')}
+          </p>
+        ) : null}
         <div className="notice notice-success anim-fade-up anim-d1">
           Your tickets are reserved — the seats are being held for you. One bank transfer
           {deadlineDisplay ? (
@@ -79,10 +100,10 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             <li className="step-item">
               <span className="step-num">2</span>
               <div>
-                <div className="tier-name">We confirm your payment</div>
+                <div className="tier-name">The organizer confirms your payment</div>
                 <p className="muted small" style={{ margin: '2px 0 0' }}>
                   Bank transfers usually take 1–2 business days to arrive. As soon as yours lands,
-                  we confirm it.
+                  it is confirmed.
                 </p>
               </div>
             </li>
@@ -159,8 +180,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             </div>
             <p className="muted small" style={{ margin: '12px 0 0' }}>
               The reference is the important part: put it in your transfer&rsquo;s purpose line
-              (&ldquo;Verwendungszweck&rdquo;) exactly as shown — it&rsquo;s how we match your
-              payment to your tickets.
+              (&ldquo;Verwendungszweck&rdquo;) exactly as shown — it&rsquo;s how the organizer
+              matches your payment to your tickets.
             </p>
             {isStudentOrder ? (
               <p className="muted small" style={{ margin: '6px 0 0' }}>
@@ -204,7 +225,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           className="anim-fade-up anim-d2"
           style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-start' }}
         >
-          <Link href="/checkout" className="btn btn-primary">
+          <Link href={checkoutHref} className="btn btn-primary">
             Return to checkout
           </Link>
           {order.paymentMode === 'paypal' && order.paypalOrderId ? <CheckPaymentButton orderId={order.id} /> : null}
@@ -227,7 +248,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             tickets (if seats are still available) or a full refund.
           </p>
           <p className="anim-fade-up anim-d3">
-            <Link href="/checkout" className="btn btn-primary">
+            <Link href={checkoutHref} className="btn btn-primary">
               Book again at checkout
             </Link>
           </p>
@@ -241,7 +262,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           This order was not completed. You have not been charged.
         </div>
         <p className="anim-fade-up anim-d2">
-          <Link href="/checkout" className="btn btn-primary">
+          <Link href={checkoutHref} className="btn btn-primary">
             Try again at checkout
           </Link>
         </p>
@@ -250,8 +271,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   }
 
   // status === 'paid'
-  const cfg = getEventConfig();
   const items = getOrderItems(order.id);
+  const tiers = event ? getEventTiers(event.id) : [];
+  const tierName = (tierId: string) => tiers.find((t) => t.tierKey === tierId)?.name ?? tierId;
   const tickets = await Promise.all(
     getTicketsForOrder(order.id).map(async (t) => ({ ...t, qr: await ticketQrDataUrl(t.code) }))
   );
@@ -265,6 +287,12 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
 
       <div className="card anim-fade-up anim-d2">
         <div className="card-title">Order summary</div>
+        {event ? (
+          <div className="summary-row">
+            <span className="muted">Event</span>
+            <span>{[event.name, event.dateDisplay].filter(Boolean).join(' · ')}</span>
+          </div>
+        ) : null}
         <div className="summary-row">
           <span className="muted">Name</span>
           <span>{order.buyerName}</span>
@@ -276,7 +304,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         {items.map((it) => (
           <div className="summary-row" key={it.tierId}>
             <span>
-              {it.quantity}&times; {getTier(it.tierId)?.name ?? it.tierId}
+              {it.quantity}&times; {tierName(it.tierId)}
             </span>
             <span>{formatMoney(it.quantity * it.unitPriceCents, order.currency)}</span>
           </div>
@@ -300,14 +328,24 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={t.qr} alt={`QR code for ticket ${t.code}`} width={260} height={260} />
             <div className="ticket-code">{t.code}</div>
-            <div className="ticket-tier">{getTier(t.tierId)?.name ?? t.tierId}</div>
-            <div style={{ color: '#555', fontSize: '0.78rem', marginTop: 8, lineHeight: 1.45 }}>
-              {cfg.eventName}
-              <br />
-              {cfg.dateDisplay}
-              <br />
-              {cfg.venue}
-            </div>
+            <div className="ticket-tier">{tierName(t.tierId)}</div>
+            {event ? (
+              <div style={{ color: '#555', fontSize: '0.78rem', marginTop: 8, lineHeight: 1.45 }}>
+                {event.name}
+                {event.dateDisplay ? (
+                  <>
+                    <br />
+                    {event.dateDisplay}
+                  </>
+                ) : null}
+                {eventVenue ? (
+                  <>
+                    <br />
+                    {eventVenue}
+                  </>
+                ) : null}
+              </div>
+            ) : null}
           </Link>
         ))}
       </div>

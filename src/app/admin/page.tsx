@@ -1,8 +1,10 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { isAdminRequest } from '@/lib/auth';
-import { getEventConfig } from '@/lib/config';
+import { countNewContactRequests } from '@/lib/contact';
+import { getPrimaryEvent, listAllEvents } from '@/lib/events';
 import { formatMoney } from '@/lib/money';
+import { listOrganizers } from '@/lib/organizers';
 import {
   expireOverdueTransferReservations,
   getStats,
@@ -66,13 +68,29 @@ function Meter({ value, max, tone }: { value: number; max: number; tone?: 'green
 export default async function AdminDashboardPage() {
   if (!(await isAdminRequest())) redirect('/admin/login');
 
-  const cfg = getEventConfig();
   // Release seats of transfer reservations whose payment never arrived.
   expireOverdueTransferReservations();
+  // No event argument = the whole platform, across every organizer.
   const stats = getStats();
   const recent = listOrders({ limit: 10 });
   const stuckCount = getStuckOrders(10).length;
   const awaitingTransfer = listAwaitingTransferOrders();
+
+  const organizers = listOrganizers();
+  const activeOrganizers = organizers.filter((o) => o.status === 'active').length;
+  const pendingOrganizers = organizers.filter((o) => o.status === 'pending').length;
+  const events = listAllEvents();
+  const publishedEvents = events.filter((e) => e.status === 'published').length;
+  // Events still owing the per-event platform fee — your outstanding revenue.
+  const feesDue = events.filter((e) => e.feeStatus !== 'paid' && e.status !== 'archived').length;
+  const eventNameById = new Map(events.map((e) => [e.id, e.name]));
+  // Account applications and "design my page for me" enquiries from /contact
+  // still waiting for an answer.
+  const newContactRequests = countNewContactRequests();
+  const totalCapacity = events.reduce((sum, e) => sum + e.totalCapacity, 0);
+  // Every event shares one currency until multi-currency exists — use the
+  // platform's first event's (falls back to EUR before any event exists).
+  const currency = getPrimaryEvent()?.currency ?? 'EUR';
 
   return (
     <div className="container section">
@@ -92,12 +110,23 @@ export default async function AdminDashboardPage() {
             Admin dashboard
           </h1>
           <p className="muted small" style={{ margin: '4px 0 0' }}>
-            {cfg.eventName} · {cfg.dateDisplay}
+            Platform overview — organizers, events, and every order in one place.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <Link href="/admin/organizers" className="btn btn-sm">
+            Organizers
+          </Link>
           <Link href="/admin/orders" className="btn btn-sm">
             Orders
+          </Link>
+          <Link href="/admin/contact" className="btn btn-sm">
+            Applications
+            {newContactRequests > 0 ? (
+              <span className="badge badge-amber" style={{ marginLeft: 6 }}>
+                {newContactRequests} new
+              </span>
+            ) : null}
           </Link>
           <Link href="/admin/checkin" className="btn btn-primary btn-sm">
             Door check-in
@@ -115,7 +144,7 @@ export default async function AdminDashboardPage() {
             confirmation
           </div>
           <p className="muted small" style={{ marginTop: 0 }}>
-            Check your bank statement for these references. When the money is there, click{' '}
+            Check the bank statement for these references. When the money is there, click{' '}
             <strong>Payment received</strong> and type the last 4 characters of the reference — the QR tickets are
             emailed automatically.
           </p>
@@ -127,7 +156,8 @@ export default async function AdminDashboardPage() {
                   <div className="action-row-who">
                     <div style={{ fontWeight: 700 }}>{o.buyerName}</div>
                     <div className="muted small">
-                      {o.itemsSummary} · reserved {o.createdAt.slice(0, 10)}
+                      {eventNameById.get(o.eventId) ?? 'Unknown event'} · {o.itemsSummary} · reserved{' '}
+                      {o.createdAt.slice(0, 10)}
                     </div>
                   </div>
                   <div className="action-row-amount">{formatMoney(o.totalCents, o.currency)}</div>
@@ -148,32 +178,67 @@ export default async function AdminDashboardPage() {
       <div className="stat-grid">
         <div className="stat-card anim-fade-up anim-d1">
           <div className="stat-label">Money received</div>
-          <div className="stat-value">{formatMoney(stats.revenueCents, cfg.currency)}</div>
+          <div className="stat-value">{formatMoney(stats.revenueCents, currency)}</div>
           <div className="stat-sub">
             {stats.ordersPaid} confirmed order{stats.ordersPaid === 1 ? '' : 's'}
           </div>
         </div>
         <div className={`stat-card anim-fade-up anim-d2${stats.awaitingTransferOrders > 0 ? ' stat-card-alert' : ''}`}>
           <div className="stat-label">Awaiting bank transfer</div>
-          <div className="stat-value">{formatMoney(stats.awaitingTransferCents, cfg.currency)}</div>
+          <div className="stat-value">{formatMoney(stats.awaitingTransferCents, currency)}</div>
           <div className="stat-sub">
             {stats.awaitingTransferOrders} order{stats.awaitingTransferOrders === 1 ? '' : 's'} ·{' '}
             {stats.awaitingTransferTickets} ticket{stats.awaitingTransferTickets === 1 ? '' : 's'}
           </div>
         </div>
-        <div className="stat-card anim-fade-up anim-d3">
+        <div className="stat-card anim-fade-up anim-d2">
           <div className="stat-label">Tickets sold</div>
           <div className="stat-value">
-            {stats.ticketsSold} <span className="muted small">/ {cfg.totalCapacity}</span>
+            {stats.ticketsSold} <span className="muted small">/ {totalCapacity}</span>
           </div>
-          <Meter value={stats.ticketsSold} max={cfg.totalCapacity} />
+          <Meter value={stats.ticketsSold} max={totalCapacity} />
         </div>
-        <div className="stat-card anim-fade-up anim-d4">
+        <div className="stat-card anim-fade-up anim-d3">
           <div className="stat-label">Checked in</div>
           <div className="stat-value">
             {stats.checkedIn} <span className="muted small">/ {stats.ticketsSold}</span>
           </div>
           <Meter value={stats.checkedIn} max={stats.ticketsSold} tone="green" />
+        </div>
+        <div className={`stat-card anim-fade-up anim-d3${pendingOrganizers > 0 ? ' stat-card-alert' : ''}`}>
+          <div className="stat-label">Organizers</div>
+          <div className="stat-value">{organizers.length}</div>
+          <div className="stat-sub">
+            {activeOrganizers} active
+            {pendingOrganizers > 0 ? (
+              <>
+                {' '}
+                · <strong>{pendingOrganizers} to activate</strong>
+              </>
+            ) : null}{' '}
+            ·{' '}
+            <Link href="/admin/organizers" style={{ color: 'var(--accent)' }}>
+              manage →
+            </Link>
+          </div>
+        </div>
+        <div className={`stat-card anim-fade-up anim-d4${feesDue > 0 ? ' stat-card-alert' : ''}`}>
+          <div className="stat-label">Events</div>
+          <div className="stat-value">
+            {publishedEvents} <span className="muted small">/ {events.length}</span>
+          </div>
+          <div className="stat-sub">
+            published / total
+            {feesDue > 0 ? (
+              <>
+                {' '}
+                ·{' '}
+                <Link href="/admin/organizers" style={{ color: 'var(--accent)' }}>
+                  <strong>{feesDue} fee{feesDue === 1 ? '' : 's'} to confirm</strong>
+                </Link>
+              </>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -182,35 +247,6 @@ export default async function AdminDashboardPage() {
         mockPaidOrders={stats.mockPaidOrders}
         mockTicketsSold={stats.mockTicketsSold}
       />
-
-      <div className="card anim-fade-up">
-        <div className="card-title">Sales by tier</div>
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Tier</th>
-                <th style={{ minWidth: 220 }}>Sold</th>
-                <th>Revenue (real)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stats.perTier.map((t) => (
-                <tr key={t.tierId}>
-                  <td>{t.name}</td>
-                  <td>
-                    <span className="mono small" style={{ whiteSpace: 'nowrap' }}>
-                      {t.sold} / {t.cap}
-                    </span>
-                    <Meter value={t.sold} max={t.cap} tone={t.sold >= t.cap ? 'amber' : undefined} />
-                  </td>
-                  <td>{formatMoney(t.revenueCents, cfg.currency)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
 
       <div className="card anim-fade-up">
         <div className="card-title">Recent orders</div>
@@ -222,6 +258,7 @@ export default async function AdminDashboardPage() {
               <thead>
                 <tr>
                   <th>Created (UTC)</th>
+                  <th>Event</th>
                   <th>Buyer</th>
                   <th>Email</th>
                   <th>Items</th>
@@ -237,6 +274,7 @@ export default async function AdminDashboardPage() {
                   return (
                     <tr key={o.id}>
                       <td className="mono small">{o.createdAt.slice(0, 16)}</td>
+                      <td className="small">{eventNameById.get(o.eventId) ?? '—'}</td>
                       <td>{o.buyerName}</td>
                       <td className="small">{o.buyerEmail}</td>
                       <td>{o.itemsSummary}</td>
@@ -271,7 +309,7 @@ export default async function AdminDashboardPage() {
 
       <div className="card glow-card anim-fade-up">
         <div className="card-title">Door scanner access</div>
-        <ScanLinkPanel />
+        <ScanLinkPanel events={events.map((e) => ({ id: e.id, name: e.name }))} />
       </div>
 
       <div className="card glow-card anim-fade-up">

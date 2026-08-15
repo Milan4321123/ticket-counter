@@ -42,6 +42,11 @@ function getSecret(): string | null {
   return stored.value;
 }
 
+/** Shared signing secret for other token kinds (organizer sessions, etc.). */
+export function getSigningSecret(): string | null {
+  return getSecret();
+}
+
 /** Placeholder passwords that must never protect a real deployment. */
 const FORBIDDEN_PASSWORDS = new Set(['change-me', 'changeme', 'password', 'admin', 'admin123', '12345678']);
 
@@ -177,47 +182,56 @@ export async function isPreauthRequest(): Promise<boolean> {
 
 // ---------------- Door-scanner access tokens ----------------
 //
-// The admin generates a scanner LINK whose key is a signed token carrying an
-// epoch number. Opening the link stores the token in a cookie; the check-in
-// API accepts it for scanning only. Bumping the epoch (one click in the admin
-// panel) instantly invalidates every scanner link and cookie ever issued.
+// The admin or an organizer generates a scanner LINK whose key is a signed
+// token carrying an epoch number. Opening the link stores the token in a
+// cookie; the check-in API accepts it for scanning only. Epochs are PER
+// EVENT (kv key 'scan_epoch:<eventId>'), so revoking one event's scanner
+// links never logs out the door staff of every other event on the platform.
 
-function readScanEpoch(): number {
-  const row = getDb().prepare(`SELECT value FROM kv WHERE key = 'scan_epoch'`).get() as
+function readScanEpoch(eventId: string): number {
+  const row = getDb().prepare(`SELECT value FROM kv WHERE key = ?`).get(`scan_epoch:${eventId}`) as
     | { value: string }
     | undefined;
   const n = row ? Number(row.value) : 1;
   return Number.isFinite(n) && n >= 1 ? n : 1;
 }
 
-export function bumpScanEpoch(): number {
-  const next = readScanEpoch() + 1;
+/** Invalidate every scanner link/cookie ever issued for ONE event. */
+export function bumpScanEpoch(eventId: string): number {
+  const next = readScanEpoch(eventId) + 1;
   getDb()
-    .prepare(`INSERT INTO kv (key, value) VALUES ('scan_epoch', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`)
-    .run(String(next));
+    .prepare(`INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`)
+    .run(`scan_epoch:${eventId}`, String(next));
   return next;
 }
 
-/** Token format: '<expiryUnixMs>.<epoch>.<hmacHex>' over 'scan:<exp>:<epoch>'. */
-export function createScanToken(validHours: number): string {
+/**
+ * Token format: '<expiryUnixMs>.<epoch>.<eventId>.<hmacHex>' over
+ * 'scan:<exp>:<epoch>:<eventId>'. Scanner links are EVENT-SCOPED: door staff
+ * of one event can never check in tickets for another.
+ */
+export function createScanToken(eventId: string, validHours: number): string {
   const secret = getSecret();
   if (!secret) throw new Error('Admin auth is not configured (set ADMIN_PASSWORD)');
+  if (!eventId || eventId.includes('.')) throw new Error('Invalid event id for scan token');
   const hours = Math.min(Math.max(validHours, 1), 24 * 7);
   const exp = Date.now() + hours * 60 * 60 * 1000;
-  const epoch = readScanEpoch();
-  return `${exp}.${epoch}.${signPayload(`scan:${exp}:${epoch}`, secret)}`;
+  const epoch = readScanEpoch(eventId);
+  return `${exp}.${epoch}.${eventId}.${signPayload(`scan:${exp}:${epoch}:${eventId}`, secret)}`;
 }
 
-export function verifyScanToken(token: string | null | undefined): boolean {
-  if (!token) return false;
+/** The event this scanner token grants check-in access to, or null. */
+export function verifyScanToken(token: string | null | undefined): { eventId: string } | null {
+  if (!token) return null;
   const secret = getSecret();
-  if (!secret) return false;
-  const [expStr, epochStr, mac] = token.split('.');
-  if (!expStr || !epochStr || !mac || !/^\d+$/.test(expStr) || !/^\d+$/.test(epochStr)) return false;
+  if (!secret) return null;
+  const [expStr, epochStr, eventId, mac] = token.split('.');
+  if (!expStr || !epochStr || !eventId || !mac || !/^\d+$/.test(expStr) || !/^\d+$/.test(epochStr)) return null;
   const exp = Number(expStr);
-  if (!Number.isFinite(exp) || exp <= Date.now()) return false;
-  if (Number(epochStr) !== readScanEpoch()) return false; // revoked
-  return safeEqual(mac, signPayload(`scan:${exp}:${epochStr}`, secret));
+  if (!Number.isFinite(exp) || exp <= Date.now()) return null;
+  if (Number(epochStr) !== readScanEpoch(eventId)) return null; // revoked for this event
+  if (!safeEqual(mac, signPayload(`scan:${exp}:${epochStr}:${eventId}`, secret))) return null;
+  return { eventId };
 }
 
 /** Remaining lifetime of a (valid) scan token, for cookie maxAge. */
@@ -226,9 +240,15 @@ export function scanTokenRemainingSeconds(token: string): number {
   return Math.max(60, Math.floor((exp - Date.now()) / 1000));
 }
 
-/** True when the request may use the check-in API (full admin OR scanner). */
-export async function isScanRequest(): Promise<boolean> {
-  if (await isAdminRequest()) return true;
+/**
+ * Who may use the check-in API on this request: the platform admin (any
+ * event), an event-scoped scanner cookie, or nobody. Organizer sessions are
+ * handled separately by the check-in route (ownership must be checked against
+ * the ticket's event).
+ */
+export async function isScanRequest(): Promise<{ kind: 'admin' } | { kind: 'scan'; eventId: string } | null> {
+  if (await isAdminRequest()) return { kind: 'admin' };
   const store = await cookies();
-  return verifyScanToken(store.get(SCAN_COOKIE_NAME)?.value ?? null);
+  const scan = verifyScanToken(store.get(SCAN_COOKIE_NAME)?.value ?? null);
+  return scan ? { kind: 'scan', eventId: scan.eventId } : null;
 }

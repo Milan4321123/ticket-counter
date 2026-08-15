@@ -1,24 +1,37 @@
 import { NextResponse } from 'next/server';
 import { isAdminRequest } from '@/lib/auth';
 import { sendTicketEmail } from '@/lib/email';
+import { getEventById } from '@/lib/events';
 import { SoldOutError } from '@/lib/inventory';
-import { markTransferOrderPaid, paymentReference } from '@/lib/orders';
+import { currentOrganizer } from '@/lib/organizers';
+import { getOrder, markTransferOrderPaid, paymentReference } from '@/lib/orders';
 import type { ApiErrorResponse } from '@/lib/types';
 
+/** Platform admin, or the organizer who owns the order's event. */
+async function mayManageOrder(orderId: string): Promise<boolean> {
+  if (await isAdminRequest()) return true;
+  const organizer = await currentOrganizer();
+  if (!organizer) return false;
+  const order = getOrder(orderId);
+  if (!order) return false;
+  const event = getEventById(order.eventId);
+  return Boolean(event && event.organizerId === organizer.id);
+}
+
 /**
- * Admin confirmed a bank transfer arrived: finalize the order, mint tickets,
- * email them to the buyer.
+ * The organizer (or platform admin) confirmed a bank transfer arrived:
+ * finalize the order, mint tickets, email them to the buyer.
  *
  * Safety: the request must include the LAST 4 CHARACTERS of the order's
- * payment reference, typed by the admin from the bank statement. A blind or
- * accidental click can never mark an order paid.
+ * payment reference, typed from the bank statement. A blind or accidental
+ * click can never mark an order paid.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   try {
-    if (!(await isAdminRequest())) {
+    if (!(await mayManageOrder(id))) {
       return NextResponse.json(
-        { error: 'Please sign in to the admin area first.' } satisfies ApiErrorResponse,
+        { error: 'Please sign in first.' } satisfies ApiErrorResponse,
         { status: 401 }
       );
     }

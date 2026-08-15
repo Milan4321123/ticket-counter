@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { scanTokenRemainingSeconds, verifyScanToken, SCAN_COOKIE_NAME } from '@/lib/auth';
+import { getEventById } from '@/lib/events';
 import { clientIp, rateLimit } from '@/lib/ratelimit';
 import type { ApiErrorResponse } from '@/lib/types';
 
@@ -21,13 +22,17 @@ export async function POST(req: Request) {
     } catch {
       // handled below
     }
-    if (!verifyScanToken(key)) {
+    const scan = verifyScanToken(key);
+    if (!scan) {
       return NextResponse.json(
         { error: 'This scanner link is invalid, expired, or has been revoked — ask the organizer for a new one.' } satisfies ApiErrorResponse,
         { status: 401 }
       );
     }
-    const res = NextResponse.json({ ok: true });
+    // Tell the scanner page which event this link is scoped to, so door staff
+    // can see at a glance they hold the right link.
+    const event = getEventById(scan.eventId);
+    const res = NextResponse.json({ ok: true, eventName: event?.name ?? null });
     res.cookies.set(SCAN_COOKIE_NAME, key, {
       httpOnly: true,
       sameSite: 'lax',

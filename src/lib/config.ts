@@ -1,7 +1,11 @@
-// Server-only: loads and validates event.config.json.
-// Do NOT import this from 'use client' components (it uses fs).
-import fs from 'fs';
-import path from 'path';
+// Server-only: payment-mode/base-URL helpers plus LEGACY single-event shims.
+//
+// The platform's source of truth for events is now the database (lib/events).
+// The get*Config()/getTier() functions below are thin compatibility shims over
+// the PRIMARY (oldest) event so not-yet-migrated pages keep compiling and
+// rendering; new code must use lib/events directly.
+// Do NOT import this from 'use client' components.
+import { getEventTiers, getPrimaryEvent, type EventRow } from './events';
 
 export interface TierConfig {
   id: string;
@@ -56,59 +60,64 @@ export interface PublicEventConfig {
   tiers: PublicTier[];
 }
 
-let cached: EventConfig | null = null;
-
-function fail(msg: string): never {
-  throw new Error(`event.config.json: ${msg}`);
+/** One-line venue string for legacy templates ("Venue, City"). */
+function venueDisplay(event: EventRow): string {
+  return [event.venueName, event.city].filter(Boolean).join(', ');
 }
 
-function validate(raw: unknown): EventConfig {
-  const c = raw as EventConfig;
-  if (!c || typeof c !== 'object') fail('file must contain a JSON object');
-  if (!c.eventName || typeof c.eventName !== 'string') fail('"eventName" is required');
-  if (typeof c.currency !== 'string' || c.currency.length !== 3) fail('"currency" must be a 3-letter code like "USD"');
-  if (!Number.isInteger(c.totalCapacity) || c.totalCapacity < 1) fail('"totalCapacity" must be a positive integer');
-  if (!Number.isInteger(c.maxTicketsPerOrder) || c.maxTicketsPerOrder < 1) fail('"maxTicketsPerOrder" must be a positive integer');
-  if (!Array.isArray(c.tiers) || c.tiers.length === 0) fail('"tiers" must be a non-empty array');
-  const seen = new Set<string>();
-  for (const t of c.tiers) {
-    if (!t.id || !/^[a-z0-9-]+$/.test(t.id)) fail(`tier id "${t.id}" must be lowercase letters/numbers/dashes`);
-    if (seen.has(t.id)) fail(`duplicate tier id "${t.id}"`);
-    seen.add(t.id);
-    if (!t.name || typeof t.name !== 'string') fail(`tier "${t.id}" needs a "name"`);
-    if (!Number.isInteger(t.priceCents) || t.priceCents < 0) fail(`tier "${t.id}": "priceCents" must be a non-negative integer (2500 = $25.00)`);
-    if (!Number.isInteger(t.cap) || t.cap < 0) fail(`tier "${t.id}": "cap" must be a non-negative integer`);
-  }
-  if (c.bankTransfer !== undefined) {
-    const b = c.bankTransfer as Partial<BankTransferConfig>;
-    if (!b || typeof b !== 'object') fail('"bankTransfer" must be an object');
-    for (const key of ['accountHolder', 'iban', 'bic', 'bankName'] as const) {
-      if (typeof b[key] !== 'string') fail(`"bankTransfer.${key}" must be a string ("" if unused)`);
-    }
-    const compactIban = (b.iban as string).replace(/\s+/g, '').toUpperCase();
-    if (compactIban !== '' && !/^[A-Z]{2}\d{2}[A-Z0-9]{8,30}$/.test(compactIban)) {
-      fail('"bankTransfer.iban" does not look like a valid IBAN (e.g. "DE89 3704 0044 0532 0130 00")');
-    }
-    if (!Number.isInteger(b.payWithinDays) || (b.payWithinDays as number) < 1 || (b.payWithinDays as number) > 30) {
-      fail('"bankTransfer.payWithinDays" must be an integer between 1 and 30');
-    }
-  }
-  return c;
-}
-
+/**
+ * @deprecated legacy shim — use lib/events (getEventById/getEventBySlug +
+ * getEventTiers). Maps the primary event onto the old event.config.json shape.
+ */
 export function getEventConfig(): EventConfig {
-  // Cache in production; re-read on every call in dev so edits show up live.
-  if (cached && process.env.NODE_ENV === 'production') return cached;
-  const file = path.join(process.cwd(), 'event.config.json');
-  const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
-  cached = validate(raw);
-  return cached;
+  const event = getPrimaryEvent();
+  if (!event) throw new Error('No event exists yet — create one in the portal first.');
+  const tiers = getEventTiers(event.id);
+  return {
+    eventName: event.name,
+    artist: event.artist,
+    description: event.description,
+    dateDisplay: event.dateDisplay,
+    venue: venueDisplay(event),
+    currency: event.currency,
+    totalCapacity: event.totalCapacity,
+    salesOpen: event.salesOpen,
+    maxTicketsPerOrder: event.maxPerOrder,
+    tiers: tiers.map((t) => ({
+      id: t.tierKey,
+      name: t.name,
+      priceCents: t.priceCents,
+      cap: t.cap,
+      studentOnly: t.studentOnly,
+      description: t.description,
+    })),
+    bankTransfer: {
+      accountHolder: event.bankAccountHolder,
+      iban: event.bankIban,
+      bic: event.bankBic,
+      bankName: event.bankName,
+      payWithinDays: event.payWithinDays,
+    },
+  };
 }
 
+/** @deprecated legacy shim — use lib/events getEventTier(eventId, tierKey). */
 export function getTier(tierId: string): TierConfig | null {
-  return getEventConfig().tiers.find((t) => t.id === tierId) ?? null;
+  const event = getPrimaryEvent();
+  if (!event) return null;
+  const t = getEventTiers(event.id).find((tier) => tier.tierKey === tierId);
+  if (!t) return null;
+  return {
+    id: t.tierKey,
+    name: t.name,
+    priceCents: t.priceCents,
+    cap: t.cap,
+    studentOnly: t.studentOnly,
+    description: t.description,
+  };
 }
 
+/** @deprecated legacy shim — use lib/events + a per-event public shape. */
 export function getPublicConfig(): PublicEventConfig {
   const c = getEventConfig();
   return {
@@ -136,13 +145,23 @@ export function hasPaypalCredentials(): boolean {
   return Boolean(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
 }
 
-/** Bank details buyers transfer to. Null until filled in event.config.json. */
+/**
+ * @deprecated legacy shim — read the event's bank* fields via lib/events.
+ * Bank details buyers transfer to (primary event). Null until filled in.
+ */
 export function getBankTransferConfig(): BankTransferConfig | null {
-  const b = getEventConfig().bankTransfer;
-  if (!b || !b.iban.trim() || !b.accountHolder.trim()) return null;
-  return b;
+  const event = getPrimaryEvent();
+  if (!event || !event.bankIban.trim() || !event.bankAccountHolder.trim()) return null;
+  return {
+    accountHolder: event.bankAccountHolder,
+    iban: event.bankIban,
+    bic: event.bankBic,
+    bankName: event.bankName,
+    payWithinDays: event.payWithinDays,
+  };
 }
 
+/** @deprecated legacy shim — check the event's bank* fields via lib/events. */
 export function isTransferConfigured(): boolean {
   return getBankTransferConfig() !== null;
 }

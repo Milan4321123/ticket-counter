@@ -3,12 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatMoney } from '@/lib/money';
-import type {
-  ApiErrorResponse,
-  CaptureOrderResponse,
-  CreateOrderRequest,
-  CreateOrderResponse,
-} from '@/lib/types';
+import type { ApiErrorResponse, CaptureOrderResponse, CreateOrderResponse } from '@/lib/types';
 import styles from './checkout.module.css';
 
 declare global {
@@ -17,11 +12,11 @@ declare global {
   }
 }
 
-// Local prop shapes (structurally identical to the server-side PublicEventConfig
-// and Availability types — redeclared here so this client component never
-// imports a server-only module).
+// Local prop shapes (structurally identical to the server-side event/tier and
+// Availability types — redeclared here so this client component never imports
+// a server-only module).
 export interface CheckoutTier {
-  id: string;
+  id: string; // tier_key — what the orders API expects as items[].tierId
   name: string;
   priceCents: number;
   studentOnly: boolean;
@@ -31,11 +26,9 @@ export interface CheckoutTier {
 export interface CheckoutConfig {
   eventName: string;
   artist: string;
-  description: string;
   dateDisplay: string;
   venue: string;
   currency: string;
-  salesOpen: boolean;
   maxTicketsPerOrder: number;
   tiers: CheckoutTier[];
 }
@@ -55,11 +48,20 @@ export interface CheckoutAvailability {
 }
 
 interface Props {
+  eventId: string;
   config: CheckoutConfig;
   availability: CheckoutAvailability;
   mode: 'paypal' | 'mock' | 'transfer';
   paypalClientId: string | null;
   transferConfigured: boolean;
+}
+
+/** POST /api/orders body — matches the platform orders API contract. */
+interface CreateOrderBody {
+  eventId: string;
+  buyerName: string;
+  buyerEmail: string;
+  items: { tierId: string; quantity: number }[];
 }
 
 type ApiCode = NonNullable<ApiErrorResponse['code']>;
@@ -143,7 +145,14 @@ interface InlineMessage {
   text: string;
 }
 
-export default function CheckoutClient({ config, availability, mode, paypalClientId, transferConfigured }: Props) {
+export default function CheckoutClient({
+  eventId,
+  config,
+  availability,
+  mode,
+  paypalClientId,
+  transferConfigured,
+}: Props) {
   const router = useRouter();
 
   const [qty, setQty] = useState<Record<string, number>>(() =>
@@ -198,7 +207,7 @@ export default function CheckoutClient({ config, availability, mode, paypalClien
     setMessage(null);
   }
 
-  function buildItems(quantities: Record<string, number>): CreateOrderRequest['items'] {
+  function buildItems(quantities: Record<string, number>): CreateOrderBody['items'] {
     return config.tiers
       .filter((t) => (quantities[t.id] ?? 0) > 0)
       .map((t) => ({ tierId: t.id, quantity: quantities[t.id] ?? 0 }));
@@ -222,7 +231,8 @@ export default function CheckoutClient({ config, availability, mode, paypalClien
     setMessage(null);
     setBusy(true);
     try {
-      const req: CreateOrderRequest = {
+      const req: CreateOrderBody = {
+        eventId,
         buyerName: name.trim(),
         buyerEmail: email.trim(),
         items: buildItems(qty),
@@ -251,7 +261,8 @@ export default function CheckoutClient({ config, availability, mode, paypalClien
     setMessage(null);
     setBusy(true);
     try {
-      const req: CreateOrderRequest = {
+      const req: CreateOrderBody = {
+        eventId,
         buyerName: name.trim(),
         buyerEmail: email.trim(),
         items: buildItems(qty),
@@ -327,7 +338,8 @@ export default function CheckoutClient({ config, availability, mode, paypalClien
           }
           setMessage(null);
           try {
-            const req: CreateOrderRequest = {
+            const req: CreateOrderBody = {
+              eventId,
               buyerName: s.name.trim(),
               buyerEmail: s.email.trim(),
               items: buildItems(s.qty),
@@ -390,10 +402,18 @@ export default function CheckoutClient({ config, availability, mode, paypalClien
   // ---------------- Render ----------------
 
   const selectedTiers = config.tiers.filter((t) => (qty[t.id] ?? 0) > 0);
+  const eventSummary = [config.eventName, config.dateDisplay, config.venue]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <div className="container container-narrow">
-      <h1 className="page-title anim-fade-up">Checkout</h1>
+      <h1 className="page-title anim-fade-up" style={{ marginBottom: 8 }}>
+        Checkout
+      </h1>
+      <p className="muted anim-fade-up" style={{ margin: '0 0 20px' }}>
+        {eventSummary}
+      </p>
 
       <div className="card anim-fade-up anim-d1">
         <h2 className="card-title">Your tickets</h2>
@@ -555,11 +575,11 @@ export default function CheckoutClient({ config, availability, mode, paypalClien
               <ul className={styles.perkList}>
                 <li>No fees, no account needed — pay from any bank app</li>
                 <li>
-                  On the next page you&rsquo;ll get our bank details and your personal payment
-                  reference (also sent to you by email)
+                  On the next page you&rsquo;ll get the organizer&rsquo;s bank details and your
+                  personal payment reference (also sent to you by email)
                 </li>
                 <li>
-                  Your QR-code tickets are emailed as soon as your transfer reaches us — usually
+                  Your QR-code tickets are emailed as soon as your transfer arrives — usually
                   within 1–2 business days
                 </li>
                 <li>

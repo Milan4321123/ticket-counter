@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import PrintButton from '@/components/PrintButton';
-import { getEventConfig, getTier } from '@/lib/config';
-import { getTicketByCode } from '@/lib/orders';
+import { getEventById, getEventTier } from '@/lib/events';
+import { getOrder, getTicketByCode } from '@/lib/orders';
 import { ticketQrDataUrl } from '@/lib/tickets';
 
 export const dynamic = 'force-dynamic';
@@ -21,17 +21,29 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
   const ticket = getTicketByCode(raw);
   if (!ticket || ticket.orderStatus !== 'paid') notFound();
 
-  const cfg = getEventConfig();
+  // The ticket's event carries the name/date/venue printed on it.
+  const order = getOrder(ticket.orderId);
+  const event = order ? getEventById(order.eventId) : null;
+  const eventVenue = event ? [event.venueName, event.city].filter(Boolean).join(', ') : '';
+  const tierName =
+    (order ? getEventTier(order.eventId, ticket.tierId)?.name : undefined) ?? ticket.tierId;
   const qr = await ticketQrDataUrl(ticket.code);
-  const tierName = getTier(ticket.tierId)?.name ?? ticket.tierId;
 
   return (
     <div className="container section" style={{ textAlign: 'center' }}>
       <div className="ticket-card anim-fade-up" style={{ maxWidth: 380, margin: '24px auto' }}>
-        <div style={{ fontWeight: 800, fontSize: '1.2rem', lineHeight: 1.3 }}>{cfg.eventName}</div>
-        <div style={{ color: '#555', fontSize: '0.85rem' }}>{cfg.artist}</div>
-        <div style={{ color: '#555', fontSize: '0.85rem' }}>{cfg.dateDisplay}</div>
-        <div style={{ color: '#555', fontSize: '0.85rem', marginBottom: 14 }}>{cfg.venue}</div>
+        {event ? (
+          <>
+            <div style={{ fontWeight: 800, fontSize: '1.2rem', lineHeight: 1.3 }}>{event.name}</div>
+            {event.artist ? (
+              <div style={{ color: '#555', fontSize: '0.85rem' }}>{event.artist}</div>
+            ) : null}
+            {event.dateDisplay ? (
+              <div style={{ color: '#555', fontSize: '0.85rem' }}>{event.dateDisplay}</div>
+            ) : null}
+            <div style={{ color: '#555', fontSize: '0.85rem', marginBottom: 14 }}>{eventVenue}</div>
+          </>
+        ) : null}
         <div
           className="qr-frame"
           style={{ border: '1px solid #e6e6e6', boxShadow: '0 8px 22px -14px rgba(0, 0, 0, 0.4)' }}

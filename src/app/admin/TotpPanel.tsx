@@ -10,6 +10,18 @@ interface SetupData {
 }
 
 /**
+ * The secret in blocks of four, e.g. 'JBSW Y3DP EHPK 3PXP'. Typing a 32-character
+ * string off a screen is where manual setup goes wrong; the blocks give the eye
+ * somewhere to come back to. Authenticator apps ignore the spaces.
+ */
+function groupSecret(secret: string): string {
+  return secret
+    .toUpperCase()
+    .replace(/(.{4})/g, '$1 ')
+    .trim();
+}
+
+/**
  * Set up (or turn off) an authenticator app as a free second factor for admin
  * login. The emailed code keeps working either way — this just lets you use a
  * code from Google/Microsoft Authenticator / Authy instead of waiting on email.
@@ -132,19 +144,38 @@ export default function TotpPanel({ initialEnrolled }: { initialEnrolled: boolea
           <ol className="step-list" style={{ margin: '0 0 14px' }}>
             <li className="step-item">
               <span className="step-num">1</span>
-              <div>
+              <div style={{ width: '100%' }}>
                 <div className="tier-name">Scan this with your authenticator app</div>
                 <div className="qr-frame" style={{ marginTop: 10, width: 'fit-content' }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={setup.qrDataUrl} alt="Authenticator app setup QR code" width={200} height={200} />
                 </div>
-                <div className="copy-row" style={{ marginTop: 10 }}>
-                  <span className="muted small">Or type this key</span>
-                  <span className="mono small" style={{ wordBreak: 'break-all' }}>
-                    {setup.secret}
-                  </span>
-                  <CopyButton value={setup.secret} label="Copy key" />
-                </div>
+                {/* Scanning fails often — the QR is usually on the same phone
+                    that holds the app. Keep the typeable key one tap away. */}
+                <details className="faq-item" style={{ marginTop: 12, marginBottom: 0 }}>
+                  <summary>Can&rsquo;t scan the code?</summary>
+                  <div style={{ padding: '0 18px 14px' }}>
+                    <p className="muted small" style={{ marginTop: 0 }}>
+                      Type the key in by hand instead. In your authenticator app choose{' '}
+                      <strong>Enter a setup key</strong> (some apps call it &ldquo;manual entry&rdquo;), give the
+                      account any name you like, set the type to <strong>Time-based</strong>, then type or paste
+                      this key.
+                    </p>
+                    <div className="copy-row">
+                      <span
+                        className="mono"
+                        style={{ letterSpacing: '0.06em', fontWeight: 700, overflowWrap: 'anywhere' }}
+                      >
+                        {groupSecret(setup.secret)}
+                      </span>
+                      <CopyButton value={setup.secret} label="Copy key" />
+                    </div>
+                    <p className="muted small" style={{ margin: '8px 0 0' }}>
+                      The spaces are only there to make it readable — the app ignores them. Treat this key like a
+                      password: anyone who copies it can generate your sign-in codes.
+                    </p>
+                  </div>
+                </details>
               </div>
             </li>
             <li className="step-item">

@@ -10,9 +10,12 @@ type Status = 'checking' | 'ready' | 'invalid';
  * (#k=...) for a scanner cookie, or — when opened without a key — checks
  * whether a valid scanner cookie / admin session already exists.
  */
-export default function ScanClient({ eventName }: { eventName: string }) {
+export default function ScanClient({ eventName }: { eventName: string | null }) {
   const [status, setStatus] = useState<Status>('checking');
   const [message, setMessage] = useState<string | null>(null);
+  // Server-known name (from the scanner cookie), possibly replaced by the
+  // name returned when a fresh link's key is exchanged for a cookie.
+  const [shownEventName, setShownEventName] = useState<string | null>(eventName);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,9 +38,13 @@ export default function ScanClient({ eventName }: { eventName: string }) {
             body: JSON.stringify({ key }),
           });
           if (res.ok) {
+            const data = (await res.json().catch(() => null)) as { eventName?: string | null } | null;
             // The key did its job — remove it from the address bar.
             window.history.replaceState(null, '', window.location.pathname + window.location.search);
-            if (!cancelled) setStatus('ready');
+            if (!cancelled) {
+              if (typeof data?.eventName === 'string' && data.eventName) setShownEventName(data.eventName);
+              setStatus('ready');
+            }
             return;
           }
           const data = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -113,9 +120,11 @@ export default function ScanClient({ eventName }: { eventName: string }) {
           <h1 className="page-title" style={{ margin: 0 }}>
             Door check-in
           </h1>
-          <p className="muted small" style={{ margin: 0 }}>
-            {eventName}
-          </p>
+          {shownEventName && (
+            <p className="muted small" style={{ margin: 0 }}>
+              {shownEventName}
+            </p>
+          )}
         </div>
         <span className="badge badge-green">
           <span className="pulse-dot" aria-hidden /> Scanner active

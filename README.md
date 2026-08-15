@@ -1,12 +1,21 @@
-# Concert Ticket Sales Website
+# Multi-Organizer Ticket Platform
 
 ## 1. What this is
 
-This is a complete, self-contained website for selling tickets to your concert (around 600 seats). Buyers visit the site, pick their tickets — including a discounted Student tier that requires a student ID at the door — and pay by **bank transfer**: the site reserves their seats, shows them your IBAN, the amount, and a personal payment reference, and they transfer the money from their own bank. You confirm each payment in the admin panel when it appears on your bank statement, and the site instantly creates the QR-code tickets and emails them to the buyer. (PayPal support is also built in but optional — bank transfer is the default and needs no payment provider at all.)
+A complete, self-contained **ticketing platform for multiple event organizers**. You — the platform owner — charge organizers a fee **per event** they publish, sized to the venue they booked: €1 for every 10 tickets it holds, minimum €15, so a 500-person event costs €50 (accounts are free). Each organizer gets a self-service portal where they build their event page (photos, video, description, address, ticket tiers), publish it to the public feed, and sell tickets. Buyers pay by **bank transfer directly to the organizer's own bank account** — the platform never holds ticket money. When the organizer sees the money on their bank statement, they confirm the payment and the site instantly creates QR-code tickets and emails them to the buyer.
 
-Every ticket has a unique code, and the site guarantees you can never sell more tickets than you have: seat counts and prices are enforced on the server, so nobody can tamper with them from their browser.
+Every ticket has a unique code and scans exactly once at the door. Seat counts and prices are enforced on the server, so nobody can oversell an event or tamper with prices from a browser. Everything is stored in a single data folder that you control — no monthly software fees, no third-party ticketing cut.
 
-You also get a private admin area with a live dashboard (tickets sold, money received, money on its way, per-tier numbers) and a door check-in page for event night. Staff scan a ticket's QR code with a phone camera or type the code in; each ticket works exactly once, so a screenshot forwarded to a friend won't get two people in. Everything is stored in a single database folder (`./data`) that you control — there are no monthly software fees.
+Three kinds of people use the site, in three separate areas:
+
+| Who | Where | What they do |
+| --- | --- | --- |
+| **Buyers** | `/` and `/e/…` | Browse events, buy tickets, receive QR tickets by email. No account needed. |
+| **Organizers** | `/portal` | Manage their events, tiers, photos, bank details; confirm payments; create door-scanner links. |
+| **You (platform owner)** | `/admin` | Manage organizer accounts, confirm event fees, oversee everything. |
+| **Door staff** | `/scan` | Check tickets in via a time-limited scanner link — nothing else. |
+
+**New here?** The business side (fees, onboarding organizers, support) is in **[PLATFORM.md](PLATFORM.md)**. The click-by-click launch guide is in **[GO-LIVE.md](GO-LIVE.md)**.
 
 ## 2. Quick start (try it in 2 minutes)
 
@@ -17,70 +26,61 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser. Without any configuration the site runs in **TEST MODE**: payments are simulated (no real money moves) and a banner reminds you of it. Go ahead and "buy" a few tickets to see the whole flow, including the QR-code tickets at the end.
-
-To try the real **bank-transfer flow** locally, create a file called `.env.local` in the project folder with at least:
+Open [http://localhost:3000](http://localhost:3000). To try the real flows locally, create a file called `.env.local` in the project folder:
 
 ```bash
 PAYMENT_MODE=transfer
 ADMIN_PASSWORD=pick-something-long-and-private
+APP_SECRET=any-long-random-string-for-local-testing
 ```
 
-and make sure your IBAN is filled in `event.config.json` (see below). All available settings are listed in the [environment variable reference](#8-environment-variable-reference).
+Then:
 
-The admin area is at [http://localhost:3000/admin](http://localhost:3000/admin) — the password is your `ADMIN_PASSWORD`.
+1. Sign in to the admin area at [http://localhost:3000/admin](http://localhost:3000/admin) with your `ADMIN_PASSWORD`. (During development, emailed sign-in codes are also printed to the server console, so broken email settings never lock you out.)
+2. Create an organizer account under **/admin/organizers** — the site shows you a one-time password.
+3. Log in as that organizer at [http://localhost:3000/portal/login](http://localhost:3000/portal/login), create an event, and give it a tier and an IBAN (any test value). Publishing is locked until the event fee is confirmed — hop back to **/admin/organizers → Event fees**, click *Fee received*, type the last 4 characters of the event's `EVENT-…` reference, then publish from the portal.
+4. Visit the homepage, buy a ticket as a buyer, then confirm the "payment" from the portal and watch the QR ticket arrive.
 
-## 3. Put in your event details
+## 3. How the site fits together
 
-All event settings live in one file: **`event.config.json`** in the project folder. Open it in any text editor. Here is what each field means:
-
-| Field | What it does |
-| --- | --- |
-| `eventName` | The name shown in the header, on tickets, and in the browser tab. |
-| `artist` | Who's performing. |
-| `description` | A short blurb shown on the home page (good place for your terms, e.g. "all sales final"). |
-| `dateDisplay` | The date/time exactly as you want it displayed, e.g. `"Saturday, October 17, 2026 · Doors 6:00 PM · Show 7:00 PM"`. |
-| `venue` | Venue name and city. |
-| `currency` | 3-letter currency code, e.g. `"EUR"`. |
-| `totalCapacity` | The absolute maximum number of tickets that can ever be sold — your room's capacity (e.g. `600`). |
-| `salesOpen` | `true` means people can buy; set it to `false` to pause or close sales (the site stays up, buying is disabled). |
-| `maxTicketsPerOrder` | The most tickets one person can buy in a single order (e.g. `8`). |
-| `bankTransfer` | Your bank details for pay-by-transfer — see below. |
-| `tiers` | The list of ticket types — see below. |
-
-The `bankTransfer` section is what buyers transfer money to:
-
-- `accountHolder` — the name on your bank account, exactly as buyers should enter it.
-- `iban` — your IBAN (spaces are fine). **Until this is filled in, checkout shows "payment not configured".**
-- `bic` / `bankName` — optional; leave as `""` if you don't want to show them.
-- `payWithinDays` — how many days buyers are asked to pay within (e.g. `5`). Reservations whose money never arrives are released again automatically, with 2 extra grace days on top so a transfer sent on the last day doesn't die in transit over a weekend.
-
-Each entry in `tiers` has:
-
-- `id` — a short internal name, lowercase letters/numbers/dashes only (e.g. `"general"`, `"student"`). Don't change ids after sales start.
-- `name` — what buyers see (e.g. `"General Admission"`).
-- `priceCents` — the price **in cents**: `2500` means €25.00, `1500` means €15.00. (Using cents avoids rounding errors.)
-- `cap` — the maximum number of tickets of *this* type.
-- `studentOnly` — `true` marks it as a student ticket; buyers are told a valid student ID will be checked at the entrance, and door staff see a reminder at check-in.
-- `description` — a short line shown under the tier name.
-
-**Tier caps vs. total capacity:** both limits are enforced. Tier caps can add up to more than `totalCapacity` if you like (e.g. General 500 + Student 100 with a total of 600) — the site simply stops selling once *either* a tier's cap or the overall total is reached. Whichever runs out first wins.
+- **`/` — the public feed.** Every published event from every organizer, newest first.
+- **`/e/[slug]` — event pages.** Each event's own page: photos, video, description, an "Open in Maps" address link, and the ticket shop. Organizers style it with a theme — or, if the AI designer is enabled, describe the vibe in their own words and let the AI pick the look and write the copy.
+- **`/checkout`, `/order/[id]`, `/ticket/[code]` — the buyer flow.** Reserve seats, see payment instructions (amount, the organizer's IBAN, a personal reference like `TICKETS-AB12CD34`), then find the QR tickets on the personal order page and in email. References containing `S-` mark orders with student tickets, visible right on the bank statement.
+- **`/portal` — the organizer portal.** Email + password login (accounts are created by the platform admin). Organizers see only their own events and orders — ownership is checked on the server for every single request.
+- **`/admin` — the platform admin.** Password plus emailed one-time code. Manage organizer accounts (create, activate, reset password, disable), confirm the per-event fees that unlock publishing, and oversee platform-wide activity.
+- **`/scan` — door check-in.** Opened via time-limited scanner links that organizers (or you) generate per event. A scanner link gives access to that one event's check-in screen only: staff scan a ticket's QR code or type its short code; each ticket works exactly once, student tickets show a "check student ID" reminder, and a ticket from a different event is clearly rejected.
 
 ## 4. How payment works (bank transfer)
 
-Set `PAYMENT_MODE=transfer` and fill in `bankTransfer` in `event.config.json`. The flow:
+1. **The buyer reserves tickets at checkout.** Seats are held immediately — nobody else can buy them while the reservation stands.
+2. **They see (and receive by email) the payment instructions:** the amount, the *organizer's* bank details, and a personal payment reference. They transfer the money from their own banking app within the event's pay-within window.
+3. **The organizer watches their own bank statement.** The portal shows every open reservation with its reference, buyer, and expected amount.
+4. **The organizer confirms the payment.** The site mints the QR tickets and emails them to the buyer automatically.
+5. **If no payment arrives**, the reservation expires on its own (pay-within days + 2 grace days) and the seats go back on sale. Late payments are handled gracefully: marking an expired reservation paid re-reserves the seats if any are left.
 
-1. **The buyer reserves tickets at checkout.** Their seats are held immediately — nobody else can buy them while the reservation stands.
-2. **They see (and receive by email) the payment instructions:** the amount, your account details, and a personal **payment reference** like `TICKETS-AB12CD34`. If the order contains student tickets, the reference is `TICKETS-S-AB12CD34` — the **`S-` marker** lets you spot student orders directly on your bank statement. Buyers are told the reference **must** go in the transfer's purpose line, and to pay within `payWithinDays` days.
-3. **You watch your bank account.** When a transfer arrives, open the admin dashboard — the **"Awaiting bank transfer"** list shows every open reservation with its reference, buyer, and expected amount. You can also paste a reference straight into the order search on `/admin/orders`.
-4. **Confirm the payment.** Click **Payment received** and type the **last 4 characters of the payment reference** as you read them from your bank statement. This little typing step is deliberate: a blind or accidental click can never mark an order paid — you're proving you actually looked at the statement. The site then mints the QR tickets and emails them to the buyer automatically.
-5. **If no payment ever arrives**, the reservation expires on its own (after `payWithinDays` + 2 grace days) and the seats go back on sale. You can also cancel a reservation manually from the admin panel if the buyer changed their mind.
+The platform itself is never in the money flow — ticket revenue goes buyer → organizer, and organizers pay the platform owner a per-event fee separately. Why that matters (and how to run it as a business) is explained in [PLATFORM.md](PLATFORM.md).
 
-**Late payments are handled gracefully:** if money arrives after a reservation expired, marking it paid re-reserves the seats if any are left and issues the tickets as normal. Only if the event genuinely sold out in the meantime will the site refuse — then you transfer the money back.
+### The event fee (how you get paid)
 
-The dashboard shows both sides of the money: **"Awaiting bank transfer"** is money on its way (reserved but unconfirmed), and **revenue** counts only confirmed, real payments.
+Your own revenue runs on the same bank-transfer idea, one event at a time:
 
-## 5. Email (tickets + sign-in codes)
+1. **An organizer builds an event** in their portal. Drafts are free and unlimited.
+2. **The Publish tab shows the fee card**: the amount for *that* event, *your* bank details, and that event's Verwendungszweck — a reference like `EVENT-1A2B3C4D` derived from the event id. The Publish button stays locked, and the same details are emailed to the organizer.
+   The amount follows the event's capacity — €1.00 per 10 tickets, minimum €15.00, so a 500-person event costs €50.00 (`PLATFORM_FEE_PER_CUSTOMER_CENTS` / `PLATFORM_FEE_MIN_CENTS`). It is quoted the moment the organizer is shown it and stored on the event, so the Publish tab, the email, and your confirm screen always name the same number. While the fee is unpaid, changing the capacity re-quotes it; once you confirm the payment the amount is frozen.
+3. **They transfer the fee** with that reference in the purpose line.
+4. **You confirm it** at `/admin/organizers` → **Event fees**: click *Fee received* and type the last 4 characters of the reference from your bank statement (the same two-step confirm as ticket payments). Publishing unlocks instantly and the organizer gets a "your event can go live" email.
+
+Events that were already published before this pricing landed are grandfathered in as paid — nobody is charged retroactively.
+
+Three emails carry this flow (all fail silently when SMTP is unset, since every detail is on screen too):
+
+| Email | When | What's in it |
+| --- | --- | --- |
+| Signup instructions | Right after someone signs up at `/organizers/signup` | Welcome, "the account is free, events cost X", your bank box, their account reference, portal link. |
+| Event fee instructions | When they try to publish an event whose fee hasn't arrived | Your bank box and that event's `EVENT-…` Verwendungszweck, plus a link to the Publish tab. |
+| Event can go live | When you confirm that event's fee | "Publishing is unlocked" and a link straight to the Publish tab. |
+
+## 5. Email
 
 Fill in the SMTP settings so the site can send email:
 
@@ -89,115 +89,71 @@ SMTP_HOST=smtp.sendgrid.net
 SMTP_PORT=587
 SMTP_USER=apikey
 SMTP_PASS=your-api-key
-EMAIL_FROM="Event Tickets <tickets@yourdomain.com>"
+EMAIL_FROM="Your Platform <tickets@yourdomain.com>"
 ```
 
-Email is used for three things:
+Email is used for payment instructions after a reservation, the QR-ticket emails after a confirmed payment, and the platform admin's sign-in codes. If SMTP is blank, sales still work (buyers see everything on their order page), but for a real launch set it up — [GO-LIVE.md](GO-LIVE.md) walks through SendGrid step by step.
 
-- **Payment instructions** right after a buyer reserves (they also see the same details on their order page).
-- **The tickets themselves** once you confirm a payment.
-- **Admin sign-in codes** for the two-step login (next section).
+## 6. The AI page designer (optional)
 
-If you leave SMTP blank, ticket sales still work — buyers see everything on their personal order page — but the two-step admin login can't deliver codes, so it falls back to password-only. For a real event, set up email. (`GO-LIVE.md` walks through SendGrid step by step.)
+If you set `ANTHROPIC_API_KEY`, organizers get an extra option when designing their event page: they describe the look and feel they want in plain words ("dark and moody, it's a metal night" / "elegant, classical, gold"), and the AI picks a matching color mood and page treatment and writes a headline, tagline, and highlight lines from the event's real details. The AI can only choose from the site's fixed design options — it never injects its own code or styling into your pages. Without the key, the manual theme picker covers everyone.
 
-## 6. The admin area and its two-step login
+The **visitor Q&A assistants** (the question box on event pages, and the platform help bot at `POST /api/platform/ask`) run on Google Gemini's free tier instead: set `GEMINI_API_KEY` with a free key from [Google AI Studio](https://aistudio.google.com). When that key is missing — or the free quota runs out — they fall back to `ANTHROPIC_API_KEY`. With neither key set, nothing breaks: event-page questions go straight to the organizer to answer in the portal, and the help bot politely points visitors at the platform contact.
 
-Everything for you as organizer lives at **`/admin`**: dashboard, orders, and door check-in. It's protected by a two-step sign-in:
+## 7. Environment variable reference
 
-1. **Password** — from `ADMIN_PASSWORD`. In production it must be at least 10 characters and must not be a placeholder like `change-me`; the site refuses to run the admin area otherwise.
-2. **One-time code** — after the correct password, a 6-digit code is emailed to the address(es) in `ADMIN_EMAIL` (comma-separated for more than one). The code expires in 10 minutes, works exactly once, and allows only a few wrong attempts before you need a fresh one. Only after the code is verified do you get a session (valid 12 hours).
-
-So even if someone learns your password, they can't get in without your inbox. Notes:
-
-- **During development** (`npm run dev`) each code is also printed to the server console, so you can sign in even with broken email settings.
-- **`ADMIN_OTP=off`** disables the second step entirely (password-only login) — useful while debugging email problems. Turn it back on for a real event.
-- If `ADMIN_EMAIL` is not set or SMTP is not configured, the second step is skipped automatically.
-- Failed login attempts are rate-limited (per address and globally), so password guessing gets nowhere.
-
-## 7. Event day: door check-in
-
-Two ways to give people scanning power at the door:
-
-**A. As the organizer:** log in to the admin area on your phone and open **`/admin/checkin`**.
-
-**B. Scanner links for your staff (recommended):** from the admin area, create a **door-scanner link**. It's a special `/scan` link that gives whoever opens it access to the check-in screen only — **no dashboard, no orders, no buyer data beyond the scan result**, and no admin password to share. Details:
-
-- You choose how long a link stays valid (1 hour up to 7 days; 24 hours by default) — make it cover the event night.
-- Share it however you like: send it to staff, or let them scan the link's QR code straight off your screen.
-- One click on **revoke** invalidates *every* scanner link ever issued, instantly — e.g. if a phone gets lost.
-
-On the check-in screen itself:
-
-- **Scan** the QR code on a buyer's ticket using the device camera, or **type** the short ticket code (like `K7KQ-M3XP`) — capitalization, spaces, and dashes don't matter.
-- A big green **VALID** means they're in. **Each ticket scans exactly once** — a ticket that was already used shows a clear **ALREADY USED** warning with the time it was first scanned.
-- **Student tickets show a reminder to check a valid student ID** before letting the person in.
-- Several staff members can check people in from different phones at the same time — the once-only rule still holds.
-
-## 8. Environment variable reference
-
-There is no `.env.example` file — this table is the reference. Locally, put these in a file called `.env.local` in the project folder; on a hosting service, enter them in its environment-variables settings.
+Locally these go in `.env.local`; on a hosting service, into its environment-variables settings.
 
 | Variable | Required? | What it does |
 | --- | --- | --- |
-| `PAYMENT_MODE` | **Yes, for real sales** | `transfer` = bank transfer (recommended). `paypal` = PayPal only. `mock` = fake test payments. `auto` (default) = PayPal if credentials exist, otherwise test mode in development. |
-| `ADMIN_PASSWORD` | **Yes** | The admin password. Production requires 10+ characters and rejects placeholders. Without it, the admin area is disabled. |
-| `APP_SECRET` | **Yes, in production** | A long random string used to sign login sessions and scanner links. Changing it logs everyone out. |
-| `ADMIN_EMAIL` | Recommended | Where admin sign-in codes are emailed. Comma-separate multiple addresses. |
-| `ADMIN_OTP` | No | Set to `off` to disable the emailed one-time code and log in with password only. |
-| `NEXT_PUBLIC_BASE_URL` | **Yes, in production** | Your site's public address, e.g. `https://tickets.example.com` — used in emailed links and scanner links. |
-| `DATA_DIR` | On hosted setups | Folder where the SQLite database lives. Defaults to `./data`. On a hosting service, point it at the persistent disk (e.g. `/data`). |
-| `SMTP_HOST` | For email | Your email provider's SMTP server, e.g. `smtp.sendgrid.net`. |
-| `SMTP_PORT` | For email | Usually `587` (or `465` for SSL). |
-| `SMTP_USER` | For email | SMTP username (for SendGrid this is literally the word `apikey`). |
-| `SMTP_PASS` | For email | SMTP password (for SendGrid: your API key). |
-| `EMAIL_FROM` | For email | The sender, e.g. `"Event Tickets <tickets@yourdomain.com>"`. Emails don't send without it. |
-| `PAYPAL_ENV` | PayPal only | `sandbox` or `live`. When `live`, test mode is always disabled. |
-| `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` | PayPal only | Credentials from developer.paypal.com. Not needed for bank transfer. |
-| `ALLOW_MOCK_PAYMENTS` | No | Extra safety latch: a production build only allows `PAYMENT_MODE=mock` if this is also `true`. Leave unset. |
+| `PLATFORM_NAME` | Recommended | Your platform's public name, shown in the site header, page titles, and emails. |
+| `PLATFORM_FEE_PER_CUSTOMER_CENTS` | No | What each person the venue holds adds to the event fee, in cents (default `10` = €1.00 per 10 tickets). The fee is `capacity × this`, rounded to whole euros. |
+| `PLATFORM_FEE_MIN_CENTS` | No | The floor for small rooms, in cents (default `1500` = €15.00). With both defaults: 100 capacity → €15.00, 300 → €30.00, 500 → €50.00, 1200 → €120.00. Charged once per event, before it can be published — organizer accounts themselves are free. Shown on `/organizers`, on each event's Publish tab, in `/admin/organizers`, and in the fee emails. |
+| `PLATFORM_BANK_HOLDER` / `PLATFORM_BANK_IBAN` | For collecting fees | **Your own** bank account, shown to organizers paying an event fee. Until both are set, the fee card and signup page show a "being set up — contact us" note instead. |
+| `PLATFORM_BANK_BIC` / `PLATFORM_BANK_NAME` | No | Optional BIC and bank name shown alongside your payment details. |
+| `PLATFORM_CONTACT_EMAIL` | Recommended | Where organizers reach you about a **custom-designed page**: shown as a mailto link on `/contact` and `/organizers`, and used as the recipient of every enquiry from the contact form. Falls back to the first `ADMIN_EMAIL` address, then to a demo address. |
+| `PAYMENT_MODE` | **Yes, for real sales** | `transfer` = bank transfer (the platform's payment model). `mock` = fake test payments for development. |
+| `ADMIN_PASSWORD` | **Yes** | The platform admin password. Production requires 10+ characters and rejects placeholders. Without it, `/admin` is disabled. |
+| `APP_SECRET` | **Yes, in production** | A long random string used to sign admin sessions, organizer sessions, and scanner links. Changing it logs everyone out. |
+| `ADMIN_EMAIL` | Recommended | Where admin sign-in codes are emailed. Comma-separate multiple addresses. Also used as the seeded owner account's email on first migration. |
+| `ADMIN_OTP` | No | Set to `off` to disable the emailed one-time code (password-only admin login). |
+| `NEXT_PUBLIC_BASE_URL` | **Yes, in production** | The site's public address, e.g. `https://tickets.example.com` — used in emailed links and scanner links. |
+| `DATA_DIR` | On hosted setups | The data folder — SQLite database **and uploaded event photos**. Defaults to `./data`. Point it at the persistent disk (e.g. `/data`). |
+| `GEMINI_API_KEY` | No | Free key from Google AI Studio — powers the Q&A assistants (the event-page question box and the platform help bot); falls back to `ANTHROPIC_API_KEY`, or to organizer-answered questions when neither is set. |
+| `ANTHROPIC_API_KEY` | No | Enables the AI page designer for organizers (section 6). Also the fallback model for the Q&A assistants when `GEMINI_API_KEY` is unset or over quota. Leave unset to offer the manual theme picker only. |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | For email | Your email provider's SMTP settings (for SendGrid: host `smtp.sendgrid.net`, port `587`, user literally `apikey`, pass = your API key). |
+| `EMAIL_FROM` | For email | The sender, e.g. `"Your Platform <tickets@yourdomain.com>"`. Emails don't send without it. |
+| `ADMIN_GATE_PATH` | No | A secret word that hides `/admin` behind a 404 until you visit `https://yourdomain.com/<gate-path>` once per device. |
+| `ADMIN_PHONE` + `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM` | No | Also text the admin sign-in code to your phone via Twilio. |
+| `ADMIN_MASTER_OTP` | No | A fixed code accepted in place of the emailed one — for testing only. Leave unset in production. |
+| `PAYPAL_ENV` / `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` | No | Legacy PayPal checkout support from the single-event version. Not used in the bank-transfer platform model. |
+| `ALLOW_MOCK_PAYMENTS` | No | Safety latch: a production build only allows `PAYMENT_MODE=mock` if this is also `true`. Leave unset. |
 
-## 9. Optional: PayPal instead of bank transfer
+## 8. Where the data lives
 
-Bank transfer is the default, but PayPal support is built in. If you'd rather use it: create a PayPal Business account, get a Client ID and Secret from [developer.paypal.com](https://developer.paypal.com) (start with the **Sandbox** ones for testing), and set `PAYPAL_ENV`, `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, and `PAYMENT_MODE=paypal`. Buyers can then pay by card via PayPal's guest checkout, tickets are issued instantly, and the admin dashboard gains a "Fix stuck orders" button that resolves interrupted payments by asking PayPal what really happened. Safety net: with `PAYPAL_ENV=live`, test mode is always disabled, no matter what other settings say.
+Everything is under one folder — `DATA_DIR` (locally `./data`):
+
+- **`tickets.db`** — the SQLite database: organizers, events, ticket tiers, orders, tickets, check-ins.
+- **`uploads/`** — every uploaded event photo, in a subfolder per event.
+
+That folder **is** the platform. Back it up regularly, treat it as private personal data (it contains buyer names and emails), and on any hosting service make sure it sits on a **persistent disk** — serverless hosts that wipe the filesystem between requests (like plain Vercel) will lose your orders.
+
+Built-in safety you don't have to configure:
+
+- Prices and seat counts are always enforced on the server; overselling is blocked atomically even with many simultaneous buyers.
+- Every portal and API request checks ownership — an organizer can never see or touch another organizer's events, orders, or photos.
+- Order creation, logins, and code verification are rate-limited against bots and password guessing.
+- A production build never silently falls back to test mode.
+
+## 9. Migrating from the single-event version
+
+If you used the earlier single-event version of this site: on first start, the platform automatically imports your `event.config.json` as the platform's **first published event**, keeps all existing orders and tickets attached to it, and creates a seeded "platform owner" organizer account that owns it. That account can't log in until you set its password — do that from `/admin/organizers` with **reset password**. Details in [GO-LIVE.md](GO-LIVE.md).
 
 ## 10. Going live
 
-The complete, click-by-click launch guide — domain, hosting on Render, SendGrid, test run, and the event-day runbook — is in **[GO-LIVE.md](GO-LIVE.md)**. The short version of what the site needs:
+The complete launch guide — domain, hosting on Render, SendGrid, creating your first organizer, the test run, and the event-day runbook — is in **[GO-LIVE.md](GO-LIVE.md)**. The short version of what the platform needs:
 
-- A host that runs **Node.js** with a **persistent disk** for the database (Render or Railway work well; **not** plain Vercel — serverless hosting wipes the SQLite file and loses your orders).
+- A host that runs **Node.js** with a **persistent disk** for `DATA_DIR`.
 - `npm install && npm run build` to build, `npm start` to run.
-- All environment variables from the table above, and HTTPS (hosts like Render handle that automatically).
-- A **backup of the data folder** (`DATA_DIR`, locally `./data`) — that folder IS your ticket database: every order, ticket, and check-in.
-
-Safety notes you don't have to configure — they're built in:
-
-- Prices are always computed on the server from `event.config.json`; nothing a buyer does in their browser can change what they're charged.
-- Overselling is blocked atomically on the server, even with many buyers at once.
-- A production build **never** silently falls back to test mode.
-- Order creation, admin login, and the code-verification step are rate-limited against bots and password guessing.
-
-## 11. Refunds & support
-
-- **Refunds:** with bank transfer, the money is already in your account — refunding is simply a bank transfer back to the buyer. The awaiting-transfer table and the order page show you their name and amount.
-- **"I paid but got no tickets":** transfers take 1–2 business days, and tickets only go out after you confirm the money in the admin panel. If a payment is visible on your statement, mark the order paid; if the buyer paid without the reference, find them by name or email in the order search.
-- **The payment arrived after the reservation expired:** mark it paid anyway — the site re-reserves the seats if any are left. If the event sold out in the meantime, it refuses and you transfer the money back.
-- **"I lost my tickets":** every buyer has a personal order page at `/order/{their-order-id}` — the link is in both emails they got. You can also resend the ticket email from the admin orders list, or look them up by name at the door.
-
-## 12. FAQ
-
-**Do buyers need any account or app?**
-No. They fill in name and email, get an IBAN and a reference, and pay with their normal banking app. Tickets arrive by email and live on their personal order page.
-
-**What does the `S-` in a payment reference mean?**
-The order contains student tickets. `TICKETS-S-AB12CD34` on your bank statement = student order; `TICKETS-AB12CD34` = regular. Handy for a quick tally, and door staff still get the student-ID reminder at check-in either way.
-
-**How does the student discount work?**
-Anyone can buy a Student ticket online at the lower price. The enforcement happens at the door: the ticket is clearly marked, the check-in screen reminds staff, and your staff asks for a valid student ID. No ID, no entry (or charge the difference — your call, just announce the policy up front).
-
-**What if a buyer forgets the reference in their transfer?**
-You'll see a payment on your statement with no matching purpose line. Match it by name and amount in the admin order search, then confirm it as usual (the confirmation still asks for the last 4 characters of the *order's* reference, shown right in the admin list).
-
-**Is overselling possible?**
-No. Seats are reserved inside the database, on the server, the moment an order is placed — even if two people grab the last ticket at the same instant, only one reservation succeeds. Tier caps and the total capacity are both enforced.
-
-**What data does the site store, and where?**
-Buyer name, email address, what they ordered, payment status, ticket codes, and check-in times — all in the SQLite database inside the data folder. No bank credentials of buyers are ever seen or stored (they pay from their own banking app). Treat the data folder as private personal data: back it up, don't share it, and delete or archive it responsibly after the event.
+- The environment variables from the table above, and HTTPS (hosts like Render handle that automatically).
+- Regular **backups of the data folder**.

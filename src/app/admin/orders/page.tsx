@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { isAdminRequest } from '@/lib/auth';
+import { listAllEvents } from '@/lib/events';
 import { formatMoney } from '@/lib/money';
 import {
   countOrdersByFilter,
@@ -37,7 +38,7 @@ function StatusBadge({ status }: { status: OrderStatus }) {
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string | string[]; filter?: string | string[] }>;
+  searchParams: Promise<{ q?: string | string[]; filter?: string | string[]; event?: string | string[] }>;
 }) {
   if (!(await isAdminRequest())) redirect('/admin/login');
 
@@ -45,8 +46,15 @@ export default async function AdminOrdersPage({
   const query = typeof params.q === 'string' ? params.q : '';
   const rawFilter = typeof params.filter === 'string' ? params.filter : 'all';
   const filter: OrderFilter = FILTERS.some((f) => f.key === rawFilter) ? (rawFilter as OrderFilter) : 'all';
+
+  const events = listAllEvents();
+  const eventNameById = new Map(events.map((e) => [e.id, e.name]));
+  const rawEvent = typeof params.event === 'string' ? params.event : '';
+  const eventId = eventNameById.has(rawEvent) ? rawEvent : '';
+
   expireOverdueTransferReservations();
-  const orders = listOrders({ query, filter });
+  const orders = listOrders({ query, filter, eventId: eventId || undefined });
+  // Chip counts are platform-wide, so they are hidden while an event filter is on.
   const counts = countOrdersByFilter(query);
 
   return (
@@ -74,7 +82,7 @@ export default async function AdminOrdersPage({
         method="get"
         action="/admin/orders"
         className="anim-fade-up anim-d1"
-        style={{ display: 'flex', gap: 10, marginBottom: 8, maxWidth: 560 }}
+        style={{ display: 'flex', gap: 10, marginBottom: 8, maxWidth: 760, flexWrap: 'wrap' }}
       >
         {filter !== 'all' && <input type="hidden" name="filter" value={filter} />}
         <input
@@ -84,13 +92,29 @@ export default async function AdminOrdersPage({
           defaultValue={query}
           placeholder="Search by name, email, order ID, or payment reference"
           aria-label="Search orders"
+          style={{ flex: '2 1 260px' }}
         />
+        <select
+          name="event"
+          className="input"
+          defaultValue={eventId}
+          aria-label="Filter by event"
+          style={{ flex: '1 1 180px', width: 'auto' }}
+        >
+          <option value="">All events</option>
+          {events.map((e) => (
+            <option key={e.id} value={e.id}>
+              {e.name}
+              {e.status !== 'published' ? ` (${e.status})` : ''}
+            </option>
+          ))}
+        </select>
         <button type="submit" className="btn">
           Search
         </button>
       </form>
       <p className="muted small anim-fade-up anim-d2" style={{ marginBottom: 16 }}>
-        Tip: paste a reference straight from your bank statement (like <span className="mono">TICKETS-AB12CD34</span>)
+        Tip: paste a reference straight from the bank statement (like <span className="mono">TICKETS-AB12CD34</span>)
         to find its order.
       </p>
 
@@ -98,22 +122,29 @@ export default async function AdminOrdersPage({
         {FILTERS.map((f) => {
           const href = `/admin/orders?${new URLSearchParams({
             ...(query ? { q: query } : {}),
+            ...(eventId ? { event: eventId } : {}),
             ...(f.key !== 'all' ? { filter: f.key } : {}),
           }).toString()}`;
           return (
             <Link key={f.key} href={href} className={`chip${filter === f.key ? ' chip-active' : ''}`}>
               {f.label}
-              <span className="chip-count">{counts[f.key]}</span>
+              {!eventId && <span className="chip-count">{counts[f.key]}</span>}
             </Link>
           );
         })}
       </div>
 
-      {query && (
+      {(query || eventId) && (
         <p className="muted small">
-          Showing results for “{query}” —{' '}
+          {eventId && (
+            <>
+              Event: <strong>{eventNameById.get(eventId)}</strong>
+              {query ? ' · ' : ' '}
+            </>
+          )}
+          {query && <>Search: “{query}” </>}—{' '}
           <Link href="/admin/orders" style={{ color: 'var(--accent)' }}>
-            clear
+            clear filters
           </Link>
         </p>
       )}
@@ -121,7 +152,7 @@ export default async function AdminOrdersPage({
       <div className="card anim-fade-up anim-d2">
         {orders.length === 0 ? (
           <p className="muted" style={{ margin: 0 }}>
-            {query ? 'No orders match that search.' : 'No orders yet.'}
+            {query || eventId ? 'No orders match these filters.' : 'No orders yet.'}
           </p>
         ) : (
           <div className="table-wrap">
@@ -129,6 +160,7 @@ export default async function AdminOrdersPage({
               <thead>
                 <tr>
                   <th>Created (UTC)</th>
+                  <th>Event</th>
                   <th>Buyer</th>
                   <th>Email</th>
                   <th>Items</th>
@@ -145,6 +177,7 @@ export default async function AdminOrdersPage({
                   return (
                     <tr key={o.id}>
                       <td className="mono small">{o.createdAt.slice(0, 16)}</td>
+                      <td className="small">{eventNameById.get(o.eventId) ?? '—'}</td>
                       <td>{o.buyerName}</td>
                       <td className="small">{o.buyerEmail}</td>
                       <td>{o.itemsSummary}</td>
