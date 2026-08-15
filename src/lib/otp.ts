@@ -165,6 +165,23 @@ export function verifyOtpCode(rawCode: string): OtpVerdict {
   return tx();
 }
 
+/**
+ * Transport for the code emails in this module. Hard timeouts so a stalled SMTP
+ * host fails fast instead of hanging a sign-in request for minutes.
+ */
+function createCodeTransport() {
+  const port = Number(process.env.SMTP_PORT || 587);
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port,
+    secure: port === 465,
+    auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
+  });
+}
+
 /** Email the code to every configured admin inbox. Never throws. */
 export async function sendOtpEmail(code: string): Promise<{ sent: boolean; reason?: string }> {
   try {
@@ -173,16 +190,7 @@ export async function sendOtpEmail(code: string): Promise<{ sent: boolean; reaso
       return { sent: false, reason: 'email-not-configured' };
     }
     const eventName = getEventConfig().eventName;
-    const port = Number(process.env.SMTP_PORT || 587);
-    const transport = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port,
-      secure: port === 465,
-      auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
-      connectionTimeout: 10_000,
-      greetingTimeout: 10_000,
-      socketTimeout: 20_000,
-    });
+    const transport = createCodeTransport();
     await transport.sendMail({
       from: process.env.EMAIL_FROM,
       to: recipients.join(', '),
@@ -201,6 +209,55 @@ export async function sendOtpEmail(code: string): Promise<{ sent: boolean; reaso
     return { sent: true };
   } catch (e) {
     console.error('Sending admin OTP email failed:', e instanceof Error ? e.message : e);
+    return { sent: false, reason: 'send-failed' };
+  }
+}
+
+/** The platform's own brand. Mirrors the private helper in email.ts. */
+function platformName(): string {
+  return process.env.PLATFORM_NAME || 'NepaliConcert';
+}
+
+/**
+ * Email an organizer the code that lets them choose a new password. Built like
+ * the admin code email above so the two read as the same product: the code
+ * large and monospace, the expiry stated, and a line for the person who did not
+ * ask for it.
+ *
+ * `to` MUST be the address stored on the account, never one typed into the
+ * form — otherwise the form would forward reset codes to any address given.
+ * Never throws, and the code appears only in the message body: no logging, no
+ * link, no subject line.
+ */
+export async function sendOrganizerResetCodeEmail(
+  to: string,
+  code: string
+): Promise<{ sent: boolean; reason?: string }> {
+  try {
+    if (!isEmailConfigured()) return { sent: false, reason: 'email-not-configured' };
+    const brand = platformName();
+    const transport = createCodeTransport();
+    await transport.sendMail({
+      from: process.env.EMAIL_FROM,
+      to,
+      subject: `Your ${brand} password reset code`,
+      text:
+        `Your code for setting a new ${brand} organizer password is: ${code}\n\n` +
+        `It expires in 10 minutes. Type it back on the page you came from, together with your new password.\n\n` +
+        `If you did not ask to reset your password, you can ignore this email — nothing has changed.`,
+      html:
+        `<div style="font-family:Arial,Helvetica,sans-serif;max-width:420px;margin:0 auto;padding:24px;color:#111">` +
+        `<p style="margin:0 0 8px;font-size:14px;color:#555">${brand} — new organizer password</p>` +
+        `<p style="margin:0 0 16px;font-size:34px;font-weight:bold;letter-spacing:6px;font-family:'Courier New',Courier,monospace">${code}</p>` +
+        `<p style="margin:0;font-size:13px;color:#555">This code expires in 10 minutes. Type it back on the page ` +
+        `you came from, together with your new password.<br><br>` +
+        `If you did not ask to reset your password, you can ignore this email — nothing has changed.</p>` +
+        `</div>`,
+    });
+    return { sent: true };
+  } catch (e) {
+    // Terse on purpose: nothing about this failure may echo the code.
+    console.error('Sending organizer password-reset email failed:', e instanceof Error ? e.message : e);
     return { sent: false, reason: 'send-failed' };
   }
 }

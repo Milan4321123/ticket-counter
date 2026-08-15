@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { bumpScanEpoch, createScanToken } from '@/lib/auth';
 import { getBaseUrl } from '@/lib/config';
 import { getEventById } from '@/lib/events';
-import { currentOrganizer } from '@/lib/organizers';
+import { planGate, requireOrganizerApi } from '../auth';
 import { ticketQrDataUrl } from '@/lib/tickets';
 import type { ApiErrorResponse } from '@/lib/types';
 
@@ -16,10 +16,17 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(req: Request) {
   try {
-    const organizer = await currentOrganizer();
-    if (!organizer) {
-      return NextResponse.json({ error: 'Not signed in.' } satisfies ApiErrorResponse, { status: 401 });
-    }
+    // The SHARED guard, like every other /api/portal route. Checking the
+    // session alone let two accounts through that should never mint a door key:
+    // one still on the emailed one-time password, and one the platform had
+    // switched off. Ownership was checked, so this was never a cross-tenant
+    // hole — but a revoked organizer could still hand out scanner links.
+    const auth = await requireOrganizerApi();
+    if (auth.failure) return auth.failure;
+    const { organizer } = auth;
+
+    const blocked = planGate(organizer);
+    if (blocked) return blocked;
     let hours = 24;
     let eventId = '';
     try {
@@ -56,10 +63,17 @@ export async function POST(req: Request) {
  */
 export async function DELETE(req: Request) {
   try {
-    const organizer = await currentOrganizer();
-    if (!organizer) {
-      return NextResponse.json({ error: 'Not signed in.' } satisfies ApiErrorResponse, { status: 401 });
-    }
+    // The SHARED guard, like every other /api/portal route. Checking the
+    // session alone let two accounts through that should never mint a door key:
+    // one still on the emailed one-time password, and one the platform had
+    // switched off. Ownership was checked, so this was never a cross-tenant
+    // hole — but a revoked organizer could still hand out scanner links.
+    const auth = await requireOrganizerApi();
+    if (auth.failure) return auth.failure;
+    const { organizer } = auth;
+
+    const blocked = planGate(organizer);
+    if (blocked) return blocked;
     let eventId = '';
     try {
       const body = (await req.json()) as { eventId?: unknown };

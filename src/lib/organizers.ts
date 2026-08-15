@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { cookies } from 'next/headers';
 import { getDb } from './db';
 import { getSigningSecret } from './auth';
+import { burnOrganizerResetCodes } from './passwordReset';
 
 export const ORGANIZER_COOKIE_NAME = 'organizer_session';
 export const ORGANIZER_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // a week
@@ -119,6 +120,11 @@ export function createOrganizer(params: {
 
 export function setOrganizerStatus(id: string, status: OrganizerStatus): void {
   getDb().prepare(`UPDATE organizers SET status = ? WHERE id = ?`).run(status, id);
+  // Locking an account also kills any "forgot my password" code it was handed:
+  // a disabled organizer must not be able to let themselves back in with a code
+  // minted minutes earlier. (The reset route re-checks status at the final step
+  // too — this just means the code is gone rather than merely useless.)
+  if (status !== 'active') burnOrganizerResetCodes(id);
 }
 
 export function setOrganizerPlanPaidUntil(id: string, date: string | null): void {
@@ -134,14 +140,22 @@ export function resetOrganizerPassword(id: string): string {
   getDb()
     .prepare(`UPDATE organizers SET password_hash = ?, must_change_password = 1 WHERE id = ?`)
     .run(hashPassword(pw), id);
+  burnOrganizerResetCodes(id);
   return pw;
 }
 
-/** The organizer picked this one themselves, so the forced change is over. */
+/**
+ * The organizer picked this one themselves, so the forced change is over.
+ *
+ * Every outstanding reset code goes with it — the one just used and any other
+ * still in an inbox. Whoever knows the new password is in; an old code must not
+ * be a second way back.
+ */
 export function setOrganizerPassword(id: string, password: string): void {
   getDb()
     .prepare(`UPDATE organizers SET password_hash = ?, must_change_password = 0 WHERE id = ?`)
     .run(hashPassword(password), id);
+  burnOrganizerResetCodes(id);
 }
 
 /**

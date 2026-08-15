@@ -6,7 +6,7 @@ import LoginForm from './LoginForm';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Organizer sign-in' };
+export const metadata = { title: 'Organizer sign-in', robots: { index: false, follow: false } };
 
 export default async function PortalLoginPage() {
   if (await currentOrganizer()) redirect('/portal');
@@ -26,6 +26,11 @@ export default async function PortalLoginPage() {
         <div className="card glow-card">
           <LoginForm />
         </div>
+        <p style={{ textAlign: 'center', margin: '14px 0 0' }}>
+          <Link href="/portal/forgot-password" className="small" style={{ display: 'inline-block', padding: '10px 8px' }}>
+            Forgot your password?
+          </Link>
+        </p>
         {/* Two real buttons, not a sentence with links buried in it: someone
             without an account needs an obvious next step, and "see it" and
             "ask for it" are the only two things they can usefully do here. */}
