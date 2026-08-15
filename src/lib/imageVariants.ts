@@ -44,13 +44,21 @@ export const VARIANTS = {
   /** Circular profile picture — a circle has to be square. */
   avatar: { width: 512, height: 512, fit: 'cover', smart: true },
   /**
-   * Feed and listing tiles (16:10). CENTRED, not smart-cropped — the one slot
-   * where the automatic subject-finder reliably picks worse than the middle.
-   * Squeezing a portrait into a wide tile leaves only a thin horizontal band,
-   * and "most interesting region" kept landing on the chin-and-collar edge and
-   * cutting the top of the head off. People photograph subjects in the middle
-   * of the frame, so for a band this thin the centre simply IS the subject.
-   * The organizer can still override any tile with the poster reposition tool.
+   * Feed and listing tiles — PORTRAIT 4:5, matching `.event-card-media` in
+   * globals.css and `CARD_ASPECT` in the editor's MediaPanel. Those three must
+   * agree: when this was 800x500 and the tile was already 4:5, the reposition
+   * tool drew a landscape frame over a portrait render and silently discarded
+   * half the width the organizer had positioned. If you change these numbers,
+   * change all three.
+   *
+   * Portrait because the uploads here are phone photos (measured 0.67-0.80),
+   * and a landscape tile had to throw away more than half of every one.
+   *
+   * CENTRED, not smart-cropped: on the thin slice a tile takes, the automatic
+   * subject-finder kept landing on the chin-and-collar edge and cutting the top
+   * of the head off. People photograph subjects in the middle of the frame, so
+   * the centre simply IS the subject here. The organizer can still override any
+   * tile with the poster reposition tool.
    */
   card: { width: 800, height: 1000, fit: 'cover', smart: false },
 } satisfies Record<string, VariantSpec>;

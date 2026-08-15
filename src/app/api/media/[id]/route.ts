@@ -1,5 +1,4 @@
 import fs from 'fs';
-import { Readable } from 'stream';
 import { NextResponse } from 'next/server';
 import { getCropForSlot, getMediaById, type CropSlot } from '@/lib/events';
 import { getVariant, isVariantName, type VariantName } from '@/lib/imageVariants';
@@ -28,29 +27,65 @@ function videoHeaders(mime: string): Record<string, string> {
   };
 }
 
-/** fs.createReadStream as a web stream Response body. */
+/**
+ * A file on disk as a Response body, safe to abandon mid-flight.
+ *
+ * Built by hand rather than with Readable.toWeb(): that adapter pushes the
+ * file's remaining chunks into the web stream's controller regardless of the
+ * controller's state, so a visitor who scrolls a feed video out of view — or
+ * simply clicks a link — leaves it enqueueing into a controller the runtime has
+ * already closed. That throws ERR_INVALID_STATE from outside any request's
+ * try/catch, i.e. an uncaughtException, i.e. ordinary browsing could take the
+ * server down. Here EVERY controller call is guarded and the read stops the
+ * moment the request goes away.
+ */
 function fileStream(
   filePath: string,
   signal: AbortSignal,
   range?: { start: number; end: number }
 ): ReadableStream {
-  const nodeStream = range ? fs.createReadStream(filePath, range) : fs.createReadStream(filePath);
+  const node = range ? fs.createReadStream(filePath, range) : fs.createReadStream(filePath);
 
-  // Aborted video requests are ROUTINE, not exceptional: the feed autoplays
-  // cover clips, and scrolling past one or following a link cancels its request
-  // mid-flight. Without this the file keeps being read into a response nobody is
-  // listening to, the web stream's controller is already closed, and Node raises
-  // an uncaughtException — a request the visitor cancelled should never be able
-  // to take the server down.
-  const stop = () => nodeStream.destroy();
-  if (signal.aborted) stop();
-  else signal.addEventListener('abort', stop, { once: true });
+  return new ReadableStream({
+    start(controller) {
+      let finished = false;
+      const finish = (err?: unknown) => {
+        if (finished) return;
+        finished = true;
+        node.destroy();
+        try {
+          if (err) controller.error(err);
+          else controller.close();
+        } catch {
+          // The runtime already tore the controller down — nothing to report.
+        }
+      };
 
-  // A read error (file deleted mid-stream, disk trouble) must not escape either;
-  // the response simply ends short.
-  nodeStream.on('error', () => nodeStream.destroy());
+      node.on('data', (chunk: string | Buffer) => {
+        if (finished) return;
+        try {
+          // The stream is opened without an encoding, so chunks are Buffers;
+          // the string branch exists only to satisfy the shared event type.
+          controller.enqueue(typeof chunk === 'string' ? new TextEncoder().encode(chunk) : new Uint8Array(chunk));
+          // Respect the consumer's appetite instead of buffering the whole file.
+          if ((controller.desiredSize ?? 1) <= 0) node.pause();
+        } catch {
+          finish();
+        }
+      });
+      node.on('end', () => finish());
+      node.on('error', (e) => finish(e));
 
-  return Readable.toWeb(nodeStream) as unknown as ReadableStream;
+      if (signal.aborted) finish();
+      else signal.addEventListener('abort', () => finish(), { once: true });
+    },
+    pull() {
+      node.resume();
+    },
+    cancel() {
+      node.destroy();
+    },
+  });
 }
 
 /**

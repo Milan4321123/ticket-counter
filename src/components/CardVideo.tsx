@@ -63,12 +63,31 @@ export default function CardVideo({ src, poster, label }: CardVideoProps) {
     return () => io.disconnect();
   }, [reduced]);
 
-  // Reduced motion or an undecodable file: the still frame is the whole tile.
-  if (reduced || broken) {
+  // An undecodable file falls back to the poster when there is one; with none,
+  // the tile shows nothing rather than a broken-image icon.
+  if (broken) {
     if (!poster) return null;
     // Served by our own /api/media route — next/image is not needed here.
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={poster} alt={`${label} poster`} className="event-card-shot" />;
+  }
+
+  // Reduced motion: keep the SAME picture, just still. Swapping to a different
+  // image would be the very flip this component exists to avoid — the video's
+  // own first frame is what the tile should show, simply not moving.
+  if (reduced) {
+    return (
+      <video
+        className="event-card-shot event-card-clip"
+        src={src}
+        poster={poster}
+        muted
+        playsInline
+        preload="metadata"
+        aria-label={label}
+        onError={() => setBroken(true)}
+      />
+    );
   }
 
   return (
