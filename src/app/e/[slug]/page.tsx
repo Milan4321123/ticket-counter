@@ -25,9 +25,18 @@ import {
   parsePageDesign,
   videoEmbedUrl,
 } from '@/lib/events';
-import type { PageDesign } from '@/lib/events';
+import type { EventRow, PageDesign } from '@/lib/events';
 import { getAvailability } from '@/lib/inventory';
+import { getOrganizer } from '@/lib/organizers';
 import { formatMoney } from '@/lib/money';
+import {
+  SITE_NAME,
+  absoluteUrl,
+  eventBreadcrumbJsonLd,
+  eventDescription,
+  eventJsonLd,
+  jsonLdScript,
+} from '@/lib/seo';
 
 // Availability comes from the database — always render fresh.
 export const dynamic = 'force-dynamic';
@@ -193,16 +202,71 @@ interface Params {
   params: Promise<{ slug: string }>;
 }
 
+/**
+ * The picture that represents this event everywhere off-site: Google, WhatsApp,
+ * Facebook, Viber. Uses the SAME cover the page itself opens with, including
+ * the organizer's own crop, so the link preview and the page agree.
+ *
+ * 1200x630 is the size every social platform crops to; the 'cover' variant is
+ * 1600x740, close enough in shape that nothing important is lost and far better
+ * than shipping a 7 MB original that Facebook would reject for size.
+ *
+ * Videos are skipped: a link preview must be a still. An event whose cover is a
+ * video falls through to its poster or first photo, and if it has no picture at
+ * all it gets no og:image rather than a broken one.
+ */
+function socialImage(event: EventRow): string | null {
+  const photos = getEventMedia(event.id); // photos only — videos are excluded here
+  const isPhoto = (id: string | null): id is string => !!id && photos.some((p) => p.id === id);
+
+  if (isPhoto(event.coverMediaId)) {
+    return mediaUrl(event.coverMediaId, 'cover', cropTag(parseCropRect(event.coverCrop)));
+  }
+  if (isPhoto(event.posterMediaId)) {
+    return mediaUrl(event.posterMediaId, 'cover', cropTag(parseCropRect(event.posterCrop)));
+  }
+  return photos[0] ? mediaUrl(photos[0].id, 'cover', null) : null;
+}
+
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
   const event = getEventBySlug(slug);
-  if (!event || event.status !== 'published') return { title: 'Event not found' };
-  const where = [event.venueName, event.city].filter(Boolean).join(', ');
+
+  // A draft or a deleted event must not be indexable — and must not leak its
+  // name into a title tag either. noindex here is what stops a page that was
+  // briefly public from lingering in Google after it is unpublished.
+  if (!event || event.status !== 'published') {
+    return { title: 'Event not found', robots: { index: false, follow: false } };
+  }
+
+  const description = eventDescription(event);
+  const image = socialImage(event);
+  const url = absoluteUrl(`/e/${event.slug}`);
+  // What a searcher types: the event, then the city. "Dashain Night 2026 —
+  // Tickets, Berlin" matches "dashain night berlin tickets" far better than the
+  // name alone, and still reads like a sentence rather than keyword soup.
+  const title = `${event.name} — Tickets${event.city.trim() ? `, ${event.city.trim()}` : ''}`;
+
   return {
-    title: `${event.name} — Tickets`,
-    description: `Get tickets for ${event.name}${event.dateDisplay ? `: ${event.dateDisplay}` : ''}${
-      where ? ` at ${where}` : ''
-    }.`,
+    title,
+    description,
+    // Canonical, so the event has exactly ONE address in Google's index no
+    // matter what tracking parameters get appended when the link is shared.
+    alternates: { canonical: `/e/${event.slug}` },
+    openGraph: {
+      type: 'website',
+      title,
+      description,
+      url,
+      siteName: SITE_NAME,
+      ...(image ? { images: [{ url: image, width: 1600, height: 740, alt: event.name }] } : {}),
+    },
+    twitter: {
+      card: image ? 'summary_large_image' : 'summary',
+      title,
+      description,
+      ...(image ? { images: [image] } : {}),
+    },
   };
 }
 
@@ -325,6 +389,25 @@ export default async function EventPage({ params }: Params) {
     backgroundImage: `radial-gradient(ellipse 70% 50% at 50% -10%, ${theme['--accent-soft']}, transparent), radial-gradient(ellipse 40% 35% at 80% 0%, ${theme['--pink-soft']}, transparent)`,
   };
 
+  // ---------------- Structured data ----------------
+  //
+  // Rendered into the page rather than into generateMetadata, because it needs
+  // live availability — Google is told a tier is sold out only while it really
+  // is. The organizer's real name is used, not the platform's: they are who is
+  // putting the event on, and Google attributes the event to them.
+  const organizer = getOrganizer(event.organizerId);
+  const socialImageUrl = socialImage(event);
+  const eventLd = eventJsonLd({
+    event,
+    tiers,
+    remainingByTier: Object.fromEntries(
+      Object.entries(availability.tiers).map(([key, t]) => [key, t.remaining])
+    ),
+    totalRemaining: availability.totalRemaining,
+    images: socialImageUrl ? [absoluteUrl(socialImageUrl)] : [],
+    organizerName: organizer?.name?.trim() || SITE_NAME,
+  });
+
   return (
     <div
       className={`event-page${canBuy ? ' has-cta-bar' : ''}${profileUrl ? ' has-avatar' : ''}${
@@ -332,6 +415,11 @@ export default async function EventPage({ params }: Params) {
       }`}
       style={{ ...theme } as React.CSSProperties}
     >
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(eventLd)} />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={jsonLdScript(eventBreadcrumbJsonLd(event))}
+      />
       <section className="hero event-hero" style={heroStyle}>
         {(coverVideoUrl || stillUrl) && (
           <div

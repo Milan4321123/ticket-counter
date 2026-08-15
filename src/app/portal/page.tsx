@@ -23,7 +23,7 @@ import { requirePortalOrganizer } from './guard';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Your events — Organizer portal' };
+export const metadata = { title: 'Your events — Organizer portal', robots: { index: false, follow: false } };
 
 const STATUS_LABEL: Record<EventStatus, string> = {
   published: 'Live',
@@ -229,9 +229,16 @@ export default async function PortalDashboardPage({
                         <span className="badge badge-amber">Fee due</span>
                       )}
                       {openQuestions > 0 && (
-                        <span className="badge badge-amber">
+                        // Straight to where they can actually be answered: the
+                        // questions inbox sits in the editor's Page & content
+                        // tab, beside the FAQ.
+                        <Link
+                          href={`/portal/events/${event.id}/edit?tab=page`}
+                          className="badge badge-amber"
+                          style={{ textDecoration: 'none' }}
+                        >
                           {openQuestions} question{openQuestions === 1 ? '' : 's'}
-                        </span>
+                        </Link>
                       )}
                     </div>
                     <div className="muted small" style={{ marginTop: 4 }}>

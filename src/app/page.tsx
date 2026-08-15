@@ -14,6 +14,8 @@ import {
 import type { EventRow, PageDesign } from '@/lib/events';
 import { getAvailability } from '@/lib/inventory';
 import { formatMoney } from '@/lib/money';
+import { runBuyerDataRetentionSweep } from '@/lib/retention';
+import { eventListJsonLd, jsonLdScript } from '@/lib/seo';
 
 // The feed reflects live availability — always render fresh.
 export const dynamic = 'force-dynamic';
@@ -124,7 +126,10 @@ function EventCard({
     >
       <div className="event-card-media">
         {videoUrl ? (
-          <CardVideo src={videoUrl} poster={stillUrl ?? undefined} label={event.name} />
+          /* No poster: it would be a DIFFERENT photo, so the tile showed that
+             photo and then flipped to the clip. The video's own first frame is
+             the only honest still for a video cover. */
+          <CardVideo src={videoUrl} label={event.name} />
         ) : stillUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -176,6 +181,10 @@ function EventCard({
 }
 
 export default function HomePage() {
+  // The feed is the busiest page on the site, so it is where the erasure sweep
+  // is armed: it self-throttles and swallows its own errors, so this costs a
+  // clock comparison on all but one render an hour. See lib/retention.ts.
+  runBuyerDataRetentionSweep();
   const events = listPublishedEvents();
 
   // listPublishedEvents() is already sorted soonest-first, dated events ahead
@@ -186,6 +195,13 @@ export default function HomePage() {
 
   return (
     <>
+      {/* Tells Google this page is a LIST of these specific events. Without it a
+          feed of ten events reads to a crawler as one long article, and none of
+          the individual events get discovered from here. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={jsonLdScript(eventListJsonLd(events))}
+      />
       <section className="feed-hero">
         <div className="container">
           <div className="feed-hero-logo anim-fade-up">

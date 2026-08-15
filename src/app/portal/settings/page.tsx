@@ -10,7 +10,7 @@ import RemindersCard from './RemindersCard';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Settings — Organizer portal' };
+export const metadata = { title: 'Settings — Organizer portal', robots: { index: false, follow: false } };
 
 export default async function PortalSettingsPage() {
   const organizer = await requirePortalOrganizer();

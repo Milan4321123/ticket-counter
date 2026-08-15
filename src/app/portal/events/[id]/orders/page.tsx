@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { getEventById, listEventQuestions } from '@/lib/events';
+import { getEventById } from '@/lib/events';
 import { formatMoney } from '@/lib/money';
 import {
   expireOverdueTransferReservations,
@@ -16,12 +16,10 @@ import ResendButton from '@/app/admin/orders/ResendButton';
 import PlanExpired from '../../../PlanExpired';
 import PortalNav from '../../../PortalNav';
 import { requirePortalOrganizer } from '../../../guard';
-import QuestionsPanel from './QuestionsPanel';
-import ScanLinkCard from './ScanLinkCard';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Orders — Organizer portal' };
+export const metadata = { title: 'Orders — Organizer portal', robots: { index: false, follow: false } };
 
 function StatusBadge({ status }: { status: OrderStatus }) {
   const cls =
@@ -68,8 +66,11 @@ export default async function PortalOrdersPage({
   const awaiting = listAwaitingTransferOrders(event.id);
   const orders = listOrders({ eventId: event.id, query });
   const stats = getStats(event.id);
-  const openQuestions = listEventQuestions(event.id, 'open');
-  const answeredQuestionCount = listEventQuestions(event.id, 'answered').length;
+  // Whether the EVENT has any orders at all, independent of the search box.
+  // Gating the export on the filtered list made the button vanish the moment a
+  // search matched nothing — exactly when someone is most likely to give up and
+  // reach for the download instead.
+  const hasAnyOrders = query ? listOrders({ eventId: event.id, limit: 1 }).length > 0 : orders.length > 0;
 
   return (
     <>
@@ -91,7 +92,7 @@ export default async function PortalOrdersPage({
               {event.dateDisplay ? ` · ${event.dateDisplay}` : ''}
             </p>
           </div>
-          {orders.length > 0 && (
+          {hasAnyOrders && (
             <div style={{ flex: 'none' }}>
               {/* A plain link, not fetch(): the browser handles the download and
                   the cookie rides along, so there is nothing to hold in memory. */}
@@ -279,39 +280,6 @@ export default async function PortalOrdersPage({
         )}
       </div>
 
-      <div className="card glow-card anim-fade-up anim-d3">
-        <div className="card-title">Door check-in</div>
-        <p className="muted small" style={{ marginTop: 0 }}>
-          On the night, scan each ticket&rsquo;s QR code at the entrance — every ticket works exactly once.
-        </p>
-        <Link href={`/portal/events/${event.id}/checkin`} className="btn btn-brand btn-sm">
-          Open check-in
-        </Link>
-        <div style={{ borderTop: '1px solid var(--border)', marginTop: 18, paddingTop: 16 }}>
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>Scanner links for door staff</div>
-          <ScanLinkCard eventId={event.id} />
-        </div>
-      </div>
-
-      <div className="card anim-fade-up anim-d4">
-        <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          Visitor questions
-          {openQuestions.length > 0 && (
-            <span className="badge badge-amber">
-              {openQuestions.length} open
-            </span>
-          )}
-        </div>
-        <p className="muted small" style={{ marginTop: 0 }}>
-          Visitors can ask questions right on your event page. The AI assistant answers from your event details,
-          FAQ, and updates — anything it is not sure about lands here for you.
-        </p>
-        <QuestionsPanel
-          eventId={event.id}
-          questions={openQuestions.map((q) => ({ id: q.id, question: q.question, askedAt: q.askedAt }))}
-          answeredCount={answeredQuestionCount}
-        />
-      </div>
       </div>
     </>
   );

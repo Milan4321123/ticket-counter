@@ -9,6 +9,13 @@ export const metadata = {
   title: 'Talk to us about a custom-designed page',
   description:
     'Want something fancier than the self-service event page? Tell our team what you have in mind and we design your event page for you.',
+  alternates: { canonical: '/contact' },
+  openGraph: {
+    type: 'website',
+    title: 'Talk to us about a custom-designed page',
+    description: 'Want something fancier than the self-service event page? Tell our team what you have in mind and we design your event page for you.',
+    url: '/contact',
+  },
 };
 
 /**

@@ -5,7 +5,7 @@ import ScanClient from './ScanClient';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Door check-in' };
+export const metadata = { title: 'Door check-in', robots: { index: false, follow: false } };
 
 /**
  * Door-staff scanner page. Opened via a time-limited scanner link created in

@@ -17,6 +17,13 @@ export const metadata = {
   title: 'Sell tickets on NepaliConcert — for organizers',
   description:
     'Your own beautiful event page, QR tickets, door scanning, and ticket money straight to your bank account. €50 for a 500-person event, no commission on ticket sales.',
+  alternates: { canonical: '/organizers' },
+  openGraph: {
+    type: 'website',
+    title: 'Sell tickets on NepaliConcert — for organizers',
+    description: 'Your own beautiful event page, QR tickets, door scanning, and ticket money straight to your bank account. €50 for a 500-person event, no commission on ticket sales.',
+    url: '/organizers',
+  },
 };
 
 /** The venue size the headline price is quoted for. */
