@@ -74,11 +74,11 @@ export default function PortalNav({ active, event, tab }: Props) {
               >
                 Check-in
               </Link>
-              {event.published && (
-                <Link href={`/e/${event.slug}`} className="portal-tab">
-                  View page ↗
-                </Link>
-              )}
+              {/* Always present. On a draft it opens the private preview, which
+                  is the whole point: check the page, THEN decide to publish. */}
+              <Link href={`/e/${event.slug}`} className="portal-tab">
+                {event.published ? 'View page ↗' : 'Preview ↗'}
+              </Link>
             </nav>
           </div>
         </div>

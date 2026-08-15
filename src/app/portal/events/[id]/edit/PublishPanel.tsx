@@ -114,6 +114,20 @@ export default function PublishPanel({ eventId, status, slug, checklist, fee }: 
         </div>
       ) : (
         <div>
+          {/* Deliberately ABOVE the fee box. Nobody should be asked to pay for
+              something they have not been allowed to look at — so the first
+              thing on this tab is the offer to go and see it. */}
+          <div className="notice" style={{ marginTop: 0 }}>
+            <strong>See it before you decide.</strong> Your page is finished enough to look at —
+            open it exactly as visitors will see it, while it is still private and before any fee is
+            paid. Nobody else can open that link.
+            <div style={{ marginTop: 10 }}>
+              <a href={`/e/${slug}`} className="btn btn-sm" target="_blank" rel="noopener">
+                Preview my page ↗
+              </a>
+            </div>
+          </div>
+
           {!fee.paid && (
             <div className="bank-box" style={{ margin: '0 0 20px' }}>
               <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

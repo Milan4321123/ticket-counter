@@ -27,7 +27,7 @@ import {
 } from '@/lib/events';
 import type { EventRow, PageDesign } from '@/lib/events';
 import { getAvailability } from '@/lib/inventory';
-import { getOrganizer } from '@/lib/organizers';
+import { currentOrganizer, getOrganizer } from '@/lib/organizers';
 import { formatMoney } from '@/lib/money';
 import {
   SITE_NAME,
@@ -235,8 +235,15 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   // A draft or a deleted event must not be indexable — and must not leak its
   // name into a title tag either. noindex here is what stops a page that was
   // briefly public from lingering in Google after it is unpublished.
-  if (!event || event.status !== 'published') {
-    return { title: 'Event not found', robots: { index: false, follow: false } };
+  if (!event) return { title: 'Event not found', robots: { index: false, follow: false } };
+
+  // An unpublished event can be opened by its own organizer as a preview, so it
+  // gets a real title to sit in the browser tab — but never an index entry, an
+  // og:image, or a canonical. Metadata is public even when the page body is
+  // not: a crawler that fetches this URL without the session cookie is served
+  // exactly this, so the noindex has to live here and not only in the body.
+  if (event.status !== 'published') {
+    return { title: `${event.name} — preview`, robots: { index: false, follow: false } };
   }
 
   const description = eventDescription(event);
@@ -273,7 +280,29 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 export default async function EventPage({ params }: Params) {
   const { slug } = await params;
   const event = getEventBySlug(slug);
-  if (!event || event.status !== 'published') notFound();
+  if (!event) notFound();
+
+  /**
+   * An unpublished event is visible to exactly one person: the organizer who
+   * owns it.
+   *
+   * Before this, a draft 404'd for everybody — including its author — so the
+   * first time anyone saw their own event page was after they had paid the fee
+   * and put it in front of the public. That is the wrong order. Someone should
+   * be able to look at what they have built, decide it is right, and only then
+   * pay; and if the photos are wrong they should find that out privately.
+   *
+   * Ownership is checked against the session, NOT against anything in the URL —
+   * a slug is guessable, and "unlisted therefore safe" is not a permission
+   * model. Anyone else, signed in or not, still gets the same 404 as before.
+   */
+  const isPublished = event.status === 'published';
+  let preview = false;
+  if (!isPublished) {
+    const viewer = await currentOrganizer();
+    if (!viewer || viewer.id !== event.organizerId) notFound();
+    preview = true;
+  }
 
   const design = parsePageDesign(event.pageDesign);
   const theme = ACCENT_THEMES[design.accent ?? 'violet'];
@@ -360,7 +389,10 @@ export default async function EventPage({ params }: Params) {
   );
   const checkoutHref = `/e/${event.slug}/checkout`;
   const headline = design.headline || event.name;
-  const canBuy = event.salesOpen && !soldOut;
+  // Never buyable in preview. The event is not public, its fee may be unpaid,
+  // and POST /api/orders would refuse the order anyway — offering a button that
+  // cannot work is just a trap for the person testing their own page.
+  const canBuy = event.salesOpen && !soldOut && !preview;
 
   // The jump bar under the hero, in the order the sections appear. Each entry
   // hangs off the SAME flag that decides whether its section renders at all, so
@@ -415,11 +447,35 @@ export default async function EventPage({ params }: Params) {
       }`}
       style={{ ...theme } as React.CSSProperties}
     >
-      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(eventLd)} />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={jsonLdScript(eventBreadcrumbJsonLd(event))}
-      />
+      {/* No structured data on a preview. This page is not public, its tickets
+          cannot be bought, and telling Google about an event that does not exist
+          yet is the kind of claim that costs rich results on the events that
+          DO. The page is noindex besides — this is the second lock. */}
+      {!preview && (
+        <>
+          <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(eventLd)} />
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={jsonLdScript(eventBreadcrumbJsonLd(event))}
+          />
+        </>
+      )}
+
+      {preview && (
+        <div className="preview-bar" role="status">
+          <div className="container preview-bar-inner">
+            <span className="badge badge-amber">Preview</span>
+            <span className="preview-bar-text">
+              This is your page as visitors will see it. <strong>Nobody else can open it</strong> —
+              it stays private until you publish, and tickets cannot be bought yet.
+            </span>
+            <Link href={`/portal/events/${event.id}/edit`} className="btn btn-sm">
+              Back to editing
+            </Link>
+          </div>
+        </div>
+      )}
+
       <section className="hero event-hero" style={heroStyle}>
         {(coverVideoUrl || stillUrl) && (
           <div
@@ -439,7 +495,8 @@ export default async function EventPage({ params }: Params) {
         )}
 
         <div className="container event-hero-inner">
-          <p className="hero-kicker anim-fade-up">Live event</p>
+          {/* "Live event" is a claim, and on a draft it is a false one. */}
+          <p className="hero-kicker anim-fade-up">{preview ? 'Not published yet' : 'Live event'}</p>
           <h1
             className="anim-fade-up anim-d1"
             style={{
@@ -476,7 +533,23 @@ export default async function EventPage({ params }: Params) {
               ) : null}
             </div>
           )}
-          {event.salesOpen ? (
+          {/* In preview the checkout does not exist yet — /e/[slug]/checkout
+              404s on an unpublished event — so a live "Get tickets" button here
+              would send the organizer testing their own page straight into a
+              dead end. Show them what the button WILL be instead. */}
+          {preview ? (
+            <div className="event-hero-actions anim-fade-up anim-d3">
+              <span className="btn btn-primary btn-lg" aria-disabled="true" style={{ opacity: 0.5, pointerEvents: 'none' }}>
+                Get tickets
+              </span>
+              <span className="badge badge-amber">Live once you publish</span>
+              {minPrice !== null ? (
+                <span className="event-hero-price">
+                  from {formatMoney(minPrice, event.currency)}
+                </span>
+              ) : null}
+            </div>
+          ) : event.salesOpen ? (
             <div className="event-hero-actions anim-fade-up anim-d3">
               {!soldOut && (
                 <Link href={checkoutHref} className="btn btn-primary btn-lg">

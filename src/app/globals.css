@@ -4906,3 +4906,35 @@ html:has(.event-page.has-section-nav) {
   background: linear-gradient(96deg, #0ea472, #2bc98d);
   box-shadow: 0 16px 38px -14px rgba(16, 185, 129, 0.9);
 }
+
+/* ---------- Pre-publish preview bar ----------
+   Sits above the hero on an unpublished event that only its own organizer can
+   open. Deliberately loud: someone looking at their own draft must never be in
+   any doubt about whether the public can see it, and must always have one
+   click back to the editor. */
+
+.preview-bar {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  background: linear-gradient(90deg, var(--amber-soft), rgba(0, 0, 0, 0.35));
+  border-bottom: 1px solid var(--amber);
+  backdrop-filter: blur(8px);
+}
+
+.preview-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.preview-bar-text {
+  flex: 1 1 260px;
+  min-width: 0;
+  color: var(--text);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}

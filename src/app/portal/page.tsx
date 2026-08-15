@@ -279,11 +279,12 @@ export default async function PortalDashboardPage({
                     <Link href={`/portal/events/${event.id}/checkin`} className="btn btn-sm">
                       Check-in
                     </Link>
-                    {event.status === 'published' && (
-                      <Link href={`/e/${event.slug}`} className="btn btn-sm">
-                        View page
-                      </Link>
-                    )}
+                    {/* Draft events get the same link, named for what it does.
+                        Seeing your own page is how you decide it is ready — it
+                        should not be something you only earn after paying. */}
+                    <Link href={`/e/${event.slug}`} className="btn btn-sm">
+                      {event.status === 'published' ? 'View page' : 'Preview page'}
+                    </Link>
                   </div>
                 </div>
               );
