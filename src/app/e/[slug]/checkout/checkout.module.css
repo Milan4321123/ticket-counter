@@ -58,3 +58,28 @@
   color: var(--green);
   font-weight: 700;
 }
+
+/* The Datenschutz note under the buyer's details. Quiet enough not to compete
+   with the pay button, boxed enough that nobody can say they never saw it. */
+
+.privacyNote {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--brand);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-dim);
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+
+/* The consent tick, inside the Datenschutz box rather than under it. Separated
+   by a rule so it reads as an action to take, not another sentence to skim. */
+.privacyConsent {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.9rem;
+}

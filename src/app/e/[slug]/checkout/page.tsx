@@ -5,6 +5,7 @@ import { getPaymentMode } from '@/lib/config';
 import { getEventBySlug, getEventTiers } from '@/lib/events';
 import { getAvailability } from '@/lib/inventory';
 import { expireOverdueTransferReservations } from '@/lib/orders';
+import { BUYER_RETENTION_DAYS } from '@/lib/retention';
 import CheckoutClient from './CheckoutClient';
 
 // Availability comes from the database — always render fresh.
@@ -17,7 +18,13 @@ interface Params {
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
   const event = getEventBySlug(slug);
-  return { title: event ? `Checkout — ${event.name}` : 'Checkout' };
+  // Never indexed: a half-finished purchase is nobody's search result, and a
+  // checkout page competing with the event page for the same query would push
+  // searchers into a form instead of onto the page that sells the event.
+  return {
+    title: event ? `Checkout — ${event.name}` : 'Checkout',
+    robots: { index: false, follow: false },
+  };
 }
 
 export default async function EventCheckoutPage({ params }: Params) {
@@ -92,6 +99,7 @@ export default async function EventCheckoutPage({ params }: Params) {
       mode={mode}
       paypalClientId={paypalClientId}
       transferConfigured={transferConfigured}
+      retentionDays={BUYER_RETENTION_DAYS}
     />
   );
 }

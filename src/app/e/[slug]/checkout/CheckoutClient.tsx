@@ -54,6 +54,13 @@ interface Props {
   mode: 'paypal' | 'mock' | 'transfer';
   paypalClientId: string | null;
   transferConfigured: boolean;
+  /**
+   * How many days after the event the buyer's name and email are erased. Passed
+   * down from the server rather than imported, because the one constant that
+   * governs it lives with the sweep that does the erasing (lib/retention.ts) —
+   * this promise and that behaviour must never be two separate numbers.
+   */
+  retentionDays: number;
 }
 
 /** POST /api/orders body — matches the platform orders API contract. */
@@ -138,6 +145,7 @@ interface Touched {
   name?: boolean;
   email?: boolean;
   student?: boolean;
+  privacy?: boolean;
 }
 
 interface InlineMessage {
@@ -152,6 +160,7 @@ export default function CheckoutClient({
   mode,
   paypalClientId,
   transferConfigured,
+  retentionDays,
 }: Props) {
   const router = useRouter();
 
@@ -161,6 +170,10 @@ export default function CheckoutClient({
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [studentAck, setStudentAck] = useState(false);
+  // Consent is an ACTION, not a notice. Nobody may hand us a name and an email
+  // without having ticked this themselves — it starts false, it is never
+  // pre-ticked, and no payment button works until it is on.
+  const [privacyAck, setPrivacyAck] = useState(false);
   const [touched, setTouched] = useState<Touched>({});
   const [message, setMessage] = useState<InlineMessage | null>(null);
   const [busy, setBusy] = useState(false); // mock payment in flight
@@ -178,7 +191,24 @@ export default function CheckoutClient({
   const nameOk = name.trim().length >= 2;
   const emailOk = EMAIL_RE.test(email.trim());
   const ackOk = !needsStudentAck || studentAck;
-  const formReady = totalQty > 0 && nameOk && emailOk && ackOk;
+  const formReady = totalQty > 0 && nameOk && emailOk && ackOk && privacyAck;
+
+  /**
+   * WHY the pay buttons are off, in the buyer's words. One flat "fill in your
+   * details" line was honest while details were the only thing that could be
+   * missing; with a consent tick in the mix it sends someone back to re-read
+   * fields they already filled, hunting for a mistake that is not there.
+   */
+  const blockedReason =
+    totalQty === 0
+      ? 'Choose at least one ticket to continue.'
+      : !nameOk || !emailOk
+        ? 'Fill in your name and email to continue.'
+        : !ackOk
+          ? 'Confirm the student ID requirement to continue.'
+          : !privacyAck
+            ? 'Tick the privacy box above to continue — we cannot take your details without it.'
+            : null;
 
   const working = busy || capturing;
 
@@ -214,7 +244,7 @@ export default function CheckoutClient({
   }
 
   function markAllTouched() {
-    setTouched({ name: true, email: true, student: true });
+    setTouched({ name: true, email: true, student: true, privacy: true });
   }
 
   // ---------------- Mock payment flow ----------------
@@ -546,6 +576,61 @@ export default function CheckoutClient({
             )}
           </>
         )}
+
+        {/* Sits at the foot of the details card on purpose: it is the last thing
+            read after typing a name and an email, and it comes BEFORE every
+            payment button in all three modes. Only claims that hold in this
+            codebase — the money sentence is limited to bank transfer, which is
+            the only mode where the account is provably the organizer's own. */}
+        <div className={styles.privacyNote}>
+          <p style={{ margin: 0 }}>
+            <strong>Your name and email go to the organizer of this event</strong> — they are who
+            your ticket is issued by, and how you get a new copy if it goes missing.
+            {mode === 'transfer'
+              ? ' Your payment goes straight to their bank account, so the money never passes through us, and the reference on your transfer is how they match it to your tickets.'
+              : ' The reference on your order is how your payment is matched to your tickets.'}{' '}
+            We never ask for a card number or your bank details here. {retentionDays} days after the
+            event, your name and email are erased from our system for good — the organizer keeps
+            their ticket count, but not you.
+          </p>
+          <p style={{ margin: '6px 0 0' }}>
+            <a
+              href="/privacy"
+              target="_blank"
+              rel="noopener"
+              className="small"
+              style={{ color: 'var(--brand-text)', fontWeight: 600 }}
+            >
+              Read the full privacy note →
+            </a>{' '}
+            <span className="small">(opens in a new tab, so you keep your ticket selection)</span>
+          </p>
+
+          {/* The consent itself. Reading the note is not agreeing to it, so the
+              tick lives INSIDE the note rather than below it — you cannot reach
+              it without scrolling past what you are agreeing to. */}
+          <label className={`checkbox-row ${styles.privacyConsent}`}>
+            <input
+              type="checkbox"
+              checked={privacyAck}
+              onChange={(e) => {
+                setPrivacyAck(e.target.checked);
+                setTouched((t) => ({ ...t, privacy: true }));
+              }}
+              disabled={working}
+            />
+            <span>
+              <strong>I agree</strong> that my name and email may be passed to the organizer of
+              this event so my tickets can be issued, and I have read the privacy note
+              (Datenschutz).
+            </span>
+          </label>
+          {touched.privacy && !privacyAck && (
+            <p className={styles.fieldError} style={{ marginTop: 6 }}>
+              Please tick the box above to continue — we cannot take your details without it.
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="card anim-fade-up anim-d3">
@@ -603,7 +688,7 @@ export default function CheckoutClient({
               </button>
               {!formReady && !busy && (
                 <p className={`muted small ${styles.hint}`}>
-                  Choose at least one ticket and fill in your details to continue.
+                  {blockedReason}
                 </p>
               )}
             </>
@@ -629,7 +714,7 @@ export default function CheckoutClient({
             </button>
             {!formReady && !busy && (
               <p className={`muted small ${styles.hint}`}>
-                Choose at least one ticket and fill in your details to continue.
+                {blockedReason}
               </p>
             )}
           </>
@@ -662,7 +747,7 @@ export default function CheckoutClient({
             </div>
             {!formReady && (
               <p className={`muted small ${styles.hint}`}>
-                Choose at least one ticket and fill in your details to enable payment.
+                {blockedReason}
               </p>
             )}
             <p className={`muted small ${styles.hint}`}>

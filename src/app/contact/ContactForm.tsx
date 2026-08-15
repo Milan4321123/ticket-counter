@@ -51,6 +51,10 @@ export default function ContactForm({ contactEmail, intent = 'custom-design' }: 
   const [eventWhere, setEventWhere] = useState('');
   const [expectedPeople, setExpectedPeople] = useState('');
   const [website, setWebsite] = useState(''); // honeypot — must stay empty
+  // Same rule as the checkout: nothing is submitted until the person has ticked
+  // this themselves. Never pre-ticked, and checked again inside submit() so it
+  // cannot be defeated by re-enabling the button in devtools.
+  const [privacyAck, setPrivacyAck] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
@@ -67,6 +71,10 @@ export default function ContactForm({ contactEmail, intent = 'custom-design' }: 
     }
     if (messageValue.length < 10) {
       setError('Please tell us a bit more about what you would like — a sentence or two is plenty.');
+      return;
+    }
+    if (!privacyAck) {
+      setError('Please tick the box to confirm how we may use your details before sending.');
       return;
     }
     setBusy(true);
@@ -305,6 +313,50 @@ export default function ContactForm({ contactEmail, intent = 'custom-design' }: 
         </p>
       </div>
 
+      {/* The equivalent of the checkout's Datenschutz note, for enquiry data:
+          what is kept, who reads it, and how to have it removed. Sits directly
+          above the send button so it is read before anything is submitted. */}
+      <p className="muted small" style={{ margin: '0 0 14px' }}>
+        What you write here is stored so it cannot be lost in a mail outage, and emailed to our own
+        team — nobody else. We use it to answer you and for nothing else, you are not added to any
+        mailing list, and once your enquiry is dealt with you can ask us to delete it.{' '}
+        <a
+          href="/privacy"
+          target="_blank"
+          rel="noopener"
+          style={{ color: 'var(--brand-text)', fontWeight: 600 }}
+        >
+          More on how we handle your details
+        </a>{' '}
+        (opens in a new tab, so nothing you have typed is lost).
+      </p>
+
+      {/* The consent itself, directly under the note it refers to and directly
+          above the button it gates — there is no path to Send that does not go
+          past it. */}
+      <label
+        className="checkbox-row"
+        style={{
+          margin: '0 0 14px',
+          padding: '12px 14px',
+          border: '1px solid var(--border)',
+          borderLeft: '3px solid var(--brand)',
+          borderRadius: 10,
+          background: 'rgba(255, 255, 255, 0.03)',
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={privacyAck}
+          onChange={(e) => setPrivacyAck(e.target.checked)}
+          disabled={busy}
+        />
+        <span>
+          <strong>I agree</strong> that the details I have entered may be stored and used to answer
+          my enquiry, and I have read the privacy note (Datenschutz).
+        </span>
+      </label>
+
       {/* Honeypot: invisible to people, irresistible to bots. */}
       <div style={HONEYPOT_STYLE} aria-hidden="true">
         <label htmlFor="contact-website">Leave this field empty</label>
@@ -319,7 +371,11 @@ export default function ContactForm({ contactEmail, intent = 'custom-design' }: 
         />
       </div>
 
-      <button type="submit" className="btn btn-brand btn-block btn-lg" disabled={busy}>
+      <button
+        type="submit"
+        className="btn btn-brand btn-block btn-lg"
+        disabled={busy || !privacyAck}
+      >
         {busy ? <span className="spinner" aria-hidden /> : null}
         {busy ? 'Sending…' : wantsAccount ? 'Send your application' : 'Send your request'}
       </button>
