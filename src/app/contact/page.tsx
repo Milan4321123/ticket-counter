@@ -52,7 +52,7 @@ export default async function ContactPage({
                 putting on, a real person reads it, and if it all looks right we set the account up
                 and email you your sign-in details.
               </p>
-              <p className="feed-hero-sub anim-fade-up anim-d2" style={{ margin: '14px 0 0' }}>
+              <p className="feed-hero-sub anim-fade-up anim-d2" style={{ marginTop: 14 }}>
                 The account is free. You only pay when you publish an event ({feeLabel}), and never a
                 cut of your ticket sales. Nothing to pay to apply, and no payment details to enter.
               </p>
@@ -64,10 +64,31 @@ export default async function ContactPage({
                 in mind and our team builds the page around your event — you keep every euro of your
                 ticket sales, exactly as always.
               </p>
-              <p className="feed-hero-sub anim-fade-up anim-d2" style={{ margin: '14px 0 0' }}>
-                Each one is built for a single event rather than picked from a set of themes, so the
-                place to start is a conversation — send the form below and we will come back with
-                ideas and a price.
+
+              {/* The honest order of operations, said before the form rather than
+                  after it. Most organizers do not need this page at all: the
+                  self-service editor is included in the fee they already pay, and
+                  it is a better first move than a conversation with a queue in
+                  front of it. Sending everyone here would fill the inbox with
+                  requests that the editor answers in ten minutes. */}
+              <div className="contact-firststep anim-fade-up anim-d2">
+                <p style={{ margin: 0 }}>
+                  <strong>Build it yourself first — it is already paid for.</strong> Every event
+                  comes with a page editor: your own photos and video, ticket types, colours, an
+                  FAQ. Most organizers never need more than that, and it takes minutes.
+                </p>
+                <p style={{ margin: '12px 0 0' }}>
+                  <a href="/organizers" className="btn btn-brand">
+                    See what you can build yourself
+                  </a>
+                </p>
+              </div>
+
+              <p className="feed-hero-sub anim-fade-up anim-d2" style={{ marginTop: 18 }}>
+                <strong>Tried it and want more?</strong> That is what this page is for. Custom pages
+                are built for one event rather than picked from a set of themes, so the place to
+                start is a conversation — send the form below and Milan comes back to you with ideas
+                and a price.
               </p>
             </>
           )}

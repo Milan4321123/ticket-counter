@@ -6062,3 +6062,27 @@ html:has(.event-page.has-section-nav) {
   margin: 10px 0 4px;
   background: var(--bg-elevated);
 }
+
+/* The "try it yourself first" step on the custom-design page. Boxed and
+   left-aligned inside a centred hero: it is an instruction to act on, and
+   centred prose with a button in it reads as decoration. */
+.contact-firststep {
+  max-width: 620px;
+  margin: 22px auto 0;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--brand, var(--accent));
+  border-radius: 14px;
+  background: var(--bg-card);
+  text-align: left;
+  line-height: 1.65;
+}
+
+/* The hero centres its paragraphs, which is right for one sentence and wrong
+   for several: without a width the lines run wider than the eye tracks, and a
+   centred block with no bound drifts under the ragged edges around it. */
+.feed-hero-sub {
+  max-width: 620px;
+  margin-left: auto;
+  margin-right: auto;
+}
