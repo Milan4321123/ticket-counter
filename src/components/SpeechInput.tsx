@@ -219,23 +219,87 @@ export default function SpeechInput({ onText, onStart, label, hint }: Props) {
     rec.stop();
   }
 
+/**
+ * Ask for the microphone, with a plain retry.
+ *
+ * The processing constraints below are worth having — a phone in a noisy hall
+ * needs all of them — but they are a REQUEST, and some browsers and some audio
+ * drivers reject the whole call rather than ignoring a constraint they cannot
+ * honour. Asking again for a bare microphone turns that dead end into a working
+ * recording with slightly worse noise handling, which is the right trade.
+ */
+async function requestMic(): Promise<MediaStream> {
+  try {
+    return await navigator.mediaDevices.getUserMedia({
+      audio: {
+        // The browser's own cleanup is better than anything done afterwards.
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    });
+  } catch (e) {
+    const name = e instanceof Error ? e.name : '';
+    // Only retry the failures that are about the CONSTRAINTS. A refused
+    // permission is refused however politely it is asked again, and retrying
+    // it would just show the visitor a second prompt for no reason.
+    if (name === 'OverconstrainedError' || name === 'NotFoundError' || name === 'TypeError') {
+      return navigator.mediaDevices.getUserMedia({ audio: true });
+    }
+    throw e;
+  }
+}
+
+/**
+ * Say what actually went wrong.
+ *
+ * This used to be one catch-all that always read "check the permission for this
+ * site in your browser" — which is unhelpful when the cause is a microphone
+ * already held by another app, or a browser that blocked it by policy rather
+ * than by choice. Someone following that advice finds the permission already
+ * granted and concludes the site is broken.
+ *
+ * getUserMedia names its failures, so each one gets the sentence that resolves
+ * it. Brave gets a mention by name in the permission case: its Shields can
+ * block the microphone independently of the site permission, so the setting
+ * people are told to check will often look correct.
+ */
+function micErrorMessage(e: unknown): string {
+  const name = e instanceof Error ? e.name : '';
+  switch (name) {
+    case 'NotAllowedError':
+    case 'PermissionDeniedError':
+      return (
+        'The browser blocked the microphone. Tap the padlock in the address bar and allow the ' +
+        'microphone for this site — in Brave, also check the Shields icon, which can block it ' +
+        'even when the site permission looks fine.'
+      );
+    case 'NotFoundError':
+    case 'DevicesNotFoundError':
+      return 'No microphone was found on this device. Plug one in, or type your notes instead.';
+    case 'NotReadableError':
+    case 'TrackStartError':
+      return (
+        'Something else is using the microphone — a call, or another tab. Close it and try again.'
+      );
+    case 'SecurityError':
+      return 'Recording needs a secure (https) connection. Open this page over https and try again.';
+    case 'AbortError':
+      return 'The microphone stopped before it started. Please try again.';
+    default:
+      return 'We could not use the microphone. Please try again, or type it in.';
+  }
+}
+
   async function start() {
     if (phase !== 'idle') return;
     setError(null);
 
     let stream: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          // The browser's own cleanup is better than anything done afterwards,
-          // and a phone in a busy hall needs all of it.
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-    } catch {
-      setError('We could not use the microphone. Check the permission for this site in your browser.');
+      stream = await requestMic();
+    } catch (e) {
+      setError(micErrorMessage(e));
       return;
     }
 
