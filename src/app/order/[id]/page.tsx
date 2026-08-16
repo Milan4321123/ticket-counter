@@ -126,9 +126,80 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           </ol>
         </div>
 
+        {/* The same money, the same person, the same reference — just a second
+            way to send it. Deliberately built like the bank box rather than as
+            a PayPal checkout: a checkout would collect into the platform's
+            merchant account, and every promise on this site says the money goes
+            straight to the organizer. */}
+        {paypal ? (
+          <div className="bank-box pay-fast anim-fade-up anim-d3" style={{ margin: '16px 0' }}>
+            <div className="card-title">
+              Send {amountDisplay} by PayPal <span className="badge badge-green">Fastest</span>
+            </div>
+            <p className="muted small" style={{ margin: '0 0 10px' }}>
+              Arrives in seconds, so the organizer can confirm it and send your QR tickets straight
+              away{bank ? ' — a bank transfer takes 1–2 business days' : ''}.
+            </p>
+            <div className="copy-row">
+              <span className="muted small" style={rowLabelStyle}>
+                Amount
+              </span>
+              <strong>{amountDisplay}</strong>
+              <CopyButton value={amountPlain} />
+            </div>
+            <div className="copy-row">
+              <span className="muted small" style={rowLabelStyle}>
+                PayPal
+              </span>
+              {/* Only a recognised PayPal.Me link ever becomes an href — see
+                  paypalPayee(). Anything else is shown as text to copy. */}
+              {paypal.link ? (
+                <a
+                  href={paypal.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: 'var(--brand-text)', fontWeight: 600, wordBreak: 'break-all' }}
+                >
+                  {paypal.handle}
+                </a>
+              ) : (
+                <span className="mono" style={{ wordBreak: 'break-all' }}>
+                  {paypal.handle}
+                </span>
+              )}
+              <CopyButton value={paypal.handle} />
+            </div>
+            <div
+              className="copy-row"
+              style={{
+                borderColor: 'rgba(139, 92, 246, 0.6)',
+                background: 'rgba(139, 92, 246, 0.1)',
+              }}
+            >
+              <span className="muted small" style={rowLabelStyle}>
+                Reference
+              </span>
+              <span
+                className="mono"
+                style={{ fontWeight: 800, fontSize: '1.1rem', letterSpacing: '0.05em' }}
+              >
+                {reference}
+              </span>
+              {isStudentOrder ? <span className="badge badge-student">Student order</span> : null}
+              <CopyButton value={reference} />
+            </div>
+            <p className="muted small" style={{ margin: '12px 0 0' }}>
+              Send the amount to that PayPal address and put the reference{' '}
+              <span className="mono">{reference}</span> in PayPal&rsquo;s message field — it is how the
+              organizer matches your payment to your tickets, exactly as with a bank transfer. Pay
+              either way, not both.
+            </p>
+          </div>
+        ) : null}
+
         {bank ? (
           <div className="bank-box anim-fade-up anim-d3" style={{ margin: '16px 0' }}>
-            <div className="card-title">Transfer {amountDisplay} to</div>
+            <div className="card-title">{paypal ? `Or transfer ${amountDisplay} to` : `Transfer ${amountDisplay} to`}</div>
             <div className="copy-row">
               <span className="muted small" style={rowLabelStyle}>
                 Amount
@@ -202,70 +273,6 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           </div>
         )}
 
-        {/* The same money, the same person, the same reference — just a second
-            way to send it. Deliberately built like the bank box rather than as
-            a PayPal checkout: a checkout would collect into the platform's
-            merchant account, and every promise on this site says the money goes
-            straight to the organizer. */}
-        {paypal ? (
-          <div className="bank-box anim-fade-up anim-d3" style={{ margin: '16px 0' }}>
-            <div className="card-title">{bank ? `Or send ${amountDisplay} by PayPal` : `Send ${amountDisplay} by PayPal`}</div>
-            <div className="copy-row">
-              <span className="muted small" style={rowLabelStyle}>
-                Amount
-              </span>
-              <strong>{amountDisplay}</strong>
-              <CopyButton value={amountPlain} />
-            </div>
-            <div className="copy-row">
-              <span className="muted small" style={rowLabelStyle}>
-                PayPal
-              </span>
-              {/* Only a recognised PayPal.Me link ever becomes an href — see
-                  paypalPayee(). Anything else is shown as text to copy. */}
-              {paypal.link ? (
-                <a
-                  href={paypal.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: 'var(--brand-text)', fontWeight: 600, wordBreak: 'break-all' }}
-                >
-                  {paypal.handle}
-                </a>
-              ) : (
-                <span className="mono" style={{ wordBreak: 'break-all' }}>
-                  {paypal.handle}
-                </span>
-              )}
-              <CopyButton value={paypal.handle} />
-            </div>
-            <div
-              className="copy-row"
-              style={{
-                borderColor: 'rgba(139, 92, 246, 0.6)',
-                background: 'rgba(139, 92, 246, 0.1)',
-              }}
-            >
-              <span className="muted small" style={rowLabelStyle}>
-                Reference
-              </span>
-              <span
-                className="mono"
-                style={{ fontWeight: 800, fontSize: '1.1rem', letterSpacing: '0.05em' }}
-              >
-                {reference}
-              </span>
-              {isStudentOrder ? <span className="badge badge-student">Student order</span> : null}
-              <CopyButton value={reference} />
-            </div>
-            <p className="muted small" style={{ margin: '12px 0 0' }}>
-              Send the amount to that PayPal address and put the reference{' '}
-              <span className="mono">{reference}</span> in PayPal&rsquo;s message field — it is how the
-              organizer matches your payment to your tickets, exactly as with a bank transfer. Pay
-              either way, not both.
-            </p>
-          </div>
-        ) : null}
 
         {deadlineDisplay ? (
           <div className="notice notice-warn anim-fade-up anim-d4">

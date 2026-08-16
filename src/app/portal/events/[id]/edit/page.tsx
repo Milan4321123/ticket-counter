@@ -96,8 +96,13 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
     { ok: Boolean(event.venueName.trim() && event.address.trim()), label: 'Add the venue name and address' },
     { ok: tiers.length > 0, label: 'Add at least one ticket type' },
     {
-      ok: Boolean(event.bankIban.trim() && event.bankAccountHolder.trim()),
-      label: 'Add your bank account (holder and IBAN)',
+      // EITHER route counts. Demanding an IBAN from an organizer who collects
+      // by PayPal blocks a perfectly sellable event, and it was doing exactly
+      // that. What publishing actually needs is one working way to be paid.
+      ok: Boolean(
+        (event.bankIban.trim() && event.bankAccountHolder.trim()) || event.paypalAccount.trim()
+      ),
+      label: 'Add a way to be paid — bank account (holder and IBAN) or PayPal',
     },
     { ok: Boolean(event.description.trim()), label: 'Write a short description' },
   ];

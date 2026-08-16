@@ -478,8 +478,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         if (!merged.dateDisplay.trim() && !merged.eventDate) missing.push('add a date');
         if (!merged.venueName.trim() || !merged.address.trim()) missing.push('add the venue name and address');
         if (tierCount < 1) missing.push('add at least one ticket type');
-        if (!merged.bankIban.trim() || !merged.bankAccountHolder.trim()) {
-          missing.push('add your bank account (holder and IBAN)');
+        // One working payment route is the requirement, not specifically a
+        // bank one. See the same rule on the Publish tab and in the checkout.
+        const hasBank = Boolean(merged.bankIban.trim() && merged.bankAccountHolder.trim());
+        const hasPaypal = Boolean((merged.paypalAccount ?? '').trim());
+        if (!hasBank && !hasPaypal) {
+          missing.push('add a way to be paid — a bank account (holder and IBAN), or PayPal');
         }
         if (!merged.description.trim()) missing.push('write a short description');
         need(missing.length === 0, `Almost there — before publishing, please ${missing.join(', ')}.`);

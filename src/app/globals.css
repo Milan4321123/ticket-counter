@@ -5895,3 +5895,12 @@ html:has(.event-page.has-section-nav) {
     font-size: 0.86rem;
   }
 }
+
+/* The recommended payment route on the reservation page. Green marks the FAST
+   one — PayPal clears in seconds where a transfer takes days — not the one
+   anyone profits from; the money goes to the organizer either way. */
+.bank-box.pay-fast {
+  border-color: var(--green, #34d399);
+  border-left: 4px solid var(--green, #34d399);
+  background: var(--green-soft, rgba(52, 211, 153, 0.08));
+}

@@ -635,11 +635,26 @@ export async function sendTicketEmail(orderId: string): Promise<{ sent: boolean;
 function paypalNoteHtml(event: EventRow, reference: string): string {
   const payee = paypalPayee(event);
   if (!payee) return '';
-  return calloutHtml(
-    `<strong>Prefer PayPal?</strong> Send the same amount to ` +
-      `${strong(escapeHtml(payee.handle))} and put ${strong(escapeHtml(reference))} in PayPal&#39;s message ` +
-      `field. It reaches the same organizer — pay one way or the other, not both.`
-  );
+  // GREEN, and placed ABOVE the bank panel at every call site: PayPal clears in
+  // seconds where a transfer takes 1-2 business days, so the buyer who takes
+  // this route has their QR tickets the same evening. Green marks the FAST one,
+  // not one anyone profits from — the money reaches the organizer either way
+  // and the platform takes nothing from ticket sales.
+  //
+  // Its own table rather than calloutHtml(), which is amber and reads as a
+  // warning. Inline styles because email clients discard stylesheets.
+  return `
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2a20" style="margin:0 0 18px;background-color:#0f2a20;border:1px solid #34d399;border-left:4px solid #34d399;border-radius:12px;">
+        <tr>
+          <td style="padding:16px 18px;color:#d1fae5;font-size:15px;line-height:1.55;">
+            <span style="color:#34d399;font-weight:800;">Fastest: pay by PayPal</span><br>
+            Send ${strong(escapeHtml(payee.handle))} the amount below and put
+            ${strong(escapeHtml(reference))} in PayPal&#39;s message field. It arrives in seconds,
+            so your QR tickets can be sent straight away — a bank transfer takes 1&ndash;2 business
+            days. It reaches the same organizer either way: pay one way or the other, not both.
+          </td>
+        </tr>
+      </table>`;
 }
 
 /** Plain-text twin of paypalNoteHtml. Empty array when there is no PayPal. */
@@ -648,9 +663,12 @@ function paypalNoteText(event: EventRow, reference: string): string[] {
   if (!payee) return [];
   return [
     '',
+    'FASTEST: PAY BY PAYPAL',
     wrapText(
-      `PREFER PAYPAL? Send the same amount to ${payee.handle} and put ${reference} in PayPal's ` +
-        `message field. It reaches the same organizer — pay one way or the other, not both.`
+      `Send ${payee.handle} the amount above and put ${reference} in PayPal's message field. It ` +
+        `arrives in seconds, so your QR tickets can be sent straight away — a bank transfer takes ` +
+        `1-2 business days. It reaches the same organizer either way: pay one way or the other, ` +
+        `not both.`
     ),
   ];
 }
@@ -708,6 +726,7 @@ export async function sendTransferInstructionsEmail(
           `${strong(deadlineDisplay)} — everything you need is here.`,
         20
       ) +
+      paypalNoteHtml(event, reference) +
       panelHtml(amountRowHtml('Amount to transfer', amount) + detailRowsHtml(bankRows)) +
       referenceBoxHtml(
         'Payment reference — required',
@@ -715,7 +734,6 @@ export async function sendTransferInstructionsEmail(
         `Put this in the transfer&#39;s purpose line (&quot;Verwendungszweck&quot;). It is how your payment finds ` +
           `your tickets.${hasStudentTickets ? ' The <strong>S-</strong> marks an order with student tickets.' : ''}`
       ) +
-      paypalNoteHtml(event, reference) +
       pHtml(
         `Once the money lands — usually one or two working days — your QR tickets are emailed to you automatically. ` +
           `Nothing else to do.`,
@@ -1293,13 +1311,13 @@ export async function sendBuyerPaymentReminderEmail(
           `go back on sale.`,
         20
       ) +
+      paypalNoteHtml(event, reference) +
       panelHtml(amountRowHtml('Amount to transfer', amount) + detailRowsHtml(bankRows)) +
       referenceBoxHtml(
         'Payment reference — required',
         reference,
         `Put this in the transfer&#39;s purpose line (&quot;Verwendungszweck&quot;) so your payment finds your tickets.`
       ) +
-      paypalNoteHtml(event, reference) +
       buttonHtml(orderUrl, 'View your order') +
       smallHtml('Your QR tickets arrive by email the moment the payment is confirmed.');
 
