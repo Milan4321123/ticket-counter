@@ -7,6 +7,7 @@ import {
   getEventMedia,
   getEventTiers,
   getMediaById,
+  isValidPaypalAccount,
   makeUniqueSlug,
   newId,
   parseCropRect,
@@ -261,6 +262,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       set('bank_bic', v);
       merged.bankBic = v;
     }
+    if ('paypalAccount' in body) {
+      const v = strField(body.paypalAccount, 'The PayPal address', 120);
+      need(
+        isValidPaypalAccount(v),
+        'That does not look like a PayPal address — use the email address on your PayPal account, or your PayPal.Me link.'
+      );
+      set('paypal_account', v);
+      merged.paypalAccount = v;
+    }
     if ('bankName' in body) {
       const v = strField(body.bankName, 'The bank name', 120);
       set('bank_name', v);
@@ -283,7 +293,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         set('poster_media_id', null);
         merged.posterMediaId = null;
       } else {
-        need(typeof raw === 'string', 'Invalid poster choice.');
+        need(typeof raw === 'string', 'Invalid listing photo choice.');
         need(
           getEventMedia(event.id).some((m) => m.id === raw),
           'That photo does not belong to this event.'

@@ -54,6 +54,8 @@ interface Props {
   mode: 'paypal' | 'mock' | 'transfer';
   paypalClientId: string | null;
   transferConfigured: boolean;
+  /** This organizer also takes PayPal — the address itself is on the order page. */
+  paypalOffered: boolean;
   /**
    * How many days after the event the buyer's name and email are erased. Passed
    * down from the server rather than imported, because the one constant that
@@ -160,6 +162,7 @@ export default function CheckoutClient({
   mode,
   paypalClientId,
   transferConfigured,
+  paypalOffered,
   retentionDays,
 }: Props) {
   const router = useRouter();
@@ -587,7 +590,9 @@ export default function CheckoutClient({
             <strong>Your name and email go to the organizer of this event</strong> — they are who
             your ticket is issued by, and how you get a new copy if it goes missing.
             {mode === 'transfer'
-              ? ' Your payment goes straight to their bank account, so the money never passes through us, and the reference on your transfer is how they match it to your tickets.'
+              ? paypalOffered
+                ? ' Your payment goes straight to the organizer — to their own bank account or their own PayPal, so the money never passes through us, and the reference on it is how they match it to your tickets.'
+                : ' Your payment goes straight to their bank account, so the money never passes through us, and the reference on your transfer is how they match it to your tickets.'
               : ' The reference on your order is how your payment is matched to your tickets.'}{' '}
             We never ask for a card number or your bank details here. {retentionDays} days after the
             event, your name and email are erased from our system for good — the organizer keeps
@@ -654,14 +659,20 @@ export default function CheckoutClient({
           ) : (
             <>
               <p className="muted small" style={{ marginTop: 0 }}>
-                Pay by regular bank transfer (Überweisung). Reserving takes one click — your
-                seats are held for you straight away.
+                {paypalOffered
+                  ? 'Pay by regular bank transfer (Überweisung) or by PayPal — whichever you prefer. Reserving takes one click — your seats are held for you straight away.'
+                  : 'Pay by regular bank transfer (Überweisung). Reserving takes one click — your seats are held for you straight away.'}
               </p>
               <ul className={styles.perkList}>
-                <li>No fees, no account needed — pay from any bank app</li>
                 <li>
-                  On the next page you&rsquo;ll get the organizer&rsquo;s bank details and your
-                  personal payment reference (also sent to you by email)
+                  {paypalOffered
+                    ? 'No fees, no account needed — pay from any bank app, or with PayPal'
+                    : 'No fees, no account needed — pay from any bank app'}
+                </li>
+                <li>
+                  On the next page you&rsquo;ll get the organizer&rsquo;s{' '}
+                  {paypalOffered ? 'bank and PayPal details' : 'bank details'} and your personal
+                  payment reference (also sent to you by email)
                 </li>
                 <li>
                   Your QR-code tickets are emailed as soon as your transfer arrives — usually

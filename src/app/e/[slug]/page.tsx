@@ -24,6 +24,7 @@ import {
   mediaUrl,
   parseCropRect,
   parsePageDesign,
+  paypalPayee,
   videoEmbedUrl,
 } from '@/lib/events';
 import type { EventRow, PageDesign } from '@/lib/events';
@@ -138,24 +139,38 @@ function vibeTuning(vibe: PageDesign['vibe']): {
   }
 }
 
-const HOW_IT_WORKS = [
-  {
-    title: 'Reserve your tickets',
-    desc: 'Pick your tickets at checkout and reserve them in one click — no account needed, and your seats are held for you right away.',
-  },
-  {
-    title: 'Pay by bank transfer',
-    desc: 'You get the organizer’s bank details and a personal payment reference. Send a normal transfer from any bank app — just remember to include the reference.',
-  },
-  {
-    title: 'Your payment is confirmed',
-    desc: 'As soon as the transfer arrives (usually 1–2 business days), the organizer confirms it and your QR-code tickets land in your inbox.',
-  },
-  {
-    title: 'Show the QR code at the door',
-    desc: 'Bring your QR codes on your phone or on paper. One quick scan per ticket and you are in — enjoy the show!',
-  },
-];
+/**
+ * The four steps, told for THIS event: an organizer who also takes PayPal
+ * should not have their page promising a bank transfer is the only way, and one
+ * who does not must not have PayPal dangled in front of their buyers.
+ */
+function howItWorks(takesPaypal: boolean) {
+  return [
+    {
+      title: 'Reserve your tickets',
+      desc: 'Pick your tickets at checkout and reserve them in one click — no account needed, and your seats are held for you right away.',
+    },
+    takesPaypal
+      ? {
+          title: 'Pay by bank transfer or PayPal',
+          desc: 'You get the organizer’s bank details, their PayPal address, and a personal payment reference. Send the money whichever way suits you — just remember to include the reference.',
+        }
+      : {
+          title: 'Pay by bank transfer',
+          desc: 'You get the organizer’s bank details and a personal payment reference. Send a normal transfer from any bank app — just remember to include the reference.',
+        },
+    {
+      title: 'Your payment is confirmed',
+      desc: takesPaypal
+        ? 'PayPal usually arrives within minutes and a bank transfer takes 1–2 business days. As soon as yours lands, the organizer confirms it and your QR-code tickets are emailed to you.'
+        : 'As soon as the transfer arrives (usually 1–2 business days), the organizer confirms it and your QR-code tickets land in your inbox.',
+    },
+    {
+      title: 'Show the QR code at the door',
+      desc: 'Bring your QR codes on your phone or on paper. One quick scan per ticket and you are in — enjoy the show!',
+    },
+  ];
+}
 
 function CalendarIcon() {
   return (
@@ -799,7 +814,7 @@ export default async function EventPage({ params }: Params) {
           <p className="section-kicker">From reserve to entry</p>
           <h2 className="page-title">How it works</h2>
           <ol className="step-list" style={{ maxWidth: 680 }}>
-            {HOW_IT_WORKS.map((item, i) => (
+            {howItWorks(paypalPayee(event) !== null).map((item, i) => (
               <li className="step-item" key={item.title}>
                 <span className="step-num">{i + 1}</span>
                 <div>

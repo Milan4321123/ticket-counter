@@ -157,8 +157,13 @@ export default function MediaPanel({
 
   const setCover = (item: MediaItem) =>
     pick(item, { coverMediaId: item.id }, 'Cover updated — this is what people see first.');
-  const setPoster = (item: MediaItem) => pick(item, { posterMediaId: item.id }, 'Poster updated.');
+  const setPoster = (item: MediaItem) =>
+    pick(item, { posterMediaId: item.id }, 'Listing photo updated — this is your tile on Browse events.');
   const setProfile = (item: MediaItem) => pick(item, { profileMediaId: item.id }, 'Profile photo updated.');
+
+  /** Hand the listing tile back to the cover — the default for a new event. */
+  const clearPoster = (item: MediaItem) =>
+    pick(item, { posterMediaId: null }, 'Listing photo cleared — your cover is used on Browse events again.');
 
   async function onVideoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -320,18 +325,53 @@ export default function MediaPanel({
     );
   }
 
+  /** The same, for the listing tile — opposite corner so the two never overlap. */
+  function ListingFlag({ id }: { id: string }) {
+    if (id !== posterMediaId) return null;
+    return (
+      <span
+        className="badge badge-accent"
+        style={{
+          position: 'absolute',
+          top: 8,
+          right: 8,
+          zIndex: 2,
+          boxShadow: '0 2px 10px rgba(0, 0, 0, 0.5)',
+        }}
+      >
+        Listing
+      </span>
+    );
+  }
+
   return (
     <div>
       {error && <div className="notice notice-error">{error}</div>}
       {!error && notice && <div className="notice notice-success">{notice}</div>}
 
       <p className="muted small" style={{ marginTop: 0 }}>
-        Pick one <strong>cover</strong> — a photo or a video. It fills the top of your event page and is the first thing
-        people see; a video cover plays by itself, quietly and on a loop. Everything else shows in the gallery below it.
-        The <strong>poster</strong> is the thumbnail your event shows in the public listings, and the{' '}
-        <strong>profile photo</strong> shows as a round avatar under the cover and next to your updates, like on a social
-        page. Each of those three has a fixed shape and is always filled — you choose which part of
-        the photo is in frame.
+        Three photos do three different jobs, and they do not have to be the same picture:
+      </p>
+      <ul className="muted small" style={{ margin: '0 0 12px', paddingLeft: 20 }}>
+        <li>
+          <strong>Cover</strong> — the wide band across the top of your own event page, and the first thing a visitor
+          sees. It can be a photo or a video; a video cover plays by itself, quietly and on a loop.
+        </li>
+        <li>
+          <strong>Listing photo</strong> — the tall tile your event shows on the{' '}
+          <strong>Browse events</strong> page, next to everyone else&rsquo;s. This is the one that has to win a
+          glance. {posterMediaId
+            ? 'You have picked one, so it is what browsers see.'
+            : 'You have not picked one yet, so your cover is being squeezed into that tall shape — pick a photo below if it deserves better.'}
+        </li>
+        <li>
+          <strong>Profile photo</strong> — the round avatar under the cover and beside your updates, like on a social
+          page.
+        </li>
+      </ul>
+      <p className="muted small" style={{ marginTop: 0 }}>
+        Each of those three has a fixed shape and is always filled — you choose which part of the photo is in frame.
+        Everything else you upload shows in the gallery.
       </p>
 
       {/* Exactly what visitors get, and the place to change it. Each of these
@@ -390,8 +430,8 @@ export default function MediaPanel({
               variant="card"
               aspect={CARD_ASPECT}
               maxWidth={260}
-              label="Poster"
-              hint="The tile your event shows in the listings."
+              label="Listing photo"
+              hint="Exactly what your tile looks like on the Browse events page."
               saved={crops.poster}
             />
           )}
@@ -418,11 +458,23 @@ export default function MediaPanel({
                   style={{ width: '100%', height: 110, objectFit: 'cover', display: 'block' }}
                 />
                 <CoverFlag id={item.id} />
+                <ListingFlag id={item.id} />
               </div>
               <div style={{ padding: 8, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                 <CoverButton item={item} />
                 {item.id === posterMediaId ? (
-                  <span className="badge badge-accent">Poster</span>
+                  <>
+                    <span className="badge badge-accent">Listing photo</span>
+                    <button
+                      type="button"
+                      className="btn-copy"
+                      onClick={() => void clearPoster(item)}
+                      disabled={busy !== null}
+                      title="Go back to using your cover on the Browse events page"
+                    >
+                      {busy === item.id ? '…' : 'Use cover instead'}
+                    </button>
+                  </>
                 ) : (
                   <button
                     type="button"
@@ -430,7 +482,7 @@ export default function MediaPanel({
                     onClick={() => void setPoster(item)}
                     disabled={busy !== null}
                   >
-                    {busy === item.id ? '…' : 'Set as poster'}
+                    {busy === item.id ? '…' : 'Set as listing photo'}
                   </button>
                 )}
                 {item.id === profileMediaId ? (

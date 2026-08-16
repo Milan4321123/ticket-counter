@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getPaymentMode } from '@/lib/config';
-import { getEventBySlug, getEventTiers } from '@/lib/events';
+import { getEventBySlug, getEventTiers, paypalPayee } from '@/lib/events';
 import { getAvailability } from '@/lib/inventory';
 import { expireOverdueTransferReservations } from '@/lib/orders';
 import { BUYER_RETENTION_DAYS } from '@/lib/retention';
@@ -76,6 +76,10 @@ export default async function EventCheckoutPage({ params }: Params) {
   const paypalClientId = process.env.PAYPAL_CLIENT_ID ?? null;
   // Per-event bank details: transfers only work once the organizer filled them in.
   const transferConfigured = Boolean(event.bankIban.trim() && event.bankAccountHolder.trim());
+  // Whether this organizer ALSO takes PayPal. Only a yes/no crosses to the
+  // browser — the address itself belongs on the order page, after someone has
+  // actually reserved, not on a public page for anyone to scrape.
+  const paypalOffered = paypalPayee(event) !== null;
 
   return (
     <CheckoutClient
@@ -99,6 +103,7 @@ export default async function EventCheckoutPage({ params }: Params) {
       mode={mode}
       paypalClientId={paypalClientId}
       transferConfigured={transferConfigured}
+      paypalOffered={paypalOffered}
       retentionDays={BUYER_RETENTION_DAYS}
     />
   );

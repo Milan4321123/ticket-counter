@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import CheckPaymentButton from '@/components/CheckPaymentButton';
 import CopyButton from '@/components/CopyButton';
 import PrintButton from '@/components/PrintButton';
-import { getEventById, getEventTiers } from '@/lib/events';
+import { getEventById, getEventTiers, paypalPayee } from '@/lib/events';
 import { formatMoney } from '@/lib/money';
 import { getOrder, getOrderItems, getTicketsForOrder, paymentReference } from '@/lib/orders';
 import { ticketQrDataUrl } from '@/lib/tickets';
@@ -54,6 +54,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             payWithinDays: event.payWithinDays,
           }
         : null;
+    const paypal = event ? paypalPayee(event) : null;
     const reference = paymentReference(order.id);
     const isStudentOrder = reference.includes('-S-');
     const amountPlain = (order.totalCents / 100).toFixed(2);
@@ -75,7 +76,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           </p>
         ) : null}
         <div className="notice notice-success anim-fade-up anim-d1">
-          Your tickets are reserved — the seats are being held for you. One bank transfer
+          Your tickets are reserved — the seats are being held for you.{' '}
+          {paypal ? 'One payment' : 'One bank transfer'}
           {deadlineDisplay ? (
             <>
               {' '}by <strong>{deadlineDisplay}</strong>
@@ -90,10 +92,13 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             <li className="step-item">
               <span className="step-num">1</span>
               <div>
-                <div className="tier-name">Send the bank transfer</div>
+                <div className="tier-name">
+                  {paypal ? 'Send the money — bank transfer or PayPal' : 'Send the bank transfer'}
+                </div>
                 <p className="muted small" style={{ margin: '2px 0 0' }}>
-                  Use the details below in any bank app — and make sure your personal reference is
-                  included.
+                  {paypal
+                    ? 'Use either set of details below — whichever suits you. Both go to the organizer, and both need your personal reference included.'
+                    : 'Use the details below in any bank app — and make sure your personal reference is included.'}
                 </p>
               </div>
             </li>
@@ -102,8 +107,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <div>
                 <div className="tier-name">The organizer confirms your payment</div>
                 <p className="muted small" style={{ margin: '2px 0 0' }}>
-                  Bank transfers usually take 1–2 business days to arrive. As soon as yours lands,
-                  it is confirmed.
+                  {paypal
+                    ? 'PayPal usually arrives within minutes; a bank transfer takes 1–2 business days. As soon as yours lands, it is confirmed.'
+                    : 'Bank transfers usually take 1–2 business days to arrive. As soon as yours lands, it is confirmed.'}
                 </p>
               </div>
             </li>
@@ -190,11 +196,76 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               </p>
             ) : null}
           </div>
-        ) : (
+        ) : paypal ? null : (
           <div className="notice notice-error anim-fade-up anim-d3">
             Payment details are not available right now — please contact the organizer.
           </div>
         )}
+
+        {/* The same money, the same person, the same reference — just a second
+            way to send it. Deliberately built like the bank box rather than as
+            a PayPal checkout: a checkout would collect into the platform's
+            merchant account, and every promise on this site says the money goes
+            straight to the organizer. */}
+        {paypal ? (
+          <div className="bank-box anim-fade-up anim-d3" style={{ margin: '16px 0' }}>
+            <div className="card-title">{bank ? `Or send ${amountDisplay} by PayPal` : `Send ${amountDisplay} by PayPal`}</div>
+            <div className="copy-row">
+              <span className="muted small" style={rowLabelStyle}>
+                Amount
+              </span>
+              <strong>{amountDisplay}</strong>
+              <CopyButton value={amountPlain} />
+            </div>
+            <div className="copy-row">
+              <span className="muted small" style={rowLabelStyle}>
+                PayPal
+              </span>
+              {/* Only a recognised PayPal.Me link ever becomes an href — see
+                  paypalPayee(). Anything else is shown as text to copy. */}
+              {paypal.link ? (
+                <a
+                  href={paypal.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: 'var(--brand-text)', fontWeight: 600, wordBreak: 'break-all' }}
+                >
+                  {paypal.handle}
+                </a>
+              ) : (
+                <span className="mono" style={{ wordBreak: 'break-all' }}>
+                  {paypal.handle}
+                </span>
+              )}
+              <CopyButton value={paypal.handle} />
+            </div>
+            <div
+              className="copy-row"
+              style={{
+                borderColor: 'rgba(139, 92, 246, 0.6)',
+                background: 'rgba(139, 92, 246, 0.1)',
+              }}
+            >
+              <span className="muted small" style={rowLabelStyle}>
+                Reference
+              </span>
+              <span
+                className="mono"
+                style={{ fontWeight: 800, fontSize: '1.1rem', letterSpacing: '0.05em' }}
+              >
+                {reference}
+              </span>
+              {isStudentOrder ? <span className="badge badge-student">Student order</span> : null}
+              <CopyButton value={reference} />
+            </div>
+            <p className="muted small" style={{ margin: '12px 0 0' }}>
+              Send the amount to that PayPal address and put the reference{' '}
+              <span className="mono">{reference}</span> in PayPal&rsquo;s message field — it is how the
+              organizer matches your payment to your tickets, exactly as with a bank transfer. Pay
+              either way, not both.
+            </p>
+          </div>
+        ) : null}
 
         {deadlineDisplay ? (
           <div className="notice notice-warn anim-fade-up anim-d4">

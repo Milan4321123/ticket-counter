@@ -5,7 +5,7 @@
 import nodemailer from 'nodemailer';
 import QRCode from 'qrcode';
 import { getBaseUrl } from './config';
-import { getEventById, getEventTier, type EventQuestionRow, type EventRow } from './events';
+import { getEventById, getEventTier, paypalPayee, type EventRow } from './events';
 import { formatMoney } from './money';
 import { getOrder, getOrderItems, getTicketsForOrder, paymentReference } from './orders';
 import {
@@ -618,6 +618,37 @@ export async function sendTicketEmail(orderId: string): Promise<{ sent: boolean;
  * Send bank-transfer payment instructions for a freshly reserved order.
  * Never throws — the buyer sees the same instructions on the order page.
  */
+/**
+ * The "you can also use PayPal" line, for buyer mails that print bank details.
+ *
+ * Deliberately a note beside the bank panel rather than a second panel of its
+ * own: it is the same amount, to the same person, with the same reference —
+ * only the pipe differs. Returns '' when the organizer offers no PayPal, so
+ * every call site can concatenate it unconditionally.
+ */
+function paypalNoteHtml(event: EventRow, reference: string): string {
+  const payee = paypalPayee(event);
+  if (!payee) return '';
+  return calloutHtml(
+    `<strong>Prefer PayPal?</strong> Send the same amount to ` +
+      `${strong(escapeHtml(payee.handle))} and put ${strong(escapeHtml(reference))} in PayPal&#39;s message ` +
+      `field. It reaches the same organizer — pay one way or the other, not both.`
+  );
+}
+
+/** Plain-text twin of paypalNoteHtml. Empty array when there is no PayPal. */
+function paypalNoteText(event: EventRow, reference: string): string[] {
+  const payee = paypalPayee(event);
+  if (!payee) return [];
+  return [
+    '',
+    wrapText(
+      `PREFER PAYPAL? Send the same amount to ${payee.handle} and put ${reference} in PayPal's ` +
+        `message field. It reaches the same organizer — pay one way or the other, not both.`
+    ),
+  ];
+}
+
 export async function sendTransferInstructionsEmail(
   orderId: string
 ): Promise<{ sent: boolean; reason?: string }> {
@@ -678,6 +709,7 @@ export async function sendTransferInstructionsEmail(
         `Put this in the transfer&#39;s purpose line (&quot;Verwendungszweck&quot;). It is how your payment finds ` +
           `your tickets.${hasStudentTickets ? ' The <strong>S-</strong> marks an order with student tickets.' : ''}`
       ) +
+      paypalNoteHtml(event, reference) +
       pHtml(
         `Once the money lands — usually one or two working days — your QR tickets are emailed to you automatically. ` +
           `Nothing else to do.`,
@@ -726,6 +758,7 @@ export async function sendTransferInstructionsEmail(
           `IMPORTANT: the reference ${reference} must go in the transfer's purpose line ` +
             `("Verwendungszweck"). It is how your payment finds your tickets.`
         ),
+        ...paypalNoteText(event, reference),
         ...(hasStudentTickets
           ? [
               '',
@@ -1260,6 +1293,7 @@ export async function sendBuyerPaymentReminderEmail(
         reference,
         `Put this in the transfer&#39;s purpose line (&quot;Verwendungszweck&quot;) so your payment finds your tickets.`
       ) +
+      paypalNoteHtml(event, reference) +
       buttonHtml(orderUrl, 'View your order') +
       smallHtml('Your QR tickets arrive by email the moment the payment is confirmed.');
 
@@ -1306,6 +1340,7 @@ export async function sendBuyerPaymentReminderEmail(
           `IMPORTANT: put the reference ${reference} in the transfer's purpose line ` +
             `("Verwendungszweck") so your payment finds your tickets.`
         ),
+        ...paypalNoteText(event, reference),
         '',
         `Your order: ${orderUrl}`,
         '',
@@ -1538,102 +1573,6 @@ export async function sendContactRequestAck(
     return { sent: true };
   } catch (err) {
     console.error('[email] Failed to send contact request acknowledgement:', err instanceof Error ? err.message : err);
-    return { sent: false, reason: 'send-failed' };
-  }
-}
-
-/**
- * The organizer's answer, sent to the person who asked.
- *
- * Questions used to be answered only on the page, which quietly assumed the
- * asker would come back and look. Nobody re-opens an event page on the chance
- * that a question they asked days ago has been answered — so in practice the
- * answer reached everyone EXCEPT the one person who wanted it.
- *
- * Sends nothing when the question was asked anonymously, and nothing once the
- * address has been erased by the retention sweep: the .invalid address is not
- * deliverable and mailing it would only generate bounces.
- */
-export async function sendQuestionAnsweredEmail(
-  question: EventQuestionRow
-): Promise<{ sent: boolean; reason?: string }> {
-  try {
-    if (!isEmailConfigured()) return { sent: false, reason: 'email-not-configured' };
-
-    const to = question.askerEmail.trim();
-    if (!to) return { sent: false, reason: 'no-address' };
-    if (question.askerErasedAt || to.endsWith('.invalid')) return { sent: false, reason: 'address-erased' };
-    if (!question.answer?.trim()) return { sent: false, reason: 'no-answer' };
-
-    const event = getEventById(question.eventId);
-    if (!event) return { sent: false, reason: 'event-missing' };
-
-    const name = platformName();
-    const eventUrl = `${getBaseUrl()}/e/${event.slug}`;
-    const greeting = question.askerName.trim() ? `Hi ${escapeHtml(question.askerName.trim())},` : 'Hi,';
-    const headline = `${event.name} — your question is answered`;
-
-    const bodyHtml =
-      pHtml(greeting) +
-      pHtml(
-        `The organizer of <strong>${escapeHtml(event.name)}</strong> has replied to the question you ` +
-          `asked on their event page.`,
-        20
-      ) +
-      quoteHtml('You asked', multilineHtml(question.question)) +
-      calloutHtml(`<strong>Their answer</strong><br>${multilineHtml(question.answer)}`) +
-      pHtml(
-        `Everything about the event — dates, tickets and the rest — is on ` +
-          `<a class="brandtext" href="${escapeHtml(eventUrl)}" style="color:${C.brandDeep};font-weight:700;">the event page</a>. ` +
-          `Need anything else? Ask again there.`,
-        20
-      ) +
-      pHtml(
-        `<span style="color:${C.muted};font-size:13px;">You are getting this because you asked to be told ` +
-          `the answer. It is a one-off — there is no mailing list, and we do not write to you again.</span>`,
-        0
-      );
-
-    const text = renderText({
-      headline,
-      lines: [
-        question.askerName.trim() ? `Hi ${question.askerName.trim()},` : 'Hi,',
-        '',
-        wrapText(`The organizer of ${event.name} has replied to the question you asked on their event page.`),
-        '',
-        'YOU ASKED',
-        question.question,
-        '',
-        'THEIR ANSWER',
-        question.answer,
-        '',
-        wrapText(`Everything about the event is on ${eventUrl} — need anything else? Ask again there.`),
-        '',
-        wrapText(
-          'You are getting this because you asked to be told the answer. It is a one-off — there is no ' +
-            'mailing list, and we do not write to you again.'
-        ),
-      ],
-      footer: [`${name} · ${getBaseUrl()}`],
-    });
-
-    await createTransporter().sendMail({
-      from: process.env.EMAIL_FROM,
-      to,
-      subject: `Answered: your question about ${event.name}`,
-      text,
-      html: renderEmail({
-        title: headline,
-        preheader: `The organizer replied to your question about ${event.name}.`,
-        kicker: 'Answered',
-        headline,
-        bodyHtml,
-        footerLines: [`${name} · ${getBaseUrl()}`],
-      }),
-    });
-    return { sent: true };
-  } catch (err) {
-    console.error('[email] Failed to send question answer:', err instanceof Error ? err.message : err);
     return { sent: false, reason: 'send-failed' };
   }
 }

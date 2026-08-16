@@ -35,6 +35,13 @@ export interface EventRow {
   bankIban: string;
   bankBic: string;
   bankName: string;
+  /**
+   * The organizer's own PayPal address, or their PayPal.Me link — '' when they
+   * have not offered one. A SECOND route for the same money to the same person,
+   * never a checkout integration: see paypalPayee() for why that distinction is
+   * the whole point.
+   */
+  paypalAccount: string;
   posterMediaId: string | null;
   profileMediaId: string | null;
   /** First/legacy uploaded video — an event can now hold several. */
@@ -141,6 +148,7 @@ const EVENT_COLS = `
   bank_iban AS bankIban,
   bank_bic AS bankBic,
   bank_name AS bankName,
+  paypal_account AS paypalAccount,
   poster_media_id AS posterMediaId,
   profile_media_id AS profileMediaId,
   video_media_id AS videoMediaId,
@@ -164,6 +172,7 @@ function rowToEvent(row: Record<string, unknown> | undefined): EventRow | null {
     salesOpen: Boolean(row.salesOpen),
     // Added by migration, so it is NULL on every event created before it.
     assistantContext: (row.assistantContext as string | null) ?? '',
+    paypalAccount: (row.paypalAccount as string | null) ?? '',
   };
 }
 
@@ -723,6 +732,58 @@ export function deleteEventCompletely(eventId: string): DeletedEventSummary {
 }
 
 // ---------------- Helpers ----------------
+
+// ---------------- PayPal (the organizer's own account) ----------------
+
+/**
+ * What the buyer is shown so they can send the money by PayPal instead of by
+ * bank transfer.
+ *
+ * This is NOT a PayPal checkout. A checkout integration would collect the money
+ * into whichever merchant account owns the client ID — the platform's — and the
+ * platform would then owe every organizer a payout it has no machinery to make.
+ * The site tells buyers, truthfully, that their money goes straight to the
+ * organizer and never passes through us, and that has to keep being true
+ * whichever button they press. So PayPal here works exactly as the IBAN does:
+ * the organizer's own address, the same payment reference, and the organizer
+ * confirming what actually arrived.
+ */
+export interface PaypalPayee {
+  /** Exactly what the organizer entered — an address or a PayPal.Me link. */
+  handle: string;
+  /** A tappable link, when they gave one. Null for a plain address. */
+  link: string | null;
+}
+
+const PAYPAL_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
+/** paypal.me/name and PayPal's own newer paypal.com/paypalme/name form. */
+const PAYPAL_LINK_RE = /^https:\/\/(?:www\.)?(?:paypal\.me|paypal\.com\/paypalme)\/[A-Za-z0-9._-]{1,64}\/?$/i;
+
+/**
+ * Normalize what an organizer typed into something safe to render.
+ *
+ * "paypal.me/myband" without the scheme is what people actually paste, so it is
+ * completed rather than rejected. Anything that is neither a plausible address
+ * nor a PayPal link comes back as a handle with no link: it is still shown for
+ * the buyer to read, but it never becomes an href — an arbitrary string from an
+ * organizer must not turn into a clickable destination.
+ */
+export function paypalPayee(event: Pick<EventRow, 'paypalAccount'>): PaypalPayee | null {
+  const raw = (event.paypalAccount || '').trim();
+  if (!raw) return null;
+  const withScheme = /^(?:www\.)?paypal\.(?:me|com)\//i.test(raw) ? `https://${raw.replace(/^www\./i, '')}` : raw;
+  if (PAYPAL_LINK_RE.test(withScheme)) return { handle: raw, link: withScheme };
+  return { handle: raw, link: null };
+}
+
+/** True for input this platform will accept in the PayPal field. */
+export function isValidPaypalAccount(raw: string): boolean {
+  const value = raw.trim();
+  if (!value) return true; // optional — empty simply means "no PayPal"
+  if (PAYPAL_EMAIL_RE.test(value)) return true;
+  const withScheme = /^(?:www\.)?paypal\.(?:me|com)\//i.test(value) ? `https://${value.replace(/^www\./i, '')}` : value;
+  return PAYPAL_LINK_RE.test(withScheme);
+}
 
 /** Universal "Open in Maps" link — opens the native maps app on phones. */
 export function mapsUrl(event: Pick<EventRow, 'address' | 'venueName' | 'city'>): string | null {

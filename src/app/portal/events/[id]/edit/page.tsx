@@ -191,8 +191,8 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
 
         <EditorSection
           id="bank"
-          title="Your bank account"
-          hint="Ticket money goes straight to this account — double-check the IBAN."
+          title="How you get paid"
+          hint="Ticket money goes straight to you — double-check the IBAN. Add PayPal too if you want to offer it."
           status={bankDone ? 'done' : 'todo'}
         >
           <BankForm
@@ -202,6 +202,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
               bankIban: event.bankIban,
               bankBic: event.bankBic,
               bankName: event.bankName,
+              paypalAccount: event.paypalAccount,
             }}
           />
         </EditorSection>

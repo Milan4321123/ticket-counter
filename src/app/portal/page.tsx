@@ -1,16 +1,13 @@
 import Link from 'next/link';
 import PlatformAssistant from '@/components/PlatformAssistant';
 import {
-  cropTag,
   eventFeeCentsFor,
-  getEventMedia,
   listEventQuestions,
   listEventsForOrganizer,
-  mediaUrl,
-  parseCropRect,
   type EventRow,
   type EventStatus,
 } from '@/lib/events';
+import { listingStillUrl } from '@/lib/listing';
 import { formatMoney } from '@/lib/money';
 import { getStats } from '@/lib/orders';
 import { organizerPlanActive } from '@/lib/organizers';
@@ -38,23 +35,13 @@ function StatusBadge({ status }: { status: EventStatus }) {
 
 /**
  * The thumbnail beside an event here must be the SAME picture the public tile
- * shows — cover first, then poster, then the first photo — or the organizer
- * checks their dashboard and sees something other than what buyers see. It
- * used to read posterMediaId alone, so an event whose cover was set but whose
- * poster was not appeared here as an empty block while its public tile looked
- * fine. Videos are skipped: this slot is a still.
+ * shows, or the organizer checks their dashboard and sees something other than
+ * what buyers see. So it is not worked out here at all: lib/listing owns that
+ * choice for the whole site, and this simply asks it. Videos are skipped by
+ * that helper too — this slot is a still.
  */
 function dashboardThumb(event: EventRow): string | null {
-  const photos = getEventMedia(event.id); // photos only
-  const isPhoto = (id: string | null): id is string => !!id && photos.some((p) => p.id === id);
-
-  if (isPhoto(event.coverMediaId)) {
-    return mediaUrl(event.coverMediaId, 'card', cropTag(parseCropRect(event.coverCrop)));
-  }
-  if (isPhoto(event.posterMediaId)) {
-    return mediaUrl(event.posterMediaId, 'card', cropTag(parseCropRect(event.posterCrop)));
-  }
-  return photos[0] ? mediaUrl(photos[0].id, 'card', null) : null;
+  return listingStillUrl(event);
 }
 
 export default async function PortalDashboardPage({

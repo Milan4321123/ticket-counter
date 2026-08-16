@@ -1717,6 +1717,16 @@ summary {
 .event-card-meta {
   color: var(--text-dim);
   font-size: 0.88rem;
+  /* Two lines, then an ellipsis. dateDisplay is free text an organizer types
+     for their own page ("Saturday, October 10, 2026 · Doors 6:00 PM · Show
+     7:00 PM"), and at tile width it ran to three lines and shoved the price
+     and the call to action down the card. The full line is on the event page,
+     which is one tap away. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .event-card-foot {
@@ -4907,60 +4917,767 @@ html:has(.event-page.has-section-nav) {
   box-shadow: 0 16px 38px -14px rgba(16, 185, 129, 0.9);
 }
 
-/* ---------- Pre-publish preview bar ----------
-   Sits above the hero on an unpublished event that only its own organizer can
-   open. Deliberately loud: someone looking at their own draft must never be in
-   any doubt about whether the public can see it, and must always have one
-   click back to the editor. */
+/* ==========================================================================
+   Browse page (home) — billboard, horizontal rails, and the buyer's
+   explanation of how a ticket here actually works.
 
-.preview-bar {
-  position: sticky;
-  top: 0;
-  z-index: 60;
-  background: linear-gradient(90deg, var(--amber-soft), rgba(0, 0, 0, 0.35));
-  border-bottom: 1px solid var(--amber);
-  backdrop-filter: blur(8px);
-}
+   Additive layer: nothing above is modified. The rails deliberately reuse
+   .event-card as-is, so a tile is the same object whether it sits in a row
+   here or anywhere else on the site.
+   ========================================================================== */
 
-.preview-bar-inner {
+/* ---------- Hero additions ---------- */
+
+/* The three facts under the hero's buttons.
+   Deliberately NOT .hero-chip: a bordered pill with a background is the shape
+   of something you press, and three of them stacked above the two real buttons
+   made the actual call to action impossible to pick out. Plain text with a
+   tinted icon says the same thing and competes with nothing. */
+.feed-trust {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  justify-content: center;
   flex-wrap: wrap;
-  padding-top: 10px;
-  padding-bottom: 10px;
+  gap: 8px 26px;
+  list-style: none;
+  padding: 0;
+  margin: 22px 0 0;
 }
 
-.preview-bar-text {
-  flex: 1 1 260px;
-  min-width: 0;
-  color: var(--text);
-  font-size: 0.88rem;
-  line-height: 1.5;
+.feed-trust-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-dim);
 }
 
-/* ---------- "Ask the organizer" form on an event page ---------- */
-
-.ask-form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-top: 12px;
+.feed-trust-item svg {
+  flex: none;
+  color: var(--brand-text);
+  opacity: 0.85;
 }
 
-@media (max-width: 560px) {
-  .ask-form-row {
-    grid-template-columns: 1fr;
+/* On a narrow screen the row becomes a short stacked list rather than three
+   ragged lines, which is easier to take in at a glance. */
+@media (max-width: 520px) {
+  .feed-trust {
+    flex-direction: column;
+    align-items: center;
+    gap: 9px;
   }
 }
 
-/* Boxed like the checkout's consent so the two read as the same promise. */
-.ask-form-consent {
-  margin-top: 12px;
-  padding: 12px 14px;
+.feed-hero-count {
+  margin: 18px 0 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+}
+
+/* ---------- Billboard: one event, given the room a poster deserves ---------- */
+
+.billboard-section {
+  padding-top: 8px;
+}
+
+.billboard {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  min-height: clamp(330px, 44vw, 440px);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
-  font-size: 0.88rem;
+  border-radius: 22px;
+  box-shadow: var(--shadow-lift);
+}
+
+.billboard-media {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+
+.billboard-shot {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  /* A video billboard is decoration behind text — taps belong to the buttons. */
+  pointer-events: none;
+}
+
+/* Two scrims doing two different jobs. The vertical one seats the panel on the
+   page background so it does not end in a hard line; the horizontal one buys
+   contrast for the text WITHOUT dimming the whole photograph, which is the
+   difference between a poster and a grey rectangle. */
+.billboard-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(6, 7, 12, 0.1) 0%,
+    rgba(6, 7, 12, 0.5) 52%,
+    rgba(6, 7, 12, 0.92) 100%
+  );
+}
+
+.billboard-scrim-side {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(6, 7, 12, 0.88) 0%,
+    rgba(6, 7, 12, 0.42) 48%,
+    rgba(6, 7, 12, 0) 82%
+  );
+}
+
+.billboard-body {
+  position: relative;
+  padding: clamp(20px, 3.6vw, 40px);
+  max-width: 640px;
+}
+
+.billboard-kicker {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.billboard-title {
+  font-family: var(--font-display, var(--font));
+  font-size: clamp(1.9rem, 5vw, 3.1rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  margin: 0 0 10px;
+  color: #fff;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.5);
+}
+
+.billboard-tagline {
+  margin: 0 0 8px;
+  font-size: 1.02rem;
+  color: rgba(255, 255, 255, 0.86);
+  max-width: 46ch;
+}
+
+.billboard-meta {
+  margin: 0 0 20px;
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 0.95rem;
+}
+
+.billboard-dot {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.billboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+}
+
+/* Glass, not a second solid button: on top of a photograph a bordered button
+   disappears, and a filled one competes with the real call to action. */
+.billboard-secondary {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #fff;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.billboard-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.billboard-note {
+  margin: 12px 0 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--amber);
+}
+
+@media (max-width: 560px) {
+  /* On a phone the picture cannot be both a backdrop and legible, so the text
+     takes the bottom half outright and the side scrim stops fighting it. */
+  .billboard {
+    min-height: 420px;
+  }
+
+  .billboard-scrim-side {
+    background: linear-gradient(90deg, rgba(6, 7, 12, 0.6), rgba(6, 7, 12, 0.2));
+  }
+
+  .billboard-actions .btn {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+}
+
+/* ---------- Rails: one horizontal row of events, scrolled sideways ---------- */
+
+.rail-section {
+  padding: 26px 0 6px;
+}
+
+.rail-head {
+  margin-bottom: 4px;
+}
+
+.rail-head .feed-section-title {
+  margin-bottom: 12px;
+}
+
+/* Full-bleed on phones: cancels the .container padding so a row runs to both
+   screen edges. That is what makes the swipe feel like the rest of the phone
+   rather than like a box on a page. */
+.rail-bleed {
+  margin-left: -20px;
+  margin-right: -20px;
+}
+
+.rail {
+  position: relative;
+}
+
+.rail-viewport {
+  position: relative;
+}
+
+/* The scroller itself. Everything here is the browser's own behaviour — the
+   component adds only the arrows, so a row still scrolls with no JavaScript.
+   The generous bottom padding is not decoration: the tiles lift on hover and
+   cast a shadow, and `overflow-x` forces the vertical axis to scroll too, so
+   without the room the lift would be clipped off. */
+.rail-track {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* MANDATORY, not proximity: a flick always lands on a tile edge instead of
+     stopping halfway through a poster, which is what makes the row feel like
+     the gallery rail rather than a scrollbar. */
+  scroll-snap-type: x mandatory;
+  /* A sideways swipe must not turn into the browser's back gesture — this is
+     most of what "smooth" means on a trackpad and on a phone. */
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 10px 20px 26px;
+  /* Keyboard scrolling lands the tile clear of the fade at the row's edge. */
+  scroll-padding-inline: 20px;
+}
+
+.rail-track::-webkit-scrollbar {
+  display: none;
+}
+
+.rail-track:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -4px;
+  border-radius: 18px;
+}
+
+.rail-item {
+  flex: 0 0 clamp(200px, 58vw, 240px);
+  scroll-snap-align: start;
+  display: flex;
+}
+
+.rail-item > .event-card {
+  width: 100%;
+}
+
+/* Soft edges, so a row reads as continuing past the screen rather than being
+   chopped at it. Sized to the track's own padding, so at rest they fade the
+   gutter and barely touch the first and last tile. */
+.rail-viewport::before,
+.rail-viewport::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: clamp(14px, 3vw, 30px);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.rail-viewport::before {
+  left: 0;
+  background: linear-gradient(90deg, var(--bg), rgba(10, 11, 16, 0));
+}
+
+.rail-viewport::after {
+  right: 0;
+  background: linear-gradient(270deg, var(--bg), rgba(10, 11, 16, 0));
+}
+
+/* Full-height arrow strips, in the manner of every row-based catalogue: the
+   gradient IS the affordance and the chevron sits inside it. Both disappear
+   entirely at the ends of the row — an arrow that cannot move anything is
+   worse than no arrow, because it invites a click that does nothing. */
+.rail-nav {
+  position: absolute;
+  top: 10px;
+  bottom: 26px;
+  z-index: 3;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: clamp(40px, 5vw, 58px);
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+  color: #fff;
+  opacity: 1;
+  transition:
+    opacity 0.2s ease,
+    color 0.2s ease;
+}
+
+/* A fade, not a bar. The disc above already carries the contrast, so this only
+   has to hint that the row continues — a strip solid enough to be read on its
+   own greys out a third of the tile it is parked on. */
+.rail-nav-prev {
+  left: 0;
+  border-radius: 18px 0 0 18px;
+  background: linear-gradient(90deg, rgba(10, 11, 16, 0.72), rgba(10, 11, 16, 0));
+}
+
+.rail-nav-next {
+  right: 0;
+  border-radius: 0 18px 18px 0;
+  background: linear-gradient(270deg, rgba(10, 11, 16, 0.72), rgba(10, 11, 16, 0));
+}
+
+/* A chevron alone vanishes against a bright poster, and a gradient dark enough
+   to rescue it would grey out the artwork it sits on. The disc solves both: it
+   carries its own contrast, so the gradient underneath only has to suggest that
+   the row continues. */
+.rail-nav-disc {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: rgba(10, 11, 16, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 6px 20px -8px rgba(0, 0, 0, 0.8);
+  transition:
+    transform 0.2s var(--ease-out),
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.rail-nav:hover .rail-nav-disc {
+  transform: scale(1.1);
+  background: rgba(10, 11, 16, 0.9);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.rail-nav:focus-visible {
+  outline: none;
+}
+
+.rail-nav:focus-visible .rail-nav-disc {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-soft);
+}
+
+.rail-nav:disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Only where there is a pointer to hover with. On a touch screen the row is
+   swiped, and a 44px strip parked over the artwork would cost more than it
+   gives. */
+@media (hover: hover) and (pointer: fine) {
+  .rail-nav {
+    display: flex;
+  }
+}
+
+/* Events that have already happened: present, findable, and unmistakably over. */
+.event-card-past {
+  opacity: 0.62;
+  filter: saturate(0.7);
+  transition:
+    opacity 0.22s ease,
+    filter 0.22s ease,
+    transform 0.22s var(--ease-out),
+    border-color 0.22s ease,
+    box-shadow 0.22s ease;
+}
+
+.event-card-past:hover,
+.event-card-past:focus-within {
+  opacity: 1;
+  filter: none;
+}
+
+/* ---------- Explanation sections (how it works, assurances, FAQ) ---------- */
+
+.info-section {
+  padding: 46px 0;
+}
+
+.info-section + .info-section {
+  border-top: 1px solid var(--border-soft);
+}
+
+.info-lede {
+  color: var(--text-dim);
+  max-width: 62ch;
+  margin: -6px 0 26px;
+}
+
+/* Four steps, side by side where there is room and stacked where there is not.
+   Numbered as a real <ol>, so the order survives with styles off. */
+.how-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+}
+
+.how-card {
+  position: relative;
+  padding: 22px 20px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 55%),
+    var(--bg-card);
+  box-shadow: var(--shadow-card);
+  transition:
+    transform 0.22s var(--ease-out),
+    border-color 0.22s ease;
+}
+
+.how-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(220, 20, 60, 0.42);
+}
+
+.how-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-bottom: 12px;
+  border-radius: 999px;
+  font-family: var(--font-display, var(--font));
+  font-weight: 800;
+  font-size: 0.86rem;
+  color: var(--brand-text);
+  background: linear-gradient(180deg, rgba(220, 20, 60, 0.3), rgba(220, 20, 60, 0.1));
+  border: 1px solid rgba(220, 20, 60, 0.5);
+}
+
+.how-title {
+  font-size: 1.02rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+
+.how-body {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+.assurance-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+}
+
+.assurance-card {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  /* The one hairline of colour in this block, on the reading edge. */
+  border-left: 3px solid rgba(220, 20, 60, 0.55);
+}
+
+.assurance-title {
+  font-size: 0.98rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+
+.assurance-body {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+.assurance-foot {
+  margin: 18px 0 0;
+}
+
+/* The buyer FAQ lives on platform chrome, so its accents are the platform's
+   crimson rather than the violet an EVENT page theme uses. Same component,
+   right palette for where it is standing. */
+.info-section .faq-item summary::after,
+.info-section .faq-item summary:hover {
+  color: var(--brand-text);
+}
+
+.inline-link {
+  color: var(--brand-text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ---------- Closing band ---------- */
+
+.cta-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: clamp(24px, 4vw, 38px);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background:
+    radial-gradient(ellipse 70% 140% at 8% 0%, rgba(220, 20, 60, 0.22), transparent 70%),
+    radial-gradient(ellipse 60% 130% at 92% 100%, rgba(0, 56, 147, 0.28), transparent 70%),
+    var(--bg-elevated);
+}
+
+.cta-band-title {
+  font-family: var(--font-display, var(--font));
+  font-size: clamp(1.3rem, 3vw, 1.7rem);
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  margin: 0 0 6px;
+}
+
+.cta-band-body {
+  margin: 0;
+  color: var(--text-dim);
+  max-width: 52ch;
+}
+
+.cta-band-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail-track {
+    scroll-behavior: auto;
+  }
+
+  .how-card:hover,
+  .event-card-past:hover {
+    transform: none;
+  }
+
+  .rail-nav:hover .rail-nav-disc {
+    transform: none;
+  }
+}
+
+
+/* ---------- Featured billboard carousel (browse page) ----------
+   The hero, swiped rather than clicked. Same construction as the event page's
+   gallery rail: the browser's own scroll-snapping does the moving, so a thumb
+   swipe gets native momentum and it still works with scripts off. */
+
+.ecar {
+  position: relative;
+}
+
+.ecar-viewport {
+  position: relative;
+}
+
+.ecar-track {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  /* Room for the billboard's own lift shadow — overflow-x forces the vertical
+     axis to scroll too, so without this the shadow is sheared off. */
+  padding-bottom: 6px;
+}
+
+.ecar-track::-webkit-scrollbar {
+  display: none;
+}
+
+.ecar-track:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 4px;
+  border-radius: 24px;
+}
+
+.ecar-slide {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  /* One event per swipe. A hero that skims past two at a time on a fast flick
+     is a hero nobody actually sees. */
+  scroll-snap-stop: always;
+}
+
+/* Arrows sit ON the artwork, vertically centred, and only appear where there
+   is a pointer to hover with — a phone swipes. */
+.ecar-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: #fff;
+  transition: opacity 0.2s ease;
+}
+
+.ecar-nav-prev {
+  left: 0;
+}
+
+.ecar-nav-next {
+  right: 0;
+}
+
+.ecar-nav-disc {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: rgba(10, 11, 16, 0.68);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px -10px rgba(0, 0, 0, 0.9);
+  transition:
+    transform 0.2s var(--ease-out),
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.ecar-nav:hover .ecar-nav-disc {
+  transform: scale(1.1);
+  background: rgba(10, 11, 16, 0.9);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.ecar-nav:focus-visible {
+  outline: none;
+}
+
+.ecar-nav:focus-visible .ecar-nav-disc {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-soft);
+}
+
+.ecar-nav:disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ecar-nav {
+    display: flex;
+  }
+
+  /* The arrows only exist where there is a pointer, so the headline only has to
+     make room for them there. Without this the prev arrow sits on top of the
+     first letter of the event's name. */
+  .ecar .billboard-body {
+    padding-left: 76px;
+  }
+}
+
+/* Dots: position AND controls. Wide enough to be a real tap target on a
+   phone, where they are the only handle besides the swipe itself. */
+.ecar-dots {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.ecar-dot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border-radius: 999px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.26);
+  cursor: pointer;
+  transition:
+    width 0.25s var(--ease-out),
+    background 0.25s ease;
+  /* The visible dot is small; the touch target around it is not. */
+  box-shadow: 0 0 0 8px transparent;
+}
+
+.ecar-dot:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.ecar-dot.is-active {
+  width: 26px;
+  background: var(--brand);
+}
+
+.ecar-dot:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ecar-nav:hover .ecar-nav-disc {
+    transform: translateY(0) scale(1);
+  }
+
+  .ecar-dot {
+    transition: none;
+  }
 }
