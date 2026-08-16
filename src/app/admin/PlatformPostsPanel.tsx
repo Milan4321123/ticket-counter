@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 interface Post {
   id: string;
   body: string;
+  photoUrl: string;
   createdAt: string;
 }
 
@@ -97,8 +98,44 @@ export default function PlatformPostsPanel({
               }}
             >
               <div className="small">{p.body}</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+              {p.photoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={p.photoUrl}
+                  alt=""
+                  style={{ display: 'block', width: '100%', borderRadius: 8, marginTop: 8 }}
+                />
+              ) : null}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
                 <span className="muted small">{p.createdAt.slice(0, 16)}</span>
+                {/* Per post, because each announcement gets its own picture —
+                    the file is only saved once a post exists to attach it to. */}
+                <label className="btn btn-sm" style={{ cursor: 'pointer' }}>
+                  {p.photoUrl ? 'Replace photo' : 'Add a photo'}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    style={{ display: 'none' }}
+                    disabled={busy}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setBusy(true);
+                      setError(null);
+                      const form = new FormData();
+                      form.append('photo', file);
+                      form.append('postId', p.id);
+                      const res = await fetch('/api/admin/contact-photo', { method: 'POST', body: form });
+                      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+                      setBusy(false);
+                      if (!res.ok) {
+                        setError(data?.error || 'That image could not be uploaded.');
+                        return;
+                      }
+                      router.refresh();
+                    }}
+                  />
+                </label>
                 <button
                   type="button"
                   className="btn btn-sm"

@@ -392,6 +392,14 @@ function migrateToPlatform(db: Database.Database): void {
     );
   `);
 
+  // An optional picture on a platform announcement. Stored as the URL we serve
+  // it from rather than a file name, so the serving route can change without a
+  // migration.
+  const ppCols = (db.pragma(`table_info(platform_posts)`) as { name: string }[]).map((c) => c.name);
+  if (!ppCols.includes('photo_url')) {
+    db.exec(`ALTER TABLE platform_posts ADD COLUMN photo_url TEXT NOT NULL DEFAULT ''`);
+  }
+
   // Whether the public page counts down the remaining tickets.
   //
   // Defaults to 1, which is what every event did before this existed. It is a

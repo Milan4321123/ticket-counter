@@ -3,7 +3,7 @@ import path from 'path';
 import { NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { isAdminRequest } from '@/lib/auth';
-import { setPlatformContact } from '@/lib/platformPosts';
+import { setPlatformContact, setPlatformPostPhoto } from '@/lib/platformPosts';
 import type { ApiErrorResponse } from '@/lib/types';
 
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -18,6 +18,11 @@ function photoDir(): string {
 // the build outright otherwise. The serving route computes the same path.
 function contactPhotoPath(): string {
   return path.join(photoDir(), 'contact.jpg');
+}
+
+/** One announcement's picture. The id is a UUID we generated, never user input. */
+function postPhotoPath(postId: string): string {
+  return path.join(photoDir(), `post-${postId}.jpg`);
 }
 
 /**
@@ -52,21 +57,39 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Photos can be at most 5 MB.' } satisfies ApiErrorResponse, { status: 400 });
     }
 
+    // A postId means "picture for this announcement"; without one it is the face
+    // on the contact bubble. Only our own UUIDs are ever accepted, so the id can
+    // never walk out of the directory.
+    const rawPostId = form.get('postId');
+    const postId = typeof rawPostId === 'string' && /^[0-9a-f-]{36}$/i.test(rawPostId) ? rawPostId : null;
+
     const bytes = Buffer.from(await file.arrayBuffer());
     fs.mkdirSync(photoDir(), { recursive: true });
-    await sharp(bytes)
-      // Respect the EXIF flag first, or a phone photo taken sideways is cropped
-      // along the wrong axis.
-      .rotate()
-      .resize(256, 256, { fit: 'cover', position: sharp.strategy.attention })
-      .jpeg({ quality: 86, mozjpeg: true })
-      .toFile(contactPhotoPath());
 
-    // A fixed URL with a cache-busting stamp: the path never changes, so without
-    // one a replaced photo would keep showing the old face until every visitor
-    // cleared their cache.
-    const url = `/api/platform-photo?v=${Date.now()}`;
-    setPlatformContact({ photoUrl: url });
+    // The face is a 46px circle, so it is squared. An announcement picture is a
+    // banner read at full width, so it keeps its shape and is merely bounded —
+    // squaring somebody's poster would be the crop bug all over again.
+    const pipeline = sharp(bytes).rotate();
+    if (postId) {
+      await pipeline
+        .resize(1200, 800, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 82, mozjpeg: true })
+        .toFile(postPhotoPath(postId));
+    } else {
+      await pipeline
+        .resize(256, 256, { fit: 'cover', position: sharp.strategy.attention })
+        .jpeg({ quality: 86, mozjpeg: true })
+        .toFile(contactPhotoPath());
+    }
+
+    // A fixed path with a cache-busting stamp: the path never changes, so
+    // without one a replaced photo would keep showing the old picture until
+    // every visitor cleared their cache.
+    const url = postId
+      ? `/api/platform-photo?post=${postId}&v=${Date.now()}`
+      : `/api/platform-photo?v=${Date.now()}`;
+    if (postId) setPlatformPostPhoto(postId, url);
+    else setPlatformContact({ photoUrl: url });
     return NextResponse.json({ ok: true, photoUrl: url });
   } catch (e) {
     console.error('POST /api/admin/contact-photo failed:', e);

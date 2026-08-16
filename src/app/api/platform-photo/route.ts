@@ -7,9 +7,12 @@ import { NextResponse } from 'next/server';
  * every page — and a single fixed file, so there is no id to guess and nothing
  * to enumerate.
  */
-export async function GET() {
+export async function GET(req: Request) {
   const dataDir = process.env.DATA_DIR || path.join(process.cwd(), 'data');
-  const file = path.join(dataDir, 'platform', 'contact.jpg');
+  // Only our own UUID shape is accepted, so nothing here can traverse a path.
+  const post = new URL(req.url).searchParams.get('post');
+  const name = post && /^[0-9a-f-]{36}$/i.test(post) ? `post-${post}.jpg` : 'contact.jpg';
+  const file = path.join(dataDir, 'platform', name);
   let bytes: Buffer;
   try {
     bytes = fs.readFileSync(file);

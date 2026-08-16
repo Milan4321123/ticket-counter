@@ -12,6 +12,8 @@ import { getDb } from './db';
 export interface PlatformPostRow {
   id: string;
   body: string;
+  /** '' when the announcement has no picture. */
+  photoUrl: string;
   createdAt: string;
 }
 
@@ -19,7 +21,7 @@ export interface PlatformPostRow {
 export function listPlatformPosts(limit = 5): PlatformPostRow[] {
   return getDb()
     .prepare(
-      `SELECT id, body, created_at AS createdAt FROM platform_posts
+      `SELECT id, body, photo_url AS photoUrl, created_at AS createdAt FROM platform_posts
        ORDER BY created_at DESC LIMIT ?`
     )
     .all(limit) as PlatformPostRow[];
@@ -29,8 +31,13 @@ export function createPlatformPost(body: string): PlatformPostRow {
   const id = crypto.randomUUID();
   getDb().prepare(`INSERT INTO platform_posts (id, body) VALUES (?, ?)`).run(id, body.trim());
   return getDb()
-    .prepare(`SELECT id, body, created_at AS createdAt FROM platform_posts WHERE id = ?`)
+    .prepare(`SELECT id, body, photo_url AS photoUrl, created_at AS createdAt FROM platform_posts WHERE id = ?`)
     .get(id) as PlatformPostRow;
+}
+
+/** Attach (or clear) the picture on one announcement. */
+export function setPlatformPostPhoto(id: string, photoUrl: string): void {
+  getDb().prepare(`UPDATE platform_posts SET photo_url = ? WHERE id = ?`).run(photoUrl, id);
 }
 
 export function deletePlatformPost(id: string): boolean {

@@ -450,6 +450,11 @@ export default function HomePage() {
               {platformPosts.map((post: PlatformPostRow) => (
                 <article className="platform-post anim-fade-up" key={post.id}>
                   <p>{post.body}</p>
+                  {post.photoUrl ? (
+                    // Served from our own route; next/image adds nothing here.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={post.photoUrl} alt="" className="platform-post-photo" />
+                  ) : null}
                   <time className="muted small" dateTime={post.createdAt.replace(' ', 'T') + 'Z'}>
                     {post.createdAt.slice(0, 10)}
                   </time>
