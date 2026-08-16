@@ -655,22 +655,47 @@ export default function CheckoutClient({
         )}
 
         {mode === 'transfer' ? (
-          !transferConfigured ? (
+          /* Blocked ONLY when there is genuinely no way to pay. This used to
+             test the bank details alone, so an organizer who had set up PayPal
+             and left the IBAN half-filled got a checkout that refused every
+             buyer — with a message telling those buyers to contact the very
+             person whose page it was. PayPal is a complete route on its own. */
+          !transferConfigured && !paypalOffered ? (
             <div className="notice notice-error">
               Payment is not set up yet, so orders cannot be placed right now. Please check back
               soon or contact the organizer.
             </div>
           ) : (
             <>
-              <p className="muted small" style={{ marginTop: 0 }}>
+              {/* PayPal first and in green when it is on offer: it clears in
+                  seconds while a transfer takes days, so the tickets arrive the
+                  same evening rather than midweek. Recommending the faster route
+                  is not decoration — it is the difference between a buyer
+                  getting their QR code tonight and waiting for a bank. */}
+              {paypalOffered && (
+                <div className={styles.payPreferred}>
+                  <strong>PayPal — fastest</strong>
+                  <span>
+                    Arrives in seconds, so the organizer can confirm it and send your QR tickets
+                    straight away. Recommended.
+                  </span>
+                </div>
+              )}
+              <p className="muted small" style={{ marginTop: paypalOffered ? 12 : 0 }}>
                 {paypalOffered
-                  ? 'Pay by regular bank transfer (Überweisung) or by PayPal — whichever you prefer. Reserving takes one click — your seats are held for you straight away.'
+                  ? 'Pay by PayPal for tickets today, or by bank transfer (Überweisung) if you prefer. Reserving takes one click — your seats are held for you straight away.'
                   : 'Pay by regular bank transfer (Überweisung). Reserving takes one click — your seats are held for you straight away.'}
               </p>
               <ul className={styles.perkList}>
+                {paypalOffered && (
+                  <li>
+                    <strong>PayPal arrives in seconds</strong> — bank transfers take 1–2 business
+                    days
+                  </li>
+                )}
                 <li>
                   {paypalOffered
-                    ? 'No fees, no account needed — pay from any bank app, or with PayPal'
+                    ? 'No fees, no account needed — pay with PayPal, or from any bank app'
                     : 'No fees, no account needed — pay from any bank app'}
                 </li>
                 <li>
