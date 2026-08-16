@@ -16,6 +16,8 @@ import { BUYER_RETENTION_DAYS, runBuyerDataRetentionSweep } from '@/lib/retentio
 import LogoutButton from './LogoutButton';
 import { isTotpEnrolled } from '@/lib/totp';
 import MaintenancePanel from './MaintenancePanel';
+import PlatformPostsPanel from './PlatformPostsPanel';
+import { getPlatformContact, listPlatformPosts } from '@/lib/platformPosts';
 import ScanLinkPanel from './ScanLinkPanel';
 import TotpPanel from './TotpPanel';
 
@@ -258,6 +260,8 @@ export default async function AdminDashboardPage() {
         <div className="card-title">Door scanner access</div>
         <ScanLinkPanel events={events.map((e) => ({ id: e.id, name: e.name }))} />
       </div>
+
+      <PlatformPostsPanel posts={listPlatformPosts(10)} contact={getPlatformContact()} />
 
       <div className="card glow-card anim-fade-up">
         <div className="card-title">Sign-in security · authenticator app</div>

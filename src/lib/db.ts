@@ -381,6 +381,17 @@ function migrateToPlatform(db: Database.Database): void {
   if (!orgCols.includes('reminders_enabled')) {
     db.exec(`ALTER TABLE organizers ADD COLUMN reminders_enabled INTEGER NOT NULL DEFAULT 1`);
   }
+  // Platform-wide announcements from the owner, shown on the browse page.
+  // Deliberately its own table rather than a row in kv: these are a LIST that
+  // grows, each with its own timestamp, and kv is a single-value store.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS platform_posts (
+      id TEXT PRIMARY KEY,
+      body TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
   // Whether the public page counts down the remaining tickets.
   //
   // Defaults to 1, which is what every event did before this existed. It is a

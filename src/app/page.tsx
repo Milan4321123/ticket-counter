@@ -9,6 +9,8 @@ import { listPublishedEvents, paypalPayee } from '@/lib/events';
 import type { EventRow } from '@/lib/events';
 import { BUYER_RETENTION_DAYS, runBuyerDataRetentionSweep } from '@/lib/retention';
 import { eventListJsonLd, faqJsonLd, jsonLdScript } from '@/lib/seo';
+import { getPlatformContact, listPlatformPosts } from '@/lib/platformPosts';
+import type { PlatformPostRow } from '@/lib/platformPosts';
 
 // The feed reflects live availability — always render fresh.
 export const dynamic = 'force-dynamic';
@@ -280,6 +282,8 @@ export default function HomePage() {
   // clock comparison on all but one render an hour. See lib/retention.ts.
   runBuyerDataRetentionSweep();
   const events = listPublishedEvents();
+  const platformPosts = listPlatformPosts(3);
+  const contact = getPlatformContact();
   const rows = buildRows(events);
   // Whether ANY live event actually takes PayPal. This page speaks for the whole
   // platform, so it must not advertise a payment route no organizer on it offers
@@ -366,6 +370,60 @@ export default function HomePage() {
           )}
         </div>
       </section>
+
+      {/* The platform's own voice, above the events but below the pitch: it is
+          news about the site, so it belongs where someone who just arrived will
+          read it — and below the events it would never be seen at all. */}
+      {platformPosts.length > 0 && (
+        <section className="section">
+          <div className="container">
+            <p className="section-kicker">From the team</p>
+            <div className="platform-posts">
+              {platformPosts.map((post: PlatformPostRow) => (
+                <article className="platform-post anim-fade-up" key={post.id}>
+                  <p>{post.body}</p>
+                  <time className="muted small" dateTime={post.createdAt.replace(' ', 'T') + 'Z'}>
+                    {post.createdAt.slice(0, 10)}
+                  </time>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* A person, not a form. The pitch of this platform is that a real human
+          designs your page — so the invitation to talk shows that human's name
+          and face. Hidden entirely when no name is set, because a nameless
+          "contact us" card is exactly the thing this is meant to replace. */}
+      {contact.name.trim() !== '' && (
+        <section className="section">
+          <div className="container">
+            <Link href="/contact" className="team-card anim-fade-up">
+              {contact.photoUrl ? (
+                // Set by the owner in the admin area; next/image is not used
+                // because the host is unknown and unconfigurable at build time.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={contact.photoUrl} alt="" className="team-card-photo" />
+              ) : (
+                <span className="team-card-photo team-card-initial" aria-hidden="true">
+                  {contact.name.trim().charAt(0).toUpperCase()}
+                </span>
+              )}
+              <span className="team-card-body">
+                <strong>Talk to {contact.name.trim()} directly</strong>
+                <span className="muted small">
+                  {contact.role.trim() || 'Designer'} · Want something built for your event, or not
+                  sure where to start? Send a message and a real person answers.
+                </span>
+              </span>
+              <span className="team-card-go" aria-hidden="true">
+                →
+              </span>
+            </Link>
+          </div>
+        </section>
+      )}
 
       <div id="events">
         {events.length === 0 ? (

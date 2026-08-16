@@ -5904,3 +5904,82 @@ html:has(.event-page.has-section-nav) {
   border-left: 4px solid var(--green, #34d399);
   background: var(--green-soft, rgba(52, 211, 153, 0.08));
 }
+
+/* ---------- Platform announcements + the "talk to a person" card ---------- */
+
+.platform-posts {
+  display: grid;
+  gap: 10px;
+  max-width: 760px;
+}
+
+.platform-post {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--brand, var(--accent));
+  border-radius: 12px;
+  background: var(--bg-card);
+}
+
+.platform-post p {
+  margin: 0 0 6px;
+  line-height: 1.6;
+}
+
+/* Deliberately shaped like a message from someone rather than a banner: a round
+   photo, a name, and an arrow. A form says "submit a request"; this says
+   "someone is there". */
+.team-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 760px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-card);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.18s ease, transform 0.18s ease;
+}
+
+.team-card:hover {
+  border-color: var(--brand, var(--accent));
+  transform: translateY(-1px);
+}
+
+.team-card-photo {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+  background: var(--bg-elevated);
+  border: 2px solid var(--brand, var(--accent));
+}
+
+/* The fallback when no photo is set — an initial beats a broken image icon. */
+.team-card-initial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display, inherit);
+  font-weight: 800;
+  font-size: 1.4rem;
+  color: #fff;
+  background: linear-gradient(135deg, var(--brand, var(--accent)), var(--pink, var(--accent-strong)));
+}
+
+.team-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.team-card-go {
+  margin-left: auto;
+  font-size: 1.3rem;
+  color: var(--text-dim);
+  flex: none;
+}
