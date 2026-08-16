@@ -70,6 +70,16 @@ export default async function ContactPage({
             </>
           ) : (
             <>
+              {/* Who this is FOR, first. The bubble that leads here follows
+                  every visitor, so ticket buyers arrive too — and a buyer needs
+                  nothing from this page. Saying so early costs them one line
+                  and saves an enquiry that cannot be answered. */}
+              <p className="feed-hero-sub anim-fade-up anim-d2" style={{ marginBottom: 14 }}>
+                <strong>For organizers and anyone putting on an event</strong> — a custom event
+                page, a bigger festival site, or an app built around how you run things. Buying a
+                ticket? You need nothing here: your tickets come by email, and anything about an
+                event goes to its own organizer on that event&rsquo;s page.
+              </p>
               <p className="feed-hero-sub anim-fade-up anim-d2" style={{ marginBottom: 0 }}>
                 Bigger festival? Sponsor logos? A look that is entirely yours? Tell us what you have
                 in mind and our team builds the page around your event — you keep every euro of your

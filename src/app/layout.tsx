@@ -121,7 +121,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/portal" className="btn btn-sm header-signin" aria-label="Organizer sign in">
                 <span className="header-label-long">Organizer sign in</span>
                 <span className="header-label-short" aria-hidden="true">
-                  Sign in
+                  {/* NOT "Sign in". Shortened to that, it read as an invitation
+                      to whoever was looking — and ticket buyers need no account
+                      at all here, so the one thing this label must never do is
+                      suggest they do. The audience is the whole message. */}
+                  Organizer
                 </span>
               </Link>
             </nav>
