@@ -81,12 +81,12 @@ export interface EventBillboardProps {
 export default function EventBillboard({ event, leading = false }: EventBillboardProps) {
   const tiers = getEventTiers(event.id);
   const minPrice = tiers.length ? Math.min(...tiers.map((t) => t.priceCents)) : null;
-  const { totalRemaining } = getAvailability(event.id);
+  const { totalRemaining, unlimited } = getAvailability(event.id);
   const { videoUrl, stillUrl, stillUrlNarrow } = billboardMedia(event);
   const accent = parsePageDesign(event.pageDesign).accent ?? 'violet';
   const design = parsePageDesign(event.pageDesign);
 
-  const soldOut = totalRemaining === 0;
+  const soldOut = !unlimited && totalRemaining === 0;
   const canBuy = event.salesOpen && !soldOut;
   const where = [event.venueName, event.city].filter((s) => s.trim()).join(', ');
   const when = event.dateDisplay.trim() || dateChipLabel(event) || '';
@@ -152,7 +152,8 @@ export default function EventBillboard({ event, leading = false }: EventBillboar
             {canBuy ? 'Event details' : 'See the event'}
           </Link>
         </p>
-        {canBuy && totalRemaining <= 50 ? (
+        {/* No count on an uncapped event — there is nothing to count down. */}
+        {canBuy && !unlimited && totalRemaining <= 50 ? (
           <p className="billboard-note">Only {totalRemaining} tickets left</p>
         ) : null}
       </div>

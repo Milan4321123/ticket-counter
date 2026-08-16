@@ -14,15 +14,30 @@ export interface TierAvailability {
   tierId: string;
   cap: number;
   sold: number; // claimed + capturing + paid
+  /** UNLIMITED_REMAINING when uncapped — always check `unlimited` before showing this. */
   remaining: number;
+  unlimited: boolean;
 }
 
 export interface Availability {
   totalCap: number;
   totalSold: number;
   totalRemaining: number;
+  /** True when the EVENT has no overall ceiling. */
+  unlimited: boolean;
   tiers: Record<string, TierAvailability>;
 }
+
+/**
+ * The stand-in "remaining" for anything uncapped.
+ *
+ * Infinity would be the honest value but does not survive JSON — it becomes
+ * null on the way to the checkout client and every comparison then silently
+ * flips. A large finite number keeps all the existing arithmetic (Math.min,
+ * `< quantity`, `<= 50`) working untouched, and every place that could PRINT a
+ * count is gated on `unlimited` first, so this number is never shown.
+ */
+export const UNLIMITED_REMAINING = 1_000_000_000;
 
 export class SoldOutError extends Error {
   constructor(public tierId?: string) {
@@ -34,7 +49,13 @@ export class SoldOutError extends Error {
 /** Statuses that hold seats. 'capturing' still holds — money may be moving. */
 const RESERVING_STATUSES = "('claimed', 'capturing', 'paid')";
 
-const EMPTY_AVAILABILITY: Availability = { totalCap: 0, totalSold: 0, totalRemaining: 0, tiers: {} };
+const EMPTY_AVAILABILITY: Availability = {
+  totalCap: 0,
+  totalSold: 0,
+  totalRemaining: 0,
+  unlimited: false,
+  tiers: {},
+};
 
 /** Live seat availability for ONE event (caps from events + event_tiers). */
 export function getAvailability(eventId: string): Availability {
@@ -58,18 +79,38 @@ export function getAvailability(eventId: string): Availability {
   for (const t of eventTiers) {
     const sold = soldByTier.get(t.tierKey) ?? 0;
     totalSold += sold;
-    tiers[t.tierKey] = { tierId: t.tierKey, cap: t.cap, sold, remaining: Math.max(0, t.cap - sold) };
+    tiers[t.tierKey] = {
+      tierId: t.tierKey,
+      cap: t.cap,
+      sold,
+      remaining: t.unlimited ? UNLIMITED_REMAINING : Math.max(0, t.cap - sold),
+      unlimited: t.unlimited,
+    };
   }
   // Seats sold against tiers that were later deleted still occupy capacity.
   for (const [tierId, sold] of soldByTier) {
     if (!tiers[tierId]) totalSold += sold;
   }
 
-  const totalRemaining = Math.max(0, event.totalCapacity - totalSold);
-  // A tier can never have more remaining than the event as a whole.
-  for (const t of Object.values(tiers)) t.remaining = Math.min(t.remaining, totalRemaining);
+  const totalRemaining = event.capacityUnlimited
+    ? UNLIMITED_REMAINING
+    : Math.max(0, event.totalCapacity - totalSold);
+  // A tier can never have more remaining than the event as a whole. This still
+  // holds when either side is uncapped: an unlimited tier inside a 100-seat
+  // event is limited by the room, and a limited tier inside an uncapped event
+  // is limited by its own cap.
+  for (const t of Object.values(tiers)) {
+    t.remaining = Math.min(t.remaining, totalRemaining);
+    t.unlimited = t.unlimited && event.capacityUnlimited;
+  }
 
-  return { totalCap: event.totalCapacity, totalSold, totalRemaining, tiers };
+  return {
+    totalCap: event.totalCapacity,
+    totalSold,
+    totalRemaining,
+    unlimited: event.capacityUnlimited,
+    tiers,
+  };
 }
 
 // Short-lived cache for the DISPLAY path only. Event pages and checkout are

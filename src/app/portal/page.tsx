@@ -164,8 +164,11 @@ export default async function PortalDashboardPage({
         ) : (
           <>
             {cards.map(({ event, stats, openQuestions, thumb }, i) => {
+              // With no ceiling the bar has no meaning — it would fill toward
+              // an "expected attendance" figure that is not a target and not a
+              // limit, and read as 100% sold out the moment it was passed.
               const pct =
-                event.totalCapacity > 0
+                !event.capacityUnlimited && event.totalCapacity > 0
                   ? Math.min(100, Math.round((stats.ticketsSold / event.totalCapacity) * 100))
                   : 0;
               return (
@@ -237,7 +240,12 @@ export default async function PortalDashboardPage({
                         <span className="meter-fill meter-fill-brand" style={{ width: `${pct}%` }} />
                       </span>
                       <span className="meter-num">
-                        {stats.ticketsSold} / {event.totalCapacity} sold
+                        {/* A progress bar needs an end. With no ceiling there
+                            is nothing to be a fraction OF, so report the count
+                            and drop the denominator. */}
+                        {event.capacityUnlimited
+                          ? `${stats.ticketsSold} sold`
+                          : `${stats.ticketsSold} / ${event.totalCapacity} sold`}
                       </span>
                     </div>
                     <div className="small" style={{ marginTop: 8, display: 'flex', gap: 16, flexWrap: 'wrap' }}>

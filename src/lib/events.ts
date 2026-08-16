@@ -28,6 +28,12 @@ export interface EventRow {
   city: string;
   currency: string;
   totalCapacity: number;
+  /**
+   * True when the event has no overall ceiling. totalCapacity still holds the
+   * organizer's EXPECTED attendance in that case — it is what the platform fee
+   * is priced from, not a limit on sales.
+   */
+  capacityUnlimited: boolean;
   salesOpen: boolean;
   maxPerOrder: number;
   payWithinDays: number;
@@ -96,6 +102,8 @@ export interface EventTierRow {
   name: string;
   priceCents: number;
   cap: number;
+  /** True when this ticket type is not capped — `cap` is then ignored. */
+  unlimited: boolean;
   studentOnly: boolean;
   description: string;
   sort: number;
@@ -141,6 +149,7 @@ const EVENT_COLS = `
   city,
   currency,
   total_capacity AS totalCapacity,
+  capacity_unlimited AS capacityUnlimited,
   sales_open AS salesOpen,
   max_per_order AS maxPerOrder,
   pay_within_days AS payWithinDays,
@@ -170,6 +179,7 @@ function rowToEvent(row: Record<string, unknown> | undefined): EventRow | null {
   return {
     ...(row as unknown as EventRow),
     salesOpen: Boolean(row.salesOpen),
+    capacityUnlimited: Boolean(row.capacityUnlimited),
     // Added by migration, so it is NULL on every event created before it.
     assistantContext: (row.assistantContext as string | null) ?? '',
     paypalAccount: (row.paypalAccount as string | null) ?? '',
@@ -323,11 +333,14 @@ export function getEventTiers(eventId: string): EventTierRow[] {
   const rows = getDb()
     .prepare(
       `SELECT id, event_id AS eventId, tier_key AS tierKey, name, price_cents AS priceCents,
-              cap, student_only AS studentOnly, description, sort
+              cap, unlimited, student_only AS studentOnly, description, sort
        FROM event_tiers WHERE event_id = ? ORDER BY sort, tier_key`
     )
-    .all(eventId) as (Omit<EventTierRow, 'studentOnly'> & { studentOnly: number })[];
-  return rows.map((r) => ({ ...r, studentOnly: Boolean(r.studentOnly) }));
+    .all(eventId) as (Omit<EventTierRow, 'studentOnly' | 'unlimited'> & {
+      studentOnly: number;
+      unlimited: number;
+    })[];
+  return rows.map((r) => ({ ...r, studentOnly: Boolean(r.studentOnly), unlimited: Boolean(r.unlimited) }));
 }
 
 export function getEventTier(eventId: string, tierKey: string): EventTierRow | null {

@@ -9,6 +9,7 @@ interface Row {
   name: string;
   price: string; // EUR, as typed ("25" or "25,50")
   cap: string;
+  unlimited: boolean;
   studentOnly: boolean;
   description: string;
 }
@@ -26,6 +27,7 @@ function toRow(t: SavedTier): Row {
     name: t.name,
     price: (t.priceCents / 100).toFixed(2),
     cap: String(t.cap),
+    unlimited: Boolean(t.unlimited),
     studentOnly: t.studentOnly,
     description: t.description,
   };
@@ -44,7 +46,7 @@ export default function TiersEditor({ eventId, initialTiers, soldByTierKey }: Pr
   }
 
   function addRow() {
-    setRows((prev) => [...prev, { tierKey: null, name: '', price: '', cap: '', studentOnly: false, description: '' }]);
+    setRows((prev) => [...prev, { tierKey: null, name: '', price: '', cap: '', unlimited: false, studentOnly: false, description: '' }]);
   }
 
   function removeRow(index: number) {
@@ -67,7 +69,15 @@ export default function TiersEditor({ eventId, initialTiers, soldByTierKey }: Pr
     if (busy) return;
     setError(null);
 
-    const tiers: { tierKey: string | null; name: string; priceCents: number; cap: number; studentOnly: boolean; description: string }[] =
+    const tiers: {
+      tierKey: string | null;
+      name: string;
+      priceCents: number;
+      cap: number;
+      unlimited: boolean;
+      studentOnly: boolean;
+      description: string;
+    }[] =
       [];
     for (const row of rows) {
       const name = row.name.trim();
@@ -80,8 +90,11 @@ export default function TiersEditor({ eventId, initialTiers, soldByTierKey }: Pr
         setError(`Please enter a valid price for "${name}" (e.g. 25 or 25.50).`);
         return;
       }
-      const cap = Number(row.cap);
-      if (!Number.isInteger(cap) || cap < 0) {
+      // An unlimited tier keeps whatever number is in the box (0 if blank) —
+      // it is simply not consulted. Storing it means switching back to limited
+      // does not lose the figure the organizer had typed.
+      const cap = row.unlimited ? Number(row.cap) || 0 : Number(row.cap);
+      if (!row.unlimited && (!Number.isInteger(cap) || cap < 0)) {
         setError(`Please enter a valid ticket limit for "${name}" (0 stops sales for it).`);
         return;
       }
@@ -90,6 +103,7 @@ export default function TiersEditor({ eventId, initialTiers, soldByTierKey }: Pr
         name,
         priceCents: Math.round(priceNum * 100),
         cap,
+        unlimited: row.unlimited,
         studentOnly: row.studentOnly,
         description: row.description.trim(),
       });
@@ -172,10 +186,26 @@ export default function TiersEditor({ eventId, initialTiers, soldByTierKey }: Pr
                   className="input"
                   type="number"
                   min={0}
-                  value={row.cap}
+                  value={row.unlimited ? '' : row.cap}
                   onChange={(e) => patchRow(i, { cap: e.target.value })}
-                  placeholder="100"
+                  placeholder={row.unlimited ? 'No limit' : '100'}
+                  disabled={row.unlimited}
                 />
+                {/* Right under the box it switches off, so the relationship
+                    between the two is impossible to misread. */}
+                <label className="checkbox-row" style={{ marginTop: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={row.unlimited}
+                    onChange={(e) => patchRow(i, { unlimited: e.target.checked })}
+                  />
+                  <span>
+                    Unlimited — sell as many as people want
+                    <span className="muted small" style={{ display: 'block' }}>
+                      No &ldquo;only N left&rdquo; and it never sells out.
+                    </span>
+                  </span>
+                </label>
               </div>
             </div>
             <div className="field" style={{ marginBottom: 10 }}>

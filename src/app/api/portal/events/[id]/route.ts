@@ -61,6 +61,8 @@ interface TierPayload {
   name: string;
   priceCents: number;
   cap: number;
+  /** True when this ticket type is uncapped — `cap` is stored but not used. */
+  unlimited: boolean;
   studentOnly: boolean;
   description: string;
 }
@@ -222,6 +224,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const v = intField(body.totalCapacity, 'The total capacity', 1, 200000);
       set('total_capacity', v);
       merged.totalCapacity = v;
+    }
+    if ('capacityUnlimited' in body) {
+      need(typeof body.capacityUnlimited === 'boolean', 'The capacity limit switch must be on or off.');
+      const v = body.capacityUnlimited;
+      set('capacity_unlimited', v ? 1 : 0);
+      merged.capacityUnlimited = v;
     }
     if ('maxPerOrder' in body) {
       const v = intField(body.maxPerOrder, 'Max tickets per order', 1, 50);
@@ -396,6 +404,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         need(name.length > 0, 'Every ticket type needs a name.');
         const priceCents = intField(r.priceCents, `The price of "${name}"`, 0, 5_000_000);
         const cap = intField(r.cap, `The ticket limit of "${name}"`, 0, 200000);
+        // Absent on bodies from older clients — treated as limited, which is
+        // what every event did before this flag existed.
+        const unlimited = r.unlimited === true;
         need(typeof r.studentOnly === 'boolean', 'Student-only must be on or off.');
         const description = strField(r.description ?? '', `The description of "${name}"`, 300);
 
@@ -409,7 +420,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         } else {
           tierKey = tierKeyFromName(name, taken);
         }
-        keep.push({ tierKey, name, priceCents, cap, studentOnly: r.studentOnly, description });
+        keep.push({ tierKey, name, priceCents, cap, unlimited, studentOnly: r.studentOnly, description });
       }
 
       const keptKeys = new Set(keep.map((t) => t.tierKey));
@@ -483,19 +494,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const del = db.prepare(`DELETE FROM event_tiers WHERE event_id = ? AND tier_key = ?`);
         for (const key of tiersPlan.removeKeys) del.run(event.id, key);
         const upd = db.prepare(
-          `UPDATE event_tiers SET name = ?, price_cents = ?, cap = ?, student_only = ?, description = ?, sort = ?
+          `UPDATE event_tiers SET name = ?, price_cents = ?, cap = ?, unlimited = ?, student_only = ?, description = ?, sort = ?
            WHERE event_id = ? AND tier_key = ?`
         );
         const ins = db.prepare(
-          `INSERT INTO event_tiers (id, event_id, tier_key, name, price_cents, cap, student_only, description, sort)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO event_tiers (id, event_id, tier_key, name, price_cents, cap, unlimited, student_only, description, sort)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         );
         const existingKeys = new Set(existingTiers.map((t) => t.tierKey));
         tiersPlan.keep.forEach((t, sort) => {
           if (existingKeys.has(t.tierKey)) {
-            upd.run(t.name, t.priceCents, t.cap, t.studentOnly ? 1 : 0, t.description, sort, event.id, t.tierKey);
+            upd.run(t.name, t.priceCents, t.cap, t.unlimited ? 1 : 0, t.studentOnly ? 1 : 0, t.description, sort, event.id, t.tierKey);
           } else {
-            ins.run(newId(), event.id, t.tierKey, t.name, t.priceCents, t.cap, t.studentOnly ? 1 : 0, t.description, sort);
+            ins.run(newId(), event.id, t.tierKey, t.name, t.priceCents, t.cap, t.unlimited ? 1 : 0, t.studentOnly ? 1 : 0, t.description, sort);
           }
         });
       }
@@ -513,6 +524,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
               name: t.name,
               priceCents: t.priceCents,
               cap: t.cap,
+              unlimited: t.unlimited,
               studentOnly: t.studentOnly,
               description: t.description,
             })),

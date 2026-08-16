@@ -326,7 +326,8 @@ export default async function EventPage({ params }: Params) {
 
   const tiers = getEventTiers(event.id);
   const availability = getAvailability(event.id);
-  const soldOut = availability.totalRemaining === 0;
+  // An uncapped event never sells out, whatever the arithmetic says.
+  const soldOut = !availability.unlimited && availability.totalRemaining === 0;
   const minPrice = tiers.length ? Math.min(...tiers.map((t) => t.priceCents)) : null;
 
   // ---------------- Media ----------------
@@ -576,7 +577,7 @@ export default async function EventPage({ params }: Params) {
               )}
               {soldOut ? (
                 <span className="badge badge-red">Sold out</span>
-              ) : availability.totalRemaining <= 50 ? (
+              ) : !availability.unlimited && availability.totalRemaining <= 50 ? (
                 <span className="badge badge-amber">
                   Only {availability.totalRemaining} tickets left
                 </span>
@@ -631,11 +632,15 @@ export default async function EventPage({ params }: Params) {
               <h2 className="page-title">Tickets</h2>
               <div className="tier-grid">
                 {tiers.map((tier) => {
-                  const remaining = availability.tiers[tier.tierKey]?.remaining ?? 0;
+                  const tierAvail = availability.tiers[tier.tierKey];
+                  const remaining = tierAvail?.remaining ?? 0;
+                  const tierUnlimited = Boolean(tierAvail?.unlimited);
                   return (
                     <div className="tier-card glow-card" key={tier.tierKey}>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        {remaining === 0 ? (
+                        {tierUnlimited ? (
+                          <span className="badge badge-green">Available</span>
+                        ) : remaining === 0 ? (
                           <span className="badge badge-red">Sold out</span>
                         ) : remaining <= 25 ? (
                           <span className="badge badge-amber">Only {remaining} left</span>

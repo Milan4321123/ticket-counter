@@ -49,8 +49,19 @@ export function dateChipLabel(event: EventRow): string | null {
   return null;
 }
 
-function AvailabilityBadge({ event, remaining }: { event: EventRow; remaining: number }) {
+function AvailabilityBadge({
+  event,
+  remaining,
+  unlimited,
+}: {
+  event: EventRow;
+  remaining: number;
+  unlimited: boolean;
+}) {
   if (!event.salesOpen) return <span className="badge badge-amber">Sales closed</span>;
+  // An uncapped event has no count to report and can never sell out. Scarcity
+  // it does not have would be a lie, so it just says tickets are available.
+  if (unlimited) return <span className="badge badge-green">Tickets available</span>;
   if (remaining === 0) return <span className="badge badge-red">Sold out</span>;
   if (remaining <= 50) return <span className="badge badge-amber">Only {remaining} left</span>;
   return <span className="badge badge-green">Tickets available</span>;
@@ -110,7 +121,11 @@ export default function EventCard({ event, past = false, delayClass = '' }: Even
           {past ? (
             <span className="badge">Finished</span>
           ) : (
-            <AvailabilityBadge event={event} remaining={availability.totalRemaining} />
+            <AvailabilityBadge
+              event={event}
+              remaining={availability.totalRemaining}
+              unlimited={availability.unlimited}
+            />
           )}
         </span>
         {/* Fades the photo into the card body so the two are one object rather

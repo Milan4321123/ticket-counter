@@ -52,7 +52,7 @@ export default async function EventCheckoutPage({ params }: Params) {
     );
   }
 
-  if (availability.totalRemaining === 0) {
+  if (!availability.unlimited && availability.totalRemaining === 0) {
     return (
       <div className="container container-narrow">
         <h1 className="page-title anim-fade-up">Checkout</h1>

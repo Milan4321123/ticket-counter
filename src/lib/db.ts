@@ -327,6 +327,23 @@ function migrateToPlatform(db: Database.Database): void {
     db.exec(`ALTER TABLE events ADD COLUMN assistant_context TEXT`);
   }
 
+  // Ticket types that are not capped at all — a free community night in a hall
+  // nobody counts, a donation ticket, an outdoor event. The cap column stays
+  // (it is NOT NULL and every existing row has one), and this flag says to
+  // ignore it. Defaulting to 0 keeps every event created before today exactly
+  // as limited as it was.
+  const tierCols = (db.pragma(`table_info(event_tiers)`) as { name: string }[]).map((c) => c.name);
+  if (!tierCols.includes('unlimited')) {
+    db.exec(`ALTER TABLE event_tiers ADD COLUMN unlimited INTEGER NOT NULL DEFAULT 0`);
+  }
+  // The same choice for the event as a whole. total_capacity is NOT dropped
+  // when this is set: it stays on as the organizer's EXPECTED attendance, which
+  // is what the platform fee is priced from — an event with no ceiling still
+  // has a size, and the fee has to be quoted from something.
+  if (!eventCols.includes('capacity_unlimited')) {
+    db.exec(`ALTER TABLE events ADD COLUMN capacity_unlimited INTEGER NOT NULL DEFAULT 0`);
+  }
+
   // Who asked a question, so the answer can be emailed back rather than only
   // appearing on the page — nobody re-opens an event page on the off-chance
   // that the thing they asked about has been answered.

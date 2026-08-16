@@ -6,6 +6,8 @@ export interface SavedTier {
   name: string;
   priceCents: number;
   cap: number;
+  /** True when this ticket type has no limit — `cap` is then ignored. */
+  unlimited: boolean;
   studentOnly: boolean;
   description: string;
 }

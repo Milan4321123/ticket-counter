@@ -38,12 +38,14 @@ export interface CheckoutTierAvailability {
   cap: number;
   sold: number;
   remaining: number;
+  unlimited: boolean;
 }
 
 export interface CheckoutAvailability {
   totalCap: number;
   totalSold: number;
   totalRemaining: number;
+  unlimited: boolean;
   tiers: Record<string, CheckoutTierAvailability>;
 }
 
@@ -460,7 +462,8 @@ export default function CheckoutClient({
                 <div>
                   <div className="tier-name">
                     {tier.name}{' '}
-                    {remaining === 0 ? (
+                    {/* Nothing to count down on an uncapped ticket type. */}
+                    {availability.tiers[tier.id]?.unlimited ? null : remaining === 0 ? (
                       <span className="badge badge-red">Sold out</span>
                     ) : remaining <= 25 ? (
                       <span className="badge badge-amber">Only {remaining} left</span>
