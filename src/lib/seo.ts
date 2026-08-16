@@ -243,6 +243,26 @@ export function eventListJsonLd(events: EventRow[]): Record<string, unknown> {
 }
 
 /**
+ * A page's question-and-answer block, in Schema.org's vocabulary.
+ *
+ * Only pass questions whose answers are visible ON the page — Google checks,
+ * and marked-up answers a visitor cannot read are the textbook example of what
+ * gets structured data ignored site-wide. Answers are flattened to plain text
+ * because acceptedAnswer.text is a string, not markup.
+ */
+export function faqJsonLd(items: { question: string; answer: string }[]): Record<string, unknown> {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: items.map((item) => ({
+      '@type': 'Question',
+      name: item.question,
+      acceptedAnswer: { '@type': 'Answer', text: item.answer.replace(/\s+/g, ' ').trim() },
+    })),
+  };
+}
+
+/**
  * Render JSON-LD into the page.
  *
  * JSON.stringify escaping is not enough on its own: a `</script>` sequence

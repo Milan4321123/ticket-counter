@@ -8,6 +8,12 @@ export interface CardVideoProps {
   poster?: string;
   /** Accessible name, e.g. "Dashain Night 2026". */
   label: string;
+  /**
+   * Which frame this clip is filling. Defaults to the feed tile; the browse
+   * billboard passes its own, and both the <video> and the still it falls back
+   * to get it, so a fallback can never land in a differently-shaped box.
+   */
+  className?: string;
 }
 
 /**
@@ -28,7 +34,12 @@ export interface CardVideoProps {
  * Falls back to the poster image when playback fails or the visitor asked for
  * reduced motion, so the tile always shows something.
  */
-export default function CardVideo({ src, poster, label }: CardVideoProps) {
+export default function CardVideo({
+  src,
+  poster,
+  label,
+  className = 'event-card-shot event-card-clip',
+}: CardVideoProps) {
   const ref = useRef<HTMLVideoElement | null>(null);
   const [broken, setBroken] = useState(false);
   const [reduced, setReduced] = useState(false);
@@ -69,7 +80,7 @@ export default function CardVideo({ src, poster, label }: CardVideoProps) {
     if (!poster) return null;
     // Served by our own /api/media route — next/image is not needed here.
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={poster} alt={`${label} poster`} className="event-card-shot" />;
+    return <img src={poster} alt={`${label} poster`} className={className} />;
   }
 
   // Reduced motion: keep the SAME picture, just still. Swapping to a different
@@ -78,7 +89,7 @@ export default function CardVideo({ src, poster, label }: CardVideoProps) {
   if (reduced) {
     return (
       <video
-        className="event-card-shot event-card-clip"
+        className={className}
         src={src}
         poster={poster}
         muted
@@ -93,7 +104,7 @@ export default function CardVideo({ src, poster, label }: CardVideoProps) {
   return (
     <video
       ref={ref}
-      className="event-card-shot event-card-clip"
+      className={className}
       src={src}
       poster={poster}
       muted

@@ -283,7 +283,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         set('poster_media_id', null);
         merged.posterMediaId = null;
       } else {
-        need(typeof raw === 'string', 'Invalid poster choice.');
+        need(typeof raw === 'string', 'Invalid listing photo choice.');
         need(
           getEventMedia(event.id).some((m) => m.id === raw),
           'That photo does not belong to this event.'
