@@ -56,6 +56,17 @@ export default async function ContactPage({
                 The account is free. You only pay when you publish an event ({feeLabel}), and never a
                 cut of your ticket sales. Nothing to pay to apply, and no payment details to enter.
               </p>
+
+              {/* A way back OUT of the form. Someone who arrived here from a
+                  "Get started" button may never have read what they are signing
+                  up to, and the form gives them no way to find out without
+                  losing their place. Secondary styling on purpose: applying is
+                  still the thing this page is for. */}
+              <p className="anim-fade-up anim-d2" style={{ marginTop: 18 }}>
+                <a href="/organizers" className="btn">
+                  Remind me what I get with an account
+                </a>
+              </p>
             </>
           ) : (
             <>
