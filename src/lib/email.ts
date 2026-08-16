@@ -5,7 +5,7 @@
 import nodemailer from 'nodemailer';
 import QRCode from 'qrcode';
 import { getBaseUrl } from './config';
-import { getEventById, getEventTier, type EventRow } from './events';
+import { getEventById, getEventTier, paypalPayee, type EventRow } from './events';
 import { formatMoney } from './money';
 import { getOrder, getOrderItems, getTicketsForOrder, paymentReference } from './orders';
 import {
@@ -618,6 +618,37 @@ export async function sendTicketEmail(orderId: string): Promise<{ sent: boolean;
  * Send bank-transfer payment instructions for a freshly reserved order.
  * Never throws — the buyer sees the same instructions on the order page.
  */
+/**
+ * The "you can also use PayPal" line, for buyer mails that print bank details.
+ *
+ * Deliberately a note beside the bank panel rather than a second panel of its
+ * own: it is the same amount, to the same person, with the same reference —
+ * only the pipe differs. Returns '' when the organizer offers no PayPal, so
+ * every call site can concatenate it unconditionally.
+ */
+function paypalNoteHtml(event: EventRow, reference: string): string {
+  const payee = paypalPayee(event);
+  if (!payee) return '';
+  return calloutHtml(
+    `<strong>Prefer PayPal?</strong> Send the same amount to ` +
+      `${strong(escapeHtml(payee.handle))} and put ${strong(escapeHtml(reference))} in PayPal&#39;s message ` +
+      `field. It reaches the same organizer — pay one way or the other, not both.`
+  );
+}
+
+/** Plain-text twin of paypalNoteHtml. Empty array when there is no PayPal. */
+function paypalNoteText(event: EventRow, reference: string): string[] {
+  const payee = paypalPayee(event);
+  if (!payee) return [];
+  return [
+    '',
+    wrapText(
+      `PREFER PAYPAL? Send the same amount to ${payee.handle} and put ${reference} in PayPal's ` +
+        `message field. It reaches the same organizer — pay one way or the other, not both.`
+    ),
+  ];
+}
+
 export async function sendTransferInstructionsEmail(
   orderId: string
 ): Promise<{ sent: boolean; reason?: string }> {
@@ -678,6 +709,7 @@ export async function sendTransferInstructionsEmail(
         `Put this in the transfer&#39;s purpose line (&quot;Verwendungszweck&quot;). It is how your payment finds ` +
           `your tickets.${hasStudentTickets ? ' The <strong>S-</strong> marks an order with student tickets.' : ''}`
       ) +
+      paypalNoteHtml(event, reference) +
       pHtml(
         `Once the money lands — usually one or two working days — your QR tickets are emailed to you automatically. ` +
           `Nothing else to do.`,
@@ -726,6 +758,7 @@ export async function sendTransferInstructionsEmail(
           `IMPORTANT: the reference ${reference} must go in the transfer's purpose line ` +
             `("Verwendungszweck"). It is how your payment finds your tickets.`
         ),
+        ...paypalNoteText(event, reference),
         ...(hasStudentTickets
           ? [
               '',
@@ -1260,6 +1293,7 @@ export async function sendBuyerPaymentReminderEmail(
         reference,
         `Put this in the transfer&#39;s purpose line (&quot;Verwendungszweck&quot;) so your payment finds your tickets.`
       ) +
+      paypalNoteHtml(event, reference) +
       buttonHtml(orderUrl, 'View your order') +
       smallHtml('Your QR tickets arrive by email the moment the payment is confirmed.');
 
@@ -1306,6 +1340,7 @@ export async function sendBuyerPaymentReminderEmail(
           `IMPORTANT: put the reference ${reference} in the transfer's purpose line ` +
             `("Verwendungszweck") so your payment finds your tickets.`
         ),
+        ...paypalNoteText(event, reference),
         '',
         `Your order: ${orderUrl}`,
         '',

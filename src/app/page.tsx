@@ -4,7 +4,7 @@ import EventCard from '@/components/EventCard';
 import EventRail from '@/components/EventRail';
 import Logo from '@/components/Logo';
 import PlatformAssistant from '@/components/PlatformAssistant';
-import { listPublishedEvents } from '@/lib/events';
+import { listPublishedEvents, paypalPayee } from '@/lib/events';
 import type { EventRow } from '@/lib/events';
 import { BUYER_RETENTION_DAYS, runBuyerDataRetentionSweep } from '@/lib/retention';
 import { eventListJsonLd, faqJsonLd, jsonLdScript } from '@/lib/seo';
@@ -22,29 +22,38 @@ export const dynamic = 'force-dynamic';
 // changes in the code, it has to change here too.
 // ---------------------------------------------------------------------------
 
-const HOW_IT_WORKS = [
+function howItWorks(anyPaypal: boolean) {
+  return [
   {
     title: 'Reserve your seats',
     body: 'Pick your tickets and reserve them in one click. No account, no password, no card number — just a name and an email so the ticket can be issued to you.',
   },
   {
-    title: 'Pay by bank transfer',
-    body: 'You get the organizer’s bank details and your own payment reference. Send a normal transfer from any banking app, with that reference in the purpose line.',
+    title: anyPaypal ? 'Pay by bank transfer or PayPal' : 'Pay by bank transfer',
+    body: anyPaypal
+      ? 'You get the organizer’s payment details and your own reference. Send a normal bank transfer from any banking app — or, where the organizer offers it, pay by PayPal. Either way the reference goes in the message.'
+      : 'You get the organizer’s bank details and your own payment reference. Send a normal transfer from any banking app, with that reference in the purpose line.',
   },
   {
     title: 'The organizer confirms',
-    body: 'Usually within 1–2 business days of your transfer arriving. You do not have to do anything while you wait — your seats stay held.',
+    body: anyPaypal
+      ? 'PayPal usually lands within minutes, a bank transfer in 1–2 business days. You do not have to do anything while you wait — your seats stay held.'
+      : 'Usually within 1–2 business days of your transfer arriving. You do not have to do anything while you wait — your seats stay held.',
   },
   {
     title: 'Your QR tickets arrive',
     body: 'By email, and on your order page so they cannot get lost. Show the code on your phone at the door — one scan per ticket and you are in.',
   },
-];
+  ];
+}
 
-const ASSURANCES = [
+function assurances(anyPaypal: boolean) {
+  return [
   {
     title: 'The money goes straight to the organizer',
-    body: 'Your transfer lands in the account of the people putting on the show — it never passes through us. No card fees, and nobody sitting on your payment.',
+    body: anyPaypal
+      ? 'Your payment lands in the account of the people putting on the show — their bank account or their own PayPal. It never passes through us. No card fees, and nobody sitting on your money.'
+      : 'Your transfer lands in the account of the people putting on the show — it never passes through us. No card fees, and nobody sitting on your payment.',
   },
   {
     title: 'Your seats are held while you pay',
@@ -58,9 +67,11 @@ const ASSURANCES = [
     title: 'A name and an email. That is all',
     body: `We never ask for card or bank details. Your name and email go to that event’s organizer so they can issue your ticket, and ${BUYER_RETENTION_DAYS} days after the event they are erased from our system for good.`,
   },
-];
+  ];
+}
 
-const FAQS = [
+function faqs(anyPaypal: boolean) {
+  return [
   {
     question: 'Do I need an account to buy tickets?',
     answer:
@@ -68,18 +79,21 @@ const FAQS = [
   },
   {
     question: 'How do I pay?',
-    answer:
-      'By ordinary bank transfer (Überweisung), from any banking app. The moment you reserve, you get the organizer’s bank details and a payment reference that belongs to your order. Put that reference in the transfer’s purpose line — it is how your payment is matched to your tickets.',
+    answer: anyPaypal
+      ? 'By ordinary bank transfer (Überweisung) from any banking app, and some organizers also accept PayPal. The moment you reserve, you get that organizer’s payment details and a reference that belongs to your order. Put that reference in the transfer’s purpose line, or in PayPal’s message field — it is how your payment is matched to your tickets. Pay one way or the other, never both.'
+      : 'By ordinary bank transfer (Überweisung), from any banking app. The moment you reserve, you get the organizer’s bank details and a payment reference that belongs to your order. Put that reference in the transfer’s purpose line — it is how your payment is matched to your tickets.',
   },
   {
     question: 'Why is there no card payment?',
-    answer:
-      'Because bank transfer keeps it simple and honest: the money goes from your account straight to the organizer’s. It never passes through us, there is no card fee taken out of it, and every euro reaches the people putting on the show.',
+    answer: anyPaypal
+      ? 'Because paying the organizer directly keeps it simple and honest: by bank transfer or by PayPal, the money goes from your account straight to theirs. It never passes through us, there is no card fee taken out of it, and every euro reaches the people putting on the show.'
+      : 'Because bank transfer keeps it simple and honest: the money goes from your account straight to the organizer’s. It never passes through us, there is no card fee taken out of it, and every euro reaches the people putting on the show.',
   },
   {
     question: 'When do my tickets arrive?',
-    answer:
-      'As soon as the organizer sees your transfer land — normally 1–2 business days. Your QR tickets are emailed to you and appear on your order page at the same moment.',
+    answer: anyPaypal
+      ? 'As soon as the organizer sees your payment land — usually minutes for PayPal, 1–2 business days for a bank transfer. Your QR tickets are emailed to you and appear on your order page at the same moment.'
+      : 'As soon as the organizer sees your transfer land — normally 1–2 business days. Your QR tickets are emailed to you and appear on your order page at the same moment.',
   },
   {
     question: 'How long do I have to pay?',
@@ -99,14 +113,15 @@ const FAQS = [
   {
     question: 'Who am I actually buying from?',
     answer:
-      'The organizer of that particular event. They set the prices, receive the payment in their own bank account, issue the tickets and run the door. NepaliConcert is the platform they use to sell — every event page names the organizer behind it.',
+      'The organizer of that particular event. They set the prices, receive the payment in their own account, issue the tickets and run the door. NepaliConcert is the platform they use to sell — every event page names the organizer behind it.',
   },
   {
     question: 'What happens if an event is cancelled or I cannot come?',
     answer:
       'Refunds and changes are handled by the organizer of that event, since they hold the money. Contact them with your order ID — it is on your order page and in every email about your booking — and they will sort it out with you directly.',
   },
-];
+  ];
+}
 
 // ---------------------------------------------------------------------------
 // Rows
@@ -248,11 +263,13 @@ function MailIcon() {
   );
 }
 
-const HERO_CHIPS = [
-  { icon: <TicketIcon />, label: 'No account needed' },
-  { icon: <BankIcon />, label: 'Pay by bank transfer' },
-  { icon: <MailIcon />, label: 'QR tickets by email' },
-];
+function heroChips(anyPaypal: boolean) {
+  return [
+    { icon: <TicketIcon />, label: 'No account needed' },
+    { icon: <BankIcon />, label: anyPaypal ? 'Bank transfer or PayPal' : 'Pay by bank transfer' },
+    { icon: <MailIcon />, label: 'QR tickets by email' },
+  ];
+}
 
 // ---------------------------------------------------------------------------
 
@@ -263,6 +280,13 @@ export default function HomePage() {
   runBuyerDataRetentionSweep();
   const events = listPublishedEvents();
   const rows = buildRows(events);
+  // Whether ANY live event actually takes PayPal. This page speaks for the whole
+  // platform, so it must not advertise a payment route no organizer on it offers
+  // — nor stay silent about one that several of them do.
+  const anyPaypal = events.some((e) => paypalPayee(e) !== null);
+  const steps = howItWorks(anyPaypal);
+  const assuranceCards = assurances(anyPaypal);
+  const faqItems = faqs(anyPaypal);
 
   // The billboard is the soonest event that has not happened yet, and only when
   // it has a real date — featuring an undated draft-ish event as "next up"
@@ -284,7 +308,7 @@ export default function HomePage() {
       {/* Every one of these answers is printed on this page below — see the FAQ
           section. Marking up answers a visitor cannot read is what gets
           structured data thrown out site-wide. */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(faqJsonLd(FAQS))} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(faqJsonLd(faqItems))} />
 
       <section className="feed-hero">
         <div className="container">
@@ -297,7 +321,7 @@ export default function HomePage() {
             tickets in one click, pay by bank transfer, and your QR tickets arrive by email.
           </p>
           <ul className="hero-chip-row feed-trust anim-fade-up anim-d2" aria-label="How buying works here">
-            {HERO_CHIPS.map((chip) => (
+            {heroChips(anyPaypal).map((chip) => (
               <li className="hero-chip" key={chip.label}>
                 {chip.icon}
                 {chip.label}
@@ -389,11 +413,12 @@ export default function HomePage() {
           <p className="feed-kicker anim-fade-up">Buying a ticket</p>
           <h2 className="feed-section-title anim-fade-up">Four steps, and no card required</h2>
           <p className="info-lede anim-fade-up">
-            Tickets here are paid the way you already pay for everything else — a normal bank
-            transfer. Here is the whole of it, start to finish.
+            {anyPaypal
+              ? 'Tickets here are paid the way you already pay for everything else — a normal bank transfer, or PayPal where the organizer offers it. Here is the whole of it, start to finish.'
+              : 'Tickets here are paid the way you already pay for everything else — a normal bank transfer. Here is the whole of it, start to finish.'}
           </p>
           <ol className="how-grid">
-            {HOW_IT_WORKS.map((step, i) => (
+            {steps.map((step, i) => (
               <li className="how-card anim-fade-up" key={step.title}>
                 <span className="how-num" aria-hidden="true">
                   {i + 1}
@@ -412,7 +437,7 @@ export default function HomePage() {
           <p className="feed-kicker anim-fade-up">Good to know</p>
           <h2 className="feed-section-title anim-fade-up">What you are agreeing to</h2>
           <div className="assurance-grid">
-            {ASSURANCES.map((item) => (
+            {assuranceCards.map((item) => (
               <div className="assurance-card anim-fade-up" key={item.title}>
                 <h3 className="assurance-title">{item.title}</h3>
                 <p className="assurance-body">{item.body}</p>
@@ -435,7 +460,7 @@ export default function HomePage() {
           <p className="feed-kicker anim-fade-up">Questions</p>
           <h2 className="feed-section-title anim-fade-up">Before you book</h2>
           <div className="anim-fade-up">
-            {FAQS.map((faq) => (
+            {faqItems.map((faq) => (
               <details className="faq-item" key={faq.question}>
                 <summary>{faq.question}</summary>
                 <p className="faq-answer">{faq.answer}</p>

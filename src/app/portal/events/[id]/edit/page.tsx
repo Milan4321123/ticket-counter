@@ -202,6 +202,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
               bankIban: event.bankIban,
               bankBic: event.bankBic,
               bankName: event.bankName,
+              paypalAccount: event.paypalAccount,
             }}
           />
         </EditorSection>

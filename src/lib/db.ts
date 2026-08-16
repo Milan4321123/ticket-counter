@@ -308,6 +308,17 @@ function migrateToPlatform(db: Database.Database): void {
     db.exec(`ALTER TABLE events ADD COLUMN poster_crop TEXT`);
   }
 
+  // A second way for a buyer to send the SAME money to the SAME person: the
+  // organizer's own PayPal address (or PayPal.Me link). Deliberately not a
+  // PayPal checkout integration — that would route ticket money through the
+  // platform's merchant account, and this platform's whole promise is that it
+  // never touches it. This is the IBAN's twin: details on screen, the same
+  // reference, the organizer confirming what landed. Optional, so publishing
+  // still only requires a bank account.
+  if (!eventCols.includes('paypal_account')) {
+    db.exec(`ALTER TABLE events ADD COLUMN paypal_account TEXT NOT NULL DEFAULT ''`);
+  }
+
   // Everything the organizer knows that has no field of its own — parking,
   // food, age limits, dress code, cloakroom, when the doors really open. Free
   // text, written (or dictated) in the portal, and the ONLY extra source the

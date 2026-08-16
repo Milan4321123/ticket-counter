@@ -7,6 +7,7 @@ import {
   getEventMedia,
   getEventTiers,
   getMediaById,
+  isValidPaypalAccount,
   makeUniqueSlug,
   newId,
   parseCropRect,
@@ -260,6 +261,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       need(compact === '' || BIC_RE.test(compact), 'That does not look like a valid BIC — it is 8 or 11 characters, like COBADEFFXXX.');
       set('bank_bic', v);
       merged.bankBic = v;
+    }
+    if ('paypalAccount' in body) {
+      const v = strField(body.paypalAccount, 'The PayPal address', 120);
+      need(
+        isValidPaypalAccount(v),
+        'That does not look like a PayPal address — use the email address on your PayPal account, or your PayPal.Me link.'
+      );
+      set('paypal_account', v);
+      merged.paypalAccount = v;
     }
     if ('bankName' in body) {
       const v = strField(body.bankName, 'The bank name', 120);
