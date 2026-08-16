@@ -5748,36 +5748,51 @@ html:has(.event-page.has-section-nav) {
   display: contents;
 }
 
-/* ---------- Phone hero: show the WHOLE cover, do not crop it ----------
+/* ---------- Phone hero: the whole cover, and nothing but the cover ----------
 
-   The hero is a wide band on a laptop and a tall panel on a phone: at 375px it
-   is about 375x568, a 0.66 portrait box, while the cover render is 2.17:1.
-   Filling that box with object-fit: cover throws away roughly 70% of the
-   picture's width — and event covers are usually POSTERS, so what gets thrown
-   away is the title, the date and the venue. Desktop looked right and mobile
-   showed a vertical slice through the middle of somebody's artwork.
+   The hero is a wide band on a laptop and a tall panel on a phone. At 375px it
+   was 526px tall while the cover render is 2.16:1 — so the picture painted 173px
+   and left 176px of empty space above it and 176px below. Cropping to fill
+   instead (the old behaviour) kept about a third of the picture's width, and
+   event covers are usually POSTERS, so what went missing was the title, the date
+   and the venue.
 
-   So on a phone the cover is letterboxed rather than cropped: the entire image
-   is shown, exactly as the laptop shows it, with a blurred enlarged copy of
-   itself filling the space around it so there are no dead black bars. This is
-   the one place where "always completely full, never letterboxed" is the wrong
-   rule — a poster you cannot read is worse than a poster with soft edges. */
+   Neither answer was right, because both accepted a box whose height had nothing
+   to do with the picture. On a phone the hero is now exactly as tall as the
+   cover itself, and the details sit UNDER it rather than on top:
+
+     - the media box takes the render's own aspect ratio, so the picture fills it
+       edge to edge with nothing cropped and nothing left over;
+     - the hero's top padding matches that height, so the text begins right below
+       the picture instead of floating in a blurred void.
+
+   The result is the same picture the laptop shows, complete, with no dead space
+   at either end. */
 
 @media (max-width: 640px) {
   .event-page .event-hero {
-    /* Shorter, so the letterbox has less empty space to fill. */
-    min-height: clamp(340px, 52vh, 520px);
+    /* No imposed height at all — the picture and the text decide it. */
+    min-height: 0;
+    /* Exactly the height the full-width cover paints at (1600x740 render). */
+    padding-top: calc(100vw / 2.162);
   }
 
+  .event-hero-media {
+    /* Only as tall as the picture, anchored to the top of the hero. */
+    bottom: auto;
+    height: calc(100vw / 2.162);
+  }
+
+  /* contain rather than cover: the box already has the render's proportions, so
+     this crops nothing — it just guarantees that stays true if either number
+     ever drifts. */
   .event-hero-media .event-hero-still {
     object-fit: contain;
-    /* Above the blurred backdrop below. */
     z-index: 1;
   }
 
-  /* The backdrop: the same photo, enlarged and blurred out of legibility, so
-     the frame is filled with something that belongs to the picture rather than
-     a flat panel. Hidden from assistive tech — it carries no information. */
+  /* A blurred copy of the cover behind it, so any rounding gap reads as part of
+     the picture rather than a seam. */
   .event-hero-media::before {
     content: '';
     position: absolute;
@@ -5785,15 +5800,36 @@ html:has(.event-page.has-section-nav) {
     background-image: var(--hero-img);
     background-size: cover;
     background-position: center;
-    filter: blur(26px) saturate(1.15) brightness(0.55);
-    transform: scale(1.25);
+    filter: blur(26px) brightness(0.55);
+    transform: scale(1.2);
     z-index: 0;
   }
 
-  /* A video cover keeps filling the frame: a clip is watched, not read, and
-     letterboxing one would leave a small picture in a large empty box. */
+  /* A video cover keeps filling its box: a clip is watched, not read. */
   .event-hero-media .event-hero-video {
     object-fit: cover;
     z-index: 1;
+  }
+
+  /* The details now sit on the page under the picture, not over it, so the
+     darkening that made white text readable on a photo is no longer needed
+     and would only grey out the section. */
+  .event-hero-scrim {
+    display: none;
+  }
+
+  /* That padding exists to push the text down the tall hero it used to sit
+     inside. The hero is no longer tall, so the same value became a 154px hole
+     between the picture and the title — the empty space simply moved rather
+     than going away. A normal gap is all that is wanted now. */
+  .event-page .event-hero-inner {
+    padding-top: 22px;
+  }
+
+  /* The round profile photo lifts itself up to straddle the old hero's bottom
+     edge. There is no edge to straddle any more, so that lift would drag it
+     back over the title. */
+  .event-page.has-avatar .event-hero-inner {
+    padding-bottom: 18px;
   }
 }
