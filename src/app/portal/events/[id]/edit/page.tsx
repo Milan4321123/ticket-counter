@@ -183,6 +183,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
               currency: event.currency,
               totalCapacity: event.totalCapacity,
               capacityUnlimited: event.capacityUnlimited,
+              showRemaining: event.showRemaining,
               maxPerOrder: event.maxPerOrder,
               payWithinDays: event.payWithinDays,
               salesOpen: event.salesOpen,

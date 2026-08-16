@@ -61,6 +61,7 @@ function AvailabilityBadge({
   if (!event.salesOpen) return <span className="badge badge-amber">Sales closed</span>;
   // An uncapped event has no count to report and can never sell out. Scarcity
   // it does not have would be a lie, so it just says tickets are available.
+  // Uncapped, or the organizer chose not to publish a countdown.
   if (unlimited) return <span className="badge badge-green">Tickets available</span>;
   if (remaining === 0) return <span className="badge badge-red">Sold out</span>;
   if (remaining <= 50) return <span className="badge badge-amber">Only {remaining} left</span>;
@@ -124,7 +125,7 @@ export default function EventCard({ event, past = false, delayClass = '' }: Even
             <AvailabilityBadge
               event={event}
               remaining={availability.totalRemaining}
-              unlimited={availability.unlimited}
+              unlimited={availability.unlimited || !availability.showRemaining}
             />
           )}
         </span>

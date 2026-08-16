@@ -86,7 +86,7 @@ export interface EventBillboardProps {
 export default function EventBillboard({ event, leading = false }: EventBillboardProps) {
   const tiers = getEventTiers(event.id);
   const minPrice = tiers.length ? Math.min(...tiers.map((t) => t.priceCents)) : null;
-  const { totalRemaining, unlimited } = getAvailability(event.id);
+  const { totalRemaining, unlimited, showRemaining } = getAvailability(event.id);
   const { videoUrl, stillUrl, stillUrlNarrow } = billboardMedia(event);
   const accent = parsePageDesign(event.pageDesign).accent ?? 'violet';
   const design = parsePageDesign(event.pageDesign);
@@ -158,7 +158,7 @@ export default function EventBillboard({ event, leading = false }: EventBillboar
           </Link>
         </p>
         {/* No count on an uncapped event — there is nothing to count down. */}
-        {canBuy && !unlimited && totalRemaining <= 50 ? (
+        {canBuy && !unlimited && showRemaining && totalRemaining <= 50 ? (
           <p className="billboard-note">Only {totalRemaining} tickets left</p>
         ) : null}
       </div>

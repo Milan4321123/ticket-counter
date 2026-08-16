@@ -34,6 +34,8 @@ export interface EventRow {
    * is priced from, not a limit on sales.
    */
   capacityUnlimited: boolean;
+  /** False hides the "only N left" countdown from buyers entirely. */
+  showRemaining: boolean;
   salesOpen: boolean;
   maxPerOrder: number;
   payWithinDays: number;
@@ -150,6 +152,7 @@ const EVENT_COLS = `
   currency,
   total_capacity AS totalCapacity,
   capacity_unlimited AS capacityUnlimited,
+  show_remaining AS showRemaining,
   sales_open AS salesOpen,
   max_per_order AS maxPerOrder,
   pay_within_days AS payWithinDays,
@@ -180,6 +183,7 @@ function rowToEvent(row: Record<string, unknown> | undefined): EventRow | null {
     ...(row as unknown as EventRow),
     salesOpen: Boolean(row.salesOpen),
     capacityUnlimited: Boolean(row.capacityUnlimited),
+    showRemaining: Boolean(row.showRemaining),
     // Added by migration, so it is NULL on every event created before it.
     assistantContext: (row.assistantContext as string | null) ?? '',
     paypalAccount: (row.paypalAccount as string | null) ?? '',

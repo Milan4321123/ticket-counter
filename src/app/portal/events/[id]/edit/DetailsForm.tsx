@@ -20,6 +20,7 @@ interface Props {
     currency: string;
     totalCapacity: number;
     capacityUnlimited: boolean;
+    showRemaining: boolean;
     maxPerOrder: number;
     payWithinDays: number;
     salesOpen: boolean;
@@ -38,6 +39,7 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
   const [city, setCity] = useState(initial.city);
   const [totalCapacity, setTotalCapacity] = useState(String(initial.totalCapacity));
   const [capacityUnlimited, setCapacityUnlimited] = useState(initial.capacityUnlimited);
+  const [showRemaining, setShowRemaining] = useState(initial.showRemaining);
   const [maxPerOrder, setMaxPerOrder] = useState(String(initial.maxPerOrder));
   const [payWithinDays, setPayWithinDays] = useState(String(initial.payWithinDays));
   const [salesOpen, setSalesOpen] = useState(initial.salesOpen);
@@ -83,6 +85,7 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
       city,
       totalCapacity: capacity,
       capacityUnlimited,
+      showRemaining,
       maxPerOrder: perOrder,
       payWithinDays: payDays,
       salesOpen,
@@ -234,6 +237,27 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
               <span className="muted small" style={{ display: 'block' }}>
                 Your page stops showing a countdown and never says sold out. The number above is
                 still what your fee is based on, as your expected attendance.
+              </span>
+            </span>
+          </label>
+
+          {/* Separate from the limit itself, because they answer different
+              questions: one is "is there a ceiling", this is "should buyers
+              see how close we are to it". */}
+          <label className="checkbox-row" style={{ marginTop: 10 }}>
+            <input
+              type="checkbox"
+              checked={showRemaining}
+              onChange={(e) => setShowRemaining(e.target.checked)}
+              disabled={capacityUnlimited}
+            />
+            <span>
+              Show buyers how many tickets are left
+              <span className="muted small" style={{ display: 'block' }}>
+                Turn this OFF if you sell early-bird tickets. &ldquo;Only 8 left&rdquo; is read as
+                the whole event nearly selling out, when it only means the cheap tier is nearly
+                gone — and that puts people off an event with hundreds of seats free. Your limits
+                still apply either way; this only decides whether the number is shown.
               </span>
             </span>
           </label>

@@ -381,6 +381,17 @@ function migrateToPlatform(db: Database.Database): void {
   if (!orgCols.includes('reminders_enabled')) {
     db.exec(`ALTER TABLE organizers ADD COLUMN reminders_enabled INTEGER NOT NULL DEFAULT 1`);
   }
+  // Whether the public page counts down the remaining tickets.
+  //
+  // Defaults to 1, which is what every event did before this existed. It is a
+  // CHOICE because the honest answer depends on how the event is priced: on an
+  // early-bird event "only 8 left" is read as "this event is nearly sold out"
+  // when it only means the cheap tier is nearly gone, and that scares people
+  // off an event with hundreds of seats free.
+  if (!eventCols.includes('show_remaining')) {
+    db.exec(`ALTER TABLE events ADD COLUMN show_remaining INTEGER NOT NULL DEFAULT 1`);
+  }
+
   // Authenticator-app second factor, PER ORGANIZER. The admin has had this for
   // a while (see lib/totp.ts); organizers had nothing but a password.
   //

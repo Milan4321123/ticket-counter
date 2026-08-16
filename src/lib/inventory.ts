@@ -25,6 +25,11 @@ export interface Availability {
   totalRemaining: number;
   /** True when the EVENT has no overall ceiling. */
   unlimited: boolean;
+  /**
+   * False when the organizer has turned the countdown off. Reservations still
+   * respect every cap — this hides the NUMBER, it does not sell more tickets.
+   */
+  showRemaining: boolean;
   tiers: Record<string, TierAvailability>;
 }
 
@@ -54,6 +59,7 @@ const EMPTY_AVAILABILITY: Availability = {
   totalSold: 0,
   totalRemaining: 0,
   unlimited: false,
+  showRemaining: true,
   tiers: {},
 };
 
@@ -109,6 +115,7 @@ export function getAvailability(eventId: string): Availability {
     totalSold,
     totalRemaining,
     unlimited: event.capacityUnlimited,
+    showRemaining: event.showRemaining,
     tiers,
   };
 }

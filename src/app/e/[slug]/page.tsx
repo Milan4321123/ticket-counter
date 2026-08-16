@@ -581,7 +581,7 @@ export default async function EventPage({ params }: Params) {
               )}
               {soldOut ? (
                 <span className="badge badge-red">Sold out</span>
-              ) : !availability.unlimited && availability.totalRemaining <= 50 ? (
+              ) : !availability.unlimited && availability.showRemaining && availability.totalRemaining <= 50 ? (
                 <span className="badge badge-amber">
                   Only {availability.totalRemaining} tickets left
                 </span>
@@ -638,7 +638,9 @@ export default async function EventPage({ params }: Params) {
                 {tiers.map((tier) => {
                   const tierAvail = availability.tiers[tier.tierKey];
                   const remaining = tierAvail?.remaining ?? 0;
-                  const tierUnlimited = Boolean(tierAvail?.unlimited);
+                  // Hidden countdown behaves like an uncapped tier here: available,
+                  // never a number, never a scare.
+                  const tierUnlimited = Boolean(tierAvail?.unlimited) || !availability.showRemaining;
                   return (
                     <div className="tier-card glow-card" key={tier.tierKey}>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
