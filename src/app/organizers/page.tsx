@@ -78,18 +78,24 @@ export default function OrganizersPage() {
             commission — the account itself is free.
           </p>
           <p className="feed-hero-actions anim-fade-up anim-d3">
-            <Link href="/contact?intent=account" className="btn btn-brand btn-lg">
-              Get started
-            </Link>
+
             {/* Kept on THIS page on purpose. "Get started" opens an
                 application form, and someone who has not read the page yet does
                 not know what they are applying for — they click the only
                 confident-looking button and end up filling in a form about an
                 account they cannot picture. This one answers the question first,
                 without leaving. */}
-            <a href="#what-you-get" className="btn btn-lg">
-              See how it works first
+            {/* The explainer leads, and in green. "Get started" opens an
+                application form, so putting it first asks someone to commit
+                before they have been told what to. Green reads as "go and look",
+                red as "do the thing" — and looking is the right first move for
+                almost everyone arriving here. */}
+            <a href="#what-you-get" className="btn btn-green btn-lg">
+              See how it works
             </a>
+            <Link href="/contact?intent=account" className="btn btn-brand btn-lg">
+              Get started
+            </Link>
             <Link href="/" className="btn btn-lg">
               See a live event page
             </Link>
