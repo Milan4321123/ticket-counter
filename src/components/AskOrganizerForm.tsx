@@ -34,6 +34,9 @@ export default function AskOrganizerForm({
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [privacyAck, setPrivacyAck] = useState(false);
+  // Honeypot — invisible to people, irresistible to form-filling bots. Same
+  // trick the contact form uses.
+  const [website, setWebsite] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<{ willEmail: boolean } | null>(null);
@@ -65,6 +68,7 @@ export default function AskOrganizerForm({
           askerName: name.trim(),
           askerEmail: trimmedEmail,
           privacyAck,
+          website,
         }),
       });
       const data = (await res.json().catch(() => null)) as
@@ -186,6 +190,22 @@ export default function AskOrganizerForm({
             </span>
           </label>
         )}
+
+        <div
+          aria-hidden="true"
+          style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, overflow: 'hidden' }}
+        >
+          <label htmlFor="ask-website">Leave this field empty</label>
+          <input
+            id="ask-website"
+            name="website"
+            type="text"
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+            tabIndex={-1}
+            autoComplete="off"
+          />
+        </div>
 
         {error && (
           <div className="notice notice-error" role="alert" style={{ marginTop: 12 }}>

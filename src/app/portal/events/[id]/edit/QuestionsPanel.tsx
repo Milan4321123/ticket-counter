@@ -5,6 +5,21 @@ import { useRouter } from 'next/navigation';
 
 const MAX_ANSWER = 1000;
 
+/**
+ * Anything that looks like a link or an address a stranger wants you to visit.
+ *
+ * Visitor questions are written by anyone on the internet and are read by the
+ * organizer in their signed-in portal — the ideal place to put "your account is
+ * suspended, confirm at ...". React escapes the text so nothing is clickable,
+ * which stops the easy version, but the words are still persuasive on their own
+ * and the organizer can retype a URL by hand.
+ *
+ * So questions carrying one are flagged rather than silently trusted. They are
+ * NOT blocked: "is it the venue on hauptstrasse.de?" is a perfectly real
+ * question, and refusing it would train people that the form is broken.
+ */
+const LINKY = /(https?:\/\/|www\.|\b[a-z0-9-]+\.(com|net|org|io|co|de|info|xyz|ru|top|link)\b)/i;
+
 interface OpenQuestion {
   id: string;
   question: string;
@@ -130,6 +145,14 @@ export default function QuestionsPanel({ eventId, questions, answeredCount }: Pr
       {open.map((q) => (
         <div key={q.id} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 14 }}>
           <div style={{ fontWeight: 700 }}>{q.question}</div>
+          {LINKY.test(q.question) && (
+            <div className="notice notice-warn small" style={{ margin: '8px 0 0' }}>
+              <strong>This question contains a link or a web address.</strong> Anyone on the internet
+              can send you one of these. Do not open it, and do not enter your password anywhere it
+              asks you to — we will never ask you to confirm your account through a visitor question.
+              If it is not a real question, dismiss it.
+            </div>
+          )}
           <div className="muted small" style={{ marginTop: 2 }}>
             Asked {q.askedAt.slice(0, 10)}
             {q.askerName ? ` by ${q.askerName}` : ''}

@@ -19,6 +19,33 @@ const MAX_QUESTION = 500;
 const MAX_NAME = 80;
 const MAX_EMAIL = 160;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Limits on the ESCALATION path specifically — the one that writes a row.
+ *
+ * The per-IP limit above this is not enough on its own: it is per IP, and the
+ * global bucket that would catch a rotating-IP flood is consumed further down,
+ * AFTER the escalation branch has already written to the database. So a
+ * distributed bot could create rows without ever touching a global limit.
+ *
+ * Three ceilings, each closing a different hole:
+ *   - a global one, so a rotating-IP flood is bounded platform-wide;
+ *   - a per-event one, so a single organizer's inbox cannot be buried even by
+ *     traffic that is under the global limit;
+ *   - a per-address one, so this form cannot be used to make somebody else's
+ *     inbox receive a stream of answers they never asked for.
+ */
+const ESCALATE_GLOBAL_LIMIT = 60;
+const ESCALATE_EVENT_LIMIT = 10;
+const ESCALATE_EMAIL_LIMIT = 3;
+const ESCALATE_WINDOW_MS = 10 * 60_000;
+/**
+ * Hard ceiling on unanswered questions per event. Rate limits bound the SPEED
+ * of writes; nothing bounded the total, so a patient script could grow one
+ * event's queue without limit. Past this, asking is refused until the organizer
+ * works through what is already there.
+ */
+const MAX_OPEN_QUESTIONS = 200;
 /** How much organizer content the assistant sees (keeps the prompt small). */
 const MAX_POSTS = 5;
 const MAX_POST_CHARS = 300;
@@ -75,7 +102,38 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // it keeps the per-IP limit above it.
     const wantsEscalation = raw && typeof raw === 'object' && (raw as { escalate?: unknown }).escalate === true;
     if (wantsEscalation) {
-      const body = raw as { askerName?: unknown; askerEmail?: unknown; privacyAck?: unknown };
+      const body = raw as {
+        askerName?: unknown;
+        askerEmail?: unknown;
+        privacyAck?: unknown;
+        website?: unknown;
+      };
+
+      // Honeypot: a field positioned off-screen that a person never sees and a
+      // form-filling bot cannot resist. Answered with the same cheerful message
+      // as a real submission so a scraper learns nothing from the difference,
+      // but nothing is written.
+      if (typeof body.website === 'string' && body.website.trim() !== '') {
+        return NextResponse.json({
+          kind: 'escalated',
+          message: 'Sent to the organizer — they will answer it on this page. Thanks for asking!',
+          willEmail: false,
+        });
+      }
+
+      if (
+        !rateLimit('ask:escalate:all', ESCALATE_GLOBAL_LIMIT, ESCALATE_WINDOW_MS) ||
+        !rateLimit(`ask:escalate:event:${id}`, ESCALATE_EVENT_LIMIT, ESCALATE_WINDOW_MS)
+      ) {
+        return apiError(429, 'A lot of questions have just come in — please try again in a few minutes.');
+      }
+
+      if (listEventQuestions(event.id, 'open').length >= MAX_OPEN_QUESTIONS) {
+        return apiError(
+          429,
+          'The organizer has a lot of unanswered questions right now. Please try again in a day or two.'
+        );
+      }
       const askerName = typeof body.askerName === 'string' ? body.askerName.trim().slice(0, MAX_NAME) : '';
       const askerEmail = typeof body.askerEmail === 'string' ? body.askerEmail.trim().slice(0, MAX_EMAIL) : '';
 
@@ -90,6 +148,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         }
         if (body.privacyAck !== true) {
           return apiError(400, 'Please tick the box to confirm we may use your email to send you the answer.');
+        }
+        // Nobody else's inbox becomes a target through this form.
+        if (!rateLimit(`ask:escalate:email:${askerEmail}`, ESCALATE_EMAIL_LIMIT, ESCALATE_WINDOW_MS)) {
+          return apiError(
+            429,
+            'That email address has already asked a few questions — please wait a little before asking again.'
+          );
         }
       }
 
