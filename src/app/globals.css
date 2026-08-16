@@ -5983,3 +5983,69 @@ html:has(.event-page.has-section-nav) {
   color: var(--text-dim);
   flex: none;
 }
+
+/* ---------- The "talk to a person" bubble ----------
+   Sits directly above the assistant's bubble: same corner, same purpose, and
+   at 56px each they would overlap on a phone side by side. */
+
+.contact-fab {
+  position: fixed;
+  right: 18px;
+  /* Clear of the 56px chat bubble plus its own bottom inset, with a gap. */
+  bottom: calc(18px + 56px + 12px + env(safe-area-inset-bottom, 0px));
+  z-index: 70;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 56px;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-lift);
+  text-decoration: none;
+  color: var(--text);
+  overflow: hidden;
+  transition: max-width 0.28s ease, border-color 0.18s ease;
+}
+
+.contact-fab:hover,
+.contact-fab:focus-visible {
+  max-width: 230px;
+  border-color: var(--brand, var(--accent));
+}
+
+.contact-fab-photo {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+  background: var(--bg-elevated);
+}
+
+.contact-fab-initial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display, inherit);
+  font-weight: 800;
+  font-size: 1.15rem;
+  color: #fff;
+  background: linear-gradient(135deg, var(--brand, var(--accent)), var(--pink, var(--accent-strong)));
+}
+
+.contact-fab-label {
+  white-space: nowrap;
+  padding-right: 12px;
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+/* On a phone there is no hover, so it stays a circle and the label never shows.
+   The accessible name still carries the whole sentence. */
+@media (hover: none) {
+  .contact-fab:hover {
+    max-width: 56px;
+  }
+}

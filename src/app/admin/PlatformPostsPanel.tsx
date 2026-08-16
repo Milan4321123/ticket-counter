@@ -149,18 +149,71 @@ export default function PlatformPostsPanel({
         />
       </div>
       <div className="field">
-        <label htmlFor="pc-photo">Photo URL</label>
-        <input
-          id="pc-photo"
-          className="input"
-          value={photoUrl}
-          maxLength={500}
-          onChange={(e) => setPhotoUrl(e.target.value)}
-          placeholder="https://…/milan.jpg"
-        />
-        <p className="muted small" style={{ margin: '6px 0 0' }}>
-          A square photo works best. Leave it blank and your initial is shown in a
-          circle instead — which is better than a broken image.
+        <label htmlFor="pc-photo">Your photo</label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          {photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={photoUrl}
+              alt="Your current photo"
+              width={64}
+              height={64}
+              style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover' }}
+            />
+          ) : (
+            <span
+              aria-hidden="true"
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: '50%',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 800,
+                fontSize: '1.5rem',
+                color: '#fff',
+                background: 'linear-gradient(135deg, var(--brand), var(--pink))',
+              }}
+            >
+              {(name.trim().charAt(0) || '?').toUpperCase()}
+            </span>
+          )}
+          <input
+            id="pc-photo"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="input"
+            style={{ maxWidth: 280 }}
+            disabled={busy}
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              setBusy(true);
+              setError(null);
+              const form = new FormData();
+              form.append('photo', file);
+              const res = await fetch('/api/admin/contact-photo', { method: 'POST', body: form });
+              const data = (await res.json().catch(() => null)) as
+                | { photoUrl?: string; error?: string }
+                | null;
+              setBusy(false);
+              if (!res.ok || !data?.photoUrl) {
+                setError(data?.error || 'That image could not be uploaded.');
+                return;
+              }
+              // Saved server-side already; reflect it here so the preview
+              // updates without a reload.
+              setPhotoUrl(data.photoUrl);
+              router.refresh();
+            }}
+          />
+        </div>
+        <p className="muted small" style={{ margin: '8px 0 0' }}>
+          Any shape works — it is cropped to a square around your face and shrunk to
+          256px, so a big photo does not slow every page down. JPEG, PNG or WebP, up
+          to 5 MB. With no photo your initial is shown instead, which beats a broken
+          image.
         </p>
       </div>
       <button

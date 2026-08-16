@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from 'next';
 import Link from 'next/link';
 import { Sora } from 'next/font/google';
+import ContactBubble from '@/components/ContactBubble';
 import Logo from '@/components/Logo';
 import { getBaseUrl } from '@/lib/config';
 import { SITE_DESCRIPTION, SITE_NAME, jsonLdScript, siteJsonLd } from '@/lib/seo';
+import { getPlatformContact } from '@/lib/platformPosts';
 import './globals.css';
 
 const sora = Sora({
@@ -77,6 +79,7 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const contact = getPlatformContact();
   return (
     <html lang="en" className={sora.variable}>
       <body>
@@ -125,6 +128,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
         <main className="anim-fade-up">{children}</main>
+        {/* Follows the visitor on every public page. The component decides for
+            itself where it does not belong (admin, the scanner, /contact). */}
+        <ContactBubble name={contact.name} role={contact.role} photoUrl={contact.photoUrl} />
         <footer className="site-footer">
           <div className="container footer-grid">
             <div>
