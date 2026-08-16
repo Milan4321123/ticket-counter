@@ -63,8 +63,8 @@ export default async function ContactPage({
                   losing their place. Secondary styling on purpose: applying is
                   still the thing this page is for. */}
               <p className="anim-fade-up anim-d2" style={{ marginTop: 18 }}>
-                <a href="/organizers" className="btn">
-                  Remind me what I get with an account
+                <a href="/organizers#what-you-get" className="btn btn-green">
+                  Remind me how it works
                 </a>
               </p>
             </>
