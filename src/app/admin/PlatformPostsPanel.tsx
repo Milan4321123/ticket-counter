@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import ContactPhotoFramer from './ContactPhotoFramer';
 
 interface Post {
   id: string;
@@ -255,57 +256,49 @@ export default function PlatformPostsPanel({
           With no photo your initial is shown instead, which beats a broken image.
         </p>
 
-        {/* Only useful once there is a photo to move. Two sliders rather than a
-            drag surface: the circle is 46px on the real site, so a drag would be
-            fighting for single pixels, while a slider lands exactly. */}
+        {/* A frame you can see and drag, not two sliders. Framing a picture is
+            a spatial job; numbers describe the result but never show what is
+            being left out. */}
         {photoUrl ? (
           <div style={{ marginTop: 14 }}>
-            <p className="muted small" style={{ margin: '0 0 8px' }}>
-              Move your face into the circle — this is exactly what visitors see:
+            <p className="muted small" style={{ margin: '0 0 10px' }}>
+              Choose what appears in your bubble:
             </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={photoUrl}
-                alt="Preview"
-                style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: '50%',
-                  objectFit: 'cover',
-                  objectPosition: `${fx}% ${fy}%`,
-                  border: '2px solid var(--brand)',
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 20, flexWrap: 'wrap' }}>
+              <ContactPhotoFramer
+                photoUrl={photoUrl}
+                fx={fx}
+                fy={fy}
+                onChange={(x, y) => {
+                  setFx(x);
+                  setFy(y);
                 }}
               />
-              <div style={{ display: 'grid', gap: 8, minWidth: 220 }}>
-                <label className="small">
-                  Left / right
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={fx}
-                    onChange={(e) => setFx(Number(e.target.value))}
-                    style={{ width: '100%' }}
+              <div>
+                <p className="muted small" style={{ margin: '0 0 8px' }}>
+                  Live preview — actual size on the site:
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={photoUrl}
+                    alt="Preview"
+                    style={{
+                      width: 46,
+                      height: 46,
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      objectPosition: `${fx}% ${fy}%`,
+                      border: '2px solid var(--brand)',
+                    }}
                   />
-                </label>
-                <label className="small">
-                  Up / down
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={fy}
-                    onChange={(e) => setFy(Number(e.target.value))}
-                    style={{ width: '100%' }}
-                  />
-                </label>
+                  <span className="muted small">as it appears in the corner</span>
+                </div>
+                <p className="muted small" style={{ margin: '14px 0 0', maxWidth: 240 }}>
+                  Press <strong>Save contact card</strong> to keep it.
+                </p>
               </div>
             </div>
-            <p className="muted small" style={{ margin: '8px 0 0' }}>
-              Heads usually sit above centre, so try pulling &ldquo;up / down&rdquo; toward
-              the left. Press <strong>Save contact card</strong> to keep it.
-            </p>
           </div>
         ) : null}
       </div>
@@ -314,7 +307,7 @@ export default function PlatformPostsPanel({
         className="btn btn-sm"
         disabled={busy}
         onClick={async () => {
-          if (await post({ action: 'contact', name, role, photoUrl })) {
+          if (await post({ action: 'contact', name, role, photoUrl, focus: `${fx}% ${fy}%` })) {
             setSaved(true);
             setTimeout(() => setSaved(false), 2500);
           }

@@ -113,38 +113,40 @@ export default function OrganizersPage() {
                 <div>
                   <strong>Tell us about your event</strong>
                   <p className="muted small" style={{ margin: 0 }}>
-                    A real person reads it. If it looks right we create your account and email
-                    your sign-in details. Free, and nothing to pay to apply.
+                    A real person reads it and sets your account up, usually within a couple of
+                    days. Nothing to pay, and no card to enter — the account is free.
                   </p>
                 </div>
               </li>
               <li className="step-item">
                 <span className="step-num step-num-brand" aria-hidden>2</span>
                 <div>
-                  <strong>Build your own event page</strong>
+                  <strong>Build your own page — yourself</strong>
                   <p className="muted small" style={{ margin: 0 }}>
-                    Your photos and video, your colours, your text — in an editor you control.
-                    Preview it privately before anyone sees it.
+                    Photos, video, colours, ticket tiers, bank details. Design it yourself in the
+                    editor, or let the AI lay it out for you, and preview it privately before
+                    anyone else sees it.
                   </p>
                 </div>
               </li>
               <li className="step-item">
                 <span className="step-num step-num-brand" aria-hidden>3</span>
                 <div>
-                  <strong>Set your ticket types and publish</strong>
+                  <strong>Pay that event's fee and publish</strong>
                   <p className="muted small" style={{ margin: 0 }}>
-                    Any prices you like, student tickets, limited or unlimited. You pay the
-                    event fee once, at publishing — never a cut of your sales.
+                    The Publish tab shows the exact amount for your capacity, with the bank
+                    details and payment reference. The moment your transfer lands, publishing
+                    unlocks. One fee per event — never a cut of your sales.
                   </p>
                 </div>
               </li>
               <li className="step-item">
                 <span className="step-num step-num-brand" aria-hidden>4</span>
                 <div>
-                  <strong>Confirm payments and scan at the door</strong>
+                  <strong>Sell straight to your own bank account</strong>
                   <p className="muted small" style={{ margin: 0 }}>
-                    Buyers pay straight into your account. Confirm a payment and the QR tickets
-                    email themselves; on the night, scan them at the entrance.
+                    Buyers pay you directly — by transfer or PayPal. Confirm a payment and the QR
+                    tickets go out on their own; on the night, scan them at the door.
                   </p>
                 </div>
               </li>
@@ -292,57 +294,6 @@ export default function OrganizersPage() {
         </div>
       </section>
 
-      {/* ---- How it works ---- */}
-      <section className="section">
-        <div className="container container-narrow">
-          <p className="feed-kicker anim-fade-up">How it works</p>
-          <h2 className="feed-section-title anim-fade-up">From first message to sold out</h2>
-          <div className="card anim-fade-up anim-d1">
-            <ol className="step-list" style={{ margin: 0 }}>
-              <li className="step-item">
-                <span className="step-num step-num-brand">1</span>
-                <div>
-                  <div className="tier-name">Tell us about your event — free</div>
-                  <p className="muted small" style={{ margin: '2px 0 0' }}>
-                    A real person reads it and sets your account up, usually within a couple of
-                    days. Nothing to pay, and no card to enter.
-                  </p>
-                </div>
-              </li>
-              <li className="step-item">
-                <span className="step-num step-num-brand">2</span>
-                <div>
-                  <div className="tier-name">Build your event</div>
-                  <p className="muted small" style={{ margin: '2px 0 0' }}>
-                    Photos, tiers, bank details — design it yourself or let the AI do it.
-                  </p>
-                </div>
-              </li>
-              <li className="step-item">
-                <span className="step-num step-num-brand">3</span>
-                <div>
-                  <div className="tier-name">Pay that event&rsquo;s fee and publish</div>
-                  <p className="muted small" style={{ margin: '2px 0 0' }}>
-                    The Publish tab shows the exact amount for your capacity, and we email you
-                    the bank details and payment reference. The moment your transfer lands,
-                    publishing unlocks.
-                  </p>
-                </div>
-              </li>
-              <li className="step-item">
-                <span className="step-num step-num-brand">4</span>
-                <div>
-                  <div className="tier-name">Sell straight to your bank account</div>
-                  <p className="muted small" style={{ margin: '2px 0 0' }}>
-                    Buyers transfer directly to you — confirm, and the QR tickets go out
-                    on their own.
-                  </p>
-                </div>
-              </li>
-            </ol>
-          </div>
-        </div>
-      </section>
 
       {/* ---- Pricing ---- */}
       <section className="section">
