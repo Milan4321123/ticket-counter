@@ -114,18 +114,22 @@ export default function OrganizersPage() {
                   <strong>Tell us about your event</strong>
                   <p className="muted small" style={{ margin: 0 }}>
                     A real person reads it and sets your account up, usually within a couple of
-                    days. Nothing to pay, and no card to enter — the account is free.
+                    days. We email you a sign-in — an email address and a password — and that is
+                    what gets you in. Nothing to pay, and no card to enter.
                   </p>
                 </div>
               </li>
               <li className="step-item">
                 <span className="step-num step-num-brand" aria-hidden>2</span>
                 <div>
-                  <strong>Build your own page — yourself</strong>
+                  <strong>Sign in, and your event page is yours to build</strong>
                   <p className="muted small" style={{ margin: 0 }}>
-                    Photos, video, colours, ticket tiers, bank details. Design it yourself in the
-                    editor, or let the AI lay it out for you, and preview it privately before
-                    anyone else sees it.
+                    That sign-in opens your organizer portal. Inside it is an editor for your
+                    event page — the cover photo people see in the listing, your gallery and
+                    video, the text, the colours, your ticket types and prices, and the bank
+                    account the money goes to. You change it, you press save, and that is what
+                    visitors see. Nobody has to build it for you, and you can preview the whole
+                    page privately before anyone else can open it.
                   </p>
                 </div>
               </li>
