@@ -289,12 +289,21 @@ export default function HomePage() {
   const assuranceCards = assurances(anyPaypal);
   const faqItems = faqs(anyPaypal);
 
-  // The billboard features the soonest events that have not happened yet, and
-  // only ones with a real date — presenting an undated event as "next up" would
-  // be a guess dressed up as a fact. Capped at five: past that it stops being a
-  // feature and becomes a second listing nobody swipes to the end of.
+  // Everything still to come gets a turn in the billboard, dated or not.
+  //
+  // This used to require a machine date, on the reasoning that calling an
+  // undated event "next up" is a guess. The reasoning was right and the filter
+  // was wrong: an organizer who never set the calendar field — the event
+  // imported from event.config.json has no event_date at all — vanished from
+  // the feature entirely rather than merely losing the claim about timing. The
+  // claim is what gets dropped now (see `leading` below), not the event.
+  //
+  // listPublishedEvents already orders these soonest-first with the undated
+  // last, so the front of this list is genuinely the front. Capped at five:
+  // past that it stops being a feature and becomes a second listing nobody
+  // swipes to the end of.
   const today = todayIso();
-  const featured = events.filter((e) => e.eventDate && !isPast(e, today)).slice(0, 5);
+  const featured = events.filter((e) => !isPast(e, today)).slice(0, 5);
 
   const cities = new Set(events.map((e) => e.city.trim()).filter(Boolean));
 
@@ -380,7 +389,9 @@ export default function HomePage() {
                   <EventCarousel label="Featured events" count={featured.length}>
                     {featured.map((event, i) => (
                       <div className="ecar-slide" data-index={i} key={event.id}>
-                        <EventBillboard event={event} />
+                        {/* Only the first slide may call itself what is next, and
+                            only if it actually knows when it is. */}
+                        <EventBillboard event={event} leading={i === 0} />
                       </div>
                     ))}
                   </EventCarousel>

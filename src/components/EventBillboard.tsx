@@ -54,7 +54,17 @@ function billboardMedia(event: EventRow): { videoUrl: string | null; stillUrl: s
   };
 }
 
-export default function EventBillboard({ event }: { event: EventRow }) {
+export interface EventBillboardProps {
+  event: EventRow;
+  /**
+   * This is the front of the queue. Only a leading event that also has a real
+   * calendar date is allowed to announce itself as what happens next — on any
+   * other slide that phrase is either a guess or plainly false.
+   */
+  leading?: boolean;
+}
+
+export default function EventBillboard({ event, leading = false }: EventBillboardProps) {
   const tiers = getEventTiers(event.id);
   const minPrice = tiers.length ? Math.min(...tiers.map((t) => t.priceCents)) : null;
   const { totalRemaining } = getAvailability(event.id);
@@ -68,7 +78,9 @@ export default function EventBillboard({ event }: { event: EventRow }) {
   const when = event.dateDisplay.trim() || dateChipLabel(event) || '';
 
   return (
-    <section className="billboard anim-fade-up" aria-labelledby="billboard-title">
+    // The id has to carry the slug: several billboards now share a page, and a
+    // repeated id is both invalid and points every slide's label at the first.
+    <section className="billboard anim-fade-up" aria-labelledby={`billboard-title-${event.slug}`}>
       <div className="billboard-media" aria-hidden="true">
         {videoUrl ? (
           <CardVideo src={videoUrl} label={event.name} className="billboard-shot" />
@@ -88,9 +100,15 @@ export default function EventBillboard({ event }: { event: EventRow }) {
       <div className="billboard-body">
         <p className="billboard-kicker">
           <span className="pulse-dot" aria-hidden />
-          {soldOut ? 'Sold out' : !event.salesOpen ? 'Sales closed' : 'Next up'}
+          {soldOut
+            ? 'Sold out'
+            : !event.salesOpen
+              ? 'Sales closed'
+              : leading && event.eventDate
+                ? 'Next up'
+                : 'On sale now'}
         </p>
-        <h2 className="billboard-title" id="billboard-title">
+        <h2 className="billboard-title" id={`billboard-title-${event.slug}`}>
           {event.name}
         </h2>
         {design.tagline ? <p className="billboard-tagline">{design.tagline}</p> : null}
