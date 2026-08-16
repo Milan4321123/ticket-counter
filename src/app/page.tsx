@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import EventBillboard from '@/components/EventBillboard';
 import EventCard from '@/components/EventCard';
+import EventCarousel from '@/components/EventCarousel';
 import EventRail from '@/components/EventRail';
 import Logo from '@/components/Logo';
 import PlatformAssistant from '@/components/PlatformAssistant';
@@ -288,11 +289,12 @@ export default function HomePage() {
   const assuranceCards = assurances(anyPaypal);
   const faqItems = faqs(anyPaypal);
 
-  // The billboard is the soonest event that has not happened yet, and only when
-  // it has a real date — featuring an undated draft-ish event as "next up"
-  // would be a guess dressed up as a fact.
+  // The billboard features the soonest events that have not happened yet, and
+  // only ones with a real date — presenting an undated event as "next up" would
+  // be a guess dressed up as a fact. Capped at five: past that it stops being a
+  // feature and becomes a second listing nobody swipes to the end of.
   const today = todayIso();
-  const feature = events.find((e) => e.eventDate && !isPast(e, today)) ?? null;
+  const featured = events.filter((e) => e.eventDate && !isPast(e, today)).slice(0, 5);
 
   const cities = new Set(events.map((e) => e.city.trim()).filter(Boolean));
 
@@ -372,10 +374,16 @@ export default function HomePage() {
           </section>
         ) : (
           <>
-            {feature && (
+            {featured.length > 0 && (
               <section className="section billboard-section">
                 <div className="container">
-                  <EventBillboard event={feature} />
+                  <EventCarousel label="Featured events" count={featured.length}>
+                    {featured.map((event, i) => (
+                      <div className="ecar-slide" data-index={i} key={event.id}>
+                        <EventBillboard event={event} />
+                      </div>
+                    ))}
+                  </EventCarousel>
                 </div>
               </section>
             )}

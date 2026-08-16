@@ -5136,7 +5136,13 @@ html:has(.event-page.has-section-nav) {
   gap: 16px;
   overflow-x: auto;
   overflow-y: hidden;
-  scroll-snap-type: x proximity;
+  /* MANDATORY, not proximity: a flick always lands on a tile edge instead of
+     stopping halfway through a poster, which is what makes the row feel like
+     the gallery rail rather than a scrollbar. */
+  scroll-snap-type: x mandatory;
+  /* A sideways swipe must not turn into the browser's back gesture — this is
+     most of what "smooth" means on a trackpad and on a phone. */
+  overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -5466,5 +5472,180 @@ html:has(.event-page.has-section-nav) {
 
   .rail-nav:hover .rail-nav-disc {
     transform: none;
+  }
+}
+
+
+/* ---------- Featured billboard carousel (browse page) ----------
+   The hero, swiped rather than clicked. Same construction as the event page's
+   gallery rail: the browser's own scroll-snapping does the moving, so a thumb
+   swipe gets native momentum and it still works with scripts off. */
+
+.ecar {
+  position: relative;
+}
+
+.ecar-viewport {
+  position: relative;
+}
+
+.ecar-track {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  /* Room for the billboard's own lift shadow — overflow-x forces the vertical
+     axis to scroll too, so without this the shadow is sheared off. */
+  padding-bottom: 6px;
+}
+
+.ecar-track::-webkit-scrollbar {
+  display: none;
+}
+
+.ecar-track:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 4px;
+  border-radius: 24px;
+}
+
+.ecar-slide {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  /* One event per swipe. A hero that skims past two at a time on a fast flick
+     is a hero nobody actually sees. */
+  scroll-snap-stop: always;
+}
+
+/* Arrows sit ON the artwork, vertically centred, and only appear where there
+   is a pointer to hover with — a phone swipes. */
+.ecar-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: #fff;
+  transition: opacity 0.2s ease;
+}
+
+.ecar-nav-prev {
+  left: 0;
+}
+
+.ecar-nav-next {
+  right: 0;
+}
+
+.ecar-nav-disc {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: rgba(10, 11, 16, 0.68);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px -10px rgba(0, 0, 0, 0.9);
+  transition:
+    transform 0.2s var(--ease-out),
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.ecar-nav:hover .ecar-nav-disc {
+  transform: scale(1.1);
+  background: rgba(10, 11, 16, 0.9);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.ecar-nav:focus-visible {
+  outline: none;
+}
+
+.ecar-nav:focus-visible .ecar-nav-disc {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-soft);
+}
+
+.ecar-nav:disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ecar-nav {
+    display: flex;
+  }
+
+  /* The arrows only exist where there is a pointer, so the headline only has to
+     make room for them there. Without this the prev arrow sits on top of the
+     first letter of the event's name. */
+  .ecar .billboard-body {
+    padding-left: 76px;
+  }
+}
+
+/* Dots: position AND controls. Wide enough to be a real tap target on a
+   phone, where they are the only handle besides the swipe itself. */
+.ecar-dots {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.ecar-dot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border-radius: 999px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.26);
+  cursor: pointer;
+  transition:
+    width 0.25s var(--ease-out),
+    background 0.25s ease;
+  /* The visible dot is small; the touch target around it is not. */
+  box-shadow: 0 0 0 8px transparent;
+}
+
+.ecar-dot:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.ecar-dot.is-active {
+  width: 26px;
+  background: var(--brand);
+}
+
+.ecar-dot:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ecar-nav:hover .ecar-nav-disc {
+    transform: translateY(0) scale(1);
+  }
+
+  .ecar-dot {
+    transition: none;
   }
 }
