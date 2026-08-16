@@ -17,14 +17,25 @@ export interface PlatformPostRow {
   createdAt: string;
 }
 
-/** Newest first — a feed nobody scrolls to the bottom of. */
+/**
+ * Newest first — a feed nobody scrolls to the bottom of.
+ *
+ * Never throws. See getPlatformContact() below for why that matters: these are
+ * read from the ROOT LAYOUT and from the home page, both of which Next renders
+ * during `next build`, when the production disk is not mounted and opening
+ * SQLite fails outright.
+ */
 export function listPlatformPosts(limit = 5): PlatformPostRow[] {
-  return getDb()
+  try {
+    return getDb()
     .prepare(
       `SELECT id, body, photo_url AS photoUrl, created_at AS createdAt FROM platform_posts
        ORDER BY created_at DESC LIMIT ?`
     )
-    .all(limit) as PlatformPostRow[];
+      .all(limit) as PlatformPostRow[];
+  } catch {
+    return [];
+  }
 }
 
 export function createPlatformPost(body: string): PlatformPostRow {
@@ -82,11 +93,22 @@ export interface PlatformContact {
  * the card is never half-empty on a fresh install.
  */
 export function getPlatformContact(): PlatformContact {
-  return {
-    name: readKv(NAME_KEY) ?? '',
-    role: readKv(ROLE_KEY) ?? 'Designer & founder',
-    photoUrl: readKv(PHOTO_KEY) ?? '',
-  };
+  // MUST NOT THROW. This is called from the root layout, which Next renders for
+  // every page during `next build`. On Render the persistent disk is not
+  // mounted at build time, so opening the database there fails — and because
+  // this sits in the layout, that failure took the ENTIRE BUILD down rather
+  // than one page. Four deploys failed with "exited with status 1" before the
+  // cause was found. An empty contact simply hides the bubble; a thrown error
+  // ships nothing at all.
+  try {
+    return {
+      name: readKv(NAME_KEY) ?? '',
+      role: readKv(ROLE_KEY) ?? 'Designer & founder',
+      photoUrl: readKv(PHOTO_KEY) ?? '',
+    };
+  } catch {
+    return { name: '', role: 'Designer & founder', photoUrl: '' };
+  }
 }
 
 export function setPlatformContact(next: Partial<PlatformContact>): void {
