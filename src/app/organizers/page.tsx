@@ -7,6 +7,7 @@ import {
   platformFeePerCustomerCents,
 } from '@/lib/platform';
 import DashboardMock from '@/components/mockups/DashboardMock';
+import PlatformAssistant from '@/components/PlatformAssistant';
 import EditorMock from '@/components/mockups/EditorMock';
 import EventPageMock from '@/components/mockups/EventPageMock';
 
@@ -412,6 +413,12 @@ export default function OrganizersPage() {
           </p>
         </div>
       </section>
+      {/* The platform's own assistant, on the page that asks organizers to
+          commit. Everything they are weighing up here — the fee, how they get
+          paid, what an account costs — is exactly what it is briefed on, and
+          leaving it off meant this page had the "talk to Milan" bubble and an
+          empty space beside it where the quick answer should be. */}
+      <PlatformAssistant />
     </>
   );
 }

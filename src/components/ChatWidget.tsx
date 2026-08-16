@@ -286,6 +286,13 @@ export default function ChatWidget({ title, subtitle, placeholder, endpoint, ext
         onClick={() => setOpen(true)}
       >
         <ChatIcon />
+        {/* Widens on hover and focus to say what it is, exactly like the
+            "talk to a person" bubble above it — two circles in a corner tell
+            a visitor nothing about which one answers what. Hidden from
+            assistive tech: the button's own label already says it. */}
+        <span className="chat-fab-label" aria-hidden="true">
+          Ask the assistant
+        </span>
       </button>,
       document.body
     );
