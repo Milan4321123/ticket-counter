@@ -370,27 +370,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* The platform's own voice, above the events but below the pitch: it is
-          news about the site, so it belongs where someone who just arrived will
-          read it — and below the events it would never be seen at all. */}
-      {platformPosts.length > 0 && (
-        <section className="section">
-          <div className="container">
-            <p className="section-kicker">From the team</p>
-            <div className="platform-posts">
-              {platformPosts.map((post: PlatformPostRow) => (
-                <article className="platform-post anim-fade-up" key={post.id}>
-                  <p>{post.body}</p>
-                  <time className="muted small" dateTime={post.createdAt.replace(' ', 'T') + 'Z'}>
-                    {post.createdAt.slice(0, 10)}
-                  </time>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
+      {/* The platform's own voice, AFTER the listing. Above the events it was
+          the first thing between a visitor and the reason they came, and news
+          about the site is never that. Someone who has scrolled the whole
+          listing is the one it is actually for. */}
       <div id="events">
         {events.length === 0 ? (
           <section className="section">
@@ -458,6 +441,24 @@ export default function HomePage() {
           </>
         )}
       </div>
+
+      {platformPosts.length > 0 && (
+        <section className="section">
+          <div className="container">
+            <p className="section-kicker">From the team</p>
+            <div className="platform-posts">
+              {platformPosts.map((post: PlatformPostRow) => (
+                <article className="platform-post anim-fade-up" key={post.id}>
+                  <p>{post.body}</p>
+                  <time className="muted small" dateTime={post.createdAt.replace(' ', 'T') + 'Z'}>
+                    {post.createdAt.slice(0, 10)}
+                  </time>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ---- How buying a ticket here works ---- */}
       <section className="section info-section" id="how-it-works">
