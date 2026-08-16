@@ -4928,12 +4928,44 @@ html:has(.event-page.has-section-nav) {
 
 /* ---------- Hero additions ---------- */
 
-/* Reuses .hero-chip-row/.hero-chip from the event page — this only strips the
-   list semantics' default styling, since here the chips are a real <ul>. */
+/* The three facts under the hero's buttons.
+   Deliberately NOT .hero-chip: a bordered pill with a background is the shape
+   of something you press, and three of them stacked above the two real buttons
+   made the actual call to action impossible to pick out. Plain text with a
+   tinted icon says the same thing and competes with nothing. */
 .feed-trust {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 26px;
   list-style: none;
   padding: 0;
-  margin: 0 0 24px;
+  margin: 22px 0 0;
+}
+
+.feed-trust-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.feed-trust-item svg {
+  flex: none;
+  color: var(--brand-text);
+  opacity: 0.85;
+}
+
+/* On a narrow screen the row becomes a short stacked list rather than three
+   ragged lines, which is easier to take in at a glance. */
+@media (max-width: 520px) {
+  .feed-trust {
+    flex-direction: column;
+    align-items: center;
+    gap: 9px;
+  }
 }
 
 .feed-hero-count {

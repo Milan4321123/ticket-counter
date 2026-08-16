@@ -329,26 +329,35 @@ export default function HomePage() {
           <h1 className="anim-fade-up anim-d1">Nepali concerts &amp; events, near you</h1>
           <p className="feed-hero-sub anim-fade-up anim-d2">
             Live shows, cultural nights and parties from Nepali organizers — reserve your
-            tickets in one click, pay by bank transfer, and your QR tickets arrive by email.
+            tickets in one click, pay {anyPaypal ? 'by bank transfer or PayPal' : 'by bank transfer'},
+            and your QR tickets arrive by email.
           </p>
-          <ul className="hero-chip-row feed-trust anim-fade-up anim-d2" aria-label="How buying works here">
+          <p className="feed-hero-actions anim-fade-up anim-d2">
+            <a href="#events" className="btn btn-brand btn-lg">
+              Browse events
+            </a>
+            {/* The pitch, not the sign-in door: someone who does not have an
+                account yet needs the price and the explanation first. Green
+                rather than outlined: side by side with the crimson button, an
+                outline reads as a caption, and half the audience for this page
+                is the organizer who needs to see a second door. */}
+            <Link href="/organizers" className="btn btn-green btn-lg">
+              For organizers
+            </Link>
+          </p>
+          {/* Reassurance, not a third row of buttons. These were pill-shaped
+              chips sitting ABOVE the call to action, which put three things
+              that look pressable in front of the two that are — so nobody
+              could tell which was which. They read as a caption now, and they
+              read it after the buttons rather than instead of them. */}
+          <ul className="feed-trust anim-fade-up anim-d3" aria-label="How buying works here">
             {heroChips(anyPaypal).map((chip) => (
-              <li className="hero-chip" key={chip.label}>
+              <li className="feed-trust-item" key={chip.label}>
                 {chip.icon}
                 {chip.label}
               </li>
             ))}
           </ul>
-          <p className="feed-hero-actions anim-fade-up anim-d3">
-            <a href="#events" className="btn btn-brand btn-lg">
-              Browse events
-            </a>
-            {/* The pitch, not the sign-in door: someone who does not have an
-                account yet needs the price and the explanation first. */}
-            <Link href="/organizers" className="btn btn-lg">
-              For organizers
-            </Link>
-          </p>
           {events.length > 0 && (
             <p className="feed-hero-count anim-fade-up anim-d3">
               {events.length} {events.length === 1 ? 'event' : 'events'} on sale
