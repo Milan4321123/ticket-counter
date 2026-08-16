@@ -16,6 +16,9 @@ import type { ApiErrorResponse } from '@/lib/types';
 
 const MIN_QUESTION = 3;
 const MAX_QUESTION = 500;
+const MAX_NAME = 80;
+const MAX_EMAIL = 160;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** How much organizer content the assistant sees (keeps the prompt small). */
 const MAX_POSTS = 5;
 const MAX_POST_CHARS = 300;
@@ -72,10 +75,34 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // it keeps the per-IP limit above it.
     const wantsEscalation = raw && typeof raw === 'object' && (raw as { escalate?: unknown }).escalate === true;
     if (wantsEscalation) {
-      createEventQuestion(event.id, question.slice(0, MAX_QUESTION));
+      const body = raw as { askerName?: unknown; askerEmail?: unknown; privacyAck?: unknown };
+      const askerName = typeof body.askerName === 'string' ? body.askerName.trim().slice(0, MAX_NAME) : '';
+      const askerEmail = typeof body.askerEmail === 'string' ? body.askerEmail.trim().slice(0, MAX_EMAIL) : '';
+
+      // An address is OPTIONAL — asking anonymously stays a real choice, and
+      // the question is answered on the page either way. But the moment one is
+      // given this stops being an anonymous question and becomes personal data,
+      // so it must be valid and it must be consented to. The tick is checked
+      // here and not only in the browser: a form is not a security boundary.
+      if (askerEmail) {
+        if (!EMAIL_RE.test(askerEmail)) {
+          return apiError(400, 'That email address does not look right — please check it.');
+        }
+        if (body.privacyAck !== true) {
+          return apiError(400, 'Please tick the box to confirm we may use your email to send you the answer.');
+        }
+      }
+
+      createEventQuestion(event.id, question.slice(0, MAX_QUESTION), {
+        name: askerName,
+        email: askerEmail,
+      });
       return NextResponse.json({
         kind: 'escalated',
-        message: 'Sent to the organizer — they will answer it on this page. Thanks for asking!',
+        message: askerEmail
+          ? 'Sent to the organizer. They will answer it on this page, and we will email you their answer.'
+          : 'Sent to the organizer — they will answer it on this page. Thanks for asking!',
+        willEmail: Boolean(askerEmail),
       });
     }
 

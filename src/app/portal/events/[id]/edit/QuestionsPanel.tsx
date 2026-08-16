@@ -9,6 +9,9 @@ interface OpenQuestion {
   id: string;
   question: string;
   askedAt: string;
+  /** '' when asked anonymously — then answering publishes to the page only. */
+  askerName: string;
+  askerEmail: string;
 }
 
 interface Props {
@@ -29,6 +32,10 @@ export default function QuestionsPanel({ eventId, questions, answeredCount }: Pr
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [doneIds, setDoneIds] = useState<Record<string, 'answered' | 'dismissed'>>({});
+  // Whether the answer actually reached the asker. null = there was nobody to
+  // email. false = there WAS, and the send failed — which the organizer has to
+  // be told, or they walk away believing someone was answered when nobody was.
+  const [emailed, setEmailed] = useState<Record<string, boolean | null>>({});
 
   async function send(questionId: string, payload: Record<string, unknown>, done: 'answered' | 'dismissed') {
     if (busyId !== null) return;
@@ -40,13 +47,16 @@ export default function QuestionsPanel({ eventId, questions, answeredCount }: Pr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ questionId, ...payload }),
       });
-      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      const data = (await res.json().catch(() => null)) as
+        | { error?: string; emailed?: boolean | null }
+        | null;
       if (!res.ok) {
         setErrors((e) => ({ ...e, [questionId]: data?.error ?? 'Something went wrong — please try again.' }));
         setBusyId(null);
         return;
       }
       setDoneIds((d) => ({ ...d, [questionId]: done }));
+      setEmailed((m) => ({ ...m, [questionId]: data?.emailed ?? null }));
       setBusyId(null);
       router.refresh();
     } catch {
@@ -86,6 +96,18 @@ export default function QuestionsPanel({ eventId, questions, answeredCount }: Pr
             <span className="badge badge-green">
               {justAnswered} answer{justAnswered === 1 ? '' : 's'} published ✓
             </span>
+            {Object.values(emailed).some((v) => v === true) && (
+              <span className="badge badge-green" style={{ marginLeft: 6 }}>
+                asker emailed ✓
+              </span>
+            )}
+            {/* Loud on purpose: the answer is live but the person who asked
+                for it was never told, and only the organizer can fix that. */}
+            {Object.values(emailed).some((v) => v === false) && (
+              <span className="badge badge-amber" style={{ marginLeft: 6 }}>
+                published, but the email could not be sent
+              </span>
+            )}
           </p>
         )}
         <p className="muted small" style={{ margin: 0 }}>
@@ -110,6 +132,19 @@ export default function QuestionsPanel({ eventId, questions, answeredCount }: Pr
           <div style={{ fontWeight: 700 }}>{q.question}</div>
           <div className="muted small" style={{ marginTop: 2 }}>
             Asked {q.askedAt.slice(0, 10)}
+            {q.askerName ? ` by ${q.askerName}` : ''}
+          </div>
+          {/* Whether an answer will travel changes how you write it — a reply
+              going to one person's inbox reads differently from one published
+              to a page of strangers. Say which before they start typing. */}
+          <div className="small" style={{ marginTop: 6 }}>
+            {q.askerEmail ? (
+              <span className="badge badge-green">
+                Your answer is emailed to {q.askerEmail}
+              </span>
+            ) : (
+              <span className="badge">Asked anonymously — answer appears on your page only</span>
+            )}
           </div>
           <textarea
             className="input"

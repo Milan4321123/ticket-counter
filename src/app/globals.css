@@ -4938,3 +4938,29 @@ html:has(.event-page.has-section-nav) {
   font-size: 0.88rem;
   line-height: 1.5;
 }
+
+/* ---------- "Ask the organizer" form on an event page ---------- */
+
+.ask-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+@media (max-width: 560px) {
+  .ask-form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Boxed like the checkout's consent so the two read as the same promise. */
+.ask-form-consent {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.88rem;
+}

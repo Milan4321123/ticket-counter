@@ -309,7 +309,13 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
         >
           <QuestionsPanel
             eventId={event.id}
-            questions={openQuestions.map((q) => ({ id: q.id, question: q.question, askedAt: q.askedAt }))}
+            questions={openQuestions.map((q) => ({
+              id: q.id,
+              question: q.question,
+              askedAt: q.askedAt,
+              askerName: q.askerName,
+              askerEmail: q.askerEmail,
+            }))}
             answeredCount={answeredQuestionCount}
           />
         </EditorSection>

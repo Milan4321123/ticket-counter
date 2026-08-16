@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import AskOrganizerForm from '@/components/AskOrganizerForm';
 import ChatWidget from '@/components/ChatWidget';
 import FeedPhoto from '@/components/FeedPhoto';
 import FeedVideo from '@/components/FeedVideo';
@@ -407,7 +408,8 @@ export default async function EventPage({ params }: Params) {
     showGallery ? { id: 'gallery', label: 'Gallery' } : null,
     { id: 'how-it-works', label: 'How it works' },
     faqs.length > 0 ? { id: 'faq', label: 'FAQ' } : null,
-    answeredQuestions.length > 0 ? { id: 'questions', label: 'Questions' } : null,
+    // Always present now — the section holds the ask form, not just answers.
+    { id: 'questions', label: 'Questions' },
   ].filter((s): s is EventSectionLink => s !== null);
   // Tickets and "How it works" are always there, so two buttons means the event
   // filled in nothing else — a bar over a page that short is just chrome.
@@ -428,6 +430,7 @@ export default async function EventPage({ params }: Params) {
   // is. The organizer's real name is used, not the platform's: they are who is
   // putting the event on, and Google attributes the event to them.
   const organizer = getOrganizer(event.organizerId);
+  const organizerDisplayName = organizer?.name?.trim() || 'the organizer';
   const socialImageUrl = socialImage(event);
   const eventLd = eventJsonLd({
     event,
@@ -839,31 +842,47 @@ export default async function EventPage({ params }: Params) {
         </section>
       )}
 
-      {answeredQuestions.length > 0 && (
-        <section className="section event-section" id="questions">
-          <div className="container">
-            <p className="section-kicker">Still wondering?</p>
-            <h2 className="page-title">Questions</h2>
-            <div style={{ maxWidth: 680 }}>
-              {answeredQuestions.map((q) => (
-                <details className="faq-item" key={q.id}>
-                  <summary>{q.question}</summary>
-                  <p className="faq-answer" style={{ paddingBottom: 6 }}>
-                    {q.answer}
-                  </p>
-                  <p className="small muted" style={{ margin: 0, padding: '0 18px 14px' }}>
-                    Asked by a visitor
-                  </p>
-                </details>
-              ))}
-              <p className="muted small" style={{ marginTop: 14 }}>
-                Have your own question? Tap the chat bubble in the corner — most get an instant
-                answer, and the trickier ones go straight to the organizer.
-              </p>
-            </div>
+      {/* Always rendered, even with nothing answered yet: the ASK form is the
+          point of this section, and hiding it until somebody else had already
+          asked meant a brand-new event — the one with the most unanswered
+          questions — was the one with no way to ask them. */}
+      <section className="section event-section" id="questions">
+        <div className="container">
+          <p className="section-kicker">Still wondering?</p>
+          <h2 className="page-title">Questions</h2>
+          <div style={{ maxWidth: 680 }}>
+            {answeredQuestions.length > 0 && (
+              <div style={{ marginBottom: 22 }}>
+                {answeredQuestions.map((q) => (
+                  <details className="faq-item" key={q.id}>
+                    <summary>{q.question}</summary>
+                    <p className="faq-answer" style={{ paddingBottom: 6 }}>
+                      {q.answer}
+                    </p>
+                    <p className="small muted" style={{ margin: 0, padding: '0 18px 14px' }}>
+                      Asked by a visitor
+                    </p>
+                  </details>
+                ))}
+              </div>
+            )}
+
+            {preview ? (
+              <div className="notice notice-warn">
+                Your visitors get a form here to ask you a question — their answer reaches them by
+                email once you reply in the portal. It starts working when you publish.
+              </div>
+            ) : (
+              <AskOrganizerForm eventId={event.id} organizerName={organizerDisplayName} />
+            )}
+
+            <p className="muted small" style={{ marginTop: 14 }}>
+              In a hurry? Tap the chat bubble in the corner — most questions get an instant answer
+              from the organizer&rsquo;s own event details.
+            </p>
           </div>
-        </section>
-      )}
+        </div>
+      </section>
 
       {/* Sticky mobile checkout bar — appears below 640px via CSS, and only
           once the hero's own button has scrolled away. */}

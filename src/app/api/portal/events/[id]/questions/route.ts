@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
-import { answerEventQuestion, dismissEventQuestion } from '@/lib/events';
+import {
+  answerEventQuestion,
+  dismissEventQuestion,
+  getEventQuestion,
+  markQuestionAnswerEmailed,
+} from '@/lib/events';
+import { sendQuestionAnsweredEmail } from '@/lib/email';
 import type { EventRow } from '@/lib/events';
 import { BodyTooLargeError, readJsonLimited } from '@/lib/http';
 import type { ApiErrorResponse } from '@/lib/types';
@@ -85,7 +91,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         { status: 404 }
       );
     }
-    return NextResponse.json({ ok: true });
+
+    // Send the answer to whoever asked, when they left an address.
+    //
+    // Awaited rather than fired and forgotten, because the organizer is told
+    // what happened: "we emailed them" is a promise, and a silent failure would
+    // leave them believing someone was told when nobody was. The answer is
+    // already saved by this point, so a failed send costs the email, never the
+    // answer itself.
+    let emailed: boolean | null = null;
+    const asked = getEventQuestion(event.id, body.questionId);
+    if (asked?.askerEmail && !asked.askerErasedAt) {
+      const result = await sendQuestionAnsweredEmail(asked);
+      emailed = result.sent;
+      if (result.sent) markQuestionAnswerEmailed(asked.id);
+    }
+    return NextResponse.json({ ok: true, emailed });
   } catch (e) {
     if (e instanceof BodyTooLargeError) {
       return NextResponse.json({ error: 'That request was too large.' } satisfies ApiErrorResponse, { status: 413 });

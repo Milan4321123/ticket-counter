@@ -316,6 +316,34 @@ function migrateToPlatform(db: Database.Database): void {
     db.exec(`ALTER TABLE events ADD COLUMN assistant_context TEXT`);
   }
 
+  // Who asked a question, so the answer can be emailed back rather than only
+  // appearing on the page — nobody re-opens an event page on the off-chance
+  // that the thing they asked about has been answered.
+  //
+  // Both contact columns are OPTIONAL and default to ''. A question asked
+  // without an address still works exactly as it did: it is answered publicly
+  // and nothing is sent. That keeps asking anonymously a real choice rather
+  // than a price of admission.
+  const questionCols = (db.pragma(`table_info(event_questions)`) as { name: string }[]).map((c) => c.name);
+  if (!questionCols.includes('asker_name')) {
+    db.exec(`ALTER TABLE event_questions ADD COLUMN asker_name TEXT NOT NULL DEFAULT ''`);
+  }
+  if (!questionCols.includes('asker_email')) {
+    db.exec(`ALTER TABLE event_questions ADD COLUMN asker_email TEXT NOT NULL DEFAULT ''`);
+  }
+  // Stamped when the answer actually reached them. Separate from answered_at
+  // because answering and emailing can fail independently — without this, a
+  // send that failed is indistinguishable from one that was never due, and the
+  // organizer has no way to know their reply went nowhere.
+  if (!questionCols.includes('answer_emailed_at')) {
+    db.exec(`ALTER TABLE event_questions ADD COLUMN answer_emailed_at TEXT`);
+  }
+  // The asker's address is personal data with the same expiry as a buyer's —
+  // see lib/retention.ts. Stamped when it has been erased.
+  if (!questionCols.includes('asker_erased_at')) {
+    db.exec(`ALTER TABLE event_questions ADD COLUMN asker_erased_at TEXT`);
+  }
+
   // "Check your bank account" reminder emails for organizers: up to three
   // timers (days after a reservation) + per-order progress tracking.
   const orgCols = (db.pragma(`table_info(organizers)`) as { name: string }[]).map((c) => c.name);

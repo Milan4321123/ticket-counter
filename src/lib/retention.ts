@@ -131,7 +131,30 @@ export function runBuyerDataRetentionSweep(force = false): { erased: number } {
       erased += eraseBatch(due.map((r) => r.id));
       if (due.length < BATCH_SIZE) break;
     }
+    // Askers get the same expiry as buyers, and for the same reason: someone
+    // who typed their address to hear one answer did not sign up to be on
+    // record forever. The QUESTION and its ANSWER survive — they are public
+    // Q&A on the event page and feed the assistant — only the person attached
+    // to them stops being identifiable.
+    //
+    // Measured from the event date, exactly like orders, so both halves of the
+    // promise on /privacy expire together rather than on two different clocks.
+    const eraseAskers = db.prepare(
+      `UPDATE event_questions
+       SET asker_name = ?, asker_email = ?, asker_erased_at = datetime('now')
+       WHERE asker_erased_at IS NULL
+         AND (asker_name <> '' OR asker_email <> '')
+         AND event_id IN (
+           SELECT id FROM events
+           WHERE event_date IS NOT NULL AND date(event_date) <= date('now', ?)
+         )`
+    );
+    const askersErased = eraseAskers.run(ERASED_BUYER_NAME, ERASED_BUYER_EMAIL, cutoff).changes;
+
     if (erased > 0) console.log(`Retention sweep: erased buyer details on ${erased} order(s).`);
+    if (askersErased > 0) {
+      console.log(`Retention sweep: erased the asker on ${askersErased} question(s).`);
+    }
     return { erased };
   } catch (e) {
     console.error('Buyer data retention sweep failed:', e);

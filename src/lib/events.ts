@@ -524,14 +524,50 @@ export interface EventQuestionRow {
   status: 'open' | 'answered' | 'dismissed';
   askedAt: string;
   answeredAt: string | null;
+  /** '' when the question was asked anonymously. */
+  askerName: string;
+  /** '' when they did not want the answer emailed. */
+  askerEmail: string;
+  answerEmailedAt: string | null;
+  askerErasedAt: string | null;
 }
 
-const QUESTION_COLS = `id, event_id AS eventId, question, answer, status, asked_at AS askedAt, answered_at AS answeredAt`;
+const QUESTION_COLS = `id, event_id AS eventId, question, answer, status, asked_at AS askedAt,
+  answered_at AS answeredAt, asker_name AS askerName, asker_email AS askerEmail,
+  answer_emailed_at AS answerEmailedAt, asker_erased_at AS askerErasedAt`;
 
-export function createEventQuestion(eventId: string, question: string): EventQuestionRow {
+export function createEventQuestion(
+  eventId: string,
+  question: string,
+  asker: { name?: string; email?: string } = {}
+): EventQuestionRow {
   const id = crypto.randomUUID();
-  getDb().prepare(`INSERT INTO event_questions (id, event_id, question) VALUES (?, ?, ?)`).run(id, eventId, question);
+  getDb()
+    .prepare(
+      `INSERT INTO event_questions (id, event_id, question, asker_name, asker_email) VALUES (?, ?, ?, ?, ?)`
+    )
+    .run(id, eventId, question, (asker.name ?? '').trim(), (asker.email ?? '').trim().toLowerCase());
   return getDb().prepare(`SELECT ${QUESTION_COLS} FROM event_questions WHERE id = ?`).get(id) as EventQuestionRow;
+}
+
+/** One question by id, scoped to its event so an id alone cannot reach across events. */
+export function getEventQuestion(eventId: string, questionId: string): EventQuestionRow | null {
+  return (
+    (getDb()
+      .prepare(`SELECT ${QUESTION_COLS} FROM event_questions WHERE id = ? AND event_id = ?`)
+      .get(questionId, eventId) as EventQuestionRow | undefined) ?? null
+  );
+}
+
+/**
+ * Record that the answer reached the asker. Only ever called after a send
+ * actually succeeded — an unset stamp is what lets the portal tell the
+ * organizer their reply never went out.
+ */
+export function markQuestionAnswerEmailed(questionId: string): void {
+  getDb()
+    .prepare(`UPDATE event_questions SET answer_emailed_at = datetime('now') WHERE id = ?`)
+    .run(questionId);
 }
 
 export function listEventQuestions(eventId: string, status?: EventQuestionRow['status']): EventQuestionRow[] {
