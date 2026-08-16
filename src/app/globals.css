@@ -5739,3 +5739,11 @@ html:has(.event-page.has-section-nav) {
   background: rgba(255, 255, 255, 0.03);
   font-size: 0.88rem;
 }
+
+/* <picture> is an inline box that would otherwise sit between .billboard-media
+   and the absolutely-positioned .billboard-shot inside it, leaving the image
+   with no positioned parent to fill. display: contents removes it from layout
+   and keeps the img's inset:0 anchored to .billboard-media as before. */
+.billboard-media picture {
+  display: contents;
+}
