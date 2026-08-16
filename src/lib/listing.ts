@@ -35,7 +35,14 @@ function listingStill(event: EventRow, photos: { id: string }[]): { id: string; 
     return { id: event.posterMediaId, crop: cropTag(parseCropRect(event.posterCrop)) };
   }
   if (isPhoto(event.coverMediaId)) {
-    return { id: event.coverMediaId, crop: cropTag(parseCropRect(event.coverCrop)) };
+    // The cover photo, but NOT the cover's rectangle. That rectangle was framed
+    // against a 2.17:1 band, and one real event here has it set to the full
+    // width by 31% of the height — a letterbox strip. Re-cropping a strip like
+    // that into a 4:5 tile keeps only its middle: a fragment of a fragment.
+    // Cropping the WHOLE photo automatically, around its subject, beats the
+    // middle of somebody's letterbox every time. A crop belongs to the shape it
+    // was drawn for, and this is not that shape.
+    return { id: event.coverMediaId, crop: null };
   }
   return photos[0] ? { id: photos[0].id, crop: null } : null;
 }

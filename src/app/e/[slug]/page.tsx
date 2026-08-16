@@ -499,6 +499,10 @@ export default async function EventPage({ params }: Params) {
         {(coverVideoUrl || stillUrl) && (
           <div
             className={`event-hero-media${stillUrl ? '' : ' event-hero-media-bare'}`}
+            /* The same picture, handed to CSS as a variable so the phone
+               layout can paint a blurred copy of it behind the letterboxed
+               original instead of leaving dead bars. */
+            style={stillUrl ? ({ ['--hero-img' as string]: `url("${stillUrl}")` } as React.CSSProperties) : undefined}
             aria-hidden="true"
           >
             {/* The cover, filling the frame. Under a video cover this same

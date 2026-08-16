@@ -15,6 +15,7 @@ import type { EventRow } from '@/lib/events';
 import { getAvailability } from '@/lib/inventory';
 import { formatMoney } from '@/lib/money';
 import { dateChipLabel } from './EventCard';
+import { listingStillUrl } from '@/lib/listing';
 
 /** Tinted stand-in for an event with no picture at all, by its accent. */
 const PLACEHOLDER_GRADIENTS: Record<string, string> = {
@@ -64,7 +65,11 @@ function billboardMedia(event: EventRow): {
   return {
     videoUrl: coverIsVideo ? mediaUrl(event.coverMediaId as string) : null,
     stillUrl: still ? mediaUrl(still.id, 'cover', still.crop) : null,
-    stillUrlNarrow: still ? mediaUrl(still.id, 'card', still.crop) : null,
+    // The phone billboard is a 4:5 portrait panel, which is exactly what a feed
+    // tile is — so it takes the tile's picture, with the tile's framing. Reusing
+    // that resolver rather than re-cropping the wide cover is the whole fix:
+    // the cover's rectangle describes a landscape band and means nothing here.
+    stillUrlNarrow: listingStillUrl(event),
   };
 }
 

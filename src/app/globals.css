@@ -5747,3 +5747,53 @@ html:has(.event-page.has-section-nav) {
 .billboard-media picture {
   display: contents;
 }
+
+/* ---------- Phone hero: show the WHOLE cover, do not crop it ----------
+
+   The hero is a wide band on a laptop and a tall panel on a phone: at 375px it
+   is about 375x568, a 0.66 portrait box, while the cover render is 2.17:1.
+   Filling that box with object-fit: cover throws away roughly 70% of the
+   picture's width — and event covers are usually POSTERS, so what gets thrown
+   away is the title, the date and the venue. Desktop looked right and mobile
+   showed a vertical slice through the middle of somebody's artwork.
+
+   So on a phone the cover is letterboxed rather than cropped: the entire image
+   is shown, exactly as the laptop shows it, with a blurred enlarged copy of
+   itself filling the space around it so there are no dead black bars. This is
+   the one place where "always completely full, never letterboxed" is the wrong
+   rule — a poster you cannot read is worse than a poster with soft edges. */
+
+@media (max-width: 640px) {
+  .event-page .event-hero {
+    /* Shorter, so the letterbox has less empty space to fill. */
+    min-height: clamp(340px, 52vh, 520px);
+  }
+
+  .event-hero-media .event-hero-still {
+    object-fit: contain;
+    /* Above the blurred backdrop below. */
+    z-index: 1;
+  }
+
+  /* The backdrop: the same photo, enlarged and blurred out of legibility, so
+     the frame is filled with something that belongs to the picture rather than
+     a flat panel. Hidden from assistive tech — it carries no information. */
+  .event-hero-media::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: var(--hero-img);
+    background-size: cover;
+    background-position: center;
+    filter: blur(26px) saturate(1.15) brightness(0.55);
+    transform: scale(1.25);
+    z-index: 0;
+  }
+
+  /* A video cover keeps filling the frame: a clip is watched, not read, and
+     letterboxing one would leave a small picture in a large empty box. */
+  .event-hero-media .event-hero-video {
+    object-fit: cover;
+    z-index: 1;
+  }
+}
