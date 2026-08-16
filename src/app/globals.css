@@ -5993,7 +5993,11 @@ html:has(.event-page.has-section-nav) {
   right: 18px;
   /* Clear of the 56px chat bubble plus its own bottom inset, with a gap. */
   bottom: calc(18px + 56px + 12px + env(safe-area-inset-bottom, 0px));
-  z-index: 70;
+  /* ONE ABOVE the chat bubble's 70, not equal to it. At the same z-index the
+     winner is whichever paints last — and the chat widget portals itself into
+     document.body, so it always paints after this and this always lost. Any
+     overlap hid a person's face behind a robot. */
+  z-index: 71;
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -6128,5 +6132,17 @@ html:has(.event-page.has-section-nav) {
 @media (hover: none) {
   .chat-fab:hover {
     max-width: 56px;
+  }
+}
+
+
+/* The sticky "buy tickets" bar lifts the chat bubble to 84px. This one has to
+   travel with it: left where it was, it sat at 86px — two pixels off the chat
+   bubble's new position — so the two overlapped almost exactly, which is what
+   made the face disappear while scrolling an event page. Same offset, stacked
+   above it, so the pair keep their gap wherever the bar is. */
+@media (max-width: 640px) {
+  body:has(.event-cta-bar.is-on) .contact-fab {
+    bottom: calc(84px + 56px + 12px + env(safe-area-inset-bottom, 0px));
   }
 }

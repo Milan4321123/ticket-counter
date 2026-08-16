@@ -81,6 +81,15 @@ export default function OrganizersPage() {
             <Link href="/contact?intent=account" className="btn btn-brand btn-lg">
               Get started
             </Link>
+            {/* Kept on THIS page on purpose. "Get started" opens an
+                application form, and someone who has not read the page yet does
+                not know what they are applying for — they click the only
+                confident-looking button and end up filling in a form about an
+                account they cannot picture. This one answers the question first,
+                without leaving. */}
+            <a href="#what-you-get" className="btn btn-lg">
+              See how it works first
+            </a>
             <Link href="/" className="btn btn-lg">
               See a live event page
             </Link>
@@ -91,6 +100,57 @@ export default function OrganizersPage() {
       {/* ---- Feature rows: mockup + three punchy points each ---- */}
       <section className="section">
         <div className="container">
+          {/* Where "See how it works first" lands. scroll-margin-top keeps the
+              heading clear of the sticky header instead of under it. */}
+          <div id="what-you-get" style={{ scrollMarginTop: 90 }}>
+            <p className="feed-kicker anim-fade-up">How it works</p>
+            <h2 className="feat-title anim-fade-up" style={{ marginTop: 4 }}>
+              Apply once, then everything is yours to run
+            </h2>
+            <ol className="step-list anim-fade-up" style={{ maxWidth: 720, marginTop: 14 }}>
+              <li className="step-item">
+                <span className="step-num step-num-brand" aria-hidden>1</span>
+                <div>
+                  <strong>Tell us about your event</strong>
+                  <p className="muted small" style={{ margin: 0 }}>
+                    A real person reads it. If it looks right we create your account and email
+                    your sign-in details. Free, and nothing to pay to apply.
+                  </p>
+                </div>
+              </li>
+              <li className="step-item">
+                <span className="step-num step-num-brand" aria-hidden>2</span>
+                <div>
+                  <strong>Build your own event page</strong>
+                  <p className="muted small" style={{ margin: 0 }}>
+                    Your photos and video, your colours, your text — in an editor you control.
+                    Preview it privately before anyone sees it.
+                  </p>
+                </div>
+              </li>
+              <li className="step-item">
+                <span className="step-num step-num-brand" aria-hidden>3</span>
+                <div>
+                  <strong>Set your ticket types and publish</strong>
+                  <p className="muted small" style={{ margin: 0 }}>
+                    Any prices you like, student tickets, limited or unlimited. You pay the
+                    event fee once, at publishing — never a cut of your sales.
+                  </p>
+                </div>
+              </li>
+              <li className="step-item">
+                <span className="step-num step-num-brand" aria-hidden>4</span>
+                <div>
+                  <strong>Confirm payments and scan at the door</strong>
+                  <p className="muted small" style={{ margin: 0 }}>
+                    Buyers pay straight into your account. Confirm a payment and the QR tickets
+                    email themselves; on the night, scan them at the entrance.
+                  </p>
+                </div>
+              </li>
+            </ol>
+          </div>
+
           {/* Dashboard */}
           <div className="feat-row">
             <div className="feat-copy anim-fade-up">
