@@ -93,16 +93,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="brand" aria-label={`${PLATFORM_NAME} — home`}>
               <Logo size={22} />
             </Link>
-            <nav
-              aria-label="Main"
-              style={{ display: 'flex', alignItems: 'center', gap: 18 }}
-            >
-              <Link
-                href="/"
-                className="small"
-                style={{ color: 'var(--text-dim)', fontWeight: 600 }}
-              >
-                Browse events
+            <nav aria-label="Main" className="header-nav">
+              {/* Two labels per link, one long and one short, swapped by CSS at
+                  the width where the long one stops fitting. A phone gets the
+                  short one; the accessible name stays the full phrase either
+                  way, so nothing is lost to a screen reader. Shortening beats
+                  hiding: the visitor asked for BOTH of these to stay visible,
+                  and a nav that drops an item on small screens is a nav that
+                  hides the thing you were looking for. */}
+              <Link href="/" className="small header-link" aria-label="Browse events">
+                <span className="header-label-long">Browse events</span>
+                <span className="header-label-short" aria-hidden="true">
+                  Browse
+                </span>
               </Link>
               {/* Named for what it does. The home page's "For organizers"
                   button goes to the pitch; this one lets an organizer who
@@ -112,8 +115,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   Deliberately the quieter button too: signing in is a utility,
                   while the brand-coloured call to action belongs to the thing we
                   actually want visitors doing — browsing events. */}
-              <Link href="/portal" className="btn btn-sm">
-                Organizer sign in
+              <Link href="/portal" className="btn btn-sm header-signin" aria-label="Organizer sign in">
+                <span className="header-label-long">Organizer sign in</span>
+                <span className="header-label-short" aria-hidden="true">
+                  Sign in
+                </span>
               </Link>
             </nav>
           </div>

@@ -5833,3 +5833,65 @@ html:has(.event-page.has-section-nav) {
     padding-bottom: 18px;
   }
 }
+
+/* ---------- Site header on small screens ----------
+
+   Measured at 375px, the header was 86px tall because "Organizer sign in" had
+   been squeezed to 95px and wrapped onto THREE lines, and "Browse events" onto
+   two. There was horizontal room (303px of content in 375px) — the items were
+   being compressed rather than shortened, which is the worst of both: cramped
+   AND tall.
+
+   So nothing wraps any more, and below 520px each link swaps its long label for
+   a short one. Both links stay visible, which is the point: a header that drops
+   an item on a phone hides the very thing someone went looking for. */
+
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.header-link {
+  color: var(--text-dim);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.site-header .header-signin {
+  white-space: nowrap;
+}
+
+.header-label-short {
+  display: none;
+}
+
+@media (max-width: 520px) {
+  .header-nav {
+    gap: 10px;
+  }
+
+  .header-label-long {
+    display: none;
+  }
+
+  .header-label-short {
+    display: inline;
+  }
+
+  /* The wordmark is the widest thing in the row and the least load-bearing —
+     the visitor already knows which site they are on. */
+  .site-header .brand svg {
+    height: 19px;
+    width: auto;
+  }
+
+  .site-header .header-signin {
+    padding: 7px 12px;
+    font-size: 0.84rem;
+  }
+
+  .header-link {
+    font-size: 0.86rem;
+  }
+}
