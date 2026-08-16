@@ -2,10 +2,12 @@ import { NextResponse } from 'next/server';
 import { readJsonLimited, BodyTooLargeError } from '@/lib/http';
 import {
   checkOrganizerCredentials,
+  createOrganizerPendingToken,
   createOrganizerSessionToken,
   ORGANIZER_COOKIE_NAME,
   ORGANIZER_SESSION_TTL_MS,
 } from '@/lib/organizers';
+import { organizerTotpEnabled } from '@/lib/organizerTotp';
 import { clientIp, isRateLimited, recordStrike } from '@/lib/ratelimit';
 import type { ApiErrorResponse } from '@/lib/types';
 
@@ -68,6 +70,18 @@ export async function POST(req: Request) {
         } satisfies ApiErrorResponse,
         { status: 401 }
       );
+    }
+
+    // Second factor, when this organizer has switched one on. The session
+    // cookie is NOT issued here — the password alone must not sign anyone in,
+    // or the second factor would be decoration. They get a five-minute ticket
+    // proving the password was right, and nothing else.
+    if (organizerTotpEnabled(organizer.id)) {
+      return NextResponse.json({
+        ok: false,
+        totpRequired: true,
+        pendingToken: createOrganizerPendingToken(organizer.id),
+      });
     }
 
     let token: string;

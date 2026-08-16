@@ -1,11 +1,13 @@
 import { listEventsForOrganizer } from '@/lib/events';
 import { organizerPlanActive } from '@/lib/organizers';
+import { organizerTotpEnabled } from '@/lib/organizerTotp';
 import { platformFeeRule } from '@/lib/platform';
 import { getReminderSettings, recommendedReminderDays } from '@/lib/reminders';
 import PlanExpired from '../PlanExpired';
 import PortalNav from '../PortalNav';
 import { requirePortalOrganizer } from '../guard';
 import ChangePasswordForm from './ChangePasswordForm';
+import TotpPanel from './TotpPanel';
 import RemindersCard from './RemindersCard';
 
 export const dynamic = 'force-dynamic';
@@ -94,6 +96,10 @@ export default async function PortalSettingsPage() {
       <div className="card anim-fade-up anim-d3">
         <div className="card-title">Change password</div>
         <ChangePasswordForm />
+
+        {/* Sits with the password, because it is the other half of the same
+            question: who is allowed into this account. */}
+        <TotpPanel enabled={organizerTotpEnabled(organizer.id)} />
       </div>
       </div>
     </>

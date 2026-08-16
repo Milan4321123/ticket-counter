@@ -23,7 +23,7 @@ const ENABLED_KEY = 'admin_totp_enabled';
 // ---- base32 (RFC 4648, no padding) — the encoding authenticator apps expect --
 const B32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
-function base32Encode(buf: Buffer): string {
+export function base32Encode(buf: Buffer): string {
   let bits = 0;
   let value = 0;
   let out = '';

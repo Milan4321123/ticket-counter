@@ -381,6 +381,20 @@ function migrateToPlatform(db: Database.Database): void {
   if (!orgCols.includes('reminders_enabled')) {
     db.exec(`ALTER TABLE organizers ADD COLUMN reminders_enabled INTEGER NOT NULL DEFAULT 1`);
   }
+  // Authenticator-app second factor, PER ORGANIZER. The admin has had this for
+  // a while (see lib/totp.ts); organizers had nothing but a password.
+  //
+  // An authenticator is the right second factor here rather than an emailed
+  // code: it needs no mail delivery at all, so it keeps working on a platform
+  // whose outbound email is unreliable — and an emailed login code on a broken
+  // mail path locks everybody out instead of protecting them.
+  if (!orgCols.includes('totp_secret')) {
+    db.exec(`ALTER TABLE organizers ADD COLUMN totp_secret TEXT`);
+  }
+  if (!orgCols.includes('totp_enabled')) {
+    db.exec(`ALTER TABLE organizers ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0`);
+  }
+
   // Set whenever the PLATFORM picked the password (account approval, admin
   // reset), because that password travelled by email and the organizer never
   // chose it. The portal is unreachable until they replace it. Existing

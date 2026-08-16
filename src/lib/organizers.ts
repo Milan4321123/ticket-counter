@@ -238,6 +238,51 @@ export function createOrganizerSessionToken(organizerId: string): string {
   return `org.${organizerId}.${exp}.${signOrganizer(organizerId, exp, hash12, secret)}`;
 }
 
+/**
+ * A short-lived ticket proving "this password was correct" — the half-finished
+ * state between a right password and a right authenticator code.
+ *
+ * It is NOT a session: it grants nothing on its own, and only the second-factor
+ * route accepts it. Five minutes is long enough to open an authenticator app
+ * and short enough that one left in a browser history is worthless.
+ *
+ * Bound to the password hash exactly like a session, so changing or resetting
+ * the password invalidates any pending login already in flight.
+ */
+const PENDING_TTL_MS = 5 * 60_000;
+
+function signPending(id: string, exp: number, hash12: string, secret: string): string {
+  return crypto.createHmac('sha256', secret).update(`organizer-2fa:${id}:${exp}:${hash12}`).digest('hex');
+}
+
+export function createOrganizerPendingToken(organizerId: string): string {
+  const secret = getSigningSecret();
+  if (!secret) throw new Error('Auth is not configured (set APP_SECRET)');
+  const passwordHash = organizerPasswordHash(organizerId);
+  if (passwordHash === null) throw new Error('Unknown organizer');
+  const exp = Date.now() + PENDING_TTL_MS;
+  return `pend.${organizerId}.${exp}.${signPending(organizerId, exp, passwordHashFingerprint(passwordHash), secret)}`;
+}
+
+export function verifyOrganizerPendingToken(token: string | null | undefined): string | null {
+  if (!token) return null;
+  const secret = getSigningSecret();
+  if (!secret) return null;
+  const parts = token.split('.');
+  if (parts.length !== 4 || parts[0] !== 'pend') return null;
+  const [, id, expStr, mac] = parts;
+  if (!id || !/^\d+$/.test(expStr)) return null;
+  const exp = Number(expStr);
+  if (!Number.isFinite(exp) || exp <= Date.now()) return null;
+  const passwordHash = organizerPasswordHash(id);
+  if (passwordHash === null) return null;
+  const expected = signPending(id, exp, passwordHashFingerprint(passwordHash), secret);
+  const ha = crypto.createHash('sha256').update(mac).digest();
+  const hb = crypto.createHash('sha256').update(expected).digest();
+  if (!crypto.timingSafeEqual(ha, hb)) return null;
+  return id;
+}
+
 export function verifyOrganizerSessionToken(token: string | null | undefined): string | null {
   if (!token) return null;
   const secret = getSigningSecret();
