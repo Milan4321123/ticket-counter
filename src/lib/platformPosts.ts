@@ -76,12 +76,23 @@ function writeKv(key: string, value: string): void {
 const NAME_KEY = 'platform_contact_name';
 const ROLE_KEY = 'platform_contact_role';
 const PHOTO_KEY = 'platform_contact_photo';
+const FOCUS_KEY = 'platform_contact_focus';
 
 export interface PlatformContact {
   name: string;
   role: string;
   /** A URL to the photo, or '' when none has been set. */
   photoUrl: string;
+  /**
+   * Which part of the photo stays in the circle, as CSS object-position — e.g.
+   * '50% 30%' to pull a face up out of the middle.
+   *
+   * A focus point rather than a stored crop: the whole photo is kept on disk,
+   * so moving it re-renders nothing and costs no quality. The event cropper
+   * extracts a rectangle because those slots have several different shapes; this
+   * one is always a circle, and a circle only needs a centre.
+   */
+  focus: string;
 }
 
 /**
@@ -105,9 +116,10 @@ export function getPlatformContact(): PlatformContact {
       name: readKv(NAME_KEY) ?? '',
       role: readKv(ROLE_KEY) ?? 'Designer & founder',
       photoUrl: readKv(PHOTO_KEY) ?? '',
+      focus: readKv(FOCUS_KEY) || '50% 50%',
     };
   } catch {
-    return { name: '', role: 'Designer & founder', photoUrl: '' };
+    return { name: '', role: 'Designer & founder', photoUrl: '', focus: '50% 50%' };
   }
 }
 
@@ -115,4 +127,6 @@ export function setPlatformContact(next: Partial<PlatformContact>): void {
   if (next.name !== undefined) writeKv(NAME_KEY, next.name.trim().slice(0, 80));
   if (next.role !== undefined) writeKv(ROLE_KEY, next.role.trim().slice(0, 80));
   if (next.photoUrl !== undefined) writeKv(PHOTO_KEY, next.photoUrl.trim().slice(0, 500));
+  // Percentages only — this string is written straight into a style attribute.
+  if (next.focus !== undefined && /^\d{1,3}% \d{1,3}%$/.test(next.focus)) writeKv(FOCUS_KEY, next.focus);
 }

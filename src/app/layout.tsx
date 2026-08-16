@@ -130,7 +130,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main className="anim-fade-up">{children}</main>
         {/* Follows the visitor on every public page. The component decides for
             itself where it does not belong (admin, the scanner, /contact). */}
-        <ContactBubble name={contact.name} role={contact.role} photoUrl={contact.photoUrl} />
+        <ContactBubble
+          name={contact.name}
+          role={contact.role}
+          photoUrl={contact.photoUrl}
+          focus={contact.focus}
+        />
         <footer className="site-footer">
           <div className="container footer-grid">
             <div>

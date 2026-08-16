@@ -23,13 +23,16 @@ export default function PlatformPostsPanel({
   contact,
 }: {
   posts: Post[];
-  contact: { name: string; role: string; photoUrl: string };
+  contact: { name: string; role: string; photoUrl: string; focus: string };
 }) {
   const router = useRouter();
   const [body, setBody] = useState('');
   const [name, setName] = useState(contact.name);
   const [role, setRole] = useState(contact.role);
   const [photoUrl, setPhotoUrl] = useState(contact.photoUrl);
+  // "x% y%" — which part of the photo stays inside the circle.
+  const [fx, setFx] = useState(() => Number.parseInt(contact.focus.split(' ')[0], 10) || 50);
+  const [fy, setFy] = useState(() => Number.parseInt(contact.focus.split(' ')[1], 10) || 50);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -247,11 +250,64 @@ export default function PlatformPostsPanel({
           />
         </div>
         <p className="muted small" style={{ margin: '8px 0 0' }}>
-          Any shape works — it is cropped to a square around your face and shrunk to
-          256px, so a big photo does not slow every page down. JPEG, PNG or WebP, up
-          to 5 MB. With no photo your initial is shown instead, which beats a broken
-          image.
+          Any shape works — the whole photo is kept and shrunk to 512px, then you
+          choose which part sits in the circle below. JPEG, PNG or WebP, up to 5 MB.
+          With no photo your initial is shown instead, which beats a broken image.
         </p>
+
+        {/* Only useful once there is a photo to move. Two sliders rather than a
+            drag surface: the circle is 46px on the real site, so a drag would be
+            fighting for single pixels, while a slider lands exactly. */}
+        {photoUrl ? (
+          <div style={{ marginTop: 14 }}>
+            <p className="muted small" style={{ margin: '0 0 8px' }}>
+              Move your face into the circle — this is exactly what visitors see:
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={photoUrl}
+                alt="Preview"
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: '50%',
+                  objectFit: 'cover',
+                  objectPosition: `${fx}% ${fy}%`,
+                  border: '2px solid var(--brand)',
+                }}
+              />
+              <div style={{ display: 'grid', gap: 8, minWidth: 220 }}>
+                <label className="small">
+                  Left / right
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={fx}
+                    onChange={(e) => setFx(Number(e.target.value))}
+                    style={{ width: '100%' }}
+                  />
+                </label>
+                <label className="small">
+                  Up / down
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={fy}
+                    onChange={(e) => setFy(Number(e.target.value))}
+                    style={{ width: '100%' }}
+                  />
+                </label>
+              </div>
+            </div>
+            <p className="muted small" style={{ margin: '8px 0 0' }}>
+              Heads usually sit above centre, so try pulling &ldquo;up / down&rdquo; toward
+              the left. Press <strong>Save contact card</strong> to keep it.
+            </p>
+          </div>
+        ) : null}
       </div>
       <button
         type="button"

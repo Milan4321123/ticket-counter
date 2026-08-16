@@ -21,10 +21,12 @@ export default function ContactBubble({
   name,
   role,
   photoUrl,
+  focus,
 }: {
   name: string;
   role: string;
   photoUrl: string;
+  focus: string;
 }) {
   const pathname = usePathname() || '';
 
@@ -50,7 +52,7 @@ export default function ContactBubble({
         // Uploaded by the owner in the admin area and served from our own route,
         // so next/image adds nothing here.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={photoUrl} alt="" className="contact-fab-photo" />
+        <img src={photoUrl} alt="" className="contact-fab-photo" style={{ objectPosition: focus }} />
       ) : (
         <span className="contact-fab-photo contact-fab-initial" aria-hidden="true">
           {name.trim().charAt(0).toUpperCase()}

@@ -49,6 +49,7 @@ export async function POST(req: Request) {
         name: typeof body.name === 'string' ? body.name : undefined,
         role: typeof body.role === 'string' ? body.role : undefined,
         photoUrl: typeof body.photoUrl === 'string' ? body.photoUrl : undefined,
+        focus: typeof body.focus === 'string' ? body.focus : undefined,
       });
       return NextResponse.json({ ok: true });
     }

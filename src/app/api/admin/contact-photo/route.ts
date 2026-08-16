@@ -77,7 +77,10 @@ export async function POST(req: Request) {
         .toFile(postPhotoPath(postId));
     } else {
       await pipeline
-        .resize(256, 256, { fit: 'cover', position: sharp.strategy.attention })
+        // 'inside', NOT a square crop. Cropping here would throw away the
+        // parts of the photo the focus control exists to bring back — you
+        // cannot reposition pixels that were discarded on arrival.
+        .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
         .jpeg({ quality: 86, mozjpeg: true })
         .toFile(contactPhotoPath());
     }
