@@ -175,8 +175,11 @@ export default function OrganizersPage() {
             </div>
           </div>
 
-          {/* Editor */}
-          <div className="feat-row feat-row-flip">
+          {/* Editor. Anchored: the custom-design page sends people straight
+              here to answer "what could I build myself?" before paying anyone
+              to build it for them. scroll-margin keeps the heading clear of the
+              sticky header. */}
+          <div className="feat-row feat-row-flip" id="editor" style={{ scrollMarginTop: 90 }}>
             <div className="feat-copy anim-fade-up">
               <p className="feed-kicker">The editor</p>
               <h2 className="feat-title">Build your page in minutes — no tech skills</h2>

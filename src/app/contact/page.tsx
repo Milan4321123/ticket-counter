@@ -89,7 +89,7 @@ export default async function ContactPage({
                   FAQ. Most organizers never need more than that, and it takes minutes.
                 </p>
                 <p style={{ margin: '12px 0 0' }}>
-                  <a href="/organizers" className="btn btn-brand">
+                  <a href="/organizers#editor" className="btn btn-brand">
                     See what you can build yourself
                   </a>
                 </p>
