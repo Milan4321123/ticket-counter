@@ -18,6 +18,9 @@ import { getOrder, getOrderItems, getTicketsForOrder, paymentReference } from '.
 import { orderPayout } from './payout';
 import {
   eventFeeAmount,
+  bareAddress,
+  emailFromBuyers,
+  emailFromOrganizers,
   platformContactEmail,
   platformFeeLabel,
   platformFeeRule,
@@ -603,7 +606,7 @@ export async function sendTicketEmail(orderId: string): Promise<{ sent: boolean;
     });
 
     await createTransporter().sendMail({
-      from: process.env.EMAIL_FROM,
+      from: emailFromBuyers(),
       to: order.buyerEmail,
       subject: `Your ${one ? 'ticket' : `${tickets.length} tickets`} for ${event.name}`,
       text,
@@ -820,7 +823,7 @@ export async function sendTransferInstructionsEmail(
     });
 
     await createTransporter().sendMail({
-      from: process.env.EMAIL_FROM,
+      from: emailFromBuyers(),
       to: order.buyerEmail,
       subject: `Reserved: your tickets for ${event.name} — payment details inside`,
       text,
@@ -936,7 +939,7 @@ export async function sendTransferReminderEmail(
     });
 
     await createTransporter().sendMail({
-      from: process.env.EMAIL_FROM,
+      from: emailFromOrganizers(),
       to: organizer.email,
       subject: `${awaiting.length} payment${one ? '' : 's'} to check — ${totals} expected`,
       text,
@@ -1082,7 +1085,7 @@ export async function sendOrganizerCredentialsEmail(
     });
 
     await createTransporter().sendMail({
-      from: process.env.EMAIL_FROM,
+      from: emailFromOrganizers(),
       to: organizer.email,
       ...(contactEmail ? { replyTo: contactEmail } : {}),
       subject: `Your ${name} organizer account is ready`,
@@ -1174,7 +1177,7 @@ export async function sendEventFeeInstructionsEmail(
     });
 
     await createTransporter().sendMail({
-      from: process.env.EMAIL_FROM,
+      from: emailFromOrganizers(),
       to: organizer.email,
       subject: `Publish “${event.name}” — ${feeLabel} transfer details inside`,
       text,
@@ -1246,7 +1249,7 @@ export async function sendEventLiveEmail(
     });
 
     await createTransporter().sendMail({
-      from: process.env.EMAIL_FROM,
+      from: emailFromOrganizers(),
       to: organizer.email,
       subject: `“${event.name}” can go live now`,
       text,
@@ -1399,7 +1402,7 @@ export async function sendBuyerPaymentReminderEmail(
     });
 
     await createTransporter().sendMail({
-      from: process.env.EMAIL_FROM,
+      from: emailFromBuyers(),
       to: order.buyerEmail,
       subject: `Reminder: your tickets for ${event.name} are still reserved`,
       text,
@@ -1515,7 +1518,7 @@ export async function sendContactRequestToTeam(
     });
 
     await createTransporter().sendMail({
-      from: process.env.EMAIL_FROM,
+      from: emailFromOrganizers(),
       to,
       replyTo: request.email,
       subject: `${subjectLead} — ${request.name}`,
@@ -1602,7 +1605,7 @@ export async function sendContactRequestAck(
     });
 
     await createTransporter().sendMail({
-      from: process.env.EMAIL_FROM,
+      from: wantsAccount ? emailFromOrganizers() : emailFromBuyers(),
       to: request.email,
       replyTo: contactEmail,
       subject: `Thanks — we've got your request (${name})`,
@@ -1702,7 +1705,7 @@ export async function sendQuestionAnsweredEmail(
     });
 
     await createTransporter().sendMail({
-      from: process.env.EMAIL_FROM,
+      from: emailFromBuyers(),
       to,
       subject: `Answered: your question about ${event.name}`,
       text,
@@ -1810,7 +1813,7 @@ export async function sendSignInAlertEmail(
       );
 
     await createTransporter().sendMail({
-      from: process.env.EMAIL_FROM,
+      from: emailFromOrganizers(),
       to: organizer.email,
       subject: headline,
       text: renderText({
@@ -2024,7 +2027,7 @@ export async function sendPayoutChangedEmail(
 
     const transporter = createTransporter();
     await transporter.sendMail({
-      from: process.env.EMAIL_FROM,
+      from: emailFromOrganizers(),
       to: organizer.email,
       subject: waiting
         ? `Confirm or cancel: the payout account for ${event.name} is being changed`
@@ -2062,7 +2065,7 @@ export async function sendPayoutChangedEmail(
         : '';
       try {
         await transporter.sendMail({
-          from: process.env.EMAIL_FROM,
+          from: emailFromOrganizers(),
           to: ownerInbox,
           subject: change.nameMismatch
             ? `NAME MISMATCH on the payout account — ${event.name}`

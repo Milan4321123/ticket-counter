@@ -99,6 +99,46 @@ export function eventFeeBasis(capacity: number): string {
 }
 
 /**
+ * The address BUYERS see, and reply to.
+ *
+ * Ticket deliveries, payment instructions, reminders, answered questions —
+ * everything sent to somebody who bought a ticket. A buyer replying to their
+ * ticket email should reach whoever answers "where do I collect", not the desk
+ * that handles organizer accounts and payout security.
+ *
+ * Falls back to EMAIL_FROM so a deployment that never sets it keeps working
+ * exactly as before.
+ */
+export function emailFromBuyers(): string {
+  return (process.env.EMAIL_FROM_BUYERS || '').trim() || process.env.EMAIL_FROM || '';
+}
+
+/**
+ * The address ORGANIZERS and the platform owner see, and reply to.
+ *
+ * Account credentials, sign-in codes, fee instructions, sign-in alerts, payout
+ * alarms. Kept apart from the buyer address for two reasons that both matter.
+ *
+ * One is triage: a buyer asking about a ticket and an organizer whose payout
+ * account has just moved need different people and different urgency, and one
+ * inbox mixes them.
+ *
+ * The other is that the second is a security channel. The payout alarm and the
+ * sign-in alert only work if the organizer reads them, and a reply address that
+ * also receives every buyer's "is my ticket coming?" is an address whose alarms
+ * get skimmed.
+ */
+export function emailFromOrganizers(): string {
+  return (process.env.EMAIL_FROM_ORGANIZERS || '').trim() || process.env.EMAIL_FROM || '';
+}
+
+/** Just the address part of a "Name <a@b.c>" header, for use as a Reply-To. */
+export function bareAddress(from: string): string {
+  const m = from.match(/<([^>]+)>/);
+  return (m ? m[1] : from).trim();
+}
+
+/**
  * Where organizers reach the team — shown on /contact and used as the "to"
  * address for custom-page enquiries. Falls back to the first ADMIN_EMAIL entry
  * (the inbox that already receives admin sign-in codes), then to a demo
