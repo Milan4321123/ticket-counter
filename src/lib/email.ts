@@ -9,6 +9,7 @@ import {
   getEventById,
   getEventTier,
   paypalPayee,
+  type PaypalPayee,
   type EventQuestionRow,
   type EventRow,
 } from './events';
@@ -633,8 +634,7 @@ export async function sendTicketEmail(orderId: string): Promise<{ sent: boolean;
  * only the pipe differs. Returns '' when the organizer offers no PayPal, so
  * every call site can concatenate it unconditionally.
  */
-function paypalNoteHtml(event: EventRow, reference: string): string {
-  const payee = paypalPayee(event);
+function paypalNoteHtml(payee: PaypalPayee | null, reference: string, amount: string): string {
   if (!payee) return '';
   // GREEN, and placed ABOVE the bank panel at every call site: PayPal clears in
   // seconds where a transfer takes 1-2 business days, so the buyer who takes
@@ -649,7 +649,7 @@ function paypalNoteHtml(event: EventRow, reference: string): string {
         <tr>
           <td style="padding:16px 18px;color:#d1fae5;font-size:15px;line-height:1.55;">
             <span style="color:#34d399;font-weight:800;">Fastest: pay by PayPal</span><br>
-            Send ${strong(escapeHtml(payee.handle))} the amount below and put
+            Send ${strong(escapeHtml(payee.handle))} ${strong(escapeHtml(amount))} and put
             ${strong(escapeHtml(reference))} in PayPal&#39;s message field. It arrives in seconds,
             so your QR tickets can be sent straight away — a bank transfer takes 1&ndash;2 business
             days. It reaches the same organizer either way: pay one way or the other, not both.
@@ -659,14 +659,13 @@ function paypalNoteHtml(event: EventRow, reference: string): string {
 }
 
 /** Plain-text twin of paypalNoteHtml. Empty array when there is no PayPal. */
-function paypalNoteText(event: EventRow, reference: string): string[] {
-  const payee = paypalPayee(event);
+function paypalNoteText(payee: PaypalPayee | null, reference: string, amount: string): string[] {
   if (!payee) return [];
   return [
     '',
     'FASTEST: PAY BY PAYPAL',
     wrapText(
-      `Send ${payee.handle} the amount above and put ${reference} in PayPal's message field. It ` +
+      `Send ${payee.handle} ${amount} and put ${reference} in PayPal's message field. It ` +
         `arrives in seconds, so your QR tickets can be sent straight away — a bank transfer takes ` +
         `1-2 business days. It reaches the same organizer either way: pay one way or the other, ` +
         `not both.`
@@ -701,6 +700,11 @@ export async function sendTransferInstructionsEmail(
       bankName: payout.bankName,
       payWithinDays: event.payWithinDays,
     };
+    // From the order's own snapshot, exactly like the bank rows beside it — the
+    // two must describe the same moment, or an organizer who later added PayPal
+    // would have it offered on instructions that never mentioned it.
+    const payee = paypalPayee({ paypalAccount: payout.paypal });
+    const offersPaypal = payee !== null;
 
     const venue = venueDisplay(event);
     const orderUrl = `${getBaseUrl()}/order/${orderId}`;
@@ -726,11 +730,11 @@ export async function sendTransferInstructionsEmail(
     const bodyHtml =
       pHtml(`Hi ${escapeHtml(order.buyerName)},`) +
       pHtml(
-        `Your seats are held. To turn them into tickets, send a bank transfer by ` +
+        `Your seats are held. To turn them into tickets, ${offersPaypal ? 'send the money' : 'send a bank transfer'} by ` +
           `${strong(deadlineDisplay)} — everything you need is here.`,
         20
       ) +
-      paypalNoteHtml(event, reference) +
+      paypalNoteHtml(payee, reference, amount) +
       panelHtml(amountRowHtml('Amount to transfer', amount) + detailRowsHtml(bankRows)) +
       referenceBoxHtml(
         'Payment reference — required',
@@ -771,7 +775,14 @@ export async function sendTransferInstructionsEmail(
       headline: `Your tickets for ${event.name} are reserved, ${order.buyerName}!`,
       context: [event.dateDisplay, venue],
       lines: [
-        wrapText(`To complete your order, send a bank transfer by ${deadlineDisplay}:`),
+        wrapText(
+          `To complete your order, ${offersPaypal ? 'send the money' : 'send a bank transfer'} by ${deadlineDisplay}:`
+        ),
+        // Above the bank rows, matching the HTML. The plain-text twin used to
+        // trail them, so the reader who gets text-only — which is every reader
+        // whose client blocks HTML — was steered to the slower method by the
+        // simple fact of it coming first.
+        ...paypalNoteText(payee, reference, amount),
         '',
         ...textRows([
           ['Amount', amount],
@@ -786,7 +797,6 @@ export async function sendTransferInstructionsEmail(
           `IMPORTANT: the reference ${reference} must go in the transfer's purpose line ` +
             `("Verwendungszweck"). It is how your payment finds your tickets.`
         ),
-        ...paypalNoteText(event, reference),
         ...(hasStudentTickets
           ? [
               '',
@@ -1285,6 +1295,8 @@ export async function sendBuyerPaymentReminderEmail(
     if (!payout.iban.trim() || !payout.holder.trim()) {
       return { sent: false, reason: 'transfer-not-configured' };
     }
+    const payee = paypalPayee({ paypalAccount: payout.paypal });
+    const offersPaypal = payee !== null;
 
     const venue = venueDisplay(event);
     const amount = formatMoney(order.totalCents, order.currency);
@@ -1312,14 +1324,17 @@ export async function sendBuyerPaymentReminderEmail(
 
     const bodyHtml =
       pHtml(`Hi ${escapeHtml(order.buyerName)},`) +
-      pHtml(`Your seats are still held, but we have not seen your bank transfer yet.`, 20) +
+      pHtml(
+        `Your seats are still held, but we have not seen your ${offersPaypal ? 'payment' : 'bank transfer'} yet.`,
+        20
+      ) +
       calloutHtml(`<strong>Already sent it?</strong> Then all is well. ${escapeHtml(alreadyPaid)}`) +
       pHtml(
         `Not yet? Here are the details again. Please send it by ${strong(deadlineDisplay)}, otherwise the seats ` +
           `go back on sale.`,
         20
       ) +
-      paypalNoteHtml(event, reference) +
+      paypalNoteHtml(payee, reference, amount) +
       panelHtml(amountRowHtml('Amount to transfer', amount) + detailRowsHtml(bankRows)) +
       referenceBoxHtml(
         'Payment reference — required',
@@ -1350,7 +1365,9 @@ export async function sendBuyerPaymentReminderEmail(
       lines: [
         `Hi ${order.buyerName},`,
         '',
-        wrapText(`Your seats are still held, but we have not seen your bank transfer yet.`),
+        wrapText(
+          `Your seats are still held, but we have not seen your ${offersPaypal ? 'payment' : 'bank transfer'} yet.`
+        ),
         '',
         wrapText(`ALREADY SENT IT? Then all is well. ${alreadyPaid}`),
         '',
@@ -1358,6 +1375,7 @@ export async function sendBuyerPaymentReminderEmail(
           `Not yet? Here are the details again. Please send it by ${deadlineDisplay}, otherwise the ` +
             `seats go back on sale.`
         ),
+        ...paypalNoteText(payee, reference, amount),
         '',
         ...textRows([
           ['Amount', amount],
@@ -1372,7 +1390,6 @@ export async function sendBuyerPaymentReminderEmail(
           `IMPORTANT: put the reference ${reference} in the transfer's purpose line ` +
             `("Verwendungszweck") so your payment finds your tickets.`
         ),
-        ...paypalNoteText(event, reference),
         '',
         `Your order: ${orderUrl}`,
         '',

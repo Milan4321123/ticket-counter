@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getEventById } from '@/lib/events';
+import { effectivePayout } from '@/lib/payout';
 import { formatMoney } from '@/lib/money';
 import {
   expireOverdueTransferReservations,
@@ -64,6 +65,10 @@ export default async function PortalOrdersPage({
   // Release seats of transfer reservations whose payment never arrived.
   expireOverdueTransferReservations(event.id);
   const awaiting = listAwaitingTransferOrders(event.id);
+  // Both routes are manual and both land as 'transfer' orders, so the platform
+  // cannot know which one a given buyer chose — only that this event offered
+  // both. That makes "bank transfer" the wrong word here whenever PayPal is on.
+  const takesPaypal = effectivePayout(event).paypal.trim() !== '';
   const orders = listOrders({ eventId: event.id, query });
   const stats = getStats(event.id);
   // Whether the EVENT has any orders at all, independent of the search box.
@@ -106,7 +111,11 @@ export default async function PortalOrdersPage({
           )}
         </div>
 
-      {/* ---- The one thing that needs doing: confirm arrived bank transfers ---- */}
+      {/* ---- The one thing that needs doing: confirm payments that arrived ----
+           Worded around whichever routes this event actually offers. A buyer
+           given a PayPal address may well have used it, and an organizer told
+           to "check your bank account" would look in one place, not find the
+           money, and leave a paid guest waiting for tickets. */}
       {awaiting.length > 0 && (
         <div className="card action-card anim-fade-up">
           <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -114,7 +123,8 @@ export default async function PortalOrdersPage({
             {awaiting.length} reservation{awaiting.length === 1 ? '' : 's'} waiting for your confirmation
           </div>
           <p className="muted small" style={{ marginTop: 0 }}>
-            Check your bank account for these references. When the money is there, click{' '}
+            Check {takesPaypal ? 'your bank account and your PayPal' : 'your bank account'} for these
+            references. When the money is there, click{' '}
             <strong>Payment received</strong> and type the last 4 characters of the reference — the QR tickets are
             emailed to the buyer automatically.
           </p>
@@ -153,7 +163,7 @@ export default async function PortalOrdersPage({
           </div>
         </div>
         <div className={`stat-card anim-fade-up anim-d2${stats.awaitingTransferOrders > 0 ? ' stat-card-alert' : ''}`}>
-          <div className="stat-label">Awaiting bank transfer</div>
+          <div className="stat-label">{takesPaypal ? 'Awaiting payment' : 'Awaiting bank transfer'}</div>
           <div className="stat-value">{formatMoney(stats.awaitingTransferCents, event.currency)}</div>
           <div className="stat-sub">
             {stats.awaitingTransferOrders} order{stats.awaitingTransferOrders === 1 ? '' : 's'} ·{' '}
@@ -240,7 +250,7 @@ export default async function PortalOrdersPage({
                       <td>
                         {o.paymentMode === 'transfer' && o.status === 'claimed' ? (
                           <span className="badge badge-amber" style={{ whiteSpace: 'nowrap' }}>
-                            awaiting transfer
+                            {takesPaypal ? 'awaiting payment' : 'awaiting transfer'}
                           </span>
                         ) : (
                           <StatusBadge status={o.status} />
