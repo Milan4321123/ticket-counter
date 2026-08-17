@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isAdminRequest } from '@/lib/auth';
+import { sendOrganizerCredentialsEmail } from '@/lib/email';
 import {
   activateOrganizer,
   getOrganizer,
@@ -26,6 +27,9 @@ function isValidDate(value: string): boolean {
  *    kept for old data and manual corrections
  *  - status: 'active' | 'disabled' — disabling signs them out immediately
  *  - resetPassword: true — returns { newPassword } EXACTLY ONCE (never re-readable)
+ *    and emails it to the organizer, reporting { emailed, emailReason }. This is
+ *    also the "resend their sign-in details" path: the password cannot be read
+ *    back to re-send, so a fresh one is issued and sent.
  *  - clearAuthenticator: true — the lost-phone path; organizers cannot clear
  *    their own without a working code, so this is the only way back in
  *  - confirmSignup: { referenceConfirmation } — activate a pending signup: the
@@ -69,6 +73,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     let newPassword: string | undefined;
     let activated = false;
     let clearedAuthenticator = false;
+    let emailed: boolean | undefined;
+    let emailReason: string | undefined;
 
     if (body && 'confirmSignup' in body) {
       const cs = body.confirmSignup as { referenceConfirmation?: unknown } | null;
@@ -127,6 +133,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (body?.resetPassword === true) {
       newPassword = resetOrganizerPassword(id);
       changedSomething = true;
+      // And EMAIL it, which is the whole point of the action.
+      //
+      // The reset used to hand the new password back to this screen and stop
+      // there, so the only way an organizer ever received one was the single
+      // email sent when their application was approved. If that email failed —
+      // and with a From address the provider will not vouch for, it does — there
+      // was no second attempt available anywhere: the owner had to copy the
+      // password out of the admin panel and pass it on by hand, over whatever
+      // channel, hoping the tab had not been refreshed first.
+      //
+      // Awaited, not fire-and-forget, because the answer decides what the owner
+      // does next: if it did not go out, the password on their screen is again
+      // the only copy that will ever exist.
+      const org = getOrganizer(id);
+      if (org) {
+        const mail = await sendOrganizerCredentialsEmail({ name: org.name, email: org.email }, newPassword);
+        emailed = mail.sent;
+        emailReason = mail.reason;
+        console.log(`Admin reset password for organizer ${id}; credentials email:`, mail);
+      }
     }
 
     // The lost-phone path, and the ONLY one. An organizer cannot clear their own
@@ -152,6 +178,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       ok: true,
       organizer: getOrganizer(id),
       ...(newPassword ? { newPassword } : {}),
+      ...(emailed === undefined ? {} : { emailed, emailReason }),
       ...(activated ? { activated: true } : {}),
       ...(clearedAuthenticator ? { clearedAuthenticator: true } : {}),
     });

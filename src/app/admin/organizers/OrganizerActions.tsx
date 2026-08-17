@@ -16,6 +16,8 @@ type Busy = 'status' | 'reset' | null;
 interface UpdateResponse {
   ok?: boolean;
   newPassword?: string;
+  emailed?: boolean;
+  emailReason?: string;
   error?: string;
 }
 
@@ -29,6 +31,7 @@ export default function OrganizerActions({ organizerId, name, email, status }: P
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState<string | null>(null);
+  const [emailed, setEmailed] = useState<{ ok: boolean; reason?: string } | null>(null);
 
   async function post(body: Record<string, unknown>, kind: Exclude<Busy, null>): Promise<UpdateResponse | null> {
     if (busy !== null) return null;
@@ -45,7 +48,8 @@ export default function OrganizerActions({ organizerId, name, email, status }: P
         setError(data?.error ?? 'Something went wrong — please try again.');
         return null;
       }
-      router.refresh();
+      // NOT refreshed while a one-time password is on screen — see the reset
+      // handler below. Callers that change nothing visible refresh themselves.
       return data;
     } catch {
       setError('Could not reach the server — please try again.');
@@ -65,19 +69,23 @@ export default function OrganizerActions({ organizerId, name, email, status }: P
     ) {
       return;
     }
-    await post({ status: next }, 'status');
+    const r = await post({ status: next }, 'status');
+    if (r) router.refresh();
   }
 
   async function resetPassword() {
     if (
       !window.confirm(
-        `Reset the password for ${name}?\n\nTheir current password stops working immediately. You'll get the new one to hand to them.`
+        `Reset the password for ${name}?\n\nTheir current password stops working immediately. A new one is emailed to ${email}, and shown here once in case it does not arrive.`
       )
     ) {
       return;
     }
     const data = await post({ resetPassword: true }, 'reset');
-    if (data?.newPassword) setNewPassword(data.newPassword);
+    if (data?.newPassword) {
+      setNewPassword(data.newPassword);
+      setEmailed({ ok: Boolean(data.emailed), reason: data.emailReason });
+    }
   }
 
   return (
@@ -104,7 +112,37 @@ export default function OrganizerActions({ organizerId, name, email, status }: P
           {error}
         </div>
       )}
+      {emailed && (
+        <div className={emailed.ok ? 'notice notice-success small' : 'notice notice-warn small'} style={{ margin: 0 }}>
+          {emailed.ok ? (
+            <>
+              The new sign-in details were emailed to <strong>{email}</strong>. Accepted by the mail
+              provider — if it never arrives it was filtered after that, so keep this password until
+              they confirm.
+            </>
+          ) : (
+            <>
+              The email did <strong>not</strong> go out
+              {emailed.reason ? ` (${emailed.reason})` : ''} — pass this password to <strong>{email}</strong>{' '}
+              yourself.
+            </>
+          )}
+        </div>
+      )}
       {newPassword && <PasswordReveal email={email} password={newPassword} />}
+      {newPassword && (
+        <button
+          type="button"
+          className="btn btn-sm"
+          onClick={() => {
+            setNewPassword(null);
+            setEmailed(null);
+            router.refresh();
+          }}
+        >
+          Done — I have saved this
+        </button>
+      )}
     </div>
   );
 }

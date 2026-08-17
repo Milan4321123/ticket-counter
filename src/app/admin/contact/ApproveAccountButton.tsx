@@ -77,7 +77,11 @@ export default function ApproveAccountButton({ requestId, name, email }: Props) 
         emailed: Boolean(data.emailed),
         emailReason: data.emailReason,
       });
-      router.refresh();
+      // Deliberately NOT refreshing here. It used to, and that destroyed the
+      // one thing this screen exists to show: refreshing re-rendered the server
+      // list, the application was no longer pending so it dropped out of it,
+      // this component unmounted, and the password — shown once, stored only as
+      // a hash — went with it. It has to be dismissed by hand instead.
     } catch {
       setError('Could not reach the server — please try again.');
     } finally {
@@ -124,6 +128,17 @@ export default function ApproveAccountButton({ requestId, name, email }: Props) 
           Shown only this once — it is stored hashed and can only be reset, never read again. They
           must change it the moment they sign in.
         </p>
+        <button
+          type="button"
+          className="btn btn-sm"
+          style={{ marginTop: 10 }}
+          onClick={() => {
+            setCreated(null);
+            router.refresh();
+          }}
+        >
+          Done — I have saved this
+        </button>
       </div>
     );
   }
