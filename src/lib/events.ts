@@ -683,6 +683,8 @@ export interface DeletedEventSummary {
   orders: number;
   tickets: number;
   media: number;
+  /** Payout-audit rows removed with the event — they hold IBANs in full. */
+  payoutChanges: number;
 }
 
 /**
@@ -725,6 +727,9 @@ export function deleteEventCompletely(eventId: string): DeletedEventSummary {
         .get(eventId) as { n: number }
     ).n,
     media: media.length,
+    payoutChanges: (
+      db.prepare(`SELECT COUNT(*) AS n FROM payout_changes WHERE event_id = ?`).get(eventId) as { n: number }
+    ).n,
   };
 
   const tx = db.transaction(() => {
@@ -740,6 +745,13 @@ export function deleteEventCompletely(eventId: string): DeletedEventSummary {
     db.prepare(`DELETE FROM event_faqs WHERE event_id = ?`).run(eventId);
     db.prepare(`DELETE FROM event_questions WHERE event_id = ?`).run(eventId);
     db.prepare(`DELETE FROM event_tiers WHERE event_id = ?`).run(eventId);
+
+    // The payout audit trail. It holds IBANs and PayPal addresses IN FULL — that
+    // is deliberate, because a masked forensic record is useless — which makes
+    // it the one table that must not outlive the event it describes. Without
+    // this, deleting an event left payout details on disk for something that no
+    // longer exists, readable by nothing and deletable by no one.
+    db.prepare(`DELETE FROM payout_changes WHERE event_id = ?`).run(eventId);
 
     // The door-scanner revocation counter is keyed per event (lib/auth), so it
     // would otherwise outlive every link it was ever counting for.

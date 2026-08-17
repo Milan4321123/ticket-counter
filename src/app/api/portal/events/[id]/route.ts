@@ -856,7 +856,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     // The only trace left of the event: who removed it and how much went with it.
     console.log(
       `Organizer ${organizer.id} deleted event ${event.id} ("${event.name}"): ` +
-        `${removed.orders} orders, ${removed.tickets} tickets, ${removed.media} photos/videos.`
+        `${removed.orders} orders, ${removed.tickets} tickets, ${removed.media} photos/videos, ` +
+        `${removed.payoutChanges} payout-audit rows.`
     );
 
     return NextResponse.json({ ok: true, name: event.name });
