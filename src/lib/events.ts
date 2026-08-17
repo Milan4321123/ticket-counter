@@ -121,6 +121,11 @@ export interface EventTierRow {
   cap: number;
   /** True when this ticket type is not capped — `cap` is then ignored. */
   unlimited: boolean;
+  /**
+   * Announced but not yet on sale. Shown on the event page with a "Coming soon"
+   * badge and refused by every purchase path — see the guard in api/orders.
+   */
+  comingSoon: boolean;
   studentOnly: boolean;
   description: string;
   sort: number;
@@ -360,14 +365,19 @@ export function getEventTiers(eventId: string): EventTierRow[] {
   const rows = getDb()
     .prepare(
       `SELECT id, event_id AS eventId, tier_key AS tierKey, name, price_cents AS priceCents,
-              cap, unlimited, student_only AS studentOnly, description, sort
+              cap, unlimited, coming_soon AS comingSoon, student_only AS studentOnly, description, sort
        FROM event_tiers WHERE event_id = ? ORDER BY sort, tier_key`
     )
     .all(eventId) as (Omit<EventTierRow, 'studentOnly' | 'unlimited'> & {
       studentOnly: number;
       unlimited: number;
     })[];
-  return rows.map((r) => ({ ...r, studentOnly: Boolean(r.studentOnly), unlimited: Boolean(r.unlimited) }));
+  return rows.map((r) => ({
+    ...r,
+    studentOnly: Boolean(r.studentOnly),
+    unlimited: Boolean(r.unlimited),
+    comingSoon: Boolean(r.comingSoon),
+  }));
 }
 
 export function getEventTier(eventId: string, tierKey: string): EventTierRow | null {

@@ -10,6 +10,7 @@ interface Row {
   price: string; // EUR, as typed ("25" or "25,50")
   cap: string;
   unlimited: boolean;
+  comingSoon: boolean;
   studentOnly: boolean;
   description: string;
 }
@@ -28,6 +29,7 @@ function toRow(t: SavedTier): Row {
     price: (t.priceCents / 100).toFixed(2),
     cap: String(t.cap),
     unlimited: Boolean(t.unlimited),
+    comingSoon: Boolean(t.comingSoon),
     studentOnly: t.studentOnly,
     description: t.description,
   };
@@ -46,7 +48,7 @@ export default function TiersEditor({ eventId, initialTiers, soldByTierKey }: Pr
   }
 
   function addRow() {
-    setRows((prev) => [...prev, { tierKey: null, name: '', price: '', cap: '', unlimited: false, studentOnly: false, description: '' }]);
+    setRows((prev) => [...prev, { tierKey: null, name: '', price: '', cap: '', unlimited: false, comingSoon: false, studentOnly: false, description: '' }]);
   }
 
   function removeRow(index: number) {
@@ -75,6 +77,7 @@ export default function TiersEditor({ eventId, initialTiers, soldByTierKey }: Pr
       priceCents: number;
       cap: number;
       unlimited: boolean;
+      comingSoon: boolean;
       studentOnly: boolean;
       description: string;
     }[] =
@@ -105,6 +108,7 @@ export default function TiersEditor({ eventId, initialTiers, soldByTierKey }: Pr
         cap,
         unlimited: row.unlimited,
         studentOnly: row.studentOnly,
+        comingSoon: row.comingSoon,
         description: row.description.trim(),
       });
     }
@@ -203,6 +207,21 @@ export default function TiersEditor({ eventId, initialTiers, soldByTierKey }: Pr
                     Unlimited — sell as many as people want
                     <span className="muted small" style={{ display: 'block' }}>
                       No &ldquo;only N left&rdquo; and it never sells out.
+                    </span>
+                  </span>
+                </label>
+                <label className="checkbox-row" style={{ marginTop: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={row.comingSoon}
+                    onChange={(e) => patchRow(i, { comingSoon: e.target.checked })}
+                  />
+                  <span>
+                    Coming soon — announce it, don&rsquo;t sell it yet
+                    <span className="muted small" style={{ display: 'block' }}>
+                      Shown on your event page with a green <strong>Coming soon</strong> badge, and
+                      nobody can buy it until you switch this off. Use it to put the whole line-up up
+                      while only the early-bird is on sale.
                     </span>
                   </span>
                 </label>

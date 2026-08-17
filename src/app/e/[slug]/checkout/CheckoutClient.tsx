@@ -463,10 +463,14 @@ export default function CheckoutClient({
                 <div>
                   <div className="tier-name">
                     {tier.name}{' '}
-                    {/* Nothing to count down on an uncapped ticket type. */}
-                    {availability.tiers[tier.id]?.unlimited || !availability.showRemaining ? null : remaining === 0 ? (
+                    {/* Sold out is shown FIRST and regardless of the countdown
+                        setting. This used to render nothing at all when the
+                        organizer hid the count, so an exhausted ticket type
+                        looked perfectly buyable — a stepper that silently
+                        refused to go above zero. */}
+                    {remaining === 0 ? (
                       <span className="badge badge-red">Sold out</span>
-                    ) : remaining <= 25 ? (
+                    ) : availability.showRemaining && remaining <= 25 ? (
                       <span className="badge badge-amber">Only {remaining} left</span>
                     ) : null}
                   </div>

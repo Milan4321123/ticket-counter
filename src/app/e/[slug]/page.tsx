@@ -29,6 +29,7 @@ import {
 } from '@/lib/events';
 import type { EventRow, PageDesign } from '@/lib/events';
 import { getAvailability } from '@/lib/inventory';
+import { ticketState, fromPriceCents } from '@/lib/ticketState';
 import { currentOrganizer, getOrganizer } from '@/lib/organizers';
 import { formatMoney } from '@/lib/money';
 import {
@@ -341,13 +342,12 @@ export default async function EventPage({ params }: Params) {
    * the sum can overshoot when several tiers are clamped to the same headroom —
    * hence the min.
    */
-  const tierRemaining = tiers.reduce(
-    (n, t) => n + Math.max(0, availability.tiers[t.tierKey]?.remaining ?? 0),
-    0
-  );
-  const buyableRemaining = Math.min(availability.totalRemaining, tierRemaining);
-  const soldOut = buyableRemaining === 0;
-  const minPrice = tiers.length ? Math.min(...tiers.map((t) => t.priceCents)) : null;
+  // A tier that is only announced is not stock. Counting it would make an event
+  // whose whole line-up is "coming soon" look on sale.
+  const state = ticketState(event, tiers, availability);
+  const soldOut = !state.buyable;
+  const buyableRemaining = state.remaining;
+  const minPrice = fromPriceCents(tiers);
 
   // ---------------- Media ----------------
 
@@ -591,34 +591,52 @@ export default async function EventPage({ params }: Params) {
                 </span>
               ) : null}
             </div>
-          ) : event.salesOpen ? (
+          ) : (
             <div className="event-hero-actions anim-fade-up anim-d3">
-              {!soldOut && (
+              {state.buyable ? (
                 <Link href={checkoutHref} className="btn btn-primary btn-lg">
                   Get tickets
                 </Link>
-              )}
-              {soldOut ? (
-                <span className="badge badge-red">Sold out</span>
-              ) : availability.showRemaining && buyableRemaining <= 50 ? (
-                <span className="badge badge-amber">
-                  Only {buyableRemaining} ticket{buyableRemaining === 1 ? '' : 's'} left
-                </span>
               ) : (
-                <span className="badge badge-green">Tickets available</span>
+                /* Says why there is no button rather than leaving a gap. A
+                   visitor who arrives at an event with nothing on sale should
+                   read "Coming soon" or "Sold out", not wonder whether the page
+                   failed to load. */
+                <span
+                  className="btn btn-lg"
+                  aria-disabled="true"
+                  style={{ opacity: 0.6, pointerEvents: 'none' }}
+                >
+                  {state.cta}
+                </span>
               )}
-              {!soldOut && minPrice !== null ? (
+              <span
+                className={`badge ${
+                  state.kind === 'sold-out'
+                    ? 'badge-red'
+                    : state.kind === 'closed'
+                      ? 'badge-amber'
+                      : state.badge.startsWith('Only')
+                        ? 'badge-amber'
+                        : 'badge-green'
+                }`}
+              >
+                {state.badge}
+              </span>
+              {state.buyable && minPrice !== null ? (
                 <span className="event-hero-price">
                   from {formatMoney(minPrice, event.currency)}
                 </span>
               ) : null}
-            </div>
-          ) : (
-            <div
-              className="notice notice-warn anim-fade-up anim-d3"
-              style={{ display: 'inline-block' }}
-            >
-              Ticket sales are currently closed — check back soon.
+              {/* One line of context under the buttons for the states that need
+                  explaining. "Sold out" speaks for itself; the other two do not. */}
+              {state.kind === 'closed' || state.kind === 'coming-soon' ? (
+                <p className="muted small" style={{ width: '100%', margin: '8px 0 0' }}>
+                  {state.kind === 'closed'
+                    ? 'Ticket sales are paused right now — check back soon.'
+                    : 'Tickets are not on sale yet. This page is where they will appear.'}
+                </p>
+              ) : null}
             </div>
           )}
         </div>
@@ -657,17 +675,26 @@ export default async function EventPage({ params }: Params) {
                 {tiers.map((tier) => {
                   const tierAvail = availability.tiers[tier.tierKey];
                   const remaining = tierAvail?.remaining ?? 0;
-                  // Hidden countdown behaves like an uncapped tier here: available,
-                  // never a number, never a scare.
-                  const tierUnlimited = Boolean(tierAvail?.unlimited) || !availability.showRemaining;
                   return (
                     <div className="tier-card glow-card" key={tier.tierKey}>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        {tierUnlimited ? (
-                          <span className="badge badge-green">Available</span>
+                        {/* Order matters. The event's own state comes first: a
+                            finished or paused event cannot have a ticket type
+                            that is "Available", and this list used to say so
+                            anyway because it only ever looked at its own row.
+                            Then announced, then sold out, and only THEN the
+                            countdown — because hiding the count must hide the
+                            NUMBER, never the fact. This branch used to start with
+                            "uncapped or countdown hidden -> Available", so a tier
+                            with the countdown switched off said Available after
+                            it had completely sold out. */}
+                        {state.kind === 'past' || state.kind === 'closed' ? (
+                          <span className="badge badge-red">{state.badge}</span>
+                        ) : tier.comingSoon ? (
+                          <span className="badge badge-green">Coming soon</span>
                         ) : remaining === 0 ? (
                           <span className="badge badge-red">Sold out</span>
-                        ) : remaining <= 25 ? (
+                        ) : availability.showRemaining && remaining <= 25 ? (
                           <span className="badge badge-amber">Only {remaining} left</span>
                         ) : (
                           <span className="badge badge-green">Available</span>
@@ -857,10 +884,14 @@ export default async function EventPage({ params }: Params) {
             ))}
           </ol>
           <div className="event-closing-actions">
-            {canBuy && (
+            {canBuy ? (
               <Link href={checkoutHref} className="btn btn-primary btn-lg">
                 Get tickets for {event.name}
               </Link>
+            ) : (
+              <span className="btn btn-lg" aria-disabled="true" style={{ opacity: 0.6, pointerEvents: 'none' }}>
+                {state.cta}
+              </span>
             )}
             <Link href="/" className="btn">
               Browse more events

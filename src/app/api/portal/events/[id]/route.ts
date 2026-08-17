@@ -92,6 +92,8 @@ interface TierPayload {
   cap: number;
   /** True when this ticket type is uncapped — `cap` is stored but not used. */
   unlimited: boolean;
+  /** Announced, not yet sellable. */
+  comingSoon: boolean;
   studentOnly: boolean;
   description: string;
 }
@@ -548,6 +550,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         // Absent on bodies from older clients — treated as limited, which is
         // what every event did before this flag existed.
         const unlimited = r.unlimited === true;
+      const comingSoon = (r as { comingSoon?: unknown }).comingSoon === true;
         need(typeof r.studentOnly === 'boolean', 'Student-only must be on or off.');
         const description = strField(r.description ?? '', `The description of "${name}"`, 300);
 
@@ -561,7 +564,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         } else {
           tierKey = tierKeyFromName(name, taken);
         }
-        keep.push({ tierKey, name, priceCents, cap, unlimited, studentOnly: r.studentOnly, description });
+        keep.push({ tierKey, name, priceCents, cap, unlimited, comingSoon, studentOnly: r.studentOnly, description });
       }
 
       const keptKeys = new Set(keep.map((t) => t.tierKey));
@@ -679,19 +682,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const del = db.prepare(`DELETE FROM event_tiers WHERE event_id = ? AND tier_key = ?`);
         for (const key of tiersPlan.removeKeys) del.run(event.id, key);
         const upd = db.prepare(
-          `UPDATE event_tiers SET name = ?, price_cents = ?, cap = ?, unlimited = ?, student_only = ?, description = ?, sort = ?
+          `UPDATE event_tiers SET name = ?, price_cents = ?, cap = ?, unlimited = ?, coming_soon = ?, student_only = ?, description = ?, sort = ?
            WHERE event_id = ? AND tier_key = ?`
         );
         const ins = db.prepare(
-          `INSERT INTO event_tiers (id, event_id, tier_key, name, price_cents, cap, unlimited, student_only, description, sort)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO event_tiers (id, event_id, tier_key, name, price_cents, cap, unlimited, coming_soon, student_only, description, sort)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         );
         const existingKeys = new Set(existingTiers.map((t) => t.tierKey));
         tiersPlan.keep.forEach((t, sort) => {
           if (existingKeys.has(t.tierKey)) {
-            upd.run(t.name, t.priceCents, t.cap, t.unlimited ? 1 : 0, t.studentOnly ? 1 : 0, t.description, sort, event.id, t.tierKey);
+            upd.run(t.name, t.priceCents, t.cap, t.unlimited ? 1 : 0, t.comingSoon ? 1 : 0, t.studentOnly ? 1 : 0, t.description, sort, event.id, t.tierKey);
           } else {
-            ins.run(newId(), event.id, t.tierKey, t.name, t.priceCents, t.cap, t.unlimited ? 1 : 0, t.studentOnly ? 1 : 0, t.description, sort);
+            ins.run(newId(), event.id, t.tierKey, t.name, t.priceCents, t.cap, t.unlimited ? 1 : 0, t.comingSoon ? 1 : 0, t.studentOnly ? 1 : 0, t.description, sort);
           }
         });
       }
@@ -762,6 +765,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
               priceCents: t.priceCents,
               cap: t.cap,
               unlimited: t.unlimited,
+              comingSoon: t.comingSoon,
               studentOnly: t.studentOnly,
               description: t.description,
             })),

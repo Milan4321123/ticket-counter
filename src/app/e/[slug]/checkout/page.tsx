@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { getPaymentMode } from '@/lib/config';
 import { getEventBySlug, getEventTiers, paypalPayee } from '@/lib/events';
 import { getAvailability } from '@/lib/inventory';
+import { ticketState } from '@/lib/ticketState';
 import { expireOverdueTransferReservations } from '@/lib/orders';
 import { effectivePayout } from '@/lib/payout';
 import { BUYER_RETENTION_DAYS } from '@/lib/retention';
@@ -53,12 +54,18 @@ export default async function EventCheckoutPage({ params }: Params) {
     );
   }
 
-  if (!availability.unlimited && availability.totalRemaining === 0) {
+  // The same decision the event page and the feed made — see lib/ticketState.ts.
+  // Reading only totalRemaining here let a buyer reach a checkout whose every
+  // ticket type was exhausted while the room still had space.
+  const state = ticketState(event, getEventTiers(event.id), availability);
+  if (!state.buyable) {
     return (
       <div className="container container-narrow">
         <h1 className="page-title anim-fade-up">Checkout</h1>
-        <div className="notice notice-error anim-fade-up anim-d1">
-          This event is completely sold out — thank you for the incredible interest!
+        <div className={`notice anim-fade-up anim-d1 ${state.kind === 'coming-soon' ? 'notice-warn' : 'notice-error'}`}>
+          {state.kind === 'coming-soon'
+            ? 'Tickets for this event are not on sale yet — nothing can be booked just now.'
+            : 'This event is completely sold out — thank you for the incredible interest!'}
         </div>
         <p className="muted anim-fade-up anim-d2">
           If a reserved order is not paid in time, its seats are released again — so it can be
@@ -96,13 +103,17 @@ export default async function EventCheckoutPage({ params }: Params) {
         venue: [event.venueName, event.city].filter(Boolean).join(', '),
         currency: event.currency,
         maxTicketsPerOrder: event.maxPerOrder,
-        tiers: getEventTiers(event.id).map((t) => ({
-          id: t.tierKey,
-          name: t.name,
-          priceCents: t.priceCents,
-          studentOnly: t.studentOnly,
-          description: t.description,
-        })),
+        // Coming-soon types are not offered at checkout at all: a stepper that
+        // cannot go above zero is a worse answer than not showing the row.
+        tiers: getEventTiers(event.id)
+          .filter((t) => !t.comingSoon)
+          .map((t) => ({
+            id: t.tierKey,
+            name: t.name,
+            priceCents: t.priceCents,
+            studentOnly: t.studentOnly,
+            description: t.description,
+          })),
       }}
       availability={availability}
       mode={mode}

@@ -6,6 +6,7 @@ import CardVideo from '@/components/CardVideo';
 import { getEventTiers, parsePageDesign } from '@/lib/events';
 import type { EventRow, PageDesign } from '@/lib/events';
 import { getAvailability } from '@/lib/inventory';
+import { ticketState, fromPriceCents } from '@/lib/ticketState';
 import { listingTileMedia } from '@/lib/listing';
 import { formatMoney } from '@/lib/money';
 
@@ -49,32 +50,14 @@ export function dateChipLabel(event: EventRow): string | null {
   return null;
 }
 
-function AvailabilityBadge({
-  event,
-  remaining,
-  showCount,
-}: {
-  event: EventRow;
-  /** Tickets that can ACTUALLY be bought — see the note in EventCard. */
-  remaining: number;
-  /** Whether the organizer publishes the number. Never whether it is sold out. */
-  showCount: boolean;
-}) {
-  if (!event.salesOpen) return <span className="badge badge-amber">Sales closed</span>;
-  // SOLD OUT IS CHECKED FIRST, and that ordering is the fix.
-  //
-  // Hiding the countdown used to be conflated with "never sells out": the
-  // organizer's choice not to publish a number was passed in as `unlimited`, and
-  // that branch returned "Tickets available" before anything looked at the count.
-  // So any event with the countdown switched off — which is the recommended
-  // setting for early-bird pricing — advertised tickets as available after it
-  // had completely sold out.
-  //
-  // Turning the countdown off hides the NUMBER. It cannot hide the fact.
-  if (remaining === 0) return <span className="badge badge-red">Sold out</span>;
-  if (showCount && remaining <= 50) return <span className="badge badge-amber">Only {remaining} left</span>;
-  return <span className="badge badge-green">Tickets available</span>;
-}
+/** Colour follows meaning: green is fine, amber is a nudge, red is a stop. */
+const BADGE_TONE: Record<string, string> = {
+  'on-sale': 'badge-green',
+  'coming-soon': 'badge-green',
+  closed: 'badge-amber',
+  'sold-out': 'badge-red',
+  past: 'badge',
+};
 
 export interface EventCardProps {
   event: EventRow;
@@ -85,7 +68,7 @@ export interface EventCardProps {
 
 export default function EventCard({ event, past = false, delayClass = '' }: EventCardProps) {
   const tiers = getEventTiers(event.id);
-  const minPrice = tiers.length ? Math.min(...tiers.map((t) => t.priceCents)) : null;
+  const minPrice = fromPriceCents(tiers);
   const availability = getAvailability(event.id);
   /**
    * What can actually be bought, not what is left in the room.
@@ -96,10 +79,7 @@ export default function EventCard({ event, past = false, delayClass = '' }: Even
    * remaining is already clamped to the room, so the sum can overshoot when
    * several are clamped to the same headroom; hence the min.
    */
-  const buyableRemaining = Math.min(
-    availability.totalRemaining,
-    tiers.reduce((n, t) => n + Math.max(0, availability.tiers[t.tierKey]?.remaining ?? 0), 0)
-  );
+  const state = ticketState(event, tiers, availability, { past });
   const { videoUrl, stillUrl } = listingTileMedia(event);
   const accent = parsePageDesign(event.pageDesign).accent ?? 'violet';
   const location = [event.venueName, event.city].filter(Boolean).join(', ');
@@ -140,15 +120,13 @@ export default function EventCard({ event, past = false, delayClass = '' }: Even
         )}
         {chip ? <span className="event-date-chip">{chip}</span> : null}
         <span className="event-card-status">
-          {past ? (
-            <span className="badge">Finished</span>
-          ) : (
-            <AvailabilityBadge
-              event={event}
-              remaining={buyableRemaining}
-              showCount={availability.showRemaining}
-            />
-          )}
+          <span className={`badge ${BADGE_TONE[state.kind] ?? 'badge-green'}`}>{state.badge}</span>
+          {/* A second pill, not a replacement: an event can be on sale AND have
+              a type still to come, and a sold-out one with something coming is
+              exactly the card a buyer wants to keep an eye on. */}
+          {!past && state.kind !== 'coming-soon' && state.upcoming > 0 ? (
+            <span className="badge badge-green">More coming soon</span>
+          ) : null}
         </span>
         {/* Fades the photo into the card body so the two are one object rather
             than a picture sitting on a panel. */}
@@ -165,7 +143,10 @@ export default function EventCard({ event, past = false, delayClass = '' }: Even
           ) : (
             <span />
           )}
-          <span className="event-card-go">{past ? 'See page' : 'Get tickets'}</span>
+          {/* Says what the buyer can actually do. It used to read "Get tickets"
+              on a sold-out event, on a paused one, and on one where nothing had
+              gone on sale yet. */}
+          <span className="event-card-go">{state.cta}</span>
         </div>
       </div>
     </Link>

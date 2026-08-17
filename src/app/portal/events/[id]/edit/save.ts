@@ -8,6 +8,8 @@ export interface SavedTier {
   cap: number;
   /** True when this ticket type has no limit — `cap` is then ignored. */
   unlimited: boolean;
+  /** Announced on the event page but not yet purchasable. */
+  comingSoon: boolean;
   studentOnly: boolean;
   description: string;
 }

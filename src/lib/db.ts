@@ -373,6 +373,16 @@ function migrateToPlatform(db: Database.Database): void {
   if (!tierCols.includes('unlimited')) {
     db.exec(`ALTER TABLE event_tiers ADD COLUMN unlimited INTEGER NOT NULL DEFAULT 0`);
   }
+  // Announce a ticket type before it goes on sale.
+  //
+  // Organizers want the whole line-up visible while only part of it is
+  // sellable — early bird now, standard from next month — and the only way to
+  // do that was to leave the tier out of the page entirely and add it on the
+  // day. It shows with a "Coming soon" badge and is refused everywhere a
+  // purchase is attempted, including by a request that names it directly.
+  if (!tierCols.includes('coming_soon')) {
+    db.exec(`ALTER TABLE event_tiers ADD COLUMN coming_soon INTEGER NOT NULL DEFAULT 0`);
+  }
   // The same choice for the event as a whole. total_capacity is NOT dropped
   // when this is set: it stays on as the organizer's EXPECTED attendance, which
   // is what the platform fee is priced from — an event with no ceiling still

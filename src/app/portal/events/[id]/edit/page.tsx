@@ -245,6 +245,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
               priceCents: t.priceCents,
               cap: t.cap,
               unlimited: t.unlimited,
+              comingSoon: t.comingSoon,
               studentOnly: t.studentOnly,
               description: t.description,
             }))}

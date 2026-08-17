@@ -13,6 +13,7 @@ import {
 } from '@/lib/events';
 import type { EventRow } from '@/lib/events';
 import { getAvailability } from '@/lib/inventory';
+import { ticketState, fromPriceCents } from '@/lib/ticketState';
 import { formatMoney } from '@/lib/money';
 import { dateChipLabel } from './EventCard';
 import { listingStillUrl } from '@/lib/listing';
@@ -85,14 +86,16 @@ export interface EventBillboardProps {
 
 export default function EventBillboard({ event, leading = false }: EventBillboardProps) {
   const tiers = getEventTiers(event.id);
-  const minPrice = tiers.length ? Math.min(...tiers.map((t) => t.priceCents)) : null;
-  const { totalRemaining, unlimited, showRemaining } = getAvailability(event.id);
+  const minPrice = fromPriceCents(tiers);
+  const availability = getAvailability(event.id);
+  // One shared decision for badge, button and note — see lib/ticketState.ts for
+  // why these three used to disagree with each other.
+  const state = ticketState(event, tiers, availability);
   const { videoUrl, stillUrl, stillUrlNarrow } = billboardMedia(event);
   const accent = parsePageDesign(event.pageDesign).accent ?? 'violet';
   const design = parsePageDesign(event.pageDesign);
 
-  const soldOut = !unlimited && totalRemaining === 0;
-  const canBuy = event.salesOpen && !soldOut;
+  const canBuy = state.buyable;
   const where = [event.venueName, event.city].filter((s) => s.trim()).join(', ');
   const when = event.dateDisplay.trim() || dateChipLabel(event) || '';
 
@@ -126,13 +129,13 @@ export default function EventBillboard({ event, leading = false }: EventBillboar
       <div className="billboard-body">
         <p className="billboard-kicker">
           <span className="pulse-dot" aria-hidden />
-          {soldOut
-            ? 'Sold out'
-            : !event.salesOpen
-              ? 'Sales closed'
-              : leading && event.eventDate
-                ? 'Next up'
-                : 'On sale now'}
+          {/* The kicker follows the same single decision as the button, so the
+              two can never say different things about the same event. */}
+          {state.kind !== 'on-sale'
+            ? state.badge
+            : leading && event.eventDate
+              ? 'Next up'
+              : 'On sale now'}
         </p>
         <h2 className="billboard-title" id={`billboard-title-${event.slug}`}>
           {event.name}
@@ -152,14 +155,35 @@ export default function EventBillboard({ event, leading = false }: EventBillboar
               Get tickets
               {minPrice !== null ? ` · from ${formatMoney(minPrice, event.currency)}` : ''}
             </Link>
-          ) : null}
+          ) : (
+            /* Not a link, because there is nothing to go to — but the state has
+               to be SAID. This slot used to fall silent, so a sold-out or
+               not-yet-selling event simply lost its headline button and looked
+               broken rather than explained. */
+            <span className={`btn btn-lg ${state.kind === 'coming-soon' ? 'btn-green' : 'billboard-secondary'}`} aria-disabled="true">
+              {state.cta}
+              {state.kind === 'coming-soon' && minPrice !== null
+                ? ` · from ${formatMoney(minPrice, event.currency)}`
+                : ''}
+            </span>
+          )}
           <Link href={`/e/${event.slug}`} className="btn btn-lg billboard-secondary">
             {canBuy ? 'Event details' : 'See the event'}
           </Link>
         </p>
-        {/* No count on an uncapped event — there is nothing to count down. */}
-        {canBuy && !unlimited && showRemaining && totalRemaining <= 50 ? (
-          <p className="billboard-note">Only {totalRemaining} tickets left</p>
+        {canBuy && state.showCount && state.remaining <= 50 ? (
+          <p className="billboard-note">
+            Only {state.remaining} ticket{state.remaining === 1 ? '' : 's'} left
+          </p>
+        ) : null}
+        {/* Said here too, because the headline already spent its one line on the
+            state of what IS on sale, and a ticket type still to come is news the
+            billboard would otherwise keep to the event page. */}
+        {state.kind !== 'coming-soon' && state.upcoming > 0 ? (
+          <p className="billboard-note">
+            {state.upcoming === 1 ? 'Another ticket type is' : `${state.upcoming} more ticket types are`} coming
+            soon — see the event page for what is on the way.
+          </p>
         ) : null}
       </div>
     </section>
