@@ -32,12 +32,6 @@ export interface EventRow {
   showRemaining: boolean;
   salesOpen: boolean;
   /**
-   * How a pause reads to a buyer. An event that is up but not yet selling —
-   * the normal state while one is still being announced — should say tickets
-   * are coming, not that sales CLOSED, which sounds like something ended.
-   */
-  closedMessage: 'closed' | 'coming-soon';
-  /**
    * The organizer's WhatsApp number, digits only, or ''. Never rendered raw —
    * every use goes through lib/whatsapp.ts.
    */
@@ -125,6 +119,18 @@ export interface EventPostRow {
   createdAt: string;
 }
 
+/**
+ * What an organizer has decided about ONE ticket type.
+ *
+ *  on-sale     — buyable, subject to its cap and the room's.
+ *  coming-soon — on the page with a green badge, refused everywhere a purchase
+ *                is attempted. For a line-up announced before it goes on sale.
+ *  hidden      — not on the page at all. For a type kept for next time, or one
+ *                the organizer has stopped offering, without deleting it and
+ *                losing the orders attached to it.
+ */
+export type TierStatus = 'on-sale' | 'coming-soon' | 'hidden';
+
 export interface EventTierRow {
   id: string;
   eventId: string;
@@ -138,7 +144,7 @@ export interface EventTierRow {
    * Announced but not yet on sale. Shown on the event page with a "Coming soon"
    * badge and refused by every purchase path — see the guard in api/orders.
    */
-  comingSoon: boolean;
+  status: TierStatus;
   studentOnly: boolean;
   description: string;
   sort: number;
@@ -186,7 +192,6 @@ const EVENT_COLS = `
   total_capacity AS totalCapacity,
   show_remaining AS showRemaining,
   sales_open AS salesOpen,
-  closed_message AS closedMessage,
   whatsapp,
   whatsapp_name AS whatsappName,
   max_per_order AS maxPerOrder,
@@ -227,7 +232,6 @@ function rowToEvent(row: Record<string, unknown> | undefined): EventRow | null {
     salesOpen: Boolean(row.salesOpen),
     // Added by migration, and a free-text column, so anything unrecognised
     // falls back to the wording that is always safe to show.
-    closedMessage: row.closedMessage === 'coming-soon' ? 'coming-soon' : 'closed',
     whatsapp: (row.whatsapp as string | null) ?? '',
     whatsappName: (row.whatsappName as string | null) ?? '',
     showRemaining: Boolean(row.showRemaining),
@@ -386,7 +390,7 @@ export function getEventTiers(eventId: string): EventTierRow[] {
   const rows = getDb()
     .prepare(
       `SELECT id, event_id AS eventId, tier_key AS tierKey, name, price_cents AS priceCents,
-              cap, unlimited, coming_soon AS comingSoon, student_only AS studentOnly, description, sort
+              cap, unlimited, status, student_only AS studentOnly, description, sort
        FROM event_tiers WHERE event_id = ? ORDER BY sort, tier_key`
     )
     .all(eventId) as (Omit<EventTierRow, 'studentOnly' | 'unlimited'> & {
@@ -397,7 +401,9 @@ export function getEventTiers(eventId: string): EventTierRow[] {
     ...r,
     studentOnly: Boolean(r.studentOnly),
     unlimited: Boolean(r.unlimited),
-    comingSoon: Boolean(r.comingSoon),
+    // Whitelisted on the way out as well as in: an unrecognised value must not
+    // silently hide a ticket type an organizer is trying to sell.
+    status: r.status === 'coming-soon' || r.status === 'hidden' ? r.status : 'on-sale',
   }));
 }
 

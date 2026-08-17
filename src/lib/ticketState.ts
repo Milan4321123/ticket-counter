@@ -56,21 +56,26 @@ export interface TicketState {
   upcoming: number;
 }
 
+/** Ticket types a visitor should see at all — 'hidden' is off the page. */
+export function visibleTiers(tiers: EventTierRow[]): EventTierRow[] {
+  return tiers.filter((t) => t.status !== 'hidden');
+}
+
 /**
- * Whether a paused event should read as "not open yet" rather than "closed".
+ * Nothing is on sale, but something has been announced.
  *
- * Two ways to say the same thing, and both count: the organizer picks the
- * wording on the details form, or marks every ticket type "coming soon".
+ * Read from the TICKETS and nothing else. It used to also consult an event-wide
+ * "what a pause says" setting, which overrode every ticket type at once: an
+ * organizer who set one type to coming-soon and left another on sale watched
+ * both go green, with no way to tell which control had won. Coming soon is a
+ * property of a ticket now, and only of a ticket.
  *
  * Exported so a refusal from the orders API cannot contradict the badge the
- * buyer was looking at when they pressed the button — which it did, telling
- * someone "sales are closed" on an event whose every page said coming soon.
+ * buyer was looking at when they pressed the button.
  */
-export function readsAsComingSoon(event: EventRow, tiers: EventTierRow[]): boolean {
-  return (
-    event.closedMessage === 'coming-soon' ||
-    (tiers.length > 0 && tiers.every((t) => t.comingSoon))
-  );
+export function readsAsComingSoon(tiers: EventTierRow[]): boolean {
+  const visible = visibleTiers(tiers);
+  return visible.length > 0 && !visible.some((t) => t.status === 'on-sale');
 }
 
 /**
@@ -90,17 +95,19 @@ export function ticketState(
 
   // Only tiers that are actually for sale count as stock. A tier that is merely
   // announced is not inventory, and counting it would make an event whose whole
-  // line-up is "coming soon" look like it was on sale.
-  const sellable = tiers.filter((t) => !t.comingSoon);
-  const upcoming = tiers.length - sellable.length;
+  // line-up is "coming soon" look like it was on sale. Hidden types are not on
+  // the page at all, so they count for nothing either way.
+  const visible = visibleTiers(tiers);
+  const sellable = visible.filter((t) => t.status === 'on-sale');
+  const upcoming = visible.filter((t) => t.status === 'coming-soon').length;
   /**
    * Nothing has been offered for sale yet.
    *
-   * Covers an event with no ticket types at all, not only one whose every type
-   * is marked coming soon. Guarding this on `tiers.length > 0` sent a
-   * half-built event down the sold-out branch — the empty reduce below makes
-   * `remaining` 0 — so an organizer previewing a page they had not added
-   * tickets to yet was told it had sold out.
+   * Covers an event with no visible ticket types at all, not only one whose
+   * every type is announced. Guarding this on a non-empty list sent a half-built
+   * event down the sold-out branch — the empty reduce below makes `remaining` 0
+   * — so an organizer previewing a page they had not added tickets to yet was
+   * told it had sold out.
    */
   const nothingOnSaleYet = sellable.length === 0;
 
@@ -115,35 +122,19 @@ export function ticketState(
   if (opts.past) {
     return { kind: 'past', buyable: false, remaining: 0, badge: 'Finished', cta: 'See page', showCount, upcoming };
   }
-  if (!event.salesOpen) {
-    // Pausing sales is what an organizer does BEFORE an event opens as well as
-    // after, so they choose which of the two it is. Saying "Sales closed" on a
-    // page that went up to gather an audience announces that something is over
-    // before it ever started, and costs the organizer the audience they were
-    // building. An organizer who marked every ticket type "coming soon" and
-    // paused sales while they finished the page was told exactly that, because
-    // the pause was read first and never looked at the tickets.
-    //
-    // The remaining count is dropped in this reading: whatever is sitting
-    // unsold is not "left", it has not been offered.
-    if (readsAsComingSoon(event, tiers)) {
-      return {
-        kind: 'coming-soon',
-        buyable: false,
-        remaining: 0,
-        badge: 'Tickets coming soon',
-        cta: 'Coming soon',
-        showCount,
-        upcoming,
-      };
-    }
-    return { kind: 'closed', buyable: false, remaining, badge: 'Sales closed', cta: 'Sales closed', showCount, upcoming };
-  }
-  // Announced-but-not-yet-selling is checked BEFORE sold out: an event where
-  // nothing has gone on sale has not sold out, and saying so would be a lie that
-  // costs the organizer the audience they were building.
+  // Announced-but-not-yet-selling is checked before BOTH the pause and sold out.
+  //
+  // Before sold out, because an event where nothing has gone on sale has not
+  // sold out, and saying so costs the organizer the audience they were building.
+  // Before the pause, because a pause is the organizer stopping sales — and
+  // there is nothing to stop when no ticket type was on sale in the first place.
+  // The count is dropped: what is sitting unsold is not "left", it was never
+  // offered.
   if (nothingOnSaleYet) {
     return { kind: 'coming-soon', buyable: false, remaining: 0, badge: 'Coming soon', cta: 'Coming soon', showCount, upcoming };
+  }
+  if (!event.salesOpen) {
+    return { kind: 'closed', buyable: false, remaining, badge: 'Sales closed', cta: 'Sales closed', showCount, upcoming };
   }
   if (remaining === 0) {
     return { kind: 'sold-out', buyable: false, remaining: 0, badge: 'Sold out', cta: 'Sold out', showCount, upcoming };
@@ -184,7 +175,8 @@ export function fromPriceCents(tiers: EventTierRow[], availability?: Availabilit
   const hasStock = (t: EventTierRow) =>
     !availability || (availability.tiers[t.tierKey]?.remaining ?? 0) > 0;
 
-  const onSale = tiers.filter((t) => !t.comingSoon && hasStock(t));
-  const announced = tiers.filter((t) => t.comingSoon);
-  return cheapest(onSale) ?? cheapest(announced) ?? cheapest(tiers);
+  const visible = visibleTiers(tiers);
+  const onSale = visible.filter((t) => t.status === 'on-sale' && hasStock(t));
+  const announced = visible.filter((t) => t.status === 'coming-soon');
+  return cheapest(onSale) ?? cheapest(announced) ?? cheapest(visible);
 }

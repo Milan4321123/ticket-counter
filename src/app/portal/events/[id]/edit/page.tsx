@@ -214,7 +214,6 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
               maxPerOrder: event.maxPerOrder,
               payWithinDays: event.payWithinDays,
               salesOpen: event.salesOpen,
-              closedMessage: event.closedMessage,
               whatsapp: event.whatsapp,
               whatsappName: event.whatsappName,
               // The bubble wears the event's own profile photo rather than a
@@ -267,10 +266,8 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
           <div className="notice notice-warn" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <span style={{ flex: 1, minWidth: 260 }}>
               Ticket sales are switched <strong>off</strong> for this whole event, so your page shows{' '}
-              <strong>
-                {event.closedMessage === 'coming-soon' ? '“Tickets coming soon”' : '“Sales closed”'}
-              </strong>{' '}
-              and nothing here can be bought — whatever you set per ticket type below.
+              <strong>&ldquo;Sales closed&rdquo;</strong> and nothing here can be bought, whatever each
+              ticket type below says.
             </span>
             <GoToTab tab="basics">Switch sales on in Basics →</GoToTab>
           </div>
@@ -283,7 +280,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
               priceCents: t.priceCents,
               cap: t.cap,
               unlimited: t.unlimited,
-              comingSoon: t.comingSoon,
+              status: t.status,
               studentOnly: t.studentOnly,
               description: t.description,
             }))}
@@ -470,9 +467,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
               switched off: the page is up, but nobody can buy. Shown beside it,
               from every tab, in the words the page itself is using. */}
           {!event.salesOpen && event.status === 'published' && (
-            <span className={`badge ${event.closedMessage === 'coming-soon' ? 'badge-green' : 'badge-amber'}`}>
-              {event.closedMessage === 'coming-soon' ? 'Tickets coming soon' : 'Sales closed'}
-            </span>
+            <span className="badge badge-amber">Sales closed</span>
           )}
           <span className="badge badge-accent">{stepsDone} of 4 steps done</span>
           <span style={{ flex: 1 }} />

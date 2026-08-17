@@ -188,7 +188,7 @@ export function eventJsonLd({
       // PreOrder is the state Google documents for "announced, not yet
       // purchasable" — it keeps the listing alive without promising a checkout.
       availability:
-        tier.comingSoon || (!event.salesOpen && readsAsComingSoon(event, tiers))
+        tier.status === 'coming-soon' || (!event.salesOpen && readsAsComingSoon(tiers))
           ? 'https://schema.org/PreOrder'
           : !event.salesOpen || totalRemaining === 0 || (remainingByTier[tier.tierKey] ?? 0) === 0
             ? 'https://schema.org/SoldOut'

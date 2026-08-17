@@ -49,7 +49,9 @@ export default function PublishPanel({ eventId, status, slug, checklist, fee }: 
     if (busy) return;
     if (
       next === 'draft' &&
-      !window.confirm('Take the event offline?\n\nIt disappears from the public feed and its page — you can publish it again any time. Existing tickets stay valid.')
+      !window.confirm(
+        'Take the event offline?\n\nIt comes off the public feed and its link stops working. You keep editing it in your portal and can publish it again any time — no new fee. Tickets already bought stay valid.'
+      )
     ) {
       return;
     }
@@ -111,6 +113,12 @@ export default function PublishPanel({ eventId, status, slug, checklist, fee }: 
           <button type="button" className="btn btn-sm" onClick={() => void setStatus('draft')} disabled={busy}>
             {busy ? 'Working…' : 'Take offline'}
           </button>
+          <p className="muted small" style={{ margin: '10px 0 0' }}>
+            Your page comes off the feed and its public link stops working, and you carry on editing
+            it here exactly as before. Publish again whenever you like — the fee is per event and
+            already paid, so going offline and back on costs nothing. Tickets people already bought
+            stay valid either way.
+          </p>
         </div>
       ) : (
         <div>

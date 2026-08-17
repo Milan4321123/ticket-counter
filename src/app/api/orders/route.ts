@@ -62,7 +62,8 @@ function validateBody(raw: unknown, event: EventRow): ValidatedOrder | string {
     // Announced, not on sale. The checkout does not offer these rows, but the
     // browser is not the guard — a request naming the tier directly has to be
     // refused here, or "coming soon" would be a label rather than a rule.
-    if (tier.comingSoon) return `“${tier.name}” is not on sale yet.`;
+    if (tier.status === 'coming-soon') return `“${tier.name}” is not on sale yet.`;
+    if (tier.status === 'hidden') return `“${tier.name}” is not on offer for this event.`;
     if (seenTiers.has(it.tierId)) return 'Each ticket type can only appear once in an order.';
     seenTiers.add(it.tierId);
     if (!Number.isInteger(it.quantity) || it.quantity < 1 || it.quantity > maxTicketsPerOrder) {
@@ -113,7 +114,7 @@ export async function POST(req: Request) {
       return apiError(
         403,
         'SALES_CLOSED',
-        readsAsComingSoon(event, getEventTiers(event.id))
+        readsAsComingSoon(getEventTiers(event.id))
           ? 'Tickets for this event are not on sale yet.'
           : 'Ticket sales are currently closed for this event.'
       );

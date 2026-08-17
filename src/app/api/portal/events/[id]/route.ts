@@ -16,6 +16,7 @@ import {
   parsePageDesign,
   quoteEventFee,
   videoEmbedUrl,
+  type TierStatus,
 } from '@/lib/events';
 import { readJsonLimited, BodyTooLargeError } from '@/lib/http';
 import { organizerTotpEnabled } from '@/lib/organizerTotp';
@@ -94,7 +95,7 @@ interface TierPayload {
   /** True when this ticket type is uncapped — `cap` is stored but not used. */
   unlimited: boolean;
   /** Announced, not yet sellable. */
-  comingSoon: boolean;
+  status: TierStatus;
   studentOnly: boolean;
   description: string;
 }
@@ -377,15 +378,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       set('whatsapp_name', name);
       merged.whatsappName = name;
     }
-    if ('closedMessage' in body) {
-      // Whitelisted, not stored as given: this string is chosen by an
-      // organizer and read back onto a public page, so only the two values the
-      // page knows how to render are ever written.
-      const v = body.closedMessage;
-      need(v === 'closed' || v === 'coming-soon', 'Choose what the page says while sales are off.');
-      set('closed_message', v);
-      merged.closedMessage = v as 'closed' | 'coming-soon';
-    }
 
     // ---- Bank details (the ORGANIZER's own account) ----------------------
     //
@@ -589,7 +581,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         // Absent on bodies from older clients — treated as limited, which is
         // what every event did before this flag existed.
         const unlimited = r.unlimited === true;
-      const comingSoon = (r as { comingSoon?: unknown }).comingSoon === true;
+        // Whitelisted, and absent means on-sale: a body from an older client
+        // must not be able to hide a ticket type an organizer is selling.
+        const rawStatus = (r as { status?: unknown }).status;
+        const status: TierStatus =
+          rawStatus === 'coming-soon' || rawStatus === 'hidden' ? rawStatus : 'on-sale';
         need(typeof r.studentOnly === 'boolean', 'Student-only must be on or off.');
         const description = strField(r.description ?? '', `The description of "${name}"`, 300);
 
@@ -603,7 +599,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         } else {
           tierKey = tierKeyFromName(name, taken);
         }
-        keep.push({ tierKey, name, priceCents, cap, unlimited, comingSoon, studentOnly: r.studentOnly, description });
+        keep.push({ tierKey, name, priceCents, cap, unlimited, status, studentOnly: r.studentOnly, description });
       }
 
       const keptKeys = new Set(keep.map((t) => t.tierKey));
@@ -721,19 +717,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const del = db.prepare(`DELETE FROM event_tiers WHERE event_id = ? AND tier_key = ?`);
         for (const key of tiersPlan.removeKeys) del.run(event.id, key);
         const upd = db.prepare(
-          `UPDATE event_tiers SET name = ?, price_cents = ?, cap = ?, unlimited = ?, coming_soon = ?, student_only = ?, description = ?, sort = ?
+          `UPDATE event_tiers SET name = ?, price_cents = ?, cap = ?, unlimited = ?, status = ?, student_only = ?, description = ?, sort = ?
            WHERE event_id = ? AND tier_key = ?`
         );
         const ins = db.prepare(
-          `INSERT INTO event_tiers (id, event_id, tier_key, name, price_cents, cap, unlimited, coming_soon, student_only, description, sort)
+          `INSERT INTO event_tiers (id, event_id, tier_key, name, price_cents, cap, unlimited, status, student_only, description, sort)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         );
         const existingKeys = new Set(existingTiers.map((t) => t.tierKey));
         tiersPlan.keep.forEach((t, sort) => {
           if (existingKeys.has(t.tierKey)) {
-            upd.run(t.name, t.priceCents, t.cap, t.unlimited ? 1 : 0, t.comingSoon ? 1 : 0, t.studentOnly ? 1 : 0, t.description, sort, event.id, t.tierKey);
+            upd.run(t.name, t.priceCents, t.cap, t.unlimited ? 1 : 0, t.status, t.studentOnly ? 1 : 0, t.description, sort, event.id, t.tierKey);
           } else {
-            ins.run(newId(), event.id, t.tierKey, t.name, t.priceCents, t.cap, t.unlimited ? 1 : 0, t.comingSoon ? 1 : 0, t.studentOnly ? 1 : 0, t.description, sort);
+            ins.run(newId(), event.id, t.tierKey, t.name, t.priceCents, t.cap, t.unlimited ? 1 : 0, t.status, t.studentOnly ? 1 : 0, t.description, sort);
           }
         });
       }
@@ -804,7 +800,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
               priceCents: t.priceCents,
               cap: t.cap,
               unlimited: t.unlimited,
-              comingSoon: t.comingSoon,
+              status: t.status,
               studentOnly: t.studentOnly,
               description: t.description,
             })),

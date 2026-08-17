@@ -30,7 +30,7 @@ import {
 } from '@/lib/events';
 import type { EventRow, PageDesign } from '@/lib/events';
 import { getAvailability } from '@/lib/inventory';
-import { ticketState, fromPriceCents } from '@/lib/ticketState';
+import { ticketState, fromPriceCents, visibleTiers } from '@/lib/ticketState';
 import { currentOrganizer, getOrganizer } from '@/lib/organizers';
 import { formatMoney } from '@/lib/money';
 import {
@@ -679,7 +679,7 @@ export default async function EventPage({ params }: Params) {
               <p className="section-kicker">Pick your spot</p>
               <h2 className="page-title">Tickets</h2>
               <div className="tier-grid">
-                {tiers.map((tier) => {
+                {visibleTiers(tiers).map((tier) => {
                   const tierAvail = availability.tiers[tier.tierKey];
                   const remaining = tierAvail?.remaining ?? 0;
                   // The card is the button when this type can actually be
@@ -692,30 +692,40 @@ export default async function EventPage({ params }: Params) {
                   // checkout 404s on an unpublished event, so a live link here
                   // would walk an organizer previewing their own draft straight
                   // into a dead end — off the biggest tap target on the page.
-                  const tierBuyable = state.buyable && !preview && !tier.comingSoon && remaining > 0;
+                  const tierBuyable =
+                    state.buyable && !preview && tier.status === 'on-sale' && remaining > 0;
                   const card = (
                     <>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        {/* Order matters. The event's own state comes first: a
-                            finished or paused event cannot have a ticket type
-                            that is "Available", and this list used to say so
-                            anyway because it only ever looked at its own row.
-                            Then announced, then sold out, and only THEN the
-                            countdown — because hiding the count must hide the
-                            NUMBER, never the fact. This branch used to start with
-                            "uncapped or countdown hidden -> Available", so a tier
-                            with the countdown switched off said Available after
-                            it had completely sold out. */}
+                        {/* Order matters, and it is: finished, then this row's
+                            own status, then its own stock, then the event's
+                            pause, then the countdown.
+                            Own-status-before-event is what lets an early bird
+                            read "Sold out" beside a standard reading "Coming
+                            soon" — for a while a paused event relabelled every
+                            row at once, which is what made the two controls
+                            impossible to tell apart. Countdown LAST because
+                            hiding the count must hide the NUMBER, never the
+                            fact: this chain once began with "countdown hidden ->
+                            Available", so a tier with it switched off said
+                            Available after selling out completely. */}
                         {state.kind === 'past' ? (
                           <span className="badge">{state.badge}</span>
-                        ) : state.kind === 'closed' ? (
-                          /* Amber, the same as the hero says it. Red here read
-                             as a failure next to an amber pause overhead. */
-                          <span className="badge badge-amber">{state.badge}</span>
-                        ) : tier.comingSoon || state.kind === 'coming-soon' ? (
+                        ) : tier.status === 'coming-soon' ? (
+                          /* Its OWN status first, ahead of the event's. A paused
+                             event used to relabel every row, so an organizer who
+                             set one type to coming-soon and another on sale saw
+                             both go the same colour and could not tell which
+                             control had won. "Coming soon" is true of this
+                             ticket whether or not sales are paused. */
                           <span className="badge badge-green">Coming soon</span>
                         ) : remaining === 0 ? (
                           <span className="badge badge-red">Sold out</span>
+                        ) : state.kind === 'closed' ? (
+                          /* On sale, but the event as a whole is paused — so the
+                             honest word for THIS row is the event's, in the
+                             amber the hero uses for it. */
+                          <span className="badge badge-amber">{state.badge}</span>
                         ) : availability.showRemaining && remaining <= 25 ? (
                           <span className="badge badge-amber">Only {remaining} left</span>
                         ) : (

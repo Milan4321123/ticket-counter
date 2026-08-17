@@ -97,7 +97,7 @@ export default async function EventCheckoutPage({ params }: Params) {
         // Coming-soon types are not offered at checkout at all: a stepper that
         // cannot go above zero is a worse answer than not showing the row.
         tiers: getEventTiers(event.id)
-          .filter((t) => !t.comingSoon)
+          .filter((t) => t.status === 'on-sale')
           .map((t) => ({
             id: t.tierKey,
             name: t.name,

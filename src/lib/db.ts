@@ -117,7 +117,7 @@ CREATE TABLE IF NOT EXISTS events (
   currency TEXT NOT NULL DEFAULT 'EUR',
   total_capacity INTEGER NOT NULL DEFAULT 100,
   sales_open INTEGER NOT NULL DEFAULT 1,
-  closed_message TEXT NOT NULL DEFAULT 'closed', -- how a PAUSE reads: 'closed' | 'coming-soon'
+  closed_message TEXT NOT NULL DEFAULT 'closed', -- RETIRED, nothing reads it: see the migration note
   whatsapp TEXT NOT NULL DEFAULT '',      -- organizer's WhatsApp, digits only (see lib/whatsapp.ts)
   whatsapp_name TEXT NOT NULL DEFAULT '', -- who the bubble says you are; '' = the account name
   max_per_order INTEGER NOT NULL DEFAULT 8,
@@ -386,13 +386,25 @@ function migrateToPlatform(db: Database.Database): void {
   if (!tierCols.includes('coming_soon')) {
     db.exec(`ALTER TABLE event_tiers ADD COLUMN coming_soon INTEGER NOT NULL DEFAULT 0`);
   }
-  // How a PAUSE reads, chosen by the organizer.
+  // ONE status per ticket type: 'on-sale' | 'coming-soon' | 'hidden'.
   //
-  // Pausing sales is what an organizer does BEFORE an event opens as well as
-  // after — the page goes up to gather an audience weeks before a single
-  // ticket is for sale. Both used to render the same amber "Sales closed",
-  // which on a brand-new event announces that something is over before it ever
-  // started. Defaults to the old wording, so no existing event changes.
+  // Replaces the coming_soon flag, which could only say two things. An
+  // organizer with an early bird, a standard and a student ticket needs to say
+  // something different about each — this one is selling, that one is announced,
+  // that one is not on offer at all — and a boolean forced them to delete a
+  // ticket type to take it off the page. coming_soon is RETIRED: it is migrated
+  // across once, below, and nothing reads it afterwards.
+  if (!tierCols.includes('status')) {
+    db.exec(`ALTER TABLE event_tiers ADD COLUMN status TEXT NOT NULL DEFAULT 'on-sale'`);
+    db.exec(`UPDATE event_tiers SET status = 'coming-soon' WHERE coming_soon = 1`);
+  }
+  // RETIRED. It let an organizer choose whether a PAUSE read "Sales closed" or
+  // "Tickets coming soon" — a second way to say what the per-ticket status
+  // below already says, and it overrode every ticket type at once. An organizer
+  // who set one ticket to coming-soon and another to on-sale watched both go
+  // green and could not tell which control had won. The pause now always reads
+  // "Sales closed"; "coming soon" is a property of a TICKET. Column kept so no
+  // migration has to rewrite the table; nothing reads it.
   if (!eventCols.includes('closed_message')) {
     db.exec(`ALTER TABLE events ADD COLUMN closed_message TEXT NOT NULL DEFAULT 'closed'`);
   }

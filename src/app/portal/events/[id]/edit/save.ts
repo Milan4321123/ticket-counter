@@ -8,8 +8,8 @@ export interface SavedTier {
   cap: number;
   /** True when this ticket type has no limit — `cap` is then ignored. */
   unlimited: boolean;
-  /** Announced on the event page but not yet purchasable. */
-  comingSoon: boolean;
+  /** on-sale | coming-soon | hidden — see lib/events.ts TierStatus. */
+  status: 'on-sale' | 'coming-soon' | 'hidden';
   studentOnly: boolean;
   description: string;
 }

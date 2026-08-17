@@ -10,7 +10,7 @@ interface Row {
   price: string; // EUR, as typed ("25" or "25,50")
   cap: string;
   unlimited: boolean;
-  comingSoon: boolean;
+  status: 'on-sale' | 'coming-soon' | 'hidden';
   studentOnly: boolean;
   description: string;
 }
@@ -29,7 +29,7 @@ function toRow(t: SavedTier): Row {
     price: (t.priceCents / 100).toFixed(2),
     cap: String(t.cap),
     unlimited: Boolean(t.unlimited),
-    comingSoon: Boolean(t.comingSoon),
+    status: t.status ?? 'on-sale',
     studentOnly: t.studentOnly,
     description: t.description,
   };
@@ -48,7 +48,7 @@ export default function TiersEditor({ eventId, initialTiers, soldByTierKey }: Pr
   }
 
   function addRow() {
-    setRows((prev) => [...prev, { tierKey: null, name: '', price: '', cap: '', unlimited: false, comingSoon: false, studentOnly: false, description: '' }]);
+    setRows((prev) => [...prev, { tierKey: null, name: '', price: '', cap: '', unlimited: false, status: 'on-sale', studentOnly: false, description: '' }]);
   }
 
   function removeRow(index: number) {
@@ -77,7 +77,7 @@ export default function TiersEditor({ eventId, initialTiers, soldByTierKey }: Pr
       priceCents: number;
       cap: number;
       unlimited: boolean;
-      comingSoon: boolean;
+      status: 'on-sale' | 'coming-soon' | 'hidden';
       studentOnly: boolean;
       description: string;
     }[] =
@@ -108,7 +108,7 @@ export default function TiersEditor({ eventId, initialTiers, soldByTierKey }: Pr
         cap,
         unlimited: row.unlimited,
         studentOnly: row.studentOnly,
-        comingSoon: row.comingSoon,
+        status: row.status,
         description: row.description.trim(),
       });
     }
@@ -210,21 +210,51 @@ export default function TiersEditor({ eventId, initialTiers, soldByTierKey }: Pr
                     </span>
                   </span>
                 </label>
-                <label className="checkbox-row" style={{ marginTop: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={row.comingSoon}
-                    onChange={(e) => patchRow(i, { comingSoon: e.target.checked })}
-                  />
-                  <span>
-                    Coming soon — announce it, don&rsquo;t sell it yet
-                    <span className="muted small" style={{ display: 'block' }}>
-                      Shown on your event page with a green <strong>Coming soon</strong> badge, and
-                      nobody can buy it until you switch this off. Use it to put the whole line-up up
-                      while only the early-bird is on sale.
-                    </span>
-                  </span>
-                </label>
+                {/* One dropdown per ticket type, not a checkbox: an organizer
+                    with an early bird, a standard and a student ticket needs to
+                    say something DIFFERENT about each, and a yes/no could only
+                    ever say two things. Whatever is chosen here is what that row
+                    shows on the event page — no event-wide setting overrules it. */}
+                <div className="field" style={{ marginTop: 10, marginBottom: 0 }}>
+                  <label htmlFor={`tier-status-${i}`} className="small">
+                    This ticket is
+                  </label>
+                  <select
+                    id={`tier-status-${i}`}
+                    className="input"
+                    value={row.status}
+                    onChange={(e) =>
+                      patchRow(i, {
+                        status:
+                          e.target.value === 'coming-soon' || e.target.value === 'hidden'
+                            ? e.target.value
+                            : 'on-sale',
+                      })
+                    }
+                  >
+                    <option value="on-sale">On sale — people can buy it now</option>
+                    <option value="coming-soon">Coming soon — announced, not on sale yet</option>
+                    <option value="hidden">Not available — off the page entirely</option>
+                  </select>
+                  <p className="muted small" style={{ margin: '6px 0 0' }}>
+                    {row.status === 'coming-soon' ? (
+                      <>
+                        On your page with a green <strong>Coming soon</strong> badge and its price, so
+                        people can see what is on the way. Nobody can buy it until you switch this to
+                        On sale.
+                      </>
+                    ) : row.status === 'hidden' ? (
+                      <>
+                        Not shown to anyone and not buyable. Use this instead of deleting a ticket
+                        type you might sell again — deleting one loses the orders attached to it.
+                      </>
+                    ) : (
+                      <>
+                        On sale now, up to its limit. Sells out on its own when the limit is reached.
+                      </>
+                    )}
+                  </p>
+                </div>
               </div>
             </div>
             <div className="field" style={{ marginBottom: 10 }}>
