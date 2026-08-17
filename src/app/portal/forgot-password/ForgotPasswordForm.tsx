@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { MIN_PASSWORD_LENGTH, passwordProblem } from '@/lib/passwordPolicy';
 
 const RESEND_COOLDOWN_S = 60;
-const MIN_PASSWORD_LENGTH = 8;
 
 type Step = 'email' | 'code';
 
@@ -108,8 +108,9 @@ export default function ForgotPasswordForm() {
       setError('Please type the 6-digit code from the email.');
       return;
     }
-    if (next.length < MIN_PASSWORD_LENGTH) {
-      setError(`Your new password needs at least ${MIN_PASSWORD_LENGTH} characters.`);
+    const problem = passwordProblem(next);
+    if (problem) {
+      setError(problem);
       return;
     }
     if (next !== confirm) {

@@ -8,6 +8,7 @@ import {
   setOrganizerPassword,
 } from '@/lib/organizers';
 import { isRateLimited, recordStrike } from '@/lib/ratelimit';
+import { passwordProblem } from '@/lib/passwordPolicy';
 import type { ApiErrorResponse } from '@/lib/types';
 import { requireOrganizerApi } from '../auth';
 
@@ -52,11 +53,9 @@ export async function POST(req: Request) {
       }
     }
 
-    if (newPassword.length < 8 || newPassword.length > 200) {
-      return NextResponse.json(
-        { error: 'Your new password needs at least 8 characters.' } satisfies ApiErrorResponse,
-        { status: 400 }
-      );
+    const problem = passwordProblem(newPassword);
+    if (problem) {
+      return NextResponse.json({ error: problem } satisfies ApiErrorResponse, { status: 400 });
     }
     if (newPassword === currentPassword) {
       return NextResponse.json(

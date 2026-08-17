@@ -14,6 +14,7 @@ import {
   verifyOrganizerResetCode,
 } from '@/lib/passwordReset';
 import { clientIp, rateLimit } from '@/lib/ratelimit';
+import { passwordProblem } from '@/lib/passwordPolicy';
 import type { ApiErrorResponse } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -27,8 +28,6 @@ const GLOBAL_KEY = 'pw-reset-confirm:all';
 const GLOBAL_LIMIT = 200;
 const GLOBAL_WINDOW_MS = 60 * 60_000;
 
-const MIN_PASSWORD_LENGTH = 8; // same floor as /api/portal/password
-const MAX_PASSWORD_LENGTH = 200;
 
 /** One rejection for every way this can fail — see RESET_CODE_REJECTED_MESSAGE. */
 function rejected() {
@@ -74,11 +73,9 @@ export async function POST(req: Request) {
 
     // The password is judged BEFORE the code is checked: a good code must not
     // be burnt because the password they typed was two characters short.
-    if (newPassword.length < MIN_PASSWORD_LENGTH || newPassword.length > MAX_PASSWORD_LENGTH) {
-      return NextResponse.json(
-        { error: `Your new password needs at least ${MIN_PASSWORD_LENGTH} characters.` } satisfies ApiErrorResponse,
-        { status: 400 }
-      );
+    const problem = passwordProblem(newPassword);
+    if (problem) {
+      return NextResponse.json({ error: problem } satisfies ApiErrorResponse, { status: 400 });
     }
 
     if (!email || !code) return rejected();
