@@ -18,10 +18,24 @@ export interface SaveData {
   tiers?: SavedTier[];
 }
 
+/**
+ * How the server wants this organizer to re-prove themselves before their
+ * payout account moves. Present ONLY on a refusal — see lib/payoutStepUp.ts.
+ */
+export interface StepUpRequest {
+  required: true;
+  method: 'authenticator' | 'password';
+  hint: string;
+  /** True when this account has no authenticator and would be safer with one. */
+  urgeEnrolment: boolean;
+}
+
 export interface SaveResult {
   ok: boolean;
   error?: string;
   data?: SaveData;
+  /** Set when the save was refused pending a payout confirmation. */
+  stepUp?: StepUpRequest;
 }
 
 export async function saveEvent(eventId: string, patch: Record<string, unknown>): Promise<SaveResult> {
@@ -31,9 +45,15 @@ export async function saveEvent(eventId: string, patch: Record<string, unknown>)
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patch),
     });
-    const data = (await res.json().catch(() => null)) as (SaveData & { ok?: boolean; error?: string }) | null;
+    const data = (await res.json().catch(() => null)) as
+      | (SaveData & { ok?: boolean; error?: string; stepUp?: StepUpRequest })
+      | null;
     if (!res.ok) {
-      return { ok: false, error: data?.error ?? 'Something went wrong — please try again.' };
+      return {
+        ok: false,
+        error: data?.error ?? 'Something went wrong — please try again.',
+        ...(data?.stepUp?.required ? { stepUp: data.stepUp } : {}),
+      };
     }
     return { ok: true, data: data ?? undefined };
   } catch {

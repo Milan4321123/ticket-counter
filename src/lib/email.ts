@@ -1696,3 +1696,229 @@ export async function sendQuestionAnsweredEmail(
     return { sent: false, reason: 'send-failed' };
   }
 }
+
+// ---------------- The payout account moved ----------------
+
+export interface PayoutChangeDetails {
+  /** What moved, in words — e.g. ['your IBAN', 'the account holder']. */
+  labels: string[];
+  /** The NEW values. Only ever shown masked; see maskTail(). */
+  bankIban: string;
+  paypalAccount: string;
+  /** True when this filled an empty payout account rather than moving one. */
+  firstTime: boolean;
+}
+
+/**
+ * Last four characters only.
+ *
+ * A notification is the one message that goes to an address we are not certain
+ * is still in the right hands — the whole point is that it reaches someone who
+ * may have just been robbed. Printing the new IBAN in full would hand the
+ * attacker's account number to the victim and the victim's to the attacker, and
+ * help neither. Four characters is enough for the owner to recognise their own
+ * account, and not enough for anyone to use.
+ *
+ * Deliberately a local copy rather than an import from lib/payoutStepUp: that
+ * module reaches the signing secret through lib/auth, which pulls in
+ * next/headers, and this file is also used from background jobs that run
+ * outside any request.
+ */
+function maskTail(value: string): string {
+  const compact = value.replace(/\s+/g, '');
+  if (!compact) return 'removed';
+  if (compact.length <= 4) return `••••${compact}`;
+  return `••••${compact.slice(-4)}`;
+}
+
+/**
+ * Tell the organizer — and the platform owner — that the account their ticket
+ * money is paid into has changed.
+ *
+ * This is an ALARM, not a receipt. It is written for the person who did not
+ * make the change: it leads with what happened, says when, and says what to do,
+ * because if it is unwelcome then every minute before it is read is a buyer
+ * transferring money to a stranger.
+ *
+ * The platform owner gets their own copy, and that is not a courtesy. Mail to
+ * some providers is being silently dropped until the sending domain is
+ * authenticated, so the organizer's copy may never arrive — the owner's inbox is
+ * the backstop that means a redirected payout is still noticed by somebody.
+ *
+ * Never throws: the change is already committed by the time this runs.
+ */
+export async function sendPayoutChangedEmail(
+  organizer: OrganizerContact,
+  event: { id: string; name: string },
+  change: PayoutChangeDetails
+): Promise<{ sent: boolean; reason?: string }> {
+  try {
+    if (!isEmailConfigured()) return { sent: false, reason: 'email-not-configured' };
+
+    const brand = platformName();
+    const what = change.labels.join(' and ');
+    const headline = change.firstTime
+      ? `Payment details set for ${event.name}`
+      : `The payout account for ${event.name} has changed`;
+    const kicker = change.firstTime ? 'Payment details set' : 'Payout account changed';
+    const editUrl = `${getBaseUrl()}/portal/events/${event.id}/edit`;
+
+    const rows: DetailRow[] = [
+      { label: 'Event', value: event.name },
+      ...(change.bankIban.trim() ? [{ label: 'IBAN now ending', value: maskTail(change.bankIban), mono: true }] : []),
+      ...(change.paypalAccount.trim()
+        ? [{ label: 'PayPal now ending', value: maskTail(change.paypalAccount), mono: true }]
+        : []),
+    ];
+
+    const alarmHtml = change.firstTime
+      ? `<strong>If you did not do this</strong>, someone else is signed in to your organizer account. ` +
+        `Change your password now and reply to this email.`
+      : `<strong>If you did not make this change, act now.</strong> Someone else is signed in to your ` +
+        `organizer account and your buyers' payments are going to them. Change your password immediately, ` +
+        `set the correct account back, and reply to this email so we can help.`;
+
+    const bodyHtml =
+      pHtml(`Hi ${escapeHtml(organizer.name)},`) +
+      pHtml(
+        change.firstTime
+          ? `You set ${escapeHtml(what)} for <strong>${escapeHtml(event.name)}</strong>. This is where your ` +
+            `ticket money will be paid — buyers transfer to you directly.`
+          : `${escapeHtml(what.charAt(0).toUpperCase() + what.slice(1))} for ` +
+            `<strong>${escapeHtml(event.name)}</strong> was just changed. From now on, buyers are told to send ` +
+            `their ticket money to the new account.`,
+        20
+      ) +
+      panelHtml(detailRowsHtml(rows)) +
+      calloutHtml(alarmHtml) +
+      pHtml(
+        `You can check the details any time on ` +
+          `<a class="brandtext" href="${escapeHtml(editUrl)}" style="color:${C.brandDeep};font-weight:700;">your event's payment tab</a>.`,
+        0
+      );
+
+    const text = renderText({
+      headline,
+      lines: [
+        `Hi ${organizer.name},`,
+        '',
+        wrapText(
+          change.firstTime
+            ? `You set ${what} for ${event.name}. This is where your ticket money will be paid — buyers transfer to you directly.`
+            : `${what.charAt(0).toUpperCase() + what.slice(1)} for ${event.name} was just changed. From now on, buyers are told to send their ticket money to the new account.`
+        ),
+        '',
+        ...textRows([
+          ['Event', event.name],
+          ...(change.bankIban.trim() ? ([['IBAN now ending', maskTail(change.bankIban)]] as Array<[string, string]>) : []),
+          ...(change.paypalAccount.trim()
+            ? ([['PayPal now ending', maskTail(change.paypalAccount)]] as Array<[string, string]>)
+            : []),
+        ]),
+        '',
+        change.firstTime
+          ? wrapText(
+              'IF YOU DID NOT DO THIS, someone else is signed in to your organizer account. Change your password now and reply to this email.'
+            )
+          : wrapText(
+              "IF YOU DID NOT MAKE THIS CHANGE, ACT NOW. Someone else is signed in to your organizer account and your buyers' payments are going to them. Change your password immediately, set the correct account back, and reply to this email so we can help."
+            ),
+        '',
+        wrapText(`You can check the details any time at ${editUrl}`),
+      ],
+      footer: [`${brand} · ${getBaseUrl()}`],
+    });
+
+    const transporter = createTransporter();
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to: organizer.email,
+      subject: change.firstTime
+        ? `Payment details set for ${event.name}`
+        : `Action may be needed: the payout account for ${event.name} changed`,
+      text,
+      html: renderEmail({
+        title: headline,
+        preheader: change.firstTime
+          ? `Where your ticket money for ${event.name} will be paid.`
+          : `The account your ticket money for ${event.name} is paid into has changed.`,
+        kicker,
+        headline,
+        bodyHtml,
+        footerLines: [`${brand} · ${getBaseUrl()}`],
+      }),
+    });
+
+    // The owner's copy: a separate message, never a CC. A CC would address the
+    // owner as the organizer and put each party's address in the other's inbox.
+    // A failure here must not turn the organizer's alarm into a failed send, so
+    // it is logged and swallowed on its own.
+    const ownerInbox = platformContactEmail();
+    if (ownerInbox && ownerInbox.toLowerCase() !== organizer.email.trim().toLowerCase()) {
+      const ownerLine =
+        `${organizer.name} (${organizer.email}) ` +
+        (change.firstTime ? 'set the payment details for' : 'CHANGED the payout account for') +
+        ` "${event.name}" — ${what}.`;
+      try {
+        await transporter.sendMail({
+          from: process.env.EMAIL_FROM,
+          to: ownerInbox,
+          subject: change.firstTime
+            ? `Payment details set — ${event.name}`
+            : `Payout account changed — ${event.name}`,
+          text: renderText({
+            headline: change.firstTime ? 'Payment details set' : 'Payout account changed',
+            lines: [
+              wrapText(ownerLine),
+              '',
+              ...textRows([
+                ['Organizer', `${organizer.name} <${organizer.email}>`],
+                ['Event', event.name],
+                ...(change.bankIban.trim()
+                  ? ([['IBAN now ending', maskTail(change.bankIban)]] as Array<[string, string]>)
+                  : []),
+                ...(change.paypalAccount.trim()
+                  ? ([['PayPal now ending', maskTail(change.paypalAccount)]] as Array<[string, string]>)
+                  : []),
+              ]),
+              '',
+              wrapText(
+                'You are told because organizer mail is not reliably delivered yet. If the organizer says ' +
+                  'they did not do this, switch the account off and check their event before any more buyers pay.'
+              ),
+            ],
+            footer: [`${brand} · ${getBaseUrl()}`],
+          }),
+          html: renderEmail({
+            title: change.firstTime ? 'Payment details set' : 'Payout account changed',
+            preheader: ownerLine,
+            kicker,
+            headline: change.firstTime ? 'Payment details set' : 'Payout account changed',
+            bodyHtml:
+              pHtml(escapeHtml(ownerLine), 20) +
+              panelHtml(
+                detailRowsHtml([
+                  { label: 'Organizer', value: `${organizer.name} <${organizer.email}>` },
+                  ...rows,
+                ])
+              ) +
+              pHtml(
+                `<span style="color:${C.muted};font-size:13px;">You are told because organizer mail is not ` +
+                  `reliably delivered yet. If they say they did not do this, switch the account off and check ` +
+                  `their event before any more buyers pay.</span>`,
+                0
+              ),
+            footerLines: [`${brand} · ${getBaseUrl()}`],
+          }),
+        });
+      } catch (err) {
+        console.error('[email] Payout-change owner copy failed:', err instanceof Error ? err.message : err);
+      }
+    }
+
+    return { sent: true };
+  } catch (err) {
+    console.error('[email] Failed to send payout-change notice:', err instanceof Error ? err.message : err);
+    return { sent: false, reason: 'send-failed' };
+  }
+}

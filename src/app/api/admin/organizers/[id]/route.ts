@@ -7,6 +7,7 @@ import {
   setOrganizerPlanPaidUntil,
   setOrganizerStatus,
 } from '@/lib/organizers';
+import { disableOrganizerTotp } from '@/lib/organizerTotp';
 import { signupReference } from '@/lib/platform';
 import type { ApiErrorResponse } from '@/lib/types';
 
@@ -25,6 +26,8 @@ function isValidDate(value: string): boolean {
  *    kept for old data and manual corrections
  *  - status: 'active' | 'disabled' — disabling signs them out immediately
  *  - resetPassword: true — returns { newPassword } EXACTLY ONCE (never re-readable)
+ *  - clearAuthenticator: true — the lost-phone path; organizers cannot clear
+ *    their own without a working code, so this is the only way back in
  *  - confirmSignup: { referenceConfirmation } — activate a pending signup: the
  *    admin types the LAST 4 characters of its reference (the same deliberate
  *    two-step confirm as mark-paid). Accounts are free — the money is charged
@@ -52,6 +55,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       planPaidUntil?: unknown;
       status?: unknown;
       resetPassword?: unknown;
+      clearAuthenticator?: unknown;
       confirmSignup?: unknown;
     }
     let body: UpdateOrganizerBody | null = null;
@@ -64,6 +68,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     let changedSomething = false;
     let newPassword: string | undefined;
     let activated = false;
+    let clearedAuthenticator = false;
 
     if (body && 'confirmSignup' in body) {
       const cs = body.confirmSignup as { referenceConfirmation?: unknown } | null;
@@ -124,6 +129,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       changedSomething = true;
     }
 
+    // The lost-phone path, and the ONLY one. An organizer cannot clear their own
+    // authenticator without a working code from it — deliberately, because one
+    // that a signed-in stranger could remove would guard neither the sign-in nor
+    // the payout account. That makes a genuinely lost phone a lockout, so the
+    // way back has to exist somewhere: here, in the hands of the platform owner,
+    // who can establish who they are talking to before using it.
+    if (body?.clearAuthenticator === true) {
+      disableOrganizerTotp(id);
+      clearedAuthenticator = true;
+      changedSomething = true;
+    }
+
     if (!changedSomething) {
       return NextResponse.json(
         { error: 'Nothing to change — please try again.' } satisfies ApiErrorResponse,
@@ -136,6 +153,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       organizer: getOrganizer(id),
       ...(newPassword ? { newPassword } : {}),
       ...(activated ? { activated: true } : {}),
+      ...(clearedAuthenticator ? { clearedAuthenticator: true } : {}),
     });
   } catch (e) {
     console.error(`POST /api/admin/organizers/${id} failed:`, e);

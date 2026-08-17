@@ -2,13 +2,7 @@ import { NextResponse } from 'next/server';
 import { BodyTooLargeError, readJsonLimited } from '@/lib/http';
 import { checkOrganizerCredentials } from '@/lib/organizers';
 import { verifyOrganizerTotp } from '@/lib/organizerTotp';
-import {
-  PAYOUT_STEP_UP_COOKIE,
-  STEP_UP_REJECTED_MESSAGE,
-  STEP_UP_TTL_MS,
-  createStepUpToken,
-  verifyPayoutStepUpCode,
-} from '@/lib/payoutStepUp';
+import { PAYOUT_STEP_UP_COOKIE, STEP_UP_TTL_MS, createStepUpToken } from '@/lib/payoutStepUp';
 import { clientIp, isRateLimited, recordStrike } from '@/lib/ratelimit';
 import type { ApiErrorResponse } from '@/lib/types';
 import { planGate, requireOrganizerApi } from '../../auth';
@@ -67,14 +61,10 @@ export async function POST(req: Request) {
     const { method } = payoutStepUpChallenge(organizer);
 
     let ok = false;
-    let failure = STEP_UP_REJECTED_MESSAGE;
+    let failure: string;
     if (method === 'authenticator') {
       ok = verifyOrganizerTotp(organizer.id, code);
       failure = 'That code is not right. Check your authenticator app — the code changes every 30 seconds.';
-    } else if (method === 'email') {
-      // Every unhappy verdict returns the same sentence: telling "wrong" apart
-      // from "expired" would say whether a code is outstanding at all.
-      ok = verifyPayoutStepUpCode(organizer.id, code) === 'ok';
     } else {
       ok = Boolean(password) && checkOrganizerCredentials(organizer.email, password) !== null;
       failure = 'That password is not right.';

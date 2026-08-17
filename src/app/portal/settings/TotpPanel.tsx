@@ -19,6 +19,10 @@ export default function TotpPanel({ enabled }: { enabled: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  /** Password to begin enrolment, and the current code to end it. */
+  const [password, setPassword] = useState('');
+  const [offCode, setOffCode] = useState('');
+  const [turningOff, setTurningOff] = useState(false);
 
   async function post(body: Record<string, unknown>) {
     setBusy(true);
@@ -44,25 +48,70 @@ export default function TotpPanel({ enabled }: { enabled: boolean }) {
           Authenticator app <span className="badge badge-green">On</span>
         </div>
         <p className="muted small" style={{ marginTop: 0 }}>
-          Signing in asks for a 6-digit code from your phone as well as your password. Nobody can get
-          into your events with a stolen password alone.
+          Signing in asks for a 6-digit code from your phone as well as your password, and so does changing
+          the account your ticket money is paid into. Nobody can do either with a stolen password alone.
         </p>
-        <button
-          type="button"
-          className="btn btn-sm"
-          disabled={busy}
-          onClick={async () => {
-            if (!confirm('Turn off the authenticator? Your password alone will then be enough to sign in.')) return;
-            const r = await post({ action: 'disable' });
-            if (r) {
-              setDone(false);
-              setQr(null);
-              router.refresh();
-            }
-          }}
-        >
-          {busy ? 'Working…' : 'Turn it off (lost phone)'}
-        </button>
+        {!turningOff ? (
+          <button type="button" className="btn btn-sm" disabled={busy} onClick={() => setTurningOff(true)}>
+            Turn it off
+          </button>
+        ) : (
+          <div>
+            {/* Turning it off needs the phone, not just the session: an
+                authenticator anyone signed in could remove would protect
+                nothing. A phone that is genuinely gone is the platform team's
+                to clear — sign-in already needs the code, so that person is
+                locked out before they ever reach this panel. */}
+            <p className="small" style={{ margin: '0 0 8px' }}>
+              Enter the current code from your authenticator to turn it off. Your password alone would then be
+              enough to sign in — and to move your payout account.
+            </p>
+            <input
+              className="input mono"
+              inputMode="numeric"
+              maxLength={7}
+              value={offCode}
+              onChange={(e) => setOffCode(e.target.value)}
+              placeholder="123456"
+              autoFocus
+              style={{ maxWidth: 180, letterSpacing: '0.3em' }}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <button
+                type="button"
+                className="btn btn-sm btn-danger"
+                disabled={busy || offCode.replace(/\D/g, '').length !== 6}
+                onClick={async () => {
+                  const r = await post({ action: 'disable', code: offCode.replace(/\D/g, '') });
+                  if (r) {
+                    setDone(false);
+                    setQr(null);
+                    setTurningOff(false);
+                    setOffCode('');
+                    router.refresh();
+                  }
+                }}
+              >
+                {busy ? 'Working…' : 'Turn it off'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm"
+                disabled={busy}
+                onClick={() => {
+                  setTurningOff(false);
+                  setOffCode('');
+                  setError(null);
+                }}
+              >
+                Keep it on
+              </button>
+            </div>
+            <p className="muted small" style={{ margin: '10px 0 0' }}>
+              Lost the phone? Contact the platform team — they can clear it for you once they know it is you.
+            </p>
+          </div>
+        )}
         {error && (
           <div className="notice notice-error small" style={{ marginTop: 10 }}>
             {error}
@@ -83,20 +132,39 @@ export default function TotpPanel({ enabled }: { enabled: boolean }) {
       </p>
 
       {!qr ? (
-        <button
-          type="button"
-          className="btn btn-brand btn-sm"
-          disabled={busy}
-          onClick={async () => {
-            const r = await post({ action: 'start' });
-            if (r) {
-              setQr(r.qr as string);
-              setManualCode(r.manualCode as string);
-            }
-          }}
-        >
-          {busy ? 'Preparing…' : 'Set up an authenticator'}
-        </button>
+        <div>
+          {/* The password guards the START of enrolment, not the end. Otherwise
+              anyone sitting in a session that was left signed in could enrol
+              their own phone and then use it to move the payout account — they
+              would be fitting the lock and keeping the key. */}
+          <div className="field" style={{ maxWidth: 320 }}>
+            <label htmlFor="totp-password">Confirm your password to begin</label>
+            <input
+              id="totp-password"
+              className="input"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              maxLength={200}
+            />
+          </div>
+          <button
+            type="button"
+            className="btn btn-brand btn-sm"
+            disabled={busy || password === ''}
+            onClick={async () => {
+              const r = await post({ action: 'start', password });
+              if (r) {
+                setPassword('');
+                setQr(r.qr as string);
+                setManualCode(r.manualCode as string);
+              }
+            }}
+          >
+            {busy ? 'Preparing…' : 'Set up an authenticator'}
+          </button>
+        </div>
       ) : (
         <div>
           <ol className="step-list">

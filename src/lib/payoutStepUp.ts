@@ -22,42 +22,26 @@
 // so re-saving the bank name must not demand a code.
 //
 // FIRST TIME IS FREE. Empty -> value asks for nothing; value -> different value
-// asks for a code. There is nothing to redirect until money is already pointed
-// somewhere, and requiring a code to set the very first IBAN would put a
-// challenge in front of every new organizer's setup — over a mail path that,
-// today, does not reliably reach Gmail.
+// asks for a check. There is nothing to redirect until money is already pointed
+// somewhere, and challenging the very first IBAN would put a wall in front of
+// every new organizer's setup while protecting nothing.
 //
-// This module deliberately imports nothing but crypto, the database and the
-// signing secret. Keeping the email stack out is what lets the routes decide
-// HOW to challenge (authenticator, email, or password) without this file
-// needing to know, and what stops a payout check from dragging nodemailer into
-// every page that touches an organizer. See lib/passwordReset.ts, which is
-// built the same way and for the same reason.
+// WHAT THE CHECK IS is decided elsewhere, in api/portal/payout/method.ts — the
+// authenticator where it is enrolled, the account password where it is not.
+// This module only decides WHETHER one is needed and mints the proof that one
+// happened, so it can stay a leaf: crypto, the database, and the signing key.
 import crypto from 'crypto';
 import { getSigningSecret } from './auth';
-import { getDb } from './db';
-import type { OtpVerdict } from './otp';
-
-/** Same four outcomes the admin and reset code checks report. */
-export type StepUpVerdict = OtpVerdict;
 
 /**
- * How long a passed check keeps counting, and how long a code stays valid.
+ * How long a passed check keeps counting.
  *
- * Ten minutes for both, matching the admin and reset codes. Long enough to fix
- * an IBAN and the holder's name in two saves without a second code; short
+ * Ten minutes, matching the admin and reset codes. Long enough to fix an IBAN
+ * and the holder's name in two saves without proving yourself twice; short
  * enough that a token left behind on a shared machine is stale by the time
  * anyone finds it.
  */
 export const STEP_UP_TTL_MS = 10 * 60_000;
-const CODE_TTL_MS = 10 * 60_000;
-
-/**
- * Five, matching the reset code rather than the admin's six. The code is worth
- * more than a login here — it is standing in front of the money — so the
- * guessing window stays as narrow as remains usable.
- */
-const MAX_ATTEMPTS = 5;
 
 /** Cookie carrying "this organizer re-proved themselves a moment ago". */
 export const PAYOUT_STEP_UP_COOKIE = 'payout_step_up';
@@ -186,86 +170,3 @@ export function verifyStepUpToken(token: string | null | undefined, organizerId:
   );
 }
 
-// ---------------- The emailed code ----------------
-
-/** Distinct prefix, so a step-up hash can never collide with a reset one. */
-function hashCode(code: string): string {
-  return crypto.createHash('sha256').update(`organizer-step-up:${code}`).digest('hex');
-}
-
-/**
- * Generate, store (hashed) and return a fresh 6-digit code.
- *
- * Any outstanding code for the same organizer is dropped first: only the newest
- * one ever works, so a code in an older email cannot be replayed and asking
- * again can never widen the attempt budget.
- */
-export function createPayoutStepUpCode(organizerId: string): string {
-  const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
-  const db = getDb();
-  const tx = db.transaction(() => {
-    db.prepare(`DELETE FROM organizer_step_up WHERE organizer_id = ?`).run(organizerId);
-    db.prepare(
-      `INSERT INTO organizer_step_up (id, organizer_id, code_hash, expires_at, attempts)
-       VALUES (?, ?, ?, ?, 0)`
-    ).run(crypto.randomUUID(), organizerId, hashCode(code), Date.now() + CODE_TTL_MS);
-  });
-  tx();
-  return code;
-}
-
-/**
- * Check a submitted code. Single-use: a correct code is stamped used_at inside
- * the same transaction that reads it, so two racing submissions cannot both
- * come back 'ok'. A wrong code costs an attempt; the last one burns the code.
- */
-export function verifyPayoutStepUpCode(organizerId: string, rawCode: string): StepUpVerdict {
-  const code = (rawCode || '').replace(/\D/g, '');
-  const db = getDb();
-  const tx = db.transaction((): StepUpVerdict => {
-    const row = db
-      .prepare(
-        `SELECT id, code_hash AS codeHash, expires_at AS expiresAt, attempts
-           FROM organizer_step_up
-          WHERE organizer_id = ? AND used_at IS NULL
-          ORDER BY expires_at DESC
-          LIMIT 1`
-      )
-      .get(organizerId) as { id: string; codeHash: string; expiresAt: number; attempts: number } | undefined;
-    if (!row || row.expiresAt <= Date.now()) return 'expired';
-    if (row.attempts >= MAX_ATTEMPTS) return 'too_many';
-    db.prepare(`UPDATE organizer_step_up SET attempts = attempts + 1 WHERE id = ?`).run(row.id);
-    const ok =
-      code.length === 6 &&
-      crypto.timingSafeEqual(Buffer.from(hashCode(code), 'hex'), Buffer.from(row.codeHash, 'hex'));
-    if (!ok) return row.attempts + 1 >= MAX_ATTEMPTS ? 'too_many' : 'wrong';
-    db.prepare(`UPDATE organizer_step_up SET used_at = datetime('now') WHERE id = ?`).run(row.id);
-    return 'ok';
-  });
-  return tx();
-}
-
-/**
- * Throw away every step-up code for an organizer.
- *
- * Called whenever the account's password or standing changes: a code minted
- * under the old state must not still be able to move the payout account.
- */
-export function burnPayoutStepUpCodes(organizerId: string): void {
-  getDb().prepare(`DELETE FROM organizer_step_up WHERE organizer_id = ?`).run(organizerId);
-}
-
-/**
- * The ONE answer to a code that did not work — wrong, expired, or out of
- * attempts. Merged so a failed guess never reveals whether a code is even
- * outstanding.
- */
-export const STEP_UP_REJECTED_MESSAGE =
-  'That code is not right, or it has expired. Check the newest email, or ask for a new one.';
-
-/** Last four characters of a payout value — all a notification may ever show. */
-export function maskPayoutValue(value: string): string {
-  const compact = value.replace(/\s+/g, '');
-  if (compact.length <= 4) return compact ? `••••${compact}` : '(removed)';
-  return `••••${compact.slice(-4)}`;
-}
