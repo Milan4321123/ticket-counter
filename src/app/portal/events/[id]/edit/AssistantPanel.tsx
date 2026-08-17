@@ -195,7 +195,7 @@ export default function AssistantPanel({ eventId, aiEnabled, initial }: Props) {
 
         <p className="muted small" style={{ margin: '10px 0 0' }}>
           {aiEnabled
-            ? 'The AI can turn these notes into ready-made FAQ entries (it saves them first). You review every one before anything goes on your page.'
+            ? 'The AI can turn these notes into ready-made FAQ entries (it saves them first). You review every one before anything goes on your page — and it writes in the language you wrote your notes in, so write them in the language your buyers read.'
             : 'The AI assistant is not switched on for this server, so there are no automatic FAQ suggestions — your notes are still saved, and the FAQ below is yours to write.'}
         </p>
       </form>
