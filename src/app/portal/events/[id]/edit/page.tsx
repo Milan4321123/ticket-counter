@@ -314,29 +314,13 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
       </div>
     ),
     design: (
-      <EditorSectionGroup initialOpen="design">
-        <EditorSection
-          id="design"
+      <div className="card">
+        <SectionHead
           title="Page design"
           hint="Pick colors and words that match the mood of the night."
-          status="optional"
-        >
-          <DesignPanel eventId={event.id} aiEnabled={aiDesignerEnabled()} initial={design} />
-        </EditorSection>
-
-        {/* Kept beside the design rather than beside the FAQ, even though its
-            suggestions land there: both of these are things you set up once so
-            the page can look after itself. The FAQ tab opens on its own when
-            suggestions arrive, so the hand-off still works across tabs. */}
-        <EditorSection
-          id="assistant"
-          title="What the assistant should know"
-          hint="Tell the AI on your page the things buyers ask about — parking, food, age limits, doors."
-          status="optional"
-        >
-          <AssistantPanel eventId={event.id} aiEnabled={aiAssistantEnabled()} initial={event.assistantContext} />
-        </EditorSection>
-      </EditorSectionGroup>
+        />
+        <DesignPanel eventId={event.id} aiEnabled={aiDesignerEnabled()} initial={design} />
+      </div>
     ),
     updates: (
       <div className="card">
@@ -355,22 +339,43 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
         />
       </div>
     ),
+    // The assistant's notes and the FAQ share this tab because they are one job
+    // done in two steps: you tell it about your event, it drafts the entries,
+    // you check them. Splitting them across tabs put the hand-off through a tab
+    // switch, and the notes — which exist to produce this list — ended up filed
+    // under Design, where nobody looking for the FAQ would find them.
     faq: (
-      <div className="card">
-        <SectionHead
-          title="FAQ"
-          hint="Answer the questions buyers keep asking, so they do not have to ask you at all."
-        />
-        <PageContentPanel
-          show="faq"
-          eventId={event.id}
-          media={attachables}
-          posts={posts.map((p) => ({ id: p.id, body: p.body, mediaId: p.mediaId, createdAt: p.createdAt }))}
-          faqs={faqs.map((f) => ({ question: f.question, answer: f.answer }))}
-          maxPhotos={MAX_PHOTOS_PER_EVENT}
-          maxVideos={MAX_VIDEOS_PER_EVENT}
-        />
-      </div>
+      <EditorSectionGroup initialOpen="assistant">
+        <EditorSection
+          id="assistant"
+          title="What the assistant should know"
+          hint="Tell it the things buyers ask about — parking, food, age limits, doors — and it can draft the FAQ below from them."
+          status="optional"
+        >
+          <AssistantPanel eventId={event.id} aiEnabled={aiAssistantEnabled()} initial={event.assistantContext} />
+        </EditorSection>
+
+        {/* Opens itself when the assistant hands over accepted suggestions, so
+            an organizer is looking at the rows that just arrived rather than at
+            a collapsed heading. */}
+        <EditorSection
+          id="faq"
+          title="The FAQ on your page"
+          hint="Up to 12 questions, shown as a tap-to-open section near the bottom of your event page."
+          status="optional"
+          revealOn={FAQ_SUGGESTIONS_EVENT}
+        >
+          <PageContentPanel
+            show="faq"
+            eventId={event.id}
+            media={attachables}
+            posts={posts.map((p) => ({ id: p.id, body: p.body, mediaId: p.mediaId, createdAt: p.createdAt }))}
+            faqs={faqs.map((f) => ({ question: f.question, answer: f.answer }))}
+            maxPhotos={MAX_PHOTOS_PER_EVENT}
+            maxVideos={MAX_VIDEOS_PER_EVENT}
+          />
+        </EditorSection>
+      </EditorSectionGroup>
     ),
     // Its own tab, because it is the one place in the editor where somebody is
     // waiting. The FAQ above is what the organizer writes in advance; this is

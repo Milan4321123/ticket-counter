@@ -639,10 +639,6 @@ export default function PageContentPanel({
       {/* ---------------- FAQ ---------------- */}
       {show === 'faq' && (
       <form ref={faqFormRef} onSubmit={saveFaqs}>
-        <p className="muted small" style={{ marginTop: 0 }}>
-          Answer the questions buyers keep asking — age limits, parking, refunds. The list shows as a tap-to-open
-          <strong> FAQ</strong> section near the bottom of your event page. Up to {MAX_FAQS} entries.
-        </p>
 
         {faqRows.map((row, i) => (
           <div
