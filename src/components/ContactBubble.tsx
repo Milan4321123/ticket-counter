@@ -30,25 +30,26 @@ export default function ContactBubble({
 }) {
   const pathname = usePathname() || '';
 
-  // Not in the places where it is noise rather than help: the owner's own admin
-  // area, the door scanner (staff mid-scan do not want a designer), or the
-  // contact page itself, where following it would reload the page you are on.
+  // An ALLOWLIST, not a list of exceptions — and the difference is the whole
+  // point of this bubble.
   //
-  // And NOT on the two pages where money is about to move — the checkout and the
-  // reservation page that shows the bank details. The platform's own face next
-  // to somebody else's IBAN reads as the platform vouching for that account, or
-  // even holding the money, and it does neither: buyers pay the organizer
-  // directly. On the one screen where a buyer might hesitate over an account
-  // number, the person to reach is the organizer who owns it, and putting a
-  // different face there sends the question to someone who cannot answer it.
-  const aboutToPay = pathname.startsWith('/order/') || /^\/e\/[^/]+\/checkout/.test(pathname);
-  const hidden =
-    !name.trim() ||
-    aboutToPay ||
-    pathname.startsWith('/admin') ||
-    pathname.startsWith('/scan') ||
-    pathname.startsWith('/contact');
-  if (hidden) return null;
+  // This is the platform owner, and what they are offering is an organizer
+  // account and a page designed by hand. That offer is for people who want to
+  // RUN an event. A ticket buyer who taps it reaches someone who cannot help
+  // with the only things they care about — their order, their seats, the
+  // account they are being asked to pay — and the platform ends up fielding
+  // questions that belong to the organizer, slowly, on the wrong channel.
+  //
+  // Worse on the money pages specifically: the platform's own face beside
+  // somebody else's IBAN reads as the platform vouching for that account, or
+  // holding the money. It does neither — buyers pay the organizer directly.
+  // The person to reach about an account number is the organizer who owns it.
+  //
+  // So it appears where someone is being invited to become an organizer, and
+  // nowhere else. Anything new that is buyer-facing stays clean by default,
+  // which is the right way round for a rule nobody will remember to re-check.
+  const forOrganizers = pathname === '/organizers' || pathname.startsWith('/organizers/');
+  if (!name.trim() || !forOrganizers) return null;
 
   const first = name.trim().split(/\s+/)[0] || name.trim();
 
