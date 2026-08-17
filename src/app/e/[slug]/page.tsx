@@ -30,7 +30,7 @@ import {
 } from '@/lib/events';
 import type { EventRow, PageDesign } from '@/lib/events';
 import { getAvailability } from '@/lib/inventory';
-import { ticketState, fromPriceCents, visibleTiers } from '@/lib/ticketState';
+import { ticketState, fromPriceCents, visibleTiers, comingSoonLabel } from '@/lib/ticketState';
 import { currentOrganizer, getOrganizer } from '@/lib/organizers';
 import { formatMoney } from '@/lib/money';
 import {
@@ -611,24 +611,24 @@ export default async function EventPage({ params }: Params) {
                   {state.cta}
                 </span>
               )}
-              <span
-                className={`badge ${
-                  state.kind === 'sold-out'
-                    ? 'badge-red'
-                    : state.kind === 'closed'
-                      ? 'badge-amber'
-                      : state.badge.startsWith('Only')
-                        ? 'badge-amber'
-                        : 'badge-green'
-                }`}
-              >
-                {state.badge}
-              </span>
-              {/* Both at once: this batch has gone, another is on the way. The
-                  hero used to say only the first, so an event with tickets
-                  still to come read as finished. */}
-              {state.kind !== 'coming-soon' && state.upcoming > 0 ? (
-                <span className="badge badge-green">Coming soon</span>
+              {/* Only when it adds something. When nothing is buyable the
+                  disabled button beside this already says "Sold out" or "Sales
+                  closed" — printing it again put THREE chips on a two-ticket
+                  event, all saying variations of the same thing. While tickets
+                  ARE buyable this slot is the only place the count appears. */}
+              {state.buyable ? (
+                <span className={`badge ${state.badge.startsWith('Only') ? 'badge-amber' : 'badge-green'}`}>
+                  {state.badge}
+                </span>
+              ) : state.kind === 'sold-out' && state.soldOutNames.length === 1 ? (
+                /* Names the type that has gone, which the button cannot: on an
+                   event with an early bird and a standard, "Sold out" alone left
+                   the visitor to guess which of the two it meant. */
+                <span className="badge badge-red">{state.badge}</span>
+              ) : null}
+              {/* And which one is still to come. */}
+              {state.kind !== 'coming-soon' && comingSoonLabel(state) ? (
+                <span className="badge badge-green">{comingSoonLabel(state)}</span>
               ) : null}
               {state.buyable && minPrice !== null ? (
                 <span className="event-hero-price">
@@ -750,7 +750,10 @@ export default async function EventPage({ params }: Params) {
                     <Link
                       className="tier-card glow-card tier-card-link"
                       key={tier.tierKey}
-                      href={checkoutHref}
+                      // Carries WHICH ticket was tapped, so the checkout opens
+                      // with it already at one. The server re-checks the key
+                      // before honouring it.
+                      href={`${checkoutHref}?tier=${encodeURIComponent(tier.tierKey)}`}
                       aria-label={`Get ${tier.name} tickets`}
                     >
                       {card}
@@ -1031,7 +1034,10 @@ export default async function EventPage({ params }: Params) {
           number={event.whatsapp}
           organizerName={event.whatsappName || organizerDisplayName}
           eventName={event.name}
-          photoUrl={profileUrl}
+          // Its own photo, chosen in the WhatsApp panel. Falls back to the
+          // page's profile photo only when the organizer has not uploaded one,
+          // so an existing bubble does not suddenly lose its face.
+          photoUrl={event.whatsappPhoto || profileUrl}
         />
       )}
 

@@ -38,6 +38,12 @@ export interface EventRow {
   whatsapp: string;
   /** Name shown on the WhatsApp bubble. '' falls back to the account name. */
   whatsappName: string;
+  /**
+   * Served URL of the bubble's own photo, or ''. Deliberately NOT the page's
+   * profile photo: the two are chosen separately, and this one never joins the
+   * event's public gallery.
+   */
+  whatsappPhoto: string;
   maxPerOrder: number;
   payWithinDays: number;
   bankAccountHolder: string;
@@ -194,6 +200,7 @@ const EVENT_COLS = `
   sales_open AS salesOpen,
   whatsapp,
   whatsapp_name AS whatsappName,
+  whatsapp_photo AS whatsappPhoto,
   max_per_order AS maxPerOrder,
   pay_within_days AS payWithinDays,
   bank_account_holder AS bankAccountHolder,
@@ -234,6 +241,7 @@ function rowToEvent(row: Record<string, unknown> | undefined): EventRow | null {
     // falls back to the wording that is always safe to show.
     whatsapp: (row.whatsapp as string | null) ?? '',
     whatsappName: (row.whatsappName as string | null) ?? '',
+    whatsappPhoto: (row.whatsappPhoto as string | null) ?? '',
     showRemaining: Boolean(row.showRemaining),
     // Added by migration, so it is NULL on every event created before it.
     assistantContext: (row.assistantContext as string | null) ?? '',
@@ -565,6 +573,16 @@ export function getEventFaqs(eventId: string): EventFaqRow[] {
        FROM event_faqs WHERE event_id = ? ORDER BY sort, rowid`
     )
     .all(eventId) as EventFaqRow[];
+}
+
+/**
+ * Point this event's WhatsApp bubble at a photo, or '' to clear it.
+ *
+ * Kept beside the other event writers rather than inside the upload route, so
+ * the DELETE handler and the POST handler cannot drift on how it is stored.
+ */
+export function setEventWhatsappPhoto(eventId: string, url: string): void {
+  getDb().prepare(`UPDATE events SET whatsapp_photo = ? WHERE id = ?`).run(url, eventId);
 }
 
 /** Replace the event's FAQ list wholesale (portal editor semantics). */

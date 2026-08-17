@@ -40,9 +40,10 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       organizerName={event.whatsappName || organizer?.name?.trim() || 'the organizer'}
       eventName={event.name}
       photoUrl={
-        event.profileMediaId
+        event.whatsappPhoto ||
+        (event.profileMediaId
           ? mediaUrl(event.profileMediaId, 'avatar', cropTag(parseCropRect(event.profileCrop)))
-          : null
+          : null)
       }
     />
   ) : null;

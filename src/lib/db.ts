@@ -120,6 +120,7 @@ CREATE TABLE IF NOT EXISTS events (
   closed_message TEXT NOT NULL DEFAULT 'closed', -- RETIRED, nothing reads it: see the migration note
   whatsapp TEXT NOT NULL DEFAULT '',      -- organizer's WhatsApp, digits only (see lib/whatsapp.ts)
   whatsapp_name TEXT NOT NULL DEFAULT '', -- who the bubble says you are; '' = the account name
+  whatsapp_photo TEXT NOT NULL DEFAULT '', -- served URL of the bubble's OWN face; '' = none
   max_per_order INTEGER NOT NULL DEFAULT 8,
   pay_within_days INTEGER NOT NULL DEFAULT 5,
   bank_account_holder TEXT NOT NULL DEFAULT '',
@@ -421,6 +422,15 @@ function migrateToPlatform(db: Database.Database): void {
   // a team's ticket phone, or a first name where the account is a company.
   if (!eventCols.includes('whatsapp_name')) {
     db.exec(`ALTER TABLE events ADD COLUMN whatsapp_name TEXT NOT NULL DEFAULT ''`);
+  }
+  // The bubble's OWN face, separate from the page's profile photo.
+  //
+  // It cannot be an event_media row: the event page builds its gallery from
+  // every photo in that table, so a headshot uploaded for a chat bubble would
+  // appear in the public gallery next to the poster. Stored as its own file
+  // with the URL kept here, the same way the platform's contact bubble works.
+  if (!eventCols.includes('whatsapp_photo')) {
+    db.exec(`ALTER TABLE events ADD COLUMN whatsapp_photo TEXT NOT NULL DEFAULT ''`);
   }
   // The same choice for the event as a whole. total_capacity is NOT dropped
   // when this is set: it stays on as the organizer's EXPECTED attendance, which

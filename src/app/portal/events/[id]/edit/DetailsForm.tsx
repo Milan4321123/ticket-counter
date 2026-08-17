@@ -26,7 +26,9 @@ interface Props {
     salesOpen: boolean;
     whatsapp: string;
     whatsappName: string;
-    /** The event's round profile photo, or '' — the bubble wears this. */
+    /** The bubble's OWN photo, or '' — chosen right here, separate from below. */
+    whatsappPhotoUrl: string;
+    /** The event's round profile photo, or '' — used only as a fallback. */
     profilePhotoUrl: string;
     /** The account name, used when no bubble name is set. */
     accountName: string;
@@ -50,6 +52,60 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
   const [salesOpen, setSalesOpen] = useState(initial.salesOpen);
   const [whatsapp, setWhatsapp] = useState(initial.whatsapp ? `+${initial.whatsapp}` : '');
   const [whatsappName, setWhatsappName] = useState(initial.whatsappName);
+  /**
+   * The bubble's own photo, held in state rather than read from `initial`, so an
+   * upload shows immediately instead of after a refresh.
+   *
+   * It uploads on its own the moment a file is picked — it does NOT wait for
+   * Save details. A file input cannot survive a form round-trip, and a photo
+   * that appeared to be chosen but was silently dropped by pressing the wrong
+   * button is worse than one extra request.
+   */
+  const [bubbleOwnPhoto, setBubbleOwnPhoto] = useState(initial.whatsappPhotoUrl);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  /** What the circle shows: its own photo, else the page's, else an initial. */
+  const bubblePhoto = bubbleOwnPhoto || initial.profilePhotoUrl;
+
+  async function uploadBubblePhoto(file: File) {
+    setPhotoBusy(true);
+    setPhotoError(null);
+    try {
+      const body = new FormData();
+      body.append('photo', file);
+      const res = await fetch(`/api/portal/events/${eventId}/whatsapp-photo`, { method: 'POST', body });
+      const data = (await res.json().catch(() => null)) as { photoUrl?: string; error?: string } | null;
+      if (!res.ok || typeof data?.photoUrl !== 'string') {
+        setPhotoError(data?.error ?? 'That photo could not be uploaded.');
+        return;
+      }
+      setBubbleOwnPhoto(data.photoUrl);
+      router.refresh();
+    } catch {
+      setPhotoError('Could not reach the server — please check your connection.');
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  async function removeBubblePhoto() {
+    setPhotoBusy(true);
+    setPhotoError(null);
+    try {
+      const res = await fetch(`/api/portal/events/${eventId}/whatsapp-photo`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        setPhotoError(data?.error ?? 'That photo could not be removed.');
+        return;
+      }
+      setBubbleOwnPhoto('');
+      router.refresh();
+    } catch {
+      setPhotoError('Could not reach the server — please check your connection.');
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -331,9 +387,11 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
           </div>
         </div>
 
-        {/* The real thing, not a description of it. An organizer should not have
-            to publish and open their own page to find out their bubble is
-            showing a letter because they never picked a profile photo. */}
+        {/* The real bubble, with its own upload beside it. An organizer should
+            not have to publish and open their own page to find out what their
+            bubble looks like — and this photo is deliberately its own, not the
+            page's profile photo: the face you want beside a WhatsApp number is
+            usually a person, while the page's profile photo is often a logo. */}
         <div
           style={{
             display: 'flex',
@@ -343,17 +401,13 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
             border: '1px solid var(--border)',
             borderRadius: 12,
             background: 'var(--bg-elevated)',
+            flexWrap: 'wrap',
           }}
         >
           <span className="contact-fab-photo-wrap" style={{ position: 'relative', display: 'inline-flex' }}>
-            {initial.profilePhotoUrl ? (
+            {bubblePhoto ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={initial.profilePhotoUrl}
-                alt=""
-                className="contact-fab-photo"
-                style={{ borderRadius: '50%' }}
-              />
+              <img src={bubblePhoto} alt="" className="contact-fab-photo" style={{ borderRadius: '50%' }} />
             ) : (
               <span className="contact-fab-photo contact-fab-initial" aria-hidden="true">
                 {((whatsappName || initial.accountName).trim().charAt(0) || 'O').toUpperCase()}
@@ -365,23 +419,54 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
               </svg>
             </span>
           </span>
-          <div style={{ flex: 1, minWidth: 200 }}>
+          <div style={{ flex: 1, minWidth: 220 }}>
             <div style={{ fontWeight: 700 }}>
-              WhatsApp {((whatsappName || initial.accountName).trim().split(/\s+/)[0] || 'you')}
+              WhatsApp {(whatsappName || initial.accountName).trim().split(/\s+/)[0] || 'you'}
             </div>
             <p className="muted small" style={{ margin: '2px 0 0' }}>
-              {initial.profilePhotoUrl ? (
-                <>This is your bubble. The circle is your event&rsquo;s profile photo.</>
-              ) : (
+              {photoError ? (
+                <span style={{ color: 'var(--danger, #f87171)' }}>{photoError}</span>
+              ) : bubbleOwnPhoto ? (
+                <>This is your bubble, with the photo you chose for it.</>
+              ) : initial.profilePhotoUrl ? (
                 <>
-                  No profile photo yet, so the circle shows a letter. Upload one under{' '}
-                  <strong style={{ color: 'var(--text)' }}>Photos &amp; videos</strong> and pick it as
-                  your profile photo — a face gets far more messages than an initial.
+                  Using your page&rsquo;s profile photo for now. Upload a different one here if you
+                  want a person&rsquo;s face beside the number instead.
                 </>
+              ) : (
+                <>A face gets far more messages than a letter. Upload one for the bubble.</>
               )}
             </p>
           </div>
-          {!initial.profilePhotoUrl && <GoToTab tab="media">Add a photo →</GoToTab>}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* A plain file input behind a button: the styled label is the
+                control, the input itself stays reachable by keyboard. */}
+            <label className="btn btn-sm" style={{ cursor: photoBusy ? 'default' : 'pointer' }}>
+              {photoBusy ? <span className="spinner" aria-hidden /> : null}
+              {photoBusy ? 'Uploading…' : bubbleOwnPhoto ? 'Change photo' : 'Upload photo'}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                style={{ display: 'none' }}
+                disabled={photoBusy}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (f) void uploadBubblePhoto(f);
+                }}
+              />
+            </label>
+            {bubbleOwnPhoto && (
+              <button
+                type="button"
+                className="btn btn-sm"
+                disabled={photoBusy}
+                onClick={() => void removeBubblePhoto()}
+              >
+                Remove
+              </button>
+            )}
+          </div>
         </div>
       </div>
       <label className="checkbox-row" htmlFor="ev-sales-open">
