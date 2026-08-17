@@ -10,6 +10,7 @@ import {
 import { verifyOrganizerTotp } from '@/lib/organizerTotp';
 import { clientIp, isRateLimited, recordStrike } from '@/lib/ratelimit';
 import type { ApiErrorResponse } from '@/lib/types';
+import { notifySignIn } from '../../auth';
 
 /**
  * Step two of organizer sign-in: the six digits from their authenticator app.
@@ -76,6 +77,8 @@ export async function POST(req: Request) {
         { status: 401 }
       );
     }
+
+    notifySignIn(organizer, req);
 
     const res = NextResponse.json({ ok: true, mustChangePassword: organizer.mustChangePassword });
     res.cookies.set(ORGANIZER_COOKIE_NAME, createOrganizerSessionToken(organizerId), {

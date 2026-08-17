@@ -1705,6 +1705,131 @@ export async function sendQuestionAnsweredEmail(
   }
 }
 
+// ---------------- Somebody signed in ----------------
+
+/**
+ * A coarse, human description of the browser that signed in.
+ *
+ * Not fingerprinting and not precise — "Chrome on Windows" is exactly as much
+ * as the account owner needs to think "that is my laptop" or "that is not
+ * mine". A version string or a full user-agent would say less to them, not
+ * more, and would put a line of machinery in a message meant to be read at a
+ * glance.
+ */
+export function describeDevice(userAgent: string): string {
+  const ua = userAgent || '';
+  const browser = /Edg\//.test(ua)
+    ? 'Edge'
+    : /OPR\/|Opera/.test(ua)
+      ? 'Opera'
+      : /Firefox\//.test(ua)
+        ? 'Firefox'
+        : /Chrome\//.test(ua)
+          ? 'Chrome'
+          : /Safari\//.test(ua)
+            ? 'Safari'
+            : '';
+  const os = /iPhone|iPad/.test(ua)
+    ? 'iPhone'
+    : /Android/.test(ua)
+      ? 'Android'
+      : /Mac OS X|Macintosh/.test(ua)
+        ? 'a Mac'
+        : /Windows/.test(ua)
+          ? 'Windows'
+          : /Linux/.test(ua)
+            ? 'Linux'
+            : '';
+  if (browser && os) return `${browser} on ${os}`;
+  if (browser) return browser;
+  if (os) return os;
+  return 'an unrecognised browser';
+}
+
+/**
+ * Tell the organizer their account was just signed in to.
+ *
+ * Sent to the address the account was opened with, which is the point: it is
+ * the one channel an attacker holding the password does not automatically
+ * control. It attacks the problem where it starts — somebody else getting in —
+ * rather than at the individual things they might then change.
+ *
+ * Deliberately short, and it asks for exactly one thing. There is no "contact
+ * the team" or support address in it: the useful action is to change the
+ * password, immediately, and every extra instruction is a reason to do nothing
+ * tonight and deal with it later.
+ *
+ * Never throws — a sign-in must not fail because the alarm about it could not
+ * be sent.
+ */
+export async function sendSignInAlertEmail(
+  organizer: OrganizerContact,
+  details: { device: string; when: Date }
+): Promise<{ sent: boolean; reason?: string }> {
+  try {
+    if (!isEmailConfigured()) return { sent: false, reason: 'email-not-configured' };
+    const brand = platformName();
+    const whenDisplay = details.when.toLocaleString('en-GB', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const headline = `New sign-in to your ${brand} account`;
+
+    const rows: DetailRow[] = [
+      { label: 'When', value: whenDisplay },
+      { label: 'Browser', value: details.device },
+    ];
+
+    const bodyHtml =
+      pHtml(`Hi ${escapeHtml(organizer.name)},`) +
+      pHtml(`Your organizer account was just signed in to.`, 20) +
+      panelHtml(detailRowsHtml(rows)) +
+      calloutHtml(
+        `<strong>Was this you?</strong> Then nothing to do — you can ignore this.<br>` +
+          `<strong>If it was not</strong>, change your password now. Somebody else knows it.`
+      );
+
+    await createTransporter().sendMail({
+      from: process.env.EMAIL_FROM,
+      to: organizer.email,
+      subject: headline,
+      text: renderText({
+        headline,
+        lines: [
+          `Hi ${organizer.name},`,
+          '',
+          'Your organizer account was just signed in to.',
+          '',
+          ...textRows([
+            ['When', whenDisplay],
+            ['Browser', details.device],
+          ]),
+          '',
+          wrapText('Was this you? Then there is nothing to do and you can ignore this.'),
+          '',
+          wrapText('If it was not you, change your password now — somebody else knows it.'),
+        ],
+        footer: [`${brand} · ${getBaseUrl()}`],
+      }),
+      html: renderEmail({
+        title: headline,
+        preheader: `Signed in on ${whenDisplay} using ${details.device}.`,
+        kicker: 'Sign-in',
+        headline,
+        bodyHtml,
+        footerLines: [`${brand} · ${getBaseUrl()}`],
+      }),
+    });
+    return { sent: true };
+  } catch (err) {
+    console.error('[email] Failed to send sign-in alert:', err instanceof Error ? err.message : err);
+    return { sent: false, reason: 'send-failed' };
+  }
+}
+
 // ---------------- The payout account moved ----------------
 
 export interface PayoutChangeDetails {

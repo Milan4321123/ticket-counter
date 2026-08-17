@@ -10,6 +10,7 @@ import {
 import { organizerTotpEnabled } from '@/lib/organizerTotp';
 import { clientIp, isRateLimited, recordStrike } from '@/lib/ratelimit';
 import type { ApiErrorResponse } from '@/lib/types';
+import { notifySignIn } from '../auth';
 
 const LOGIN_FAILURE_LIMIT = 8;
 const LOGIN_FAILURE_WINDOW_MS = 15 * 60_000;
@@ -96,6 +97,8 @@ export async function POST(req: Request) {
         { status: 503 }
       );
     }
+
+    notifySignIn(organizer, req);
 
     const res = NextResponse.json({ ok: true });
     res.cookies.set(ORGANIZER_COOKIE_NAME, token, {
