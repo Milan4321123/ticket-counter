@@ -23,6 +23,7 @@ import PlanExpired from '../../../PlanExpired';
 import PortalNav from '../../../PortalNav';
 import { requirePortalOrganizer } from '../../../guard';
 import AssistantPanel from './AssistantPanel';
+import { organizerTotpEnabled } from '@/lib/organizerTotp';
 import { effectivePayout, queuedPayoutChange } from '@/lib/payout';
 import BankForm from './BankForm';
 import DangerZone from './DangerZone';
@@ -106,6 +107,10 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
       label: 'Add a way to be paid — bank account (holder and IBAN) or PayPal',
     },
     { ok: Boolean(event.description.trim()), label: 'Write a short description' },
+    {
+      ok: organizerTotpEnabled(organizer.id),
+      label: 'Set up your authenticator app (Settings) — required before you can sell tickets',
+    },
   ];
 
   // The platform fee is charged per event and follows the capacity, so the

@@ -11,6 +11,7 @@ import { listingStillUrl } from '@/lib/listing';
 import { formatMoney } from '@/lib/money';
 import { getStats } from '@/lib/orders';
 import { organizerPlanActive } from '@/lib/organizers';
+import { organizerTotpEnabled } from '@/lib/organizerTotp';
 import { platformFeeRule } from '@/lib/platform';
 import { runTransferReminderSweep } from '@/lib/reminders';
 import CreateEventForm from './CreateEventForm';
@@ -61,6 +62,8 @@ export default async function PortalDashboardPage({
   // reminders still go out on hosts without the background interval. The
   // sweep self-throttles, so firing it on every visit is cheap.
   void runTransferReminderSweep();
+
+  const hasAuthenticator = organizerTotpEnabled(organizer.id);
 
   const events = listEventsForOrganizer(organizer.id);
   const cards = events.map((event) => ({
@@ -116,6 +119,27 @@ export default async function PortalDashboardPage({
           <p className="muted small anim-fade-up" style={{ marginTop: -6 }}>
             Your account is free — you pay per event you publish: {platformFeeRule()}.
           </p>
+        )}
+
+        {/* Said here, not only at the moment publishing is refused. An organizer
+            who meets this as a blocked button on launch day reads it as the
+            platform getting in the way; the same sentence a week earlier reads
+            as the platform looking after their money. */}
+        {!hasAuthenticator && (
+          <div className="notice notice-warn anim-fade-up" style={{ marginTop: 12 }}>
+            <strong>Set up your authenticator app.</strong>
+            <p className="small" style={{ margin: '6px 0 0' }}>
+              It is a free app on your phone that shows a 6-digit code. Once it is on, your password
+              alone is not enough to get into your account — and not enough to change the bank
+              account your ticket money is paid into, which is the one thing nobody can undo for
+              you. It works offline, so it keeps working even when email does not.
+            </p>
+            <p className="small" style={{ margin: '8px 0 0' }}>
+              <strong>You will need it before you can publish an event</strong>, so it is worth doing
+              now rather than on the day you want to go live.{' '}
+              <a href="/portal/settings">Set it up in Settings</a> — it takes a minute.
+            </p>
+          </div>
         )}
 
         {cards.length === 0 ? (

@@ -17,6 +17,7 @@ import {
   videoEmbedUrl,
 } from '@/lib/events';
 import { readJsonLimited, BodyTooLargeError } from '@/lib/http';
+import { organizerTotpEnabled } from '@/lib/organizerTotp';
 import { formatMoney } from '@/lib/money';
 import {
   PAYOUT_DELAY_MS,
@@ -38,6 +39,18 @@ import { planGate, requireOrganizerApi, requireOwnedEvent } from '../../auth';
 import { payoutStepUpChallenge } from '../../payout/method';
 
 export const dynamic = 'force-dynamic';
+
+/**
+ * Off-switch for the publish-time authenticator requirement.
+ *
+ * ON by default. It exists because this is a people problem as much as a
+ * technical one: an organizer who genuinely cannot run an authenticator app
+ * should be unblocked by the platform owner within minutes rather than left
+ * unable to sell, and that is better than having no lever at all.
+ */
+function requireAuthenticatorToPublish(): boolean {
+  return process.env.PORTAL_REQUIRE_AUTHENTICATOR !== 'off';
+}
 
 /** Friendly, buyer-safe validation failure — message goes straight to the UI. */
 class ValidationError extends Error {}
@@ -572,6 +585,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           missing.push('add a way to be paid — a bank account (holder and IBAN), or PayPal');
         }
         if (!merged.description.trim()) missing.push('write a short description');
+        // Publishing is the moment this account stops being a draft and starts
+        // taking strangers' money, so it is where the second factor becomes
+        // required rather than encouraged. Demanding it at sign-up would strand
+        // anyone without a smartphone before they had any stake; demanding it
+        // here asks for it exactly when the stakes appear, alongside the fee and
+        // the bank details they are already entering.
+        //
+        // It also closes a gap in the payout check. That check falls back to the
+        // account password when no authenticator is enrolled — the weakest rung,
+        // and the one somebody who phished the password can answer. Requiring
+        // enrolment BEFORE any money can be taken means a payout change on a
+        // selling event always meets the strong factor instead.
+        if (requireAuthenticatorToPublish() && !organizerTotpEnabled(organizer.id)) {
+          missing.push('set up your authenticator app in Settings — it is required before you can sell tickets');
+        }
         need(missing.length === 0, `Almost there — before publishing, please ${missing.join(', ')}.`);
       }
       if (status !== event.status) {
