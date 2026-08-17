@@ -7,7 +7,8 @@ import {
   getOrganizer,
   verifyOrganizerPendingToken,
 } from '@/lib/organizers';
-import { verifyOrganizerTotp } from '@/lib/organizerTotp';
+import { LOGIN_CODE_REJECTED_MESSAGE, verifyOrganizerLoginCode } from '@/lib/loginCode';
+import { organizerTotpEnabled, verifyOrganizerTotp } from '@/lib/organizerTotp';
 import { clientIp, isRateLimited, recordStrike } from '@/lib/ratelimit';
 import type { ApiErrorResponse } from '@/lib/types';
 import { notifySignIn } from '../../auth';
@@ -66,13 +67,22 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!verifyOrganizerTotp(organizerId, code)) {
+    // Which factor this account actually uses is decided HERE, from the
+    // account, never from the request: letting the caller say would let an
+    // enrolled account ask to be checked against the weaker one instead.
+    const usesAuthenticator = organizerTotpEnabled(organizerId);
+    const ok = usesAuthenticator
+      ? verifyOrganizerTotp(organizerId, code)
+      : verifyOrganizerLoginCode(organizerId, code) === 'ok';
+
+    if (!ok) {
       recordStrike(limiterKey, FAILURE_WINDOW_MS);
       recordStrike(GLOBAL_FAILURE_KEY, FAILURE_WINDOW_MS);
       return NextResponse.json(
         {
-          error:
-            'That code is not right. Check your authenticator app — the code changes every 30 seconds.',
+          error: usesAuthenticator
+            ? 'That code is not right. Check your authenticator app — the code changes every 30 seconds.'
+            : LOGIN_CODE_REJECTED_MESSAGE,
         } satisfies ApiErrorResponse,
         { status: 401 }
       );

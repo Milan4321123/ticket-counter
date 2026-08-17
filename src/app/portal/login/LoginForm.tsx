@@ -13,6 +13,9 @@ export default function LoginForm() {
   // form then shows the code step instead — the password is never re-sent.
   const [pendingToken, setPendingToken] = useState<string | null>(null);
   const [code, setCode] = useState('');
+  /** Which second factor the server asked for, so the step can say so. */
+  const [factor, setFactor] = useState<'authenticator' | 'email'>('authenticator');
+  const [sentTo, setSentTo] = useState('');
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
 
@@ -41,6 +44,8 @@ export default function LoginForm() {
             pending?: boolean;
             organizerId?: string;
             totpRequired?: boolean;
+            emailCodeRequired?: boolean;
+            sentTo?: string;
             pendingToken?: string;
             error?: string;
           }
@@ -48,6 +53,17 @@ export default function LoginForm() {
       // A correct password with a second factor set returns 200 but NO session:
       // move to the code step rather than treating it as signed in.
       if (data?.totpRequired && data.pendingToken) {
+        setFactor('authenticator');
+        setPendingToken(data.pendingToken);
+        setBusy(false);
+        return;
+      }
+      // No authenticator on this account, so a code went to the address it was
+      // opened with. Same step, different source — and the copy has to say which,
+      // or the organizer stares at their authenticator app waiting for nothing.
+      if (data?.emailCodeRequired && data.pendingToken) {
+        setFactor('email');
+        setSentTo(data.sentTo ?? '');
         setPendingToken(data.pendingToken);
         setBusy(false);
         return;
@@ -82,7 +98,11 @@ export default function LoginForm() {
     if (busy || !pendingToken) return;
     const digits = code.replace(/\D/g, '');
     if (digits.length !== 6) {
-      setError('Enter the 6-digit code from your authenticator app.');
+      setError(
+        factor === 'email'
+          ? 'Enter the 6-digit code from the email we just sent.'
+          : 'Enter the 6-digit code from your authenticator app.'
+      );
       return;
     }
     setBusy(true);
@@ -118,8 +138,18 @@ export default function LoginForm() {
       <form className="anim-fade-up" onSubmit={submitCode}>
         {error && <div className="notice notice-error">{error}</div>}
         <p className="muted small" style={{ marginTop: 0 }}>
-          Your password was correct. Now open your authenticator app and type the 6-digit code for
-          this account.
+          {factor === 'email' ? (
+            <>
+              Your password was correct. We sent a 6-digit code to{' '}
+              <strong>{sentTo || 'the address on your account'}</strong> — type it in below. It
+              expires in 10 minutes.
+            </>
+          ) : (
+            <>
+              Your password was correct. Now open your authenticator app and type the 6-digit code
+              for this account.
+            </>
+          )}
         </p>
         <div className="field">
           <label htmlFor="portal-totp">6-digit code</label>
@@ -141,7 +171,14 @@ export default function LoginForm() {
           {busy ? 'Checking…' : 'Sign in'}
         </button>
         <p className="muted small" style={{ marginTop: 12, textAlign: 'center' }}>
-          The code changes every 30 seconds — if it is refused, wait for the next one.
+          {factor === 'email' ? (
+            <>
+              Not arriving? Check your spam folder. An authenticator app works without email at all —
+              you can set one up in Settings once you are in.
+            </>
+          ) : (
+            <>The code changes every 30 seconds — if it is refused, wait for the next one.</>
+          )}
         </p>
       </form>
     );

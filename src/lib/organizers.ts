@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { cookies } from 'next/headers';
 import { getDb } from './db';
 import { getSigningSecret } from './auth';
+import { burnOrganizerLoginCodes } from './loginCode';
 import { burnOrganizerResetCodes } from './passwordReset';
 
 export const ORGANIZER_COOKIE_NAME = 'organizer_session';
@@ -124,7 +125,10 @@ export function setOrganizerStatus(id: string, status: OrganizerStatus): void {
   // a disabled organizer must not be able to let themselves back in with a code
   // minted minutes earlier. (The reset route re-checks status at the final step
   // too — this just means the code is gone rather than merely useless.)
-  if (status !== 'active') burnOrganizerResetCodes(id);
+  if (status !== 'active') {
+    burnOrganizerResetCodes(id);
+    burnOrganizerLoginCodes(id);
+  }
 }
 
 export function setOrganizerPlanPaidUntil(id: string, date: string | null): void {
@@ -141,6 +145,7 @@ export function resetOrganizerPassword(id: string): string {
     .prepare(`UPDATE organizers SET password_hash = ?, must_change_password = 1 WHERE id = ?`)
     .run(hashPassword(pw), id);
   burnOrganizerResetCodes(id);
+  burnOrganizerLoginCodes(id);
   return pw;
 }
 
@@ -156,6 +161,7 @@ export function setOrganizerPassword(id: string, password: string): void {
     .prepare(`UPDATE organizers SET password_hash = ?, must_change_password = 0 WHERE id = ?`)
     .run(hashPassword(password), id);
   burnOrganizerResetCodes(id);
+  burnOrganizerLoginCodes(id);
 }
 
 /**

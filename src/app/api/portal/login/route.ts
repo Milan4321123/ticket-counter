@@ -9,6 +9,9 @@ import {
 } from '@/lib/organizers';
 import { organizerTotpEnabled } from '@/lib/organizerTotp';
 import { clientIp, isRateLimited, recordStrike } from '@/lib/ratelimit';
+import { createOrganizerLoginCode, freshLoginCodeOutstanding } from '@/lib/loginCode';
+import { maskEmail, sendOrganizerLoginCodeEmail } from '@/lib/otp';
+import { isEmailConfigured } from '@/lib/email';
 import type { ApiErrorResponse } from '@/lib/types';
 import { notifySignIn } from '../auth';
 
@@ -23,6 +26,28 @@ const GLOBAL_FAILURE_LIMIT = 100;
  * Organizer sign-in: email + password -> session cookie. Only FAILED attempts
  * count toward the rate limit, so a team sharing one office IP can all sign in.
  */
+/**
+ * Is the emailed sign-in code switched on?
+ *
+ * OFF by default, and that is not timidity — it is the only safe default until
+ * the sending domain is authenticated.
+ *
+ * The obvious safeguard does not work here. A code that cannot be SENT is
+ * caught below and waved through, but that is not the failure this platform
+ * has: SendGrid ACCEPTS the message and it is discarded further down, silently,
+ * for whole providers. From the server the send looks perfectly successful, so
+ * the code is demanded and the organizer simply never receives one — and every
+ * organizer without an authenticator is locked out at once, with nobody able to
+ * sign in and turn it off.
+ *
+ * So it waits behind a switch. Authenticate the domain, confirm a code actually
+ * arrives at a Gmail address, then set PORTAL_EMAIL_OTP=on. Everything else is
+ * built and tested; this is one environment variable away.
+ */
+function emailLoginCodeEnabled(): boolean {
+  return process.env.PORTAL_EMAIL_OTP === 'on' && isEmailConfigured();
+}
+
 export async function POST(req: Request) {
   try {
     const limiterKey = `portal-login:${clientIp(req)}`;
@@ -85,6 +110,44 @@ export async function POST(req: Request) {
       });
     }
 
+    // No authenticator: fall back to a code emailed to the address on the
+    // account. See lib/loginCode.ts for why a failure to SEND must not become a
+    // failure to sign in — an undeliverable second factor would lock out every
+    // organizer at once, with nobody able to get in and fix it.
+    let codeSent = false;
+    // Set ONLY when the emailed factor was meant to run and could not. Being
+    // switched off is not a failure and must not be reported as one, or every
+    // sign-in would warn about a check nobody asked for.
+    let codeSkippedReason = '';
+    if (emailLoginCodeEnabled()) {
+      if (freshLoginCodeOutstanding(organizer.id)) {
+        // One is already in their inbox. Re-sending on every password submit is
+        // how someone who knows the password floods it.
+        codeSent = true;
+      } else {
+        const result = await sendOrganizerLoginCodeEmail(
+          organizer.email,
+          createOrganizerLoginCode(organizer.id)
+        );
+        codeSent = result.sent;
+        codeSkippedReason = result.reason ?? '';
+      }
+    }
+
+    if (codeSent) {
+      return NextResponse.json({
+        ok: false,
+        emailCodeRequired: true,
+        sentTo: maskEmail(organizer.email),
+        pendingToken: createOrganizerPendingToken(organizer.id),
+      });
+    }
+    if (codeSkippedReason) {
+      console.warn(
+        `Organizer sign-in code not sent (${codeSkippedReason}) for ${organizer.email} — signing in on the password alone.`
+      );
+    }
+
     let token: string;
     try {
       token = createOrganizerSessionToken(organizer.id);
@@ -100,7 +163,9 @@ export async function POST(req: Request) {
 
     notifySignIn(organizer, req);
 
-    const res = NextResponse.json({ ok: true });
+    // Never a silent fail-open: the client says so, so an organizer knows the
+    // check did not happen rather than believing they are protected.
+    const res = NextResponse.json({ ok: true, ...(codeSkippedReason ? { codeUnavailable: true } : {}) });
     res.cookies.set(ORGANIZER_COOKIE_NAME, token, {
       httpOnly: true,
       sameSite: 'lax',

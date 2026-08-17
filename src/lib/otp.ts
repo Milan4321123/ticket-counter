@@ -261,3 +261,51 @@ export async function sendOrganizerResetCodeEmail(
     return { sent: false, reason: 'send-failed' };
   }
 }
+
+/**
+ * Email an organizer the code that completes their sign-in.
+ *
+ * Built like the admin and reset code emails so all three read as one product:
+ * the digits large and monospace, the expiry stated, and a line for the person
+ * who did not ask for it — which here is the important one. Somebody receiving
+ * this without trying to sign in has just learned that their password is known
+ * to someone else, and that is the most useful thing this platform can tell
+ * them.
+ *
+ * `to` MUST be the address on the account, never one typed into the form.
+ * Never throws, and the code appears only in the body: no logging, no link, no
+ * subject line.
+ */
+export async function sendOrganizerLoginCodeEmail(
+  to: string,
+  code: string
+): Promise<{ sent: boolean; reason?: string }> {
+  try {
+    if (!isEmailConfigured()) return { sent: false, reason: 'email-not-configured' };
+    const brand = platformName();
+    const transport = createCodeTransport();
+    await transport.sendMail({
+      from: process.env.EMAIL_FROM,
+      to,
+      subject: `${code} is your ${brand} sign-in code`,
+      text:
+        `Your code for signing in to ${brand} is: ${code}\n\n` +
+        `It expires in 10 minutes.\n\n` +
+        `If you did not just try to sign in, someone else knows your password. ` +
+        `Do not enter this code — change your password instead.`,
+      html:
+        `<div style="font-family:Arial,Helvetica,sans-serif;max-width:420px;margin:0 auto;padding:24px;color:#111">` +
+        `<p style="margin:0 0 8px;font-size:14px;color:#555">${brand} — organizer sign-in</p>` +
+        `<p style="margin:0 0 16px;font-size:34px;font-weight:bold;letter-spacing:6px;font-family:'Courier New',Courier,monospace">${code}</p>` +
+        `<p style="margin:0 0 16px;font-size:13px;color:#555">This code expires in 10 minutes.</p>` +
+        `<p style="margin:0;padding:12px;background:#fff4f4;border-left:3px solid #c0392b;font-size:13px;color:#111">` +
+        `<strong>If you did not just try to sign in, someone else knows your password.</strong> ` +
+        `Do not enter this code — change your password instead.</p>` +
+        `</div>`,
+    });
+    return { sent: true };
+  } catch (e) {
+    console.error('Sending organizer login code failed:', e instanceof Error ? e.message : e);
+    return { sent: false, reason: 'send-failed' };
+  }
+}

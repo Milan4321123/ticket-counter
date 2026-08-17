@@ -86,6 +86,21 @@ CREATE TABLE IF NOT EXISTS organizer_password_reset (
 );
 CREATE INDEX IF NOT EXISTS idx_organizer_password_reset_org ON organizer_password_reset(organizer_id);
 
+-- The emailed second factor at organizer sign-in, for accounts with no
+-- authenticator. Its own table, not organizer_password_reset: a reset code is
+-- handed to somebody locked OUT, this one to somebody halfway IN, and a code
+-- minted for one must never open the other's door.
+CREATE TABLE IF NOT EXISTS organizer_login_code (
+  id TEXT PRIMARY KEY,
+  organizer_id TEXT NOT NULL REFERENCES organizers(id) ON DELETE CASCADE,
+  code_hash TEXT NOT NULL,
+  expires_at INTEGER NOT NULL, -- unix ms
+  attempts INTEGER NOT NULL DEFAULT 0,
+  used_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_organizer_login_code_org ON organizer_login_code(organizer_id);
+
 CREATE TABLE IF NOT EXISTS events (
   id TEXT PRIMARY KEY,
   organizer_id TEXT NOT NULL REFERENCES organizers(id),
