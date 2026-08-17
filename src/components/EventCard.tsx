@@ -52,19 +52,27 @@ export function dateChipLabel(event: EventRow): string | null {
 function AvailabilityBadge({
   event,
   remaining,
-  unlimited,
+  showCount,
 }: {
   event: EventRow;
+  /** Tickets that can ACTUALLY be bought — see the note in EventCard. */
   remaining: number;
-  unlimited: boolean;
+  /** Whether the organizer publishes the number. Never whether it is sold out. */
+  showCount: boolean;
 }) {
   if (!event.salesOpen) return <span className="badge badge-amber">Sales closed</span>;
-  // An uncapped event has no count to report and can never sell out. Scarcity
-  // it does not have would be a lie, so it just says tickets are available.
-  // Uncapped, or the organizer chose not to publish a countdown.
-  if (unlimited) return <span className="badge badge-green">Tickets available</span>;
+  // SOLD OUT IS CHECKED FIRST, and that ordering is the fix.
+  //
+  // Hiding the countdown used to be conflated with "never sells out": the
+  // organizer's choice not to publish a number was passed in as `unlimited`, and
+  // that branch returned "Tickets available" before anything looked at the count.
+  // So any event with the countdown switched off — which is the recommended
+  // setting for early-bird pricing — advertised tickets as available after it
+  // had completely sold out.
+  //
+  // Turning the countdown off hides the NUMBER. It cannot hide the fact.
   if (remaining === 0) return <span className="badge badge-red">Sold out</span>;
-  if (remaining <= 50) return <span className="badge badge-amber">Only {remaining} left</span>;
+  if (showCount && remaining <= 50) return <span className="badge badge-amber">Only {remaining} left</span>;
   return <span className="badge badge-green">Tickets available</span>;
 }
 
@@ -79,6 +87,19 @@ export default function EventCard({ event, past = false, delayClass = '' }: Even
   const tiers = getEventTiers(event.id);
   const minPrice = tiers.length ? Math.min(...tiers.map((t) => t.priceCents)) : null;
   const availability = getAvailability(event.id);
+  /**
+   * What can actually be bought, not what is left in the room.
+   *
+   * Tier capacities need not add up to the event's capacity, so every ticket
+   * type can be exhausted while the venue still has space — and the room's
+   * figure would then call a card available when nothing on it is. Each tier's
+   * remaining is already clamped to the room, so the sum can overshoot when
+   * several are clamped to the same headroom; hence the min.
+   */
+  const buyableRemaining = Math.min(
+    availability.totalRemaining,
+    tiers.reduce((n, t) => n + Math.max(0, availability.tiers[t.tierKey]?.remaining ?? 0), 0)
+  );
   const { videoUrl, stillUrl } = listingTileMedia(event);
   const accent = parsePageDesign(event.pageDesign).accent ?? 'violet';
   const location = [event.venueName, event.city].filter(Boolean).join(', ');
@@ -124,8 +145,8 @@ export default function EventCard({ event, past = false, delayClass = '' }: Even
           ) : (
             <AvailabilityBadge
               event={event}
-              remaining={availability.totalRemaining}
-              unlimited={availability.unlimited || !availability.showRemaining}
+              remaining={buyableRemaining}
+              showCount={availability.showRemaining}
             />
           )}
         </span>

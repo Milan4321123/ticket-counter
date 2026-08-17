@@ -326,8 +326,27 @@ export default async function EventPage({ params }: Params) {
 
   const tiers = getEventTiers(event.id);
   const availability = getAvailability(event.id);
-  // An uncapped event never sells out, whatever the arithmetic says.
-  const soldOut = !availability.unlimited && availability.totalRemaining === 0;
+
+  /**
+   * How many tickets can ACTUALLY be bought right now.
+   *
+   * Not the same as space left in the room, and the difference was showing.
+   * Tier capacities do not have to add up to the event's capacity — an event for
+   * 100 people can have ticket types totalling 50 — so every type can be
+   * exhausted while the venue still has room. The old check only asked whether
+   * the room was full, so such an event advertised "Tickets available" with a
+   * Get tickets button that led to a checkout where nothing could be selected.
+   *
+   * Each tier's remaining is already clamped to the room by getAvailability, so
+   * the sum can overshoot when several tiers are clamped to the same headroom —
+   * hence the min.
+   */
+  const tierRemaining = tiers.reduce(
+    (n, t) => n + Math.max(0, availability.tiers[t.tierKey]?.remaining ?? 0),
+    0
+  );
+  const buyableRemaining = Math.min(availability.totalRemaining, tierRemaining);
+  const soldOut = buyableRemaining === 0;
   const minPrice = tiers.length ? Math.min(...tiers.map((t) => t.priceCents)) : null;
 
   // ---------------- Media ----------------
@@ -581,9 +600,9 @@ export default async function EventPage({ params }: Params) {
               )}
               {soldOut ? (
                 <span className="badge badge-red">Sold out</span>
-              ) : !availability.unlimited && availability.showRemaining && availability.totalRemaining <= 50 ? (
+              ) : availability.showRemaining && buyableRemaining <= 50 ? (
                 <span className="badge badge-amber">
-                  Only {availability.totalRemaining} tickets left
+                  Only {buyableRemaining} ticket{buyableRemaining === 1 ? '' : 's'} left
                 </span>
               ) : (
                 <span className="badge badge-green">Tickets available</span>
