@@ -172,6 +172,21 @@ export default function EventCarousel({ label, count, children }: EventCarouselP
           ))}
         </div>
       )}
+
+      {/* Say that there is more, in words.
+          Dots are a progress indicator, not an instruction — they tell you
+          where you are once you already know you can move, and a visitor who
+          has never swiped this rail reads three dots as decoration. The arrows
+          only appear on a pointer device, so on a phone there was nothing at
+          all saying another event existed. Naming the gesture is what turns a
+          static-looking card into something you try. */}
+      {count > 1 && (
+        <p className="ecar-hint">
+          <span aria-hidden="true">←</span>
+          Swipe or drag sideways for {count - 1} more event{count - 1 === 1 ? '' : 's'}
+          <span aria-hidden="true">→</span>
+        </p>
+      )}
     </div>
   );
 }

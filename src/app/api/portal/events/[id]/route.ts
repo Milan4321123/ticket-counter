@@ -1,6 +1,7 @@
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
-import { sendEventFeeInstructionsEmail } from '@/lib/email';
+import { sendEventFeeInstructionsEmail, sendPayoutChangedEmail } from '@/lib/email';
 import {
   countPaidOrdersForEvent,
   deleteEventCompletely,
@@ -17,9 +18,15 @@ import {
 } from '@/lib/events';
 import { readJsonLimited, BodyTooLargeError } from '@/lib/http';
 import { formatMoney } from '@/lib/money';
+import {
+  PAYOUT_STEP_UP_COOKIE,
+  summarisePayoutChange,
+  verifyStepUpToken,
+} from '@/lib/payoutStepUp';
 import { eventFeeReference, platformBank } from '@/lib/platform';
 import type { ApiErrorResponse } from '@/lib/types';
 import { planGate, requireOrganizerApi, requireOwnedEvent } from '../../auth';
+import { payoutStepUpChallenge } from '../../payout/method';
 
 export const dynamic = 'force-dynamic';
 
@@ -135,6 +142,35 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }
       if (e instanceof ValidationError) throw e;
       return NextResponse.json({ error: 'Nothing to save.' } satisfies ApiErrorResponse, { status: 400 });
+    }
+
+    // ---- The payout account: prove it is still you -----------------------
+    //
+    // Every other field in this route is reversible. Where the money lands is
+    // not — a buyer who has already transferred cannot un-transfer. So this one
+    // change, alone in the whole editor, asks a second time.
+    //
+    // The rules live in lib/payoutStepUp.ts: only the fields that decide the
+    // destination, only when the value genuinely moves, and never for the first
+    // one set. The check happens BEFORE any validation or writing, so a request
+    // that cannot pass it never touches the event at all.
+    const payoutBefore = {
+      bankIban: event.bankIban,
+      bankAccountHolder: event.bankAccountHolder,
+      paypalAccount: event.paypalAccount ?? '',
+    };
+    const payoutChange = summarisePayoutChange(payoutBefore, body);
+    if (payoutChange.changed.length > 0 && !payoutChange.firstTimeOnly) {
+      const store = await cookies();
+      if (!verifyStepUpToken(store.get(PAYOUT_STEP_UP_COOKIE)?.value ?? null, organizer.id)) {
+        return NextResponse.json(
+          {
+            error: 'Changing where your ticket money is paid needs one more check.',
+            stepUp: { required: true, ...payoutStepUpChallenge(organizer) },
+          },
+          { status: 403 }
+        );
+      }
     }
 
     const db = getDb();
@@ -522,6 +558,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }
     });
     tx();
+
+    // The alarm. It goes out AFTER the write, because it reports what is now
+    // true, and it is awaited so it is on its way before the organizer is told
+    // "Saved" — but it can never fail the save: the money already moved, and
+    // refusing the response over a mail hiccup would only hide that.
+    if (payoutChange.changed.length > 0) {
+      await sendPayoutChangedEmail(
+        { name: organizer.name, email: organizer.email },
+        { id: event.id, name: event.name },
+        {
+          labels: payoutChange.labels,
+          bankIban: merged.bankIban,
+          paypalAccount: merged.paypalAccount ?? '',
+          firstTime: payoutChange.firstTimeOnly,
+        }
+      );
+    }
 
     return NextResponse.json({
       ok: true,

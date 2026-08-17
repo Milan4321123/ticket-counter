@@ -86,6 +86,23 @@ CREATE TABLE IF NOT EXISTS organizer_password_reset (
 );
 CREATE INDEX IF NOT EXISTS idx_organizer_password_reset_org ON organizer_password_reset(organizer_id);
 
+-- Codes that re-prove who you are before the PAYOUT ACCOUNT on an event moves.
+--
+-- Separate from organizer_password_reset on purpose, even though the two look
+-- alike. A reset code is handed to someone who is locked OUT; this one is handed
+-- to someone already signed IN, and the two must never be interchangeable —
+-- otherwise a reset code sitting in an old inbox would also move the money.
+CREATE TABLE IF NOT EXISTS organizer_step_up (
+  id TEXT PRIMARY KEY,
+  organizer_id TEXT NOT NULL REFERENCES organizers(id) ON DELETE CASCADE,
+  code_hash TEXT NOT NULL,
+  expires_at INTEGER NOT NULL, -- unix ms
+  attempts INTEGER NOT NULL DEFAULT 0,
+  used_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_organizer_step_up_org ON organizer_step_up(organizer_id);
+
 CREATE TABLE IF NOT EXISTS events (
   id TEXT PRIMARY KEY,
   organizer_id TEXT NOT NULL REFERENCES organizers(id),

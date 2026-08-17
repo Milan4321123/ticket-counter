@@ -261,3 +261,53 @@ export async function sendOrganizerResetCodeEmail(
     return { sent: false, reason: 'send-failed' };
   }
 }
+
+/**
+ * Email an organizer the code that lets them move their payout account.
+ *
+ * The wording is deliberately not the reset email's. A reset code says "you
+ * asked to get back in"; this one has to say what is about to happen to the
+ * money, because the person who most needs to read it is the one who did NOT
+ * ask for it — and for them, this email is the alarm. So it names the change
+ * and tells them what to do, before it shows the digits.
+ *
+ * `to` MUST be the address stored on the account. Never throws, and the code
+ * exists only in the body: no logging, no link, no subject line.
+ */
+export async function sendPayoutStepUpCodeEmail(
+  to: string,
+  code: string
+): Promise<{ sent: boolean; reason?: string }> {
+  try {
+    if (!isEmailConfigured()) return { sent: false, reason: 'email-not-configured' };
+    const brand = platformName();
+    const transport = createCodeTransport();
+    await transport.sendMail({
+      from: process.env.EMAIL_FROM,
+      to,
+      subject: `Your ${brand} code for changing your payout account`,
+      text:
+        `Someone is changing the bank or PayPal account your ticket money is paid into.\n\n` +
+        `Your confirmation code is: ${code}\n\n` +
+        `It expires in 10 minutes.\n\n` +
+        `IF THIS WAS NOT YOU: do not enter this code. Someone else is signed in to your ` +
+        `organizer account. Change your password immediately and contact us — until a code ` +
+        `is entered, nothing has changed and your payout account is untouched.`,
+      html:
+        `<div style="font-family:Arial,Helvetica,sans-serif;max-width:460px;margin:0 auto;padding:24px;color:#111">` +
+        `<p style="margin:0 0 8px;font-size:14px;color:#555">${brand} — changing your payout account</p>` +
+        `<p style="margin:0 0 16px;font-size:15px">Someone is changing the bank or PayPal account your ticket money is paid into.</p>` +
+        `<p style="margin:0 0 16px;font-size:34px;font-weight:bold;letter-spacing:6px;font-family:'Courier New',Courier,monospace">${code}</p>` +
+        `<p style="margin:0 0 16px;font-size:13px;color:#555">This code expires in 10 minutes.</p>` +
+        `<p style="margin:0;padding:12px;background:#fff4f4;border-left:3px solid #c0392b;font-size:13px;color:#111">` +
+        `<strong>If this was not you, do not enter this code.</strong> Someone else is signed in to your ` +
+        `organizer account. Change your password immediately and contact us — until a code is entered, ` +
+        `nothing has changed and your payout account is untouched.</p>` +
+        `</div>`,
+    });
+    return { sent: true };
+  } catch (e) {
+    console.error('Sending organizer payout step-up email failed:', e instanceof Error ? e.message : e);
+    return { sent: false, reason: 'send-failed' };
+  }
+}

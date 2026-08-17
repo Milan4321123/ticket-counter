@@ -6146,3 +6146,39 @@ html:has(.event-page.has-section-nav) {
     bottom: calc(84px + 56px + 12px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* "Swipe sideways for more" under the carousel dots. Quiet, but present: the
+   dots alone never told anyone the rail moves. */
+.ecar-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 2px 0 0;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* The arrows drift out and back, so the eye catches the movement and reads it
+   as "this goes sideways" without anything having to shout. */
+.ecar-hint span {
+  animation: ecar-nudge 2.4s ease-in-out infinite;
+}
+
+.ecar-hint span:last-child {
+  animation-delay: 1.2s;
+}
+
+@keyframes ecar-nudge {
+  0%, 100% { transform: translateX(0); opacity: 0.55; }
+  50% { transform: translateX(3px); opacity: 1; }
+}
+
+/* A hint that moves is a hint that distracts, for anyone who asked us not to. */
+@media (prefers-reduced-motion: reduce) {
+  .ecar-hint span {
+    animation: none;
+  }
+}
