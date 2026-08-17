@@ -1,6 +1,6 @@
 import { listEventsForOrganizer } from '@/lib/events';
 import { organizerPlanActive } from '@/lib/organizers';
-import { organizerTotpEnabled } from '@/lib/organizerTotp';
+import { organizerTotpEnabled, organizerTotpPending } from '@/lib/organizerTotp';
 import { platformFeeRule } from '@/lib/platform';
 import { getReminderSettings, recommendedReminderDays } from '@/lib/reminders';
 import PlanExpired from '../PlanExpired';
@@ -99,7 +99,7 @@ export default async function PortalSettingsPage() {
 
         {/* Sits with the password, because it is the other half of the same
             question: who is allowed into this account. */}
-        <TotpPanel enabled={organizerTotpEnabled(organizer.id)} />
+        <TotpPanel enabled={organizerTotpEnabled(organizer.id)} unfinished={organizerTotpPending(organizer.id)} />
       </div>
       </div>
     </>

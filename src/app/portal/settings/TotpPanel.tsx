@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
  * stored but INERT until a working code comes back; until then, sign-in carries
  * on exactly as before. Nobody gets locked out by a setup that silently failed.
  */
-export default function TotpPanel({ enabled }: { enabled: boolean }) {
+export default function TotpPanel({ enabled, unfinished }: { enabled: boolean; unfinished?: boolean }) {
   const router = useRouter();
   const [qr, setQr] = useState<string | null>(null);
   const [manualCode, setManualCode] = useState('');
@@ -130,6 +130,18 @@ export default function TotpPanel({ enabled }: { enabled: boolean }) {
         Add a second step to your sign-in using a free app like Google Authenticator. It works
         offline and needs no email, so it keeps working even when email does not.
       </p>
+
+      {/* Scanning the QR is not setting it up. The secret is stored but INERT
+          until a working code comes back, so sign-in carries on asking for
+          nothing — which is right, but from the outside it is indistinguishable
+          from an authenticator that does not work. Say so. */}
+      {unfinished && !qr && (
+        <div className="notice notice-warn small">
+          <strong>Your setup was never finished.</strong> You scanned the code but did not type one
+          back, so your sign-in is still password-only and the app on your phone will not be asked
+          for. Start again below and complete both steps.
+        </div>
+      )}
 
       {!qr ? (
         <div>

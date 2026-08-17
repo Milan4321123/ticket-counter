@@ -51,6 +51,20 @@ export function organizerTotpEnabled(organizerId: string): boolean {
 }
 
 /**
+ * True when a secret was generated but never confirmed.
+ *
+ * This state is invisible from the outside and easy to reach: scan the QR, get
+ * interrupted, close the tab. Sign-in carries on asking for nothing, which is
+ * correct — an unconfirmed secret must never guard anything — but it looks
+ * exactly like an authenticator that does not work. Settings uses this to say
+ * plainly that the setup is unfinished.
+ */
+export function organizerTotpPending(organizerId: string): boolean {
+  const row = readRow(organizerId);
+  return Boolean(row && row.enabled !== 1 && row.secret);
+}
+
+/**
  * A secret to enrol with, creating one on first use.
  *
  * Calling this again before confirming REPLACES the pending secret, which is
