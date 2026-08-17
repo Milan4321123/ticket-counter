@@ -24,6 +24,7 @@ export default function EventFeeActions({ eventId, eventName, organizerName, fee
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [emailSent, setEmailSent] = useState(true);
+  const [emailReason, setEmailReason] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -42,7 +43,7 @@ export default function EventFeeActions({ eventId, eventName, organizerName, fee
         body: JSON.stringify({ referenceConfirmation: typed }),
       });
       const data = (await res.json().catch(() => null)) as
-        | { ok?: boolean; emailSent?: boolean; error?: string }
+        | { ok?: boolean; emailSent?: boolean; emailReason?: string; error?: string }
         | null;
       if (!res.ok || !data?.ok) {
         setError(data?.error ?? 'Something went wrong — please try again.');
@@ -51,6 +52,7 @@ export default function EventFeeActions({ eventId, eventName, organizerName, fee
         return;
       }
       setEmailSent(data.emailSent !== false);
+      setEmailReason(data.emailReason);
       setDone(true);
       setOpen(false);
       setBusy(false);
@@ -66,9 +68,14 @@ export default function EventFeeActions({ eventId, eventName, organizerName, fee
       <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4, whiteSpace: 'normal' }}>
         <span className="badge badge-green">Fee confirmed ✓</span>
         <span className="muted small">
+          {/* "Emailed" only ever meant the provider accepted it. Saying it
+              arrived is a promise this platform cannot keep while its From
+              address fails alignment and gets filtered downstream. */}
           {emailSent
-            ? 'They can publish now — we emailed them.'
-            : 'They can publish now (the email could not be sent — tell them yourself).'}
+            ? 'They can publish now. We sent them an email — if they say it never arrived, tell them directly.'
+            : `They can publish now, but the email did NOT go out${
+                emailReason ? ` (${emailReason})` : ''
+              } — tell them yourself.`}
         </span>
       </span>
     );

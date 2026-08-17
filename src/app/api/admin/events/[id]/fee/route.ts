@@ -68,6 +68,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // Tell the organizer their event can go live now. Never blocks the confirm.
     let emailSent = false;
+    let emailReason: string | undefined;
     const organizer = getOrganizer(event.organizerId);
     if (organizer) {
       const mail = await sendEventLiveEmail(
@@ -75,9 +76,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         { id: event.id, name: event.name }
       );
       emailSent = mail.sent;
+      emailReason = mail.reason;
+      console.log(`Admin confirmed fee for event ${event.id}; publish-unlocked email:`, mail);
     }
 
-    return NextResponse.json({ ok: true, emailSent });
+    return NextResponse.json({ ok: true, emailSent, emailReason });
   } catch (e) {
     console.error(`POST /api/admin/events/${id}/fee failed:`, e);
     return NextResponse.json(
