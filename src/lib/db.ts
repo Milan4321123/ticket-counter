@@ -121,6 +121,7 @@ CREATE TABLE IF NOT EXISTS events (
   whatsapp TEXT NOT NULL DEFAULT '',      -- organizer's WhatsApp, digits only (see lib/whatsapp.ts)
   whatsapp_name TEXT NOT NULL DEFAULT '', -- who the bubble says you are; '' = the account name
   whatsapp_photo TEXT NOT NULL DEFAULT '', -- served URL of the bubble's OWN face; '' = none
+  whatsapp_focus TEXT NOT NULL DEFAULT '50% 50%', -- which part of it sits in the circle
   max_per_order INTEGER NOT NULL DEFAULT 8,
   pay_within_days INTEGER NOT NULL DEFAULT 5,
   bank_account_holder TEXT NOT NULL DEFAULT '',
@@ -431,6 +432,16 @@ function migrateToPlatform(db: Database.Database): void {
   // with the URL kept here, the same way the platform's contact bubble works.
   if (!eventCols.includes('whatsapp_photo')) {
     db.exec(`ALTER TABLE events ADD COLUMN whatsapp_photo TEXT NOT NULL DEFAULT ''`);
+  }
+  // Which part of that photo lands in the circle, as CSS object-position.
+  //
+  // A focus POINT, not a stored crop: the upload keeps the whole photo (it is
+  // bounded, never cut), so moving the circle re-renders nothing and costs no
+  // quality — and a circle only needs a centre. The event cropper stores
+  // rectangles because those slots have several different shapes; this one is
+  // always round.
+  if (!eventCols.includes('whatsapp_focus')) {
+    db.exec(`ALTER TABLE events ADD COLUMN whatsapp_focus TEXT NOT NULL DEFAULT '50% 50%'`);
   }
   // The same choice for the event as a whole. total_capacity is NOT dropped
   // when this is set: it stays on as the organizer's EXPECTED attendance, which

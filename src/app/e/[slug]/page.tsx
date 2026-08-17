@@ -1038,6 +1038,7 @@ export default async function EventPage({ params }: Params) {
           // page's profile photo only when the organizer has not uploaded one,
           // so an existing bubble does not suddenly lose its face.
           photoUrl={event.whatsappPhoto || profileUrl}
+          photoFocus={event.whatsappPhoto ? event.whatsappFocus : null}
         />
       )}
 

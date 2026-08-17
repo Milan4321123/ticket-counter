@@ -45,6 +45,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           ? mediaUrl(event.profileMediaId, 'avatar', cropTag(parseCropRect(event.profileCrop)))
           : null)
       }
+      photoFocus={event.whatsappPhoto ? event.whatsappFocus : null}
     />
   ) : null;
 

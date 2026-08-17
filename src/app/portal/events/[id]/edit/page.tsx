@@ -217,6 +217,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
               whatsapp: event.whatsapp,
               whatsappName: event.whatsappName,
               whatsappPhotoUrl: event.whatsappPhoto,
+              whatsappFocus: event.whatsappFocus,
               // The bubble wears the event's own profile photo rather than a
               // second upload of the same face — one picture, already cropped
               // to a circle, already inside the media quota.

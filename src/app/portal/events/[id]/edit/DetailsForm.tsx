@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import GoToTab from './GoToTab';
+import ContactPhotoFramer from '@/components/ContactPhotoFramer';
 import SpeechInput from '@/components/SpeechInput';
 import { saveEvent } from './save';
 
@@ -28,6 +29,8 @@ interface Props {
     whatsappName: string;
     /** The bubble's OWN photo, or '' — chosen right here, separate from below. */
     whatsappPhotoUrl: string;
+    /** Which part of it sits in the circle, as CSS object-position. */
+    whatsappFocus: string;
     /** The event's round profile photo, or '' — used only as a fallback. */
     profilePhotoUrl: string;
     /** The account name, used when no bubble name is set. */
@@ -64,6 +67,9 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
   const [bubbleOwnPhoto, setBubbleOwnPhoto] = useState(initial.whatsappPhotoUrl);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  // Percentages rather than the string, because the framer works in numbers.
+  const [fx, setFx] = useState(() => Number.parseInt(initial.whatsappFocus.split(' ')[0], 10) || 50);
+  const [fy, setFy] = useState(() => Number.parseInt(initial.whatsappFocus.split(' ')[1], 10) || 50);
   /** What the circle shows: its own photo, else the page's, else an initial. */
   const bubblePhoto = bubbleOwnPhoto || initial.profilePhotoUrl;
 
@@ -153,6 +159,7 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
       salesOpen,
       whatsapp,
       whatsappName,
+      whatsappFocus: `${fx}% ${fy}%`,
     });
     setBusy(false);
     if (!result.ok) {
@@ -407,7 +414,17 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
           <span className="contact-fab-photo-wrap" style={{ position: 'relative', display: 'inline-flex' }}>
             {bubblePhoto ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={bubblePhoto} alt="" className="contact-fab-photo" style={{ borderRadius: '50%' }} />
+              <img
+                src={bubblePhoto}
+                alt=""
+                className="contact-fab-photo"
+                style={{
+                  borderRadius: '50%',
+                  // Only the bubble's own photo is framed here; the profile
+                  // photo arrives already cropped.
+                  ...(bubbleOwnPhoto ? { objectPosition: `${fx}% ${fy}%` } : {}),
+                }}
+              />
             ) : (
               <span className="contact-fab-photo contact-fab-initial" aria-hidden="true">
                 {((whatsappName || initial.accountName).trim().charAt(0) || 'O').toUpperCase()}
@@ -468,6 +485,30 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
             )}
           </div>
         </div>
+
+        {/* Framing is a spatial job, so it gets a spatial control: the whole
+            photo with a bright circle over the part that will show. Only for the
+            bubble's own photo — a group shot centred on nobody is exactly the
+            case this exists for. */}
+        {bubbleOwnPhoto && (
+          <div style={{ marginTop: 12 }}>
+            <p className="muted small" style={{ margin: '0 0 8px' }}>
+              Drag the circle to choose which part of the photo the bubble shows.
+            </p>
+            <ContactPhotoFramer
+              photoUrl={bubbleOwnPhoto}
+              fx={fx}
+              fy={fy}
+              onChange={(x, y) => {
+                setFx(x);
+                setFy(y);
+              }}
+            />
+            <p className="muted small" style={{ margin: '8px 0 0' }}>
+              Press <strong style={{ color: 'var(--text)' }}>Save details</strong> to keep the framing.
+            </p>
+          </div>
+        )}
       </div>
       <label className="checkbox-row" htmlFor="ev-sales-open">
         <input

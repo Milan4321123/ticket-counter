@@ -44,6 +44,8 @@ export interface EventRow {
    * event's public gallery.
    */
   whatsappPhoto: string;
+  /** Which part of that photo sits in the circle, as CSS object-position. */
+  whatsappFocus: string;
   maxPerOrder: number;
   payWithinDays: number;
   bankAccountHolder: string;
@@ -201,6 +203,7 @@ const EVENT_COLS = `
   whatsapp,
   whatsapp_name AS whatsappName,
   whatsapp_photo AS whatsappPhoto,
+  whatsapp_focus AS whatsappFocus,
   max_per_order AS maxPerOrder,
   pay_within_days AS payWithinDays,
   bank_account_holder AS bankAccountHolder,
@@ -232,6 +235,16 @@ const EVENT_COLS = `
   created_at AS createdAt
 `;
 
+/**
+ * `50% 50%` and nothing else — two integer percentages.
+ *
+ * This string is written by an organizer and ends up inside a style attribute,
+ * so it is never stored or read back without being matched against this. A
+ * whitelist of the exact shape leaves no room for a second declaration, a url(),
+ * or a closing quote.
+ */
+export const FOCUS_RE = /^(?:100|\d{1,2})% (?:100|\d{1,2})%$/;
+
 function rowToEvent(row: Record<string, unknown> | undefined): EventRow | null {
   if (!row) return null;
   return {
@@ -242,6 +255,9 @@ function rowToEvent(row: Record<string, unknown> | undefined): EventRow | null {
     whatsapp: (row.whatsapp as string | null) ?? '',
     whatsappName: (row.whatsappName as string | null) ?? '',
     whatsappPhoto: (row.whatsappPhoto as string | null) ?? '',
+    // Re-validated on the way out too: this lands in a style attribute, so a
+    // row written before the whitelist existed must not reach one unchecked.
+    whatsappFocus: FOCUS_RE.test(String(row.whatsappFocus ?? '')) ? String(row.whatsappFocus) : '50% 50%',
     showRemaining: Boolean(row.showRemaining),
     // Added by migration, so it is NULL on every event created before it.
     assistantContext: (row.assistantContext as string | null) ?? '',

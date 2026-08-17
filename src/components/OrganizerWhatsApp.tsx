@@ -36,6 +36,7 @@ export default function OrganizerWhatsApp({
   organizerName,
   eventName,
   photoUrl = null,
+  photoFocus = null,
 }: {
   /** Raw as the organizer typed it — validated and normalised here. */
   number: string;
@@ -43,6 +44,13 @@ export default function OrganizerWhatsApp({
   eventName: string;
   /** The organizer's round profile photo, when they have uploaded one. */
   photoUrl?: string | null;
+  /**
+   * Which part of that photo sits in the circle, as CSS object-position.
+   *
+   * Only meaningful for the bubble's OWN photo — the page's profile photo is
+   * served already cropped, so a caller falling back to it passes nothing.
+   */
+  photoFocus?: string | null;
 }) {
   // The first line is written for the ORGANIZER's benefit as much as the
   // buyer's: it arrives naming the event, so someone running three of them
@@ -73,7 +81,12 @@ export default function OrganizerWhatsApp({
         {photoUrl ? (
           // Served from our own media route, already cropped to an avatar.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={photoUrl} alt="" className="contact-fab-photo" />
+          <img
+            src={photoUrl}
+            alt=""
+            className="contact-fab-photo"
+            style={photoFocus ? { objectPosition: photoFocus } : undefined}
+          />
         ) : (
           <span className="contact-fab-photo contact-fab-initial" aria-hidden="true">
             {(name.charAt(0) || 'O').toUpperCase()}

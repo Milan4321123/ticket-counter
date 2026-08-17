@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import ContactPhotoFramer from './ContactPhotoFramer';
+import ContactPhotoFramer from '@/components/ContactPhotoFramer';
 
 interface Post {
   id: string;

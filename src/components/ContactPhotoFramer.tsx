@@ -3,7 +3,11 @@
 import { useRef, useState } from 'react';
 
 /**
- * Choose which part of the photo sits in the bubble, by SEEING it.
+ * Choose which part of the photo sits in a round bubble, by SEEING it.
+ *
+ * Shared by the platform's own contact bubble (admin) and each organizer's
+ * WhatsApp bubble (portal). Both are the same problem — a circle showing part of
+ * a rectangle — so both get the same control rather than two that drift.
  *
  * The first version was two sliders and a small preview. That tells you the
  * numbers and shows you the result, but never the relationship between them —

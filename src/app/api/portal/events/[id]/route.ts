@@ -17,6 +17,7 @@ import {
   quoteEventFee,
   videoEmbedUrl,
   type TierStatus,
+  FOCUS_RE,
 } from '@/lib/events';
 import { readJsonLimited, BodyTooLargeError } from '@/lib/http';
 import { organizerTotpEnabled } from '@/lib/organizerTotp';
@@ -348,6 +349,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       need(typeof body.salesOpen === 'boolean', 'Sales open must be on or off.');
       set('sales_open', body.salesOpen ? 1 : 0);
       merged.salesOpen = body.salesOpen;
+    }
+    if ('whatsappFocus' in body) {
+      need(typeof body.whatsappFocus === 'string', 'That focus point does not look right.');
+      // Matched against the exact shape, never stored as sent: it is rendered
+      // into a style attribute on a public page.
+      need(FOCUS_RE.test(body.whatsappFocus as string), 'That focus point does not look right.');
+      set('whatsapp_focus', body.whatsappFocus as string);
+      merged.whatsappFocus = body.whatsappFocus as string;
     }
     if ('whatsapp' in body) {
       // Stored NORMALISED, never as typed. Everything downstream builds a
