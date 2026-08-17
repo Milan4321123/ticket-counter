@@ -14,6 +14,7 @@ interface ApproveResponse {
   ok?: boolean;
   initialPassword?: string;
   emailed?: boolean;
+  emailReason?: string;
   organizer?: { email?: string };
   error?: string;
 }
@@ -22,6 +23,7 @@ interface Created {
   email: string;
   password: string;
   emailed: boolean;
+  emailReason?: string;
 }
 
 /**
@@ -31,6 +33,18 @@ interface Created {
  * The password comes back here too, and stays on screen until the page is left:
  * if the mail did not go out, this is the only copy of it that will ever exist.
  */
+/** Turn a send-failure reason into something the owner can act on. */
+function reasonText(reason: string): string {
+  switch (reason) {
+    case 'email-not-configured':
+      return 'sending email is not set up on the server — SMTP_HOST or EMAIL_FROM is missing';
+    case 'send-failed':
+      return 'the mail provider refused it — check that the From address is a verified sender';
+    default:
+      return reason;
+  }
+}
+
 export default function ApproveAccountButton({ requestId, name, email }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -61,6 +75,7 @@ export default function ApproveAccountButton({ requestId, name, email }: Props) 
         email: data.organizer?.email ?? email,
         password: data.initialPassword,
         emailed: Boolean(data.emailed),
+        emailReason: data.emailReason,
       });
       router.refresh();
     } catch {
@@ -76,12 +91,26 @@ export default function ApproveAccountButton({ requestId, name, email }: Props) 
         <p className="small" style={{ marginTop: 0, marginBottom: 8 }}>
           {created.emailed ? (
             <>
-              Account created and the sign-in details were emailed to <strong>{created.email}</strong>.
+              Account created and the sign-in details were emailed to <strong>{created.email}</strong>.{' '}
+              <span className="muted">
+                Accepted by the mail provider — if it never arrives, it was filtered after that, so keep
+                this password until they confirm.
+              </span>
             </>
           ) : (
             <>
               Account created, but the email did <strong>not</strong> go out. Pass this password to{' '}
               <strong>{created.email}</strong> yourself.
+              {/* The reason was already coming back from the API and being
+                  thrown away, which left "it did not send" as the whole story
+                  and no way to tell a missing SMTP config from a rejected
+                  sender without opening the server log. */}
+              {created.emailReason && (
+                <>
+                  {' '}
+                  <span className="muted">({reasonText(created.emailReason)})</span>
+                </>
+              )}
             </>
           )}
         </p>
