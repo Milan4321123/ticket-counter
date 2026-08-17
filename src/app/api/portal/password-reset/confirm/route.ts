@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { readJsonLimited, BodyTooLargeError } from '@/lib/http';
 import {
+  createOrganizerPendingToken,
   createOrganizerSessionToken,
   getOrganizer,
   getOrganizerByEmail,
@@ -8,6 +9,7 @@ import {
   ORGANIZER_SESSION_TTL_MS,
   setOrganizerPassword,
 } from '@/lib/organizers';
+import { organizerTotpEnabled } from '@/lib/organizerTotp';
 import {
   burnOrganizerResetCodes,
   RESET_CODE_REJECTED_MESSAGE,
@@ -100,10 +102,32 @@ export async function POST(req: Request) {
     // outstanding one for the account (see setOrganizerPassword).
     setOrganizerPassword(organizer.id, newPassword);
 
-    // Session MACs are bound to the password hash, so the write above revoked
-    // every token for this organizer. Hand them a fresh one — they have just
-    // proved they hold the account's inbox — otherwise the reset would end at
-    // the sign-in page instead of the portal.
+    // An enrolled authenticator is not optional here.
+    //
+    // Handing out a session at this point used to skip it entirely: whoever
+    // held the emailed code chose a new password and was signed straight in,
+    // without the phone ever being asked for. That made the reset flow a way
+    // AROUND the second factor rather than a way back into the account — and
+    // the mailbox is precisely the channel this platform cannot vouch for,
+    // since mail to some providers is silently dropped and inbox access is the
+    // thing an attacker most often already has.
+    //
+    // Proving you hold the inbox now proves exactly one thing: you may set the
+    // password. Getting in still needs the factor the account chose. So the
+    // reset ends where a normal sign-in ends — at the code step — carrying the
+    // same short-lived pending ticket the password step issues.
+    if (organizerTotpEnabled(organizer.id)) {
+      return NextResponse.json({
+        ok: true,
+        totpRequired: true,
+        pendingToken: createOrganizerPendingToken(organizer.id),
+      });
+    }
+
+    // No authenticator on this account, so the inbox was the only factor there
+    // is. Session MACs are bound to the password hash, so the write above
+    // revoked every token for this organizer; hand them a fresh one, otherwise
+    // the reset would end at the sign-in page instead of the portal.
     const res = NextResponse.json({ ok: true });
     try {
       res.cookies.set(ORGANIZER_COOKIE_NAME, createOrganizerSessionToken(organizer.id), {

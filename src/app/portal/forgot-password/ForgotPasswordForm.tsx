@@ -124,7 +124,9 @@ export default function ForgotPasswordForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, code: code.trim(), newPassword: next }),
       });
-      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      const data = (await res.json().catch(() => null)) as
+        | { ok?: boolean; error?: string; totpRequired?: boolean; pendingToken?: string }
+        | null;
       if (!res.ok || !data?.ok) {
         setError(data?.error ?? 'Something went wrong — please try again.');
         setCode('');
@@ -135,6 +137,20 @@ export default function ForgotPasswordForm() {
         codeRef.current?.focus();
         return;
       }
+      // The password is set, but this account has an authenticator, so no
+      // session was issued — holding the inbox proves you may CHANGE the
+      // password, never that you may get in. Send them to sign in with the new
+      // one, where the code step is waiting.
+      //
+      // Not carrying the pending ticket across: it is a five-minute token and
+      // putting it in a URL is how it ends up in history and referrers. Typing
+      // a password they chose ten seconds ago costs them nothing.
+      if (data.totpRequired) {
+        router.push('/portal/login?reset=1');
+        router.refresh();
+        return;
+      }
+
       // Stay busy through the navigation: they are signed in already and a
       // second submit could only fail.
       router.push('/portal');
