@@ -15,6 +15,7 @@ import {
 import { BUYER_RETENTION_DAYS, runBuyerDataRetentionSweep } from '@/lib/retention';
 import LogoutButton from './LogoutButton';
 import { isTotpEnrolled } from '@/lib/totp';
+import EmailConfigPanel from './EmailConfigPanel';
 import MaintenancePanel from './MaintenancePanel';
 import PlatformPostsPanel from './PlatformPostsPanel';
 import { getPlatformContact, listPlatformPosts } from '@/lib/platformPosts';
@@ -267,6 +268,10 @@ export default async function AdminDashboardPage() {
         <div className="card-title">Sign-in security · authenticator app</div>
         <TotpPanel initialEnrolled={isTotpEnrolled()} />
       </div>
+
+      {/* Straight from the running process, so "I set it in the dashboard" and
+          "the server is using it" stop being the same assumption. */}
+      <EmailConfigPanel />
     </div>
   );
 }

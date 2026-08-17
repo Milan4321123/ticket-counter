@@ -144,6 +144,25 @@ export function emailFromOrganizers(): string {
   return (process.env.EMAIL_FROM_ORGANIZERS || '').trim() || process.env.EMAIL_FROM || '';
 }
 
+/**
+ * Where replies should actually go, per audience.
+ *
+ * Defaults to the From address, which is right once the domain can receive mail.
+ * It is overridable because sending and receiving are separate services and they
+ * arrive at different times: a domain can be authenticated for SENDING within
+ * minutes while having no mailbox at all, and in that window a Reply-To of
+ * tickets@yourdomain bounces every reply a buyer sends. Point these at an inbox
+ * that exists — a personal address is fine — until real mailboxes are in place,
+ * then delete them.
+ */
+export function replyToBuyers(): string {
+  return (process.env.EMAIL_REPLY_TO_BUYERS || '').trim() || bareAddress(emailFromBuyers());
+}
+
+export function replyToOrganizers(): string {
+  return (process.env.EMAIL_REPLY_TO_ORGANIZERS || '').trim() || bareAddress(emailFromOrganizers());
+}
+
 /** Just the address part of a "Name <a@b.c>" header, for use as a Reply-To. */
 export function bareAddress(from: string): string {
   const m = from.match(/<([^>]+)>/);
