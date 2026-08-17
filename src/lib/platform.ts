@@ -214,3 +214,39 @@ export function eventFeeReference(eventId: string): string {
 
 /** Alias kept for readability at call sites that read as prose. */
 export const platformName = platformNameFromEnv;
+
+/**
+ * The brand split into the plain part and the accented part, for the two-tone
+ * wordmark used in the header, the footer and every email masthead.
+ *
+ * This used to be hardcoded twice over. The email did `/^(Nepali)(.+)$/` and
+ * fell back to flat white for any other name; the site's Logo component did not
+ * read PLATFORM_NAME AT ALL — it printed "Nepali" and "Concert" as two literal
+ * spans, so renaming the platform changed the emails and left the logo on every
+ * page still saying the old name.
+ *
+ * The rule now works for any name:
+ *   "NepaliConcert"     -> Nepali | Concert   (split at the camelCase seam)
+ *   "Events Ticket Buy" -> Events Ticket | Buy (accent the last word)
+ *   "Nachtkasse"        -> Nachtkasse |        (nothing to accent; stays plain)
+ *
+ * Accenting the LAST word is the right default because that is how a wordmark
+ * reads — the eye lands on the end — and it keeps the existing look for the
+ * current name without naming it in code.
+ */
+export function platformWordmark(): { head: string; accent: string } {
+  const name = platformNameFromEnv().trim();
+
+  // Several words: accent the final one.
+  const words = name.split(/\s+/);
+  if (words.length > 1) {
+    const accent = words[words.length - 1];
+    return { head: words.slice(0, -1).join(' ') + ' ', accent };
+  }
+
+  // One word: split at a lower-to-upper seam, e.g. NepaliConcert.
+  const seam = /^(.*[a-z0-9])([A-Z].*)$/.exec(name);
+  if (seam) return { head: seam[1], accent: seam[2] };
+
+  return { head: name, accent: '' };
+}

@@ -23,6 +23,7 @@ import {
   emailFromOrganizers,
   platformContactEmail,
   platformNameFromEnv,
+  platformWordmark,
   platformFeeLabel,
   platformFeeRule,
   type PlatformBank,
@@ -108,12 +109,17 @@ function venueDisplay(event: EventRow): string {
   return [event.venueName, event.city].filter(Boolean).join(', ');
 }
 
-/** Two-tone wordmark ("Nepali" + the rest), or plain white for other names. */
+/**
+ * Two-tone wordmark for the masthead, from the same splitter the site logo uses.
+ *
+ * It used to match on /^(Nepali)(.+)$/ and fall back to flat white for anything
+ * else, so a rename quietly lost the design in every email.
+ */
 function wordmarkHtml(): string {
-  const name = platformName();
-  const m = /^(Nepali)(.+)$/i.exec(name);
-  if (!m) return `<span style="color:#ffffff;">${escapeHtml(name)}</span>`;
-  return `<span style="color:#ffffff;">${escapeHtml(m[1])}</span><span style="color:${C.brandLight};">${escapeHtml(m[2])}</span>`;
+  const { head, accent } = platformWordmark();
+  const plain = `<span style="color:#ffffff;">${escapeHtml(head)}</span>`;
+  if (!accent) return plain;
+  return `${plain}<span style="color:${C.brandLight};">${escapeHtml(accent)}</span>`;
 }
 
 /**

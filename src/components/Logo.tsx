@@ -1,10 +1,21 @@
+import { platformWordmark } from '@/lib/platform';
+
 /**
- * NepaliConcert logo lockup: a crimson double-pennant mark (a nod to Nepal's
- * flag — two stacked triangles with subtle white moon/sun dots) next to the
- * two-tone wordmark. Pure inline SVG + text, so it renders crisply at any
- * size — small in the sticky header, larger in the footer and feed hero.
+ * The logo lockup: a crimson double-pennant mark (a nod to Nepal's flag — two
+ * stacked triangles with subtle white moon/sun dots) next to the two-tone
+ * wordmark. Pure inline SVG + text, so it renders crisply at any size — small
+ * in the sticky header, larger in the footer and feed hero.
+ *
+ * The wordmark used to be the two literal strings "Nepali" and "Concert", which
+ * meant PLATFORM_NAME renamed the emails and the page titles while the logo on
+ * every single page carried on showing the old name. It now comes from the same
+ * splitter the email masthead uses.
+ *
+ * Every call site is a server component, so reading the environment here is
+ * fine; if one ever becomes a client component this needs to arrive as a prop.
  */
 export default function Logo({ size = 24 }: { size?: number }) {
+  const { head, accent } = platformWordmark();
   const markWidth = Math.round((size * 28) / 32);
   return (
     <span className="logo-lockup" style={{ gap: Math.max(6, Math.round(size * 0.3)) }}>
@@ -28,8 +39,8 @@ export default function Logo({ size = 24 }: { size?: number }) {
         <circle cx="10.5" cy="22.5" r="2.1" fill="#fff" opacity="0.92" />
       </svg>
       <span className="logo-word" style={{ fontSize: Math.round(size * 0.84) }}>
-        <span className="logo-word-np">Nepali</span>
-        <span className="logo-word-co">Concert</span>
+        <span className="logo-word-np">{head}</span>
+        {accent && <span className="logo-word-co">{accent}</span>}
       </span>
     </span>
   );
