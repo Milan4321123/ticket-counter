@@ -31,6 +31,12 @@ export interface EventRow {
   /** False hides the "only N left" countdown from buyers entirely. */
   showRemaining: boolean;
   salesOpen: boolean;
+  /**
+   * How a pause reads to a buyer. An event that is up but not yet selling —
+   * the normal state while one is still being announced — should say tickets
+   * are coming, not that sales CLOSED, which sounds like something ended.
+   */
+  closedMessage: 'closed' | 'coming-soon';
   maxPerOrder: number;
   payWithinDays: number;
   bankAccountHolder: string;
@@ -173,6 +179,7 @@ const EVENT_COLS = `
   total_capacity AS totalCapacity,
   show_remaining AS showRemaining,
   sales_open AS salesOpen,
+  closed_message AS closedMessage,
   max_per_order AS maxPerOrder,
   pay_within_days AS payWithinDays,
   bank_account_holder AS bankAccountHolder,
@@ -209,6 +216,9 @@ function rowToEvent(row: Record<string, unknown> | undefined): EventRow | null {
   return {
     ...(row as unknown as EventRow),
     salesOpen: Boolean(row.salesOpen),
+    // Added by migration, and a free-text column, so anything unrecognised
+    // falls back to the wording that is always safe to show.
+    closedMessage: row.closedMessage === 'coming-soon' ? 'coming-soon' : 'closed',
     showRemaining: Boolean(row.showRemaining),
     // Added by migration, so it is NULL on every event created before it.
     assistantContext: (row.assistantContext as string | null) ?? '',

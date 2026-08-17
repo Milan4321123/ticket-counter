@@ -117,6 +117,7 @@ CREATE TABLE IF NOT EXISTS events (
   currency TEXT NOT NULL DEFAULT 'EUR',
   total_capacity INTEGER NOT NULL DEFAULT 100,
   sales_open INTEGER NOT NULL DEFAULT 1,
+  closed_message TEXT NOT NULL DEFAULT 'closed', -- how a PAUSE reads: 'closed' | 'coming-soon'
   max_per_order INTEGER NOT NULL DEFAULT 8,
   pay_within_days INTEGER NOT NULL DEFAULT 5,
   bank_account_holder TEXT NOT NULL DEFAULT '',
@@ -382,6 +383,16 @@ function migrateToPlatform(db: Database.Database): void {
   // purchase is attempted, including by a request that names it directly.
   if (!tierCols.includes('coming_soon')) {
     db.exec(`ALTER TABLE event_tiers ADD COLUMN coming_soon INTEGER NOT NULL DEFAULT 0`);
+  }
+  // How a PAUSE reads, chosen by the organizer.
+  //
+  // Pausing sales is what an organizer does BEFORE an event opens as well as
+  // after — the page goes up to gather an audience weeks before a single
+  // ticket is for sale. Both used to render the same amber "Sales closed",
+  // which on a brand-new event announces that something is over before it ever
+  // started. Defaults to the old wording, so no existing event changes.
+  if (!eventCols.includes('closed_message')) {
+    db.exec(`ALTER TABLE events ADD COLUMN closed_message TEXT NOT NULL DEFAULT 'closed'`);
   }
   // The same choice for the event as a whole. total_capacity is NOT dropped
   // when this is set: it stays on as the organizer's EXPECTED attendance, which

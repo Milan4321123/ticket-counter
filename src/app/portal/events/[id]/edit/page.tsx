@@ -203,6 +203,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
               maxPerOrder: event.maxPerOrder,
               payWithinDays: event.payWithinDays,
               salesOpen: event.salesOpen,
+              closedMessage: event.closedMessage,
             }}
           />
         </EditorSection>

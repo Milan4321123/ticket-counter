@@ -130,7 +130,11 @@ function friendlyError(e: unknown): string {
       case 'SOLD_OUT':
         return 'Some of those tickets just sold out. Please lower your quantities and try again.';
       case 'SALES_CLOSED':
-        return 'Ticket sales are currently closed.';
+        // The server picks between "sales are closed" and "not on sale yet"
+        // from the organizer's own setting. Hardcoding one of them here told a
+        // buyer sales had CLOSED on an event whose every other surface said
+        // the tickets were still to come.
+        return e.message || 'Ticket sales are currently closed.';
       case 'PAYMENT_FAILED':
         return 'The payment could not be completed and you have not been charged. Please try again.';
       case 'NOT_FOUND':

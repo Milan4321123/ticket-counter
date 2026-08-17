@@ -57,6 +57,23 @@ export interface TicketState {
 }
 
 /**
+ * Whether a paused event should read as "not open yet" rather than "closed".
+ *
+ * Two ways to say the same thing, and both count: the organizer picks the
+ * wording on the details form, or marks every ticket type "coming soon".
+ *
+ * Exported so a refusal from the orders API cannot contradict the badge the
+ * buyer was looking at when they pressed the button — which it did, telling
+ * someone "sales are closed" on an event whose every page said coming soon.
+ */
+export function readsAsComingSoon(event: EventRow, tiers: EventTierRow[]): boolean {
+  return (
+    event.closedMessage === 'coming-soon' ||
+    (tiers.length > 0 && tiers.every((t) => t.comingSoon))
+  );
+}
+
+/**
  * Work out the state from the event, its ticket types and live availability.
  *
  * `past` is passed in rather than derived, because "has this event happened" is
@@ -76,6 +93,16 @@ export function ticketState(
   // line-up is "coming soon" look like it was on sale.
   const sellable = tiers.filter((t) => !t.comingSoon);
   const upcoming = tiers.length - sellable.length;
+  /**
+   * Nothing has been offered for sale yet.
+   *
+   * Covers an event with no ticket types at all, not only one whose every type
+   * is marked coming soon. Guarding this on `tiers.length > 0` sent a
+   * half-built event down the sold-out branch — the empty reduce below makes
+   * `remaining` 0 — so an organizer previewing a page they had not added
+   * tickets to yet was told it had sold out.
+   */
+  const nothingOnSaleYet = sellable.length === 0;
 
   // Each tier's remaining is already clamped to the room by getAvailability, so
   // summing several can overshoot when they are clamped to the same headroom —
@@ -89,12 +116,33 @@ export function ticketState(
     return { kind: 'past', buyable: false, remaining: 0, badge: 'Finished', cta: 'See page', showCount, upcoming };
   }
   if (!event.salesOpen) {
+    // Pausing sales is what an organizer does BEFORE an event opens as well as
+    // after, so they choose which of the two it is. Saying "Sales closed" on a
+    // page that went up to gather an audience announces that something is over
+    // before it ever started, and costs the organizer the audience they were
+    // building. An organizer who marked every ticket type "coming soon" and
+    // paused sales while they finished the page was told exactly that, because
+    // the pause was read first and never looked at the tickets.
+    //
+    // The remaining count is dropped in this reading: whatever is sitting
+    // unsold is not "left", it has not been offered.
+    if (readsAsComingSoon(event, tiers)) {
+      return {
+        kind: 'coming-soon',
+        buyable: false,
+        remaining: 0,
+        badge: 'Tickets coming soon',
+        cta: 'Coming soon',
+        showCount,
+        upcoming,
+      };
+    }
     return { kind: 'closed', buyable: false, remaining, badge: 'Sales closed', cta: 'Sales closed', showCount, upcoming };
   }
   // Announced-but-not-yet-selling is checked BEFORE sold out: an event where
   // nothing has gone on sale has not sold out, and saying so would be a lie that
   // costs the organizer the audience they were building.
-  if (tiers.length > 0 && sellable.length === 0) {
+  if (nothingOnSaleYet) {
     return { kind: 'coming-soon', buyable: false, remaining: 0, badge: 'Coming soon', cta: 'Coming soon', showCount, upcoming };
   }
   if (remaining === 0) {
@@ -122,7 +170,6 @@ export function ticketState(
  */
 export function fromPriceCents(tiers: EventTierRow[]): number | null {
   const sellable = tiers.filter((t) => !t.comingSoon);
-  const upcoming = tiers.length - sellable.length;
   const pool = sellable.length ? sellable : tiers;
   return pool.length ? Math.min(...pool.map((t) => t.priceCents)) : null;
 }

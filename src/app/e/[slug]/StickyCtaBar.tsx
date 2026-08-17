@@ -9,6 +9,10 @@ interface Props {
   name: string;
   /** "from €20.00", or a plain availability line when there is no price. */
   priceLabel: string;
+  /** False when nothing can be bought: the bar stays, the link does not. */
+  buyable?: boolean;
+  /** What the button says — "Get tickets", "Coming soon", "Sold out". */
+  cta?: string;
 }
 
 /**
@@ -19,7 +23,7 @@ interface Props {
  * where the bar sits, so the two would cover each other. Once that button
  * scrolls away the bar takes over.
  */
-export default function StickyCtaBar({ href, name, priceLabel }: Props) {
+export default function StickyCtaBar({ href, name, priceLabel, buyable = true, cta = 'Get tickets' }: Props) {
   const [armed, setArmed] = useState(false);
 
   useEffect(() => {
@@ -43,9 +47,18 @@ export default function StickyCtaBar({ href, name, priceLabel }: Props) {
         <div className="event-cta-name">{name}</div>
         <div className="event-cta-price">{priceLabel}</div>
       </div>
-      <Link href={href} className="btn btn-primary">
-        Get tickets
-      </Link>
+      {/* The bar used to be dropped entirely whenever nothing was on sale, so
+          the one control a phone always had in reach disappeared exactly when
+          a visitor most needed telling why. It stays and says so. */}
+      {buyable ? (
+        <Link href={href} className="btn btn-primary">
+          {cta}
+        </Link>
+      ) : (
+        <span className="btn" aria-disabled="true" style={{ opacity: 0.65, pointerEvents: 'none' }}>
+          {cta}
+        </span>
+      )}
     </div>
   );
 }

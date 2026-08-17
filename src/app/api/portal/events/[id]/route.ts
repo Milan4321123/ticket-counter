@@ -347,6 +347,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       set('sales_open', body.salesOpen ? 1 : 0);
       merged.salesOpen = body.salesOpen;
     }
+    if ('closedMessage' in body) {
+      // Whitelisted, not stored as given: this string is chosen by an
+      // organizer and read back onto a public page, so only the two values the
+      // page knows how to render are ever written.
+      const v = body.closedMessage;
+      need(v === 'closed' || v === 'coming-soon', 'Choose what the page says while sales are off.');
+      set('closed_message', v);
+      merged.closedMessage = v as 'closed' | 'coming-soon';
+    }
 
     // ---- Bank details (the ORGANIZER's own account) ----------------------
     //

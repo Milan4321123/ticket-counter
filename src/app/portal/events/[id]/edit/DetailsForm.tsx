@@ -23,6 +23,7 @@ interface Props {
     maxPerOrder: number;
     payWithinDays: number;
     salesOpen: boolean;
+    closedMessage: 'closed' | 'coming-soon';
   };
 }
 
@@ -41,6 +42,7 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
   const [maxPerOrder, setMaxPerOrder] = useState(String(initial.maxPerOrder));
   const [payWithinDays, setPayWithinDays] = useState(String(initial.payWithinDays));
   const [salesOpen, setSalesOpen] = useState(initial.salesOpen);
+  const [closedMessage, setClosedMessage] = useState(initial.closedMessage);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,6 +88,7 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
       maxPerOrder: perOrder,
       payWithinDays: payDays,
       salesOpen,
+      closedMessage,
     });
     setBusy(false);
     if (!result.ok) {
@@ -283,9 +286,40 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
         />
         <span>
           <strong style={{ color: 'var(--text)' }}>Ticket sales open</strong> — switch off to pause sales without
-          taking the page down (buyers see &ldquo;sales are closed&rdquo;).
+          taking the page down. You choose below what buyers are told while it is off.
         </span>
       </label>
+      {/* Only asked when it can matter. Pausing sales is what an organizer does
+          BEFORE an event opens as well as after, and the two need opposite
+          words: one says come back, the other says it is over. */}
+      {!salesOpen && (
+        <div className="field" style={{ maxWidth: 520, marginTop: 4 }}>
+          <label htmlFor="ev-closed-message">While sales are off, the page says</label>
+          <select
+            id="ev-closed-message"
+            className="input"
+            value={closedMessage}
+            onChange={(e) => setClosedMessage(e.target.value === 'coming-soon' ? 'coming-soon' : 'closed')}
+          >
+            <option value="closed">Sales closed — paused, and you mean to reopen</option>
+            <option value="coming-soon">Tickets coming soon — not open yet</option>
+          </select>
+          <p className="muted small" style={{ margin: '6px 0 0' }}>
+            {closedMessage === 'coming-soon' ? (
+              <>
+                A green <strong style={{ color: 'var(--text)' }}>Tickets coming soon</strong> badge on your page and
+                everywhere your event is listed, so people can find you and come back. Search engines are told the
+                same, instead of that the event sold out.
+              </>
+            ) : (
+              <>
+                An amber <strong style={{ color: 'var(--text)' }}>Sales closed</strong> badge. Right for a pause you
+                mean to lift — but on an event that has not opened yet it reads as though it is already over.
+              </>
+            )}
+          </p>
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
         <button type="submit" className="btn btn-brand" disabled={busy}>
           {busy ? <span className="spinner" aria-hidden /> : null}

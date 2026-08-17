@@ -19,6 +19,7 @@ import { platformNameFromEnv } from './platform';
 // every event, not just the one that lied.
 import { getBaseUrl } from './config';
 import type { EventRow, EventTierRow } from './events';
+import { readsAsComingSoon } from './ticketState';
 
 export const SITE_NAME = platformNameFromEnv();
 
@@ -182,10 +183,16 @@ export function eventJsonLd({
       price: (tier.priceCents / 100).toFixed(2),
       priceCurrency: event.currency,
       url,
+      // An event that has not opened yet is not sold out, and marking it so
+      // tells Google to stop advertising tickets that were never offered.
+      // PreOrder is the state Google documents for "announced, not yet
+      // purchasable" — it keeps the listing alive without promising a checkout.
       availability:
-        !event.salesOpen || totalRemaining === 0 || (remainingByTier[tier.tierKey] ?? 0) === 0
-          ? 'https://schema.org/SoldOut'
-          : 'https://schema.org/InStock',
+        tier.comingSoon || (!event.salesOpen && readsAsComingSoon(event, tiers))
+          ? 'https://schema.org/PreOrder'
+          : !event.salesOpen || totalRemaining === 0 || (remainingByTier[tier.tierKey] ?? 0) === 0
+            ? 'https://schema.org/SoldOut'
+            : 'https://schema.org/InStock',
     }));
   }
 

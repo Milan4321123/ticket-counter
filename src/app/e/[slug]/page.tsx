@@ -480,7 +480,7 @@ export default async function EventPage({ params }: Params) {
 
   return (
     <div
-      className={`event-page${canBuy ? ' has-cta-bar' : ''}${profileUrl ? ' has-avatar' : ''}${
+      className={`event-page${preview ? '' : ' has-cta-bar'}${profileUrl ? ' has-avatar' : ''}${
         showSectionNav ? ' has-section-nav' : ''
       }`}
       style={{ ...theme } as React.CSSProperties}
@@ -675,8 +675,19 @@ export default async function EventPage({ params }: Params) {
                 {tiers.map((tier) => {
                   const tierAvail = availability.tiers[tier.tierKey];
                   const remaining = tierAvail?.remaining ?? 0;
-                  return (
-                    <div className="tier-card glow-card" key={tier.tierKey}>
+                  // The card is the button when this type can actually be
+                  // bought. People tap the price, not the paragraph below it —
+                  // and a card that lifts on hover but does nothing on click
+                  // reads as broken. A type that is sold out, announced or on a
+                  // paused event stays a plain card: there is nowhere to go.
+                  //
+                  // `!preview` for the same reason the hero button has it: the
+                  // checkout 404s on an unpublished event, so a live link here
+                  // would walk an organizer previewing their own draft straight
+                  // into a dead end — off the biggest tap target on the page.
+                  const tierBuyable = state.buyable && !preview && !tier.comingSoon && remaining > 0;
+                  const card = (
+                    <>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         {/* Order matters. The event's own state comes first: a
                             finished or paused event cannot have a ticket type
@@ -688,9 +699,13 @@ export default async function EventPage({ params }: Params) {
                             "uncapped or countdown hidden -> Available", so a tier
                             with the countdown switched off said Available after
                             it had completely sold out. */}
-                        {state.kind === 'past' || state.kind === 'closed' ? (
-                          <span className="badge badge-red">{state.badge}</span>
-                        ) : tier.comingSoon ? (
+                        {state.kind === 'past' ? (
+                          <span className="badge">{state.badge}</span>
+                        ) : state.kind === 'closed' ? (
+                          /* Amber, the same as the hero says it. Red here read
+                             as a failure next to an amber pause overhead. */
+                          <span className="badge badge-amber">{state.badge}</span>
+                        ) : tier.comingSoon || state.kind === 'coming-soon' ? (
                           <span className="badge badge-green">Coming soon</span>
                         ) : remaining === 0 ? (
                           <span className="badge badge-red">Sold out</span>
@@ -711,6 +726,21 @@ export default async function EventPage({ params }: Params) {
                           Bring a valid student ID — it&rsquo;s checked at the entrance.
                         </p>
                       )}
+                      {tierBuyable && <span className="tier-card-go">Get tickets →</span>}
+                    </>
+                  );
+                  return tierBuyable ? (
+                    <Link
+                      className="tier-card glow-card tier-card-link"
+                      key={tier.tierKey}
+                      href={checkoutHref}
+                      aria-label={`Get ${tier.name} tickets`}
+                    >
+                      {card}
+                    </Link>
+                  ) : (
+                    <div className="tier-card glow-card" key={tier.tierKey}>
+                      {card}
                     </div>
                   );
                 })}
@@ -962,14 +992,16 @@ export default async function EventPage({ params }: Params) {
 
       {/* Sticky mobile checkout bar — appears below 640px via CSS, and only
           once the hero's own button has scrolled away. */}
-      {canBuy && (
+      {!preview && (
         <StickyCtaBar
           href={checkoutHref}
           name={event.name}
+          buyable={state.buyable}
+          cta={state.cta}
           priceLabel={
-            minPrice !== null
+            state.buyable && minPrice !== null
               ? `from ${formatMoney(minPrice, event.currency)}`
-              : 'Tickets available'
+              : state.badge
           }
         />
       )}

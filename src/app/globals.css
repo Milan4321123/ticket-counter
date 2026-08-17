@@ -641,6 +641,26 @@ summary {
     0 16px 40px -22px rgba(139, 92, 246, 0.4);
 }
 
+/* A tier card that is an <a>. Only rendered as a link when the type can
+   actually be bought, so this styling never advertises a dead click. */
+.tier-card-link {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.tier-card-go {
+  margin-top: 4px;
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--accent-text);
+  transition: transform 0.22s var(--ease-out);
+}
+
+.tier-card-link:hover .tier-card-go {
+  transform: translateX(3px);
+}
+
 .tier-price {
   font-family: var(--font-display, var(--font));
   font-size: 1.9rem;

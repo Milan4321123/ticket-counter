@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getPaymentMode, hasPaypalCredentials } from '@/lib/config';
-import { getEventById, getEventTier, type EventRow } from '@/lib/events';
+import { getEventById, getEventTier, getEventTiers, type EventRow } from '@/lib/events';
+import { readsAsComingSoon } from '@/lib/ticketState';
 import { getAvailability, SoldOutError } from '@/lib/inventory';
 import { effectivePayout } from '@/lib/payout';
 import { heldUnpaidTicketsForEmail, createOrder, expireOverdueTransferReservations, markOrderFailed, setPaypalOrderId } from '@/lib/orders';
@@ -106,7 +107,16 @@ export async function POST(req: Request) {
       return apiError(404, 'NOT_FOUND', 'We could not find that event — it may no longer be available.');
     }
     if (!event.salesOpen) {
-      return apiError(403, 'SALES_CLOSED', 'Ticket sales are currently closed for this event.');
+      // Refused either way — only the wording follows the organizer's choice,
+      // so a buyer who got this far is not told sales ended on an event that
+      // has not opened yet.
+      return apiError(
+        403,
+        'SALES_CLOSED',
+        readsAsComingSoon(event, getEventTiers(event.id))
+          ? 'Tickets for this event are not on sale yet.'
+          : 'Ticket sales are currently closed for this event.'
+      );
     }
 
     const validated = validateBody(raw, event);

@@ -131,8 +131,8 @@ export default function OrganizersPage() {
                   <strong>Tell us about your event</strong>
                   <p className="muted small" style={{ margin: 0 }}>
                     A real person reads it and sets your account up, usually within a couple of
-                    days. We email you a sign-in — an email address and a password — and that is
-                    what gets you in. Nothing to pay, and no card to enter.
+                    days. We email you a sign-in — an email address and a one-time password — and
+                    that is what gets you in. Nothing to pay, and no card to enter.
                   </p>
                 </div>
               </li>
@@ -141,7 +141,10 @@ export default function OrganizersPage() {
                 <div>
                   <strong>Sign in, and your event page is yours to build</strong>
                   <p className="muted small" style={{ margin: 0 }}>
-                    That sign-in opens your organizer portal. Inside it is an editor for your
+                    The first thing it asks for is a new password of your own — the one we emailed
+                    is single-use, and the portal stays locked until you have replaced it, so a
+                    password sitting in an inbox is never the one protecting your ticket money.
+                    After that you are in your organizer portal. Inside it is an editor for your
                     event page — the cover photo people see in the listing, your gallery and
                     video, the text, the colours, your ticket types and prices, and the bank
                     account the money goes to. You change it, you press save, and that is what

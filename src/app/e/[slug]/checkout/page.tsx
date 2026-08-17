@@ -38,39 +38,30 @@ export default async function EventCheckoutPage({ params }: Params) {
   expireOverdueTransferReservations(event.id);
   const availability = getAvailability(event.id);
 
-  if (!event.salesOpen) {
-    return (
-      <div className="container container-narrow">
-        <h1 className="page-title anim-fade-up">Checkout</h1>
-        <div className="notice notice-warn anim-fade-up anim-d1">
-          Ticket sales are currently closed, so nothing can be booked right now. Check back soon!
-        </div>
-        <p className="anim-fade-up anim-d2">
-          <Link href={`/e/${event.slug}`} className="btn">
-            Back to the event page
-          </Link>
-        </p>
-      </div>
-    );
-  }
-
   // The same decision the event page and the feed made — see lib/ticketState.ts.
   // Reading only totalRemaining here let a buyer reach a checkout whose every
-  // ticket type was exhausted while the room still had space.
+  // ticket type was exhausted while the room still had space. A separate
+  // salesOpen check used to sit in front of this and answered "sales are
+  // closed" in the one voice, which on an event the organizer has marked as not
+  // yet open said the opposite of what every other page said.
   const state = ticketState(event, getEventTiers(event.id), availability);
   if (!state.buyable) {
     return (
       <div className="container container-narrow">
         <h1 className="page-title anim-fade-up">Checkout</h1>
-        <div className={`notice anim-fade-up anim-d1 ${state.kind === 'coming-soon' ? 'notice-warn' : 'notice-error'}`}>
+        <div className={`notice anim-fade-up anim-d1 ${state.kind === 'sold-out' ? 'notice-error' : 'notice-warn'}`}>
           {state.kind === 'coming-soon'
             ? 'Tickets for this event are not on sale yet — nothing can be booked just now.'
-            : 'This event is completely sold out — thank you for the incredible interest!'}
+            : state.kind === 'sold-out'
+              ? 'This event is completely sold out — thank you for the incredible interest!'
+              : 'Ticket sales are currently closed, so nothing can be booked right now. Check back soon!'}
         </div>
-        <p className="muted anim-fade-up anim-d2">
-          If a reserved order is not paid in time, its seats are released again — so it can be
-          worth checking back later.
-        </p>
+        {state.kind === 'sold-out' ? (
+          <p className="muted anim-fade-up anim-d2">
+            If a reserved order is not paid in time, its seats are released again — so it can be
+            worth checking back later.
+          </p>
+        ) : null}
         <p className="anim-fade-up anim-d3">
           <Link href={`/e/${event.slug}`} className="btn">
             Back to the event page
