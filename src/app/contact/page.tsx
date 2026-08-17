@@ -119,15 +119,20 @@ export default async function ContactPage({
       <section className="section" style={{ paddingTop: 28 }}>
         <div className="container container-narrow">
           <div style={{ maxWidth: 560, margin: '0 auto' }}>
-            <p className="anim-fade-up" style={{ textAlign: 'center', margin: '0 0 4px' }}>
-              Prefer plain email? Write to{' '}
-              <a
-                href={`mailto:${contactEmail}`}
-                style={{ color: 'var(--brand-text)', fontWeight: 700 }}
-              >
-                {contactEmail}
-              </a>
-            </p>
+            {/* Only when there is a real address. Empty means none is
+                configured, and an empty mailto: link is worse than no line at
+                all — it looks like a way to reach us and reaches nobody. */}
+            {contactEmail && (
+              <p className="anim-fade-up" style={{ textAlign: 'center', margin: '0 0 4px' }}>
+                Prefer plain email? Write to{' '}
+                <a
+                  href={`mailto:${contactEmail}`}
+                  style={{ color: 'var(--brand-text)', fontWeight: 700 }}
+                >
+                  {contactEmail}
+                </a>
+              </p>
+            )}
             <p
               className="muted small anim-fade-up"
               style={{ textAlign: 'center', margin: '0 0 18px' }}

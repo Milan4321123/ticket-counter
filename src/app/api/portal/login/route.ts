@@ -14,6 +14,7 @@ import { maskEmail, sendOrganizerLoginCodeEmail } from '@/lib/otp';
 import { isEmailConfigured } from '@/lib/email';
 import type { ApiErrorResponse } from '@/lib/types';
 import { notifySignIn } from '../auth';
+import { platformNameFromEnv } from '@/lib/platform';
 
 const LOGIN_FAILURE_LIMIT = 8;
 const LOGIN_FAILURE_WINDOW_MS = 15 * 60_000;
@@ -92,7 +93,7 @@ export async function POST(req: Request) {
     if (organizer.status !== 'active') {
       return NextResponse.json(
         {
-          error: 'This account has been disabled. Please contact the NepaliConcert team if you think this is a mistake.',
+          error: `This account has been disabled. Please contact the ${platformNameFromEnv()} team if you think this is a mistake.`,
         } satisfies ApiErrorResponse,
         { status: 401 }
       );

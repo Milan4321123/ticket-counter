@@ -3,6 +3,7 @@ import { answerWithBestModel, platformAssistantContext } from '@/lib/assistant';
 import { BodyTooLargeError, readJsonLimited } from '@/lib/http';
 import { clientIp, rateLimit } from '@/lib/ratelimit';
 import type { ApiErrorResponse } from '@/lib/types';
+import { platformNameFromEnv } from '@/lib/platform';
 
 const MIN_QUESTION = 3;
 const MAX_QUESTION = 500;
@@ -66,7 +67,7 @@ export async function POST(req: Request) {
     }
 
     const result = await answerWithBestModel(
-      'You answer visitor questions about the NepaliConcert ticketing platform, using ONLY the platform context ' +
+      `You answer visitor questions about the ${platformNameFromEnv()} ticketing platform, using ONLY the platform context ` +
         'provided. Never invent facts — fees, policies, features — that are not in it. ' +
         'BUT do answer broad or vague questions ("what do you know?", "what is this?", "what can you do?", ' +
         '"tell me about this") by summarising what the context DOES contain: what the platform is, what it costs, ' +
@@ -106,7 +107,7 @@ export async function POST(req: Request) {
       message: 'I could not find that in what I know about the platform.',
       canEscalate: true,
       escalateHref: '/contact',
-      escalateLabel: 'Ask the NepaliConcert team',
+      escalateLabel: `Ask the ${platformNameFromEnv()} team`,
     });
   } catch (e) {
     console.error('POST /api/platform/ask failed:', e);

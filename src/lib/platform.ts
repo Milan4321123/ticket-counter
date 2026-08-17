@@ -3,6 +3,18 @@
 // details, which belong to organizers). Configured via environment variables.
 import { formatMoney } from './money';
 
+/**
+ * The platform's own name, from PLATFORM_NAME.
+ *
+ * THE one definition. It was copy-pasted as `process.env.PLATFORM_NAME ||
+ * 'NepaliConcert'` in six files, and worse, the name was written out by hand in
+ * page titles, an account-disabled message, two AI briefings and a FAQ answer —
+ * so setting PLATFORM_NAME renamed some of the product and not the rest.
+ */
+export function platformNameFromEnv(): string {
+  return (process.env.PLATFORM_NAME || '').trim() || 'NepaliConcert';
+}
+
 /** The flat part, paid to publish at all (€15.00). */
 const DEFAULT_FEE_BASE_CENTS = 1500;
 
@@ -147,11 +159,23 @@ export function bareAddress(from: string): string {
 export function platformContactEmail(): string {
   const explicit = (process.env.PLATFORM_CONTACT_EMAIL || '').trim();
   if (explicit) return explicit;
-  const firstAdmin = (process.env.ADMIN_EMAIL || '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)[0];
-  return firstAdmin || 'hello@nepaliconcert.com';
+
+  // Falls back to the ORGANIZER sending address, then to EMAIL_FROM, and then to
+  // nothing at all.
+  //
+  // It used to fall back to the first ADMIN_EMAIL, which was backwards in the
+  // worst way: that is the inbox that receives ADMIN SIGN-IN CODES, and this
+  // function's value is printed on /contact, /privacy and /organizers. The
+  // platform was publishing the single address most worth attacking, and
+  // pointing at it as the place to write — so anyone deciding to phish the owner
+  // was told which mailbox to aim at, on a public page, by us.
+  //
+  // The old 'hello@nepaliconcert.com' last resort was no better: a domain
+  // nobody here owns, so mail to it disappears while looking like it worked.
+  // Empty is the honest answer, and every caller already handles it — the pages
+  // hide the line and sendContactRequestToTeam refuses rather than guessing.
+  const organizerFrom = bareAddress(emailFromOrganizers());
+  return organizerFrom || '';
 }
 
 export interface PlatformBank {
@@ -187,3 +211,6 @@ export function signupReference(organizerId: string): string {
 export function eventFeeReference(eventId: string): string {
   return 'EVENT-' + eventId.slice(0, 8).toUpperCase();
 }
+
+/** Alias kept for readability at call sites that read as prose. */
+export const platformName = platformNameFromEnv;

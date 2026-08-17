@@ -9,7 +9,7 @@ import nodemailer from 'nodemailer';
 import { getDb } from './db';
 import { getEventConfig } from './config';
 import { isEmailConfigured } from './email';
-import { bareAddress, emailFromOrganizers } from './platform';
+import { bareAddress, emailFromOrganizers, platformNameFromEnv } from './platform';
 import { adminPhones, isSmsConfigured, maskPhone, sendOtpSms } from './sms';
 import { isTotpEnrolled } from './totp';
 
@@ -217,7 +217,7 @@ export async function sendOtpEmail(code: string): Promise<{ sent: boolean; reaso
 
 /** The platform's own brand. Mirrors the private helper in email.ts. */
 function platformName(): string {
-  return process.env.PLATFORM_NAME || 'NepaliConcert';
+  return platformNameFromEnv();
 }
 
 /**

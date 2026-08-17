@@ -3,6 +3,7 @@ import { formatMoney } from '@/lib/money';
 import {
   eventFeeAmount,
   platformContactEmail,
+  platformNameFromEnv,
   platformFeeBaseAmount,
   platformFeePerTicketAmount,
 } from '@/lib/platform';
@@ -14,18 +15,28 @@ import EventPageMock from '@/components/mockups/EventPageMock';
 // The fee comes from env vars — read them fresh on every request.
 export const dynamic = 'force-dynamic';
 
-export const metadata = {
-  title: 'Sell tickets on NepaliConcert — for organizers',
-  description:
-    'Your own beautiful event page, QR tickets, door scanning, and ticket money straight to your bank account. €50 for a 500-person event, no commission on ticket sales.',
-  alternates: { canonical: '/organizers' },
-  openGraph: {
-    type: 'website',
-    title: 'Sell tickets on NepaliConcert — for organizers',
-    description: 'Your own beautiful event page, QR tickets, door scanning, and ticket money straight to your bank account. €50 for a 500-person event, no commission on ticket sales.',
-    url: '/organizers',
-  },
-};
+/**
+ * Generated, not a static object, for two reasons that had both gone wrong.
+ *
+ * The brand was written out by hand, so setting PLATFORM_NAME renamed the site
+ * everywhere except the title of the page whose whole job is recruiting
+ * organizers. And the price was frozen in the text — it still advertised "€50
+ * for a 500-person event" after the fee model changed, which is the one number
+ * on this page somebody might decide to sign up on.
+ */
+export async function generateMetadata() {
+  const brand = platformNameFromEnv();
+  const title = `Sell tickets on ${brand} — for organizers`;
+  const description =
+    `Your own beautiful event page, QR tickets, door scanning, and ticket money straight to your bank ` +
+    `account. ${eventFeeAmount(HEADLINE_CAPACITY)} for a ${HEADLINE_CAPACITY}-person event, no commission on ticket sales.`;
+  return {
+    title,
+    description,
+    alternates: { canonical: '/organizers' },
+    openGraph: { type: 'website', title, description, url: '/organizers' },
+  };
+}
 
 /** The venue size the headline price is quoted for. */
 const HEADLINE_CAPACITY = 500;
@@ -390,15 +401,17 @@ export default function OrganizersPage() {
               your page for you — tell us what you have in mind and we&rsquo;ll come back with ideas
               and a price.
             </p>
-            <p className="small" style={{ margin: '0 0 14px' }}>
-              Or email us at{' '}
-              <a
-                href={`mailto:${contactEmail}`}
-                style={{ color: 'var(--brand-text)', fontWeight: 700 }}
-              >
-                {contactEmail}
-              </a>
-            </p>
+            {contactEmail && (
+              <p className="small" style={{ margin: '0 0 14px' }}>
+                Or email us at{' '}
+                <a
+                  href={`mailto:${contactEmail}`}
+                  style={{ color: 'var(--brand-text)', fontWeight: 700 }}
+                >
+                  {contactEmail}
+                </a>
+              </p>
+            )}
             <p className="muted small" style={{ margin: '0 0 14px' }}>
               Every page is designed for the one event, so there is nothing to browse — tell us about
               your night and we will show you what we would build for it.
@@ -439,7 +452,7 @@ export default function OrganizersPage() {
           paid, what an account costs — is exactly what it is briefed on, and
           leaving it off meant this page had the "talk to Milan" bubble and an
           empty space beside it where the quick answer should be. */}
-      <PlatformAssistant />
+      <PlatformAssistant brand={platformNameFromEnv()} />
     </>
   );
 }

@@ -11,6 +11,7 @@ import { BUYER_RETENTION_DAYS, runBuyerDataRetentionSweep } from '@/lib/retentio
 import { eventListJsonLd, faqJsonLd, jsonLdScript } from '@/lib/seo';
 import { listPlatformPosts } from '@/lib/platformPosts';
 import type { PlatformPostRow } from '@/lib/platformPosts';
+import { platformNameFromEnv } from '@/lib/platform';
 
 // The feed reflects live availability — always render fresh.
 export const dynamic = 'force-dynamic';
@@ -116,7 +117,7 @@ function faqs(anyPaypal: boolean) {
   {
     question: 'Who am I actually buying from?',
     answer:
-      'The organizer of that particular event. They set the prices, receive the payment in their own account, issue the tickets and run the door. NepaliConcert is the platform they use to sell — every event page names the organizer behind it.',
+      `The organizer of that particular event. They set the prices, receive the payment in their own account, issue the tickets and run the door. ${platformNameFromEnv()} is the platform they use to sell — every event page names the organizer behind it.`,
   },
   {
     question: 'What happens if an event is cancelled or I cannot come?',
@@ -556,7 +557,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <PlatformAssistant />
+      <PlatformAssistant brand={platformNameFromEnv()} />
     </>
   );
 }

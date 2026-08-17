@@ -22,6 +22,7 @@ import {
   emailFromBuyers,
   emailFromOrganizers,
   platformContactEmail,
+  platformNameFromEnv,
   platformFeeLabel,
   platformFeeRule,
   type PlatformBank,
@@ -59,7 +60,7 @@ function escapeHtml(s: string): string {
 }
 
 function platformName(): string {
-  return process.env.PLATFORM_NAME || 'NepaliConcert';
+  return platformNameFromEnv();
 }
 
 // ---------------------------------------------------------------------------

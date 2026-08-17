@@ -16,6 +16,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { geminiEnabled, geminiJson } from './gemini';
 import { eventFeeAmount, platformFeeRule } from './platform';
+import { platformNameFromEnv } from './platform';
 
 export interface BestModelAnswer {
   confident: boolean;
@@ -125,7 +126,7 @@ export function platformAssistantContext(): string {
   const fee500 = eventFeeAmount(500);
   return [
     'WHAT NEPALICONCERT IS',
-    'NepaliConcert is a self-service ticketing platform for multiple independent event organizers.',
+    `${platformNameFromEnv()} is a self-service ticketing platform for multiple independent event organizers.`,
     `Organizer accounts are free; the platform charges a fee PER EVENT that follows the venue capacity the organizer sets — ${feeRule}, so a 500-person event costs ${fee500} — paid before that event can be published. Buyers pay organizers directly for tickets.`,
     'The platform never holds, forwards, or touches ticket money — it is software access, not a payment service.',
     'Three areas: the public site for buyers, the organizer portal at /portal, and the platform admin at /admin.',

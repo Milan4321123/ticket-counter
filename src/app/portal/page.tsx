@@ -18,6 +18,7 @@ import CreateEventForm from './CreateEventForm';
 import PlanExpired from './PlanExpired';
 import PortalNav from './PortalNav';
 import { requirePortalOrganizer } from './guard';
+import { platformNameFromEnv } from '@/lib/platform';
 
 export const dynamic = 'force-dynamic';
 
@@ -311,7 +312,7 @@ export default async function PortalDashboardPage({
         )}
       </div>
 
-      <PlatformAssistant />
+      <PlatformAssistant brand={platformNameFromEnv()} />
     </>
   );
 }

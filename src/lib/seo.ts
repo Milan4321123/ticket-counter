@@ -1,3 +1,4 @@
+import { platformNameFromEnv } from './platform';
 // Everything Google needs to find this site, understand it, and show it well.
 //
 // Three separate jobs live here, and they are easy to confuse:
@@ -19,7 +20,7 @@
 import { getBaseUrl } from './config';
 import type { EventRow, EventTierRow } from './events';
 
-export const SITE_NAME = process.env.PLATFORM_NAME || 'NepaliConcert';
+export const SITE_NAME = platformNameFromEnv();
 
 /**
  * The one-line pitch, used wherever nothing more specific exists. Written for a

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { platformContactEmail } from '@/lib/platform';
+import { platformContactEmail, platformName } from '@/lib/platform';
 import { BUYER_RETENTION_DAYS } from '@/lib/retention';
 
 // The retention window is read from the same constant the erasure sweep uses,
@@ -19,7 +19,7 @@ export const metadata = {
   },
 };
 
-const PLATFORM_NAME = process.env.PLATFORM_NAME || 'NepaliConcert';
+const PLATFORM_NAME = platformName();
 
 export default function PrivacyPage() {
   const contactEmail = platformContactEmail();
@@ -160,11 +160,18 @@ export default function PrivacyPage() {
             <h2 className="card-title">Ask us anything</h2>
             <p style={{ marginBottom: 0 }}>
               If you want to know what we hold about you, or you want it gone sooner than{' '}
-              {BUYER_RETENTION_DAYS} days, write to{' '}
-              <a href={`mailto:${contactEmail}`} style={{ color: 'var(--brand-text)', fontWeight: 700 }}>
-                {contactEmail}
-              </a>{' '}
-              and a real person will answer.
+              {BUYER_RETENTION_DAYS} days,{' '}
+              {contactEmail ? (
+                <>
+                  write to{' '}
+                  <a href={`mailto:${contactEmail}`} style={{ color: 'var(--brand-text)', fontWeight: 700 }}>
+                    {contactEmail}
+                  </a>{' '}
+                  and a real person will answer.
+                </>
+              ) : (
+                <>use the contact form and a real person will answer.</>
+              )}
             </p>
           </div>
         </div>

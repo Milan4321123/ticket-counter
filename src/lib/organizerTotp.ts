@@ -22,13 +22,14 @@
 import crypto from 'crypto';
 import QRCode from 'qrcode';
 import { getDb } from './db';
+import { platformNameFromEnv } from './platform';
 import { base32Encode, totpStepFor, verifyTotpAgainstSecret } from './totp';
 
 const DIGITS = 6;
 const STEP_SECONDS = 30;
 
 function platformName(): string {
-  return process.env.PLATFORM_NAME || 'NepaliConcert';
+  return platformNameFromEnv();
 }
 
 interface TotpRow {
