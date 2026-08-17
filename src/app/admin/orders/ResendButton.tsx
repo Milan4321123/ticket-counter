@@ -4,6 +4,20 @@ import { useState } from 'react';
 
 type ResendState = 'idle' | 'busy' | 'sent' | 'failed';
 
+/** Internal reason codes, in words the person fixing it can act on. */
+function explain(reason?: string): string | null {
+  switch (reason) {
+    case 'email-not-configured':
+      return 'Sending is switched off — SMTP_HOST or a From address is missing.';
+    case 'order-not-found':
+      return 'That order no longer exists.';
+    case 'no-tickets':
+      return 'This order has no tickets to send.';
+    default:
+      return reason ?? null;
+  }
+}
+
 export default function ResendButton({ orderId }: { orderId: string }) {
   const [state, setState] = useState<ResendState>('idle');
   const [reason, setReason] = useState<string | null>(null);
@@ -14,12 +28,16 @@ export default function ResendButton({ orderId }: { orderId: string }) {
     setReason(null);
     try {
       const res = await fetch(`/api/admin/orders/${orderId}/resend`, { method: 'POST' });
-      const data = (await res.json().catch(() => null)) as { sent?: boolean; reason?: string } | null;
+      const data = (await res.json().catch(() => null)) as
+        | { sent?: boolean; reason?: string; detail?: string }
+        | null;
       if (res.ok && data?.sent) {
         setState('sent');
       } else {
         setState('failed');
-        setReason(typeof data?.reason === 'string' ? data.reason : 'Email could not be sent.');
+        // Prefer what the mail server said over the internal code. 'send-failed'
+        // is true and useless; "535 Authentication failed" names the fix.
+        setReason(data?.detail || explain(data?.reason) || 'Email could not be sent.');
       }
     } catch {
       setState('failed');
@@ -33,9 +51,17 @@ export default function ResendButton({ orderId }: { orderId: string }) {
         {state === 'busy' ? 'Sending…' : state === 'sent' ? 'Send again' : 'Resend email'}
       </button>
       {state === 'sent' && <span className="badge badge-green">Sent</span>}
+      {/* The reason shown, not hidden in a tooltip. A red badge saying only
+          "Failed" sends the owner to the server logs, which is where an evening
+          goes. Hover text is also invisible on a phone. */}
       {state === 'failed' && (
-        <span className="badge badge-red" title={reason ?? undefined}>
-          Failed
+        <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 2, whiteSpace: 'normal' }}>
+          <span className="badge badge-red">Failed</span>
+          {reason && (
+            <span className="mono small" style={{ color: 'var(--danger, #f87171)', maxWidth: 320 }}>
+              {reason}
+            </span>
+          )}
         </span>
       )}
     </span>

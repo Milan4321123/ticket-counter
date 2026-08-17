@@ -502,7 +502,9 @@ function ticketStubHtml(opts: {
  * Send the buyer their tickets for a PAID order. Never throws — payment flow
  * must not fail because email is down or unconfigured.
  */
-export async function sendTicketEmail(orderId: string): Promise<{ sent: boolean; reason?: string }> {
+export async function sendTicketEmail(
+  orderId: string
+): Promise<{ sent: boolean; reason?: string; detail?: string }> {
   try {
     if (!isEmailConfigured()) return { sent: false, reason: 'email-not-configured' };
 
@@ -638,8 +640,13 @@ export async function sendTicketEmail(orderId: string): Promise<{ sent: boolean;
 
     return { sent: true };
   } catch (err) {
-    console.error('[email] Failed to send ticket email:', err instanceof Error ? err.message : err);
-    return { sent: false, reason: 'send-failed' };
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error('[email] Failed to send ticket email:', detail);
+    // `reason` stays the stable code other callers branch on (the reminder sweep
+    // treats anything other than 'send-failed' as permanent). `detail` carries
+    // what the mail server actually said, for the admin who has to fix it —
+    // "send-failed" in a tooltip is not a diagnosis.
+    return { sent: false, reason: 'send-failed', detail };
   }
 }
 
