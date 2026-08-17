@@ -31,7 +31,19 @@ import {
 import type { ContactRequestRow } from './contact';
 
 export function isEmailConfigured(): boolean {
-  return Boolean(process.env.SMTP_HOST && process.env.EMAIL_FROM);
+  // ANY of the three From addresses counts, not EMAIL_FROM specifically.
+  //
+  // This was a trap of my own making. Splitting the sender into
+  // EMAIL_FROM_BUYERS and EMAIL_FROM_ORGANIZERS documented them as optional
+  // with a fallback to EMAIL_FROM — but this gate, the master switch every
+  // single send checks first, still demanded EMAIL_FROM by name. So setting the
+  // two new variables and clearing the old one switched email OFF completely:
+  // every send returned 'email-not-configured' having never attempted anything,
+  // which looks exactly like a broken mail provider and is not one.
+  return Boolean(
+    process.env.SMTP_HOST &&
+      (process.env.EMAIL_FROM || process.env.EMAIL_FROM_BUYERS || process.env.EMAIL_FROM_ORGANIZERS)
+  );
 }
 
 function createTransporter() {
