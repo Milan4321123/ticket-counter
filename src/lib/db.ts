@@ -316,11 +316,16 @@ function migrateToPlatform(db: Database.Database): void {
   // quoted from. Their fee_cents is NULL (never re-quoted), so it cannot be
   // divided back into a seat count — this column is why the rule works for them
   // at all.
-  const feeCapacityIsNew = !eventCols.includes('fee_capacity');
-  if (feeCapacityIsNew) {
+  if (!eventCols.includes('fee_capacity')) {
     db.exec(`ALTER TABLE events ADD COLUMN fee_capacity INTEGER`);
-    db.exec(`UPDATE events SET fee_capacity = total_capacity WHERE fee_status = 'paid'`);
   }
+  // Run EVERY boot, not only when the column is new. The ALTER and this UPDATE
+  // are separate statements with no transaction around them, so a process
+  // killed between the two would otherwise leave the column committed and empty
+  // — and empty means feeCapacity is null, which switches the ceiling OFF for
+  // every paid event, silently and permanently. Idempotent and a no-op
+  // afterwards, so it self-heals instead of failing open.
+  db.exec(`UPDATE events SET fee_capacity = total_capacity WHERE fee_status = 'paid' AND fee_capacity IS NULL`);
   if (!eventCols.includes('fee_cents')) {
     db.exec(`ALTER TABLE events ADD COLUMN fee_cents INTEGER`);
   }

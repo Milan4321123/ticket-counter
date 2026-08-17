@@ -110,9 +110,17 @@ export function isTotpEnrolled(): boolean {
   return readKv(ENABLED_KEY) === '1' && !!readKv(SECRET_KEY);
 }
 
-/** Mark authenticator login active (after the admin proves a working code). */
-export function setTotpEnrolled(): void {
+/**
+ * Mark authenticator login active, spending the code that proved it.
+ *
+ * The step is recorded for the same reason the organizer's is: enabling grants
+ * nothing by itself, but leaving the marker at 0 keeps the code that was just
+ * typed spendable at the admin sign-in for the rest of its window — including
+ * by whoever was watching the setup.
+ */
+export function setTotpEnrolled(step?: number): void {
   writeKv(ENABLED_KEY, '1');
+  if (typeof step === 'number' && step > 0) writeKv(LAST_STEP_KEY, String(step));
 }
 
 /** Turn authenticator login off and forget the secret (e.g. lost phone). */
@@ -184,7 +192,14 @@ export function totpStepFor(secret: string, rawCode: string): number {
   const now = Math.floor(Date.now() / 1000);
   for (let w = -DRIFT_WINDOWS; w <= DRIFT_WINDOWS; w++) {
     const t = now + w * STEP_SECONDS;
-    if (totpCode(bytes, t) === code) return Math.floor(t / STEP_SECONDS);
+    // Constant-time per window. Both sides are exactly DIGITS long — the input
+    // was length-checked above and totpCode pads — so timingSafeEqual cannot
+    // throw on a length mismatch. Restored deliberately: consolidating the two
+    // verifiers into this function had quietly dropped it from the admin path,
+    // which is not a control to lose as a side effect of a refactor.
+    if (crypto.timingSafeEqual(Buffer.from(totpCode(bytes, t)), Buffer.from(code))) {
+      return Math.floor(t / STEP_SECONDS);
+    }
   }
   return -1;
 }

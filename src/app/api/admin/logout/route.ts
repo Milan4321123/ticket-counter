@@ -3,7 +3,6 @@ import {
   bumpAdminSessionEpoch,
   COOKIE_NAME,
   isAdminRequest,
-  isPreauthRequest,
   PREAUTH_COOKIE_NAME,
   SCAN_COOKIE_NAME,
 } from '@/lib/auth';
@@ -24,11 +23,32 @@ export async function POST() {
   // the session dead before the next page loaded, with no way to tell why. On
   // event day that is the door scanner and the orders page gone at once.
   //
-  // So the server-side revocation now needs a caller who is actually signed in
-  // (or halfway through signing in). Clearing the caller's OWN cookies stays
-  // unconditional: it touches nothing but the browser making the request, and
-  // keeping it that way means a stale tab can still tidy itself up.
-  const authorised = (await isAdminRequest()) || (await isPreauthRequest());
+  // So the server-side revocation now needs a caller who is actually signed in.
+  // Clearing the caller's OWN cookies stays unconditional: it touches nothing
+  // but the browser making the request, and keeping it that way means a stale
+  // tab can still tidy itself up.
+  //
+  // A FULL session only. Not preauth — that cookie means "typed the right
+  // password", and the whole point of the second factor is that the password
+  // may be known to someone else. Accepting it here would have handed the
+  // lockout loop straight back: right password, POST logout, repeat, and the
+  // owner can enter the correct password AND the correct code and still find
+  // the session dead before the next page renders.
+  //
+  // Nothing legitimate needs the preauth branch either. The only caller is the
+  // Log out button in the admin area, which is rendered behind isAdminRequest().
+  // It would also have broken a real case: starting a fresh password step on a
+  // laptop would kill a session already signed in on a phone.
+  //
+  // The check touches the database, so its failure must not swallow the cookie
+  // clearing below — a logout that 500s while leaving admin_session in the
+  // browser is the worst of both, especially on a shared machine.
+  let authorised = false;
+  try {
+    authorised = await isAdminRequest();
+  } catch (e) {
+    console.error('logout: could not check the admin session', e);
+  }
   if (authorised) {
     try {
       bumpAdminSessionEpoch();

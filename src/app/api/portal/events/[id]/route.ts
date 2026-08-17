@@ -5,6 +5,7 @@ import { sendEventFeeInstructionsEmail, sendPayoutChangedEmail } from '@/lib/ema
 import {
   countPaidOrdersForEvent,
   deleteEventCompletely,
+  getEventById,
   getEventMedia,
   getEventTiers,
   getMediaById,
@@ -212,6 +213,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const merged = { ...event };
 
     /**
+     * The capacity this patch asks for, or null when it does not touch it.
+     *
+     * Kept so the UPDATE itself can carry the fee ceiling as a WHERE clause —
+     * the check above is the friendly error, this is the one that cannot be
+     * raced.
+     */
+    let capacityRequested: number | null = null;
+
+    /**
      * Changing WHICH photo fills a slot throws away the framing that went with
      * it: fractions measured on one picture mean something else entirely on the
      * next, so keeping them would show a slice of the new photo nobody chose.
@@ -294,13 +304,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       // Lowering it is always fine: selling fewer seats than you paid for is
       // the organizer's own loss, and refusing it would trap someone who moved
       // to a smaller room.
-      if (event.feeStatus === 'paid' && event.feeCapacity !== null && v > event.feeCapacity) {
+      //
+      // Checked against a FRESH read, not the row loaded before the body was
+      // awaited. readJsonLimited drains the request with no timeout, so the
+      // organizer decides how long that snapshot stays stale: send the body one
+      // byte at a time across the moment the owner confirms the fee, and the
+      // held request would finish holding feeStatus 'unpaid' and write the
+      // raised capacity anyway. The write below is also made conditional in
+      // SQL, so even a race that slips past this line cannot land.
+      const feeNow = getEventById(event.id);
+      if (feeNow && feeNow.feeStatus === 'paid' && feeNow.feeCapacity !== null && v > feeNow.feeCapacity) {
         need(
           false,
-          `This event's fee covers ${event.feeCapacity} tickets, which is what was paid for. ` +
+          `This event's fee covers ${feeNow.feeCapacity} tickets, which is what was paid for. ` +
             `To sell more, get in touch and we will quote the difference — you can still lower it freely.`
         );
       }
+      capacityRequested = v;
       set('total_capacity', v);
       merged.totalCapacity = v;
     }
@@ -637,7 +657,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const tx = db.transaction(() => {
       if (sets.length > 0) {
-        db.prepare(`UPDATE events SET ${sets.join(', ')} WHERE id = ?`).run(...args, event.id);
+        // The fee ceiling is enforced by SQLite, not by a value read earlier in
+        // this request: a paid event may only raise its capacity within what
+        // the fee bought, whatever any snapshot said. Nothing else about the
+        // patch changes, so a refusal here means the race was lost and the
+        // whole transaction is thrown away rather than half-applied.
+        const guard =
+          capacityRequested === null
+            ? ''
+            : ` AND (fee_status != 'paid' OR fee_capacity IS NULL OR ${capacityRequested} <= fee_capacity)`;
+        const changed = db
+          .prepare(`UPDATE events SET ${sets.join(', ')} WHERE id = ?${guard}`)
+          .run(...args, event.id).changes;
+        if (changed === 0 && capacityRequested !== null) {
+          throw new ValidationError(
+            'That capacity is more than this event has paid for. Reload the page and try again.'
+          );
+        }
       }
       if (tiersPlan) {
         const del = db.prepare(`DELETE FROM event_tiers WHERE event_id = ? AND tier_key = ?`);

@@ -95,12 +95,22 @@ export function startOrganizerTotpEnrolment(organizerId: string): string {
 export function confirmOrganizerTotp(organizerId: string, rawCode: string): boolean {
   const row = readRow(organizerId);
   if (!row?.secret) return false;
-  // Stateless on purpose: enrolment happens inside a session that is already
-  // signed in, so the code proves a phone was configured rather than granting
-  // anything. Consuming the step here would make the organizer wait thirty
-  // seconds before their first real sign-in for no gain.
-  if (!verifyTotpAgainstSecret(row.secret, rawCode)) return false;
-  getDb().prepare(`UPDATE organizers SET totp_enabled = 1 WHERE id = ?`).run(organizerId);
+  // The step is CONSUMED here too, and the earlier reasoning for leaving it
+  // stateless was wrong. It is true that confirming grants nothing by itself —
+  // the session is already signed in. But it leaves totp_last_step at 0 while
+  // totp_enabled flips to 1, so for the remaining minute or so of that code's
+  // validity it is still spendable at the two places that DO grant something:
+  // the login second factor and the payout step-up. Somebody who watched the
+  // setup being done, over a shoulder or on a shared screen, could use the very
+  // code they saw typed.
+  //
+  // The cost is one thirty-second wait, once, at the end of setup — the same
+  // wait already accepted everywhere else.
+  const step = totpStepFor(row.secret, rawCode);
+  if (step < 0) return false;
+  getDb()
+    .prepare(`UPDATE organizers SET totp_enabled = 1, totp_last_step = ? WHERE id = ?`)
+    .run(step, organizerId);
   return true;
 }
 
@@ -118,6 +128,31 @@ export function disableOrganizerTotp(organizerId: string): void {
  * must check organizerTotpEnabled() first and never treat "not enrolled" as a
  * successful second factor.
  */
+/**
+ * Why a code was refused, so the caller can say something true.
+ *
+ * 'reused' is the one that matters: it is what an organizer meets by signing in
+ * and going straight to their bank details, because the code their app is
+ * showing is still the one the sign-in just spent. Reporting that as "not
+ * right" invites them to retype the same digits, fail again, and burn the
+ * attempt budget on their way to concluding the feature is broken.
+ */
+export type OrganizerTotpVerdict = 'ok' | 'reused' | 'wrong';
+
+export function organizerTotpVerdict(organizerId: string, rawCode: string): OrganizerTotpVerdict {
+  const row = readRow(organizerId);
+  if (!row?.secret || row.enabled !== 1) return 'wrong';
+  const step = totpStepFor(row.secret, rawCode);
+  if (step < 0) return 'wrong';
+  const changed = getDb()
+    .prepare(
+      `UPDATE organizers SET totp_last_step = ?
+        WHERE id = ? AND COALESCE(totp_last_step, 0) < ?`
+    )
+    .run(step, organizerId, step).changes;
+  return changed > 0 ? 'ok' : 'reused';
+}
+
 export function verifyOrganizerTotp(organizerId: string, rawCode: string): boolean {
   const row = readRow(organizerId);
   if (!row?.secret || row.enabled !== 1) return false;
@@ -133,16 +168,7 @@ export function verifyOrganizerTotp(organizerId: string, rawCode: string): boole
   // The write is conditional on the stored value in the same statement, so two
   // requests racing with the same code cannot both come back true: the second
   // UPDATE matches no row and is refused.
-  const step = totpStepFor(row.secret, rawCode);
-  if (step < 0) return false;
-
-  const changed = getDb()
-    .prepare(
-      `UPDATE organizers SET totp_last_step = ?
-        WHERE id = ? AND COALESCE(totp_last_step, 0) < ?`
-    )
-    .run(step, organizerId, step).changes;
-  return changed > 0;
+  return organizerTotpVerdict(organizerId, rawCode) === 'ok';
 }
 
 /** otpauth:// URI an authenticator app imports. Labelled per account. */

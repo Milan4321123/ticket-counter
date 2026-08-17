@@ -8,7 +8,7 @@ import {
   setTotpEnrolled,
   totpAuthUri,
   totpQrDataUrl,
-  verifyTotpAgainstSecret,
+  totpStepFor,
 } from '@/lib/totp';
 import type { ApiErrorResponse } from '@/lib/types';
 
@@ -53,13 +53,15 @@ export async function POST(req: Request) {
 
     if (action === 'enable') {
       const secret = getOrCreateTotpSecret();
-      if (!verifyTotpAgainstSecret(secret, code)) {
+      const step = totpStepFor(secret, code);
+      if (step < 0) {
         return NextResponse.json(
           { error: 'That code did not match. Make sure your phone’s clock is set automatically, then enter the current 6-digit code.' } satisfies ApiErrorResponse,
           { status: 400 }
         );
       }
-      setTotpEnrolled();
+      // Spend it, so the code just typed cannot also be used to sign in.
+      setTotpEnrolled(step);
       return NextResponse.json({ enrolled: true });
     }
 

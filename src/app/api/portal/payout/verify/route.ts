@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { BodyTooLargeError, readJsonLimited } from '@/lib/http';
 import { checkOrganizerCredentials } from '@/lib/organizers';
-import { verifyOrganizerTotp } from '@/lib/organizerTotp';
+import { organizerTotpVerdict } from '@/lib/organizerTotp';
 import { PAYOUT_STEP_UP_COOKIE, STEP_UP_TTL_MS, createStepUpToken } from '@/lib/payoutStepUp';
 import { clientIp, isRateLimited, recordStrike } from '@/lib/ratelimit';
 import type { ApiErrorResponse } from '@/lib/types';
@@ -63,8 +63,17 @@ export async function POST(req: Request) {
     let ok = false;
     let failure: string;
     if (method === 'authenticator') {
-      ok = verifyOrganizerTotp(organizer.id, code);
-      failure = 'That code is not right. Check your authenticator app — the code changes every 30 seconds.';
+      const verdict = organizerTotpVerdict(organizer.id, code);
+      ok = verdict === 'ok';
+      // Signing in spends a code, and this check often follows a sign-in by
+      // seconds — so the code the app is showing is frequently the one already
+      // used. Saying "not right" there is simply false, and it invites the
+      // organizer to retype the same digits, fail again, and spend their
+      // attempt budget on the way to deciding the feature is broken.
+      failure =
+        verdict === 'reused'
+          ? 'You have already used that code. Wait for your authenticator to show the next one — about 30 seconds — and enter that.'
+          : 'That code is not right. Check your authenticator app — the code changes every 30 seconds.';
     } else {
       ok = Boolean(password) && checkOrganizerCredentials(organizer.email, password) !== null;
       failure = 'That password is not right.';

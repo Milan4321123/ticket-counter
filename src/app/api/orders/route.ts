@@ -123,7 +123,12 @@ export async function POST(req: Request) {
     // reservation claims its seats immediately and only releases them after
     // pay_within_days + 2, so a scripted caller could reserve an entire event
     // in minutes and keep it sold out for a week without ever sending a cent.
-    if (!rateLimit(`orders:hour:${clientIp(req)}`, 30, 60 * 60_000)) {
+    // 120, not 30. clientIp() is the single public address a proxy saw, which a
+    // whole university, office or mobile carrier shares — and a busy on-sale
+    // behind one CGNAT address would have met a 30/hour cap and turned real
+    // buyers away. The seat ceiling below is the actual defence; this is only a
+    // backstop against one host hammering the endpoint.
+    if (!rateLimit(`orders:hour:${clientIp(req)}`, 120, 60 * 60_000)) {
       return apiError(429, 'INTERNAL', 'You have reserved a lot of tickets recently — please try again later.');
     }
 
@@ -151,14 +156,19 @@ export async function POST(req: Request) {
     if (getPaymentMode() === 'transfer') {
       const alreadyHeld = heldUnpaidTicketsForEmail(event.id, validated.buyerEmail);
       const wanted = validated.totalQuantity;
-      const ceiling = Math.max(event.maxPerOrder * 3, 12);
+      // Also bounded by the room. Derived only from maxPerOrder, the ceiling
+      // could exceed a small event's whole capacity — a 12-seat event with a
+      // per-order limit of 6 gave a ceiling of 18, so one address could still
+      // hold every seat and the cap never fired at all. A quarter of the room
+      // is the most any single buyer has a reason to hold at once.
+      const ceiling = Math.max(1, Math.min(Math.max(event.maxPerOrder * 3, 12), Math.ceil(event.totalCapacity / 4)));
       if (alreadyHeld + wanted > ceiling) {
         return apiError(
           409,
           'VALIDATION',
-          `You already have ${alreadyHeld} ticket${alreadyHeld === 1 ? '' : 's'} reserved for this event and ` +
-            `not yet paid for. Please pay for those first — or ask the organizer to release them — before ` +
-            `reserving more.`
+          `You already have ${alreadyHeld} ticket${alreadyHeld === 1 ? '' : 's'} reserved for this event that ` +
+            `the organizer has not confirmed as paid yet. A transfer can take a day or two to show up — please ` +
+            `wait for those to be confirmed, or ask the organizer to release them, before reserving more.`
         );
       }
     }

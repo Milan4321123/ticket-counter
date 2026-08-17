@@ -8,7 +8,7 @@ import {
   verifyOrganizerPendingToken,
 } from '@/lib/organizers';
 import { LOGIN_CODE_REJECTED_MESSAGE, verifyOrganizerLoginCode } from '@/lib/loginCode';
-import { organizerTotpEnabled, verifyOrganizerTotp } from '@/lib/organizerTotp';
+import { organizerTotpEnabled, organizerTotpVerdict } from '@/lib/organizerTotp';
 import { clientIp, isRateLimited, recordStrike } from '@/lib/ratelimit';
 import type { ApiErrorResponse } from '@/lib/types';
 import { notifySignIn } from '../../auth';
@@ -71,8 +71,9 @@ export async function POST(req: Request) {
     // account, never from the request: letting the caller say would let an
     // enrolled account ask to be checked against the weaker one instead.
     const usesAuthenticator = organizerTotpEnabled(organizerId);
+    const totpVerdict = usesAuthenticator ? organizerTotpVerdict(organizerId, code) : null;
     const ok = usesAuthenticator
-      ? verifyOrganizerTotp(organizerId, code)
+      ? totpVerdict === 'ok'
       : verifyOrganizerLoginCode(organizerId, code) === 'ok';
 
     if (!ok) {
@@ -80,9 +81,11 @@ export async function POST(req: Request) {
       recordStrike(GLOBAL_FAILURE_KEY, FAILURE_WINDOW_MS);
       return NextResponse.json(
         {
-          error: usesAuthenticator
-            ? 'That code is not right. Check your authenticator app — the code changes every 30 seconds.'
-            : LOGIN_CODE_REJECTED_MESSAGE,
+          error: !usesAuthenticator
+            ? LOGIN_CODE_REJECTED_MESSAGE
+            : totpVerdict === 'reused'
+              ? 'You have already used that code. Wait for the next one — about 30 seconds — and enter that.'
+              : 'That code is not right. Check your authenticator app — the code changes every 30 seconds.',
         } satisfies ApiErrorResponse,
         { status: 401 }
       );
