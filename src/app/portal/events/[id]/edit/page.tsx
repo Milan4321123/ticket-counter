@@ -29,6 +29,7 @@ import BankForm from './BankForm';
 import DangerZone from './DangerZone';
 import DesignPanel from './DesignPanel';
 import EditorSection, { EditorSectionGroup } from './EditorSection';
+import GoToTab from './GoToTab';
 import EditorTabs from './EditorTabs';
 import DetailsForm from './DetailsForm';
 import { FAQ_SUGGESTIONS_EVENT } from './faqBridge';
@@ -248,6 +249,23 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
     tickets: (
       <div className="card">
         <SectionHead title="Tickets" hint="Your ticket types and prices — you need at least one to publish." />
+        {/* Two switches produce the same words on the page — this one per ticket
+            type, and the event-wide pause in Basics — and an organizer who
+            unticks "Coming soon" here while the event-wide one is on sees
+            nothing change and no reason why. Said plainly, where they are
+            looking, with the way out attached. */}
+        {!event.salesOpen && (
+          <div className="notice notice-warn" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ flex: 1, minWidth: 260 }}>
+              Ticket sales are switched <strong>off</strong> for this whole event, so your page shows{' '}
+              <strong>
+                {event.closedMessage === 'coming-soon' ? '“Tickets coming soon”' : '“Sales closed”'}
+              </strong>{' '}
+              and nothing here can be bought — whatever you set per ticket type below.
+            </span>
+            <GoToTab tab="basics">Switch sales on in Basics →</GoToTab>
+          </div>
+        )}
         <TiersEditor
             eventId={event.id}
             initialTiers={tiers.map((t) => ({
@@ -439,6 +457,14 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
           >
             {event.status === 'published' ? 'Live' : event.status === 'draft' ? 'Draft' : 'Archived'}
           </span>
+          {/* "Live" alone was a half-truth on a published event whose sales are
+              switched off: the page is up, but nobody can buy. Shown beside it,
+              from every tab, in the words the page itself is using. */}
+          {!event.salesOpen && event.status === 'published' && (
+            <span className={`badge ${event.closedMessage === 'coming-soon' ? 'badge-green' : 'badge-amber'}`}>
+              {event.closedMessage === 'coming-soon' ? 'Tickets coming soon' : 'Sales closed'}
+            </span>
+          )}
           <span className="badge badge-accent">{stepsDone} of 4 steps done</span>
           <span style={{ flex: 1 }} />
           {event.status === 'published' && (

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
+import { GOTO_TAB_EVENT } from './GoToTab';
 
 export interface EditorTabDef {
   key: string;
@@ -41,6 +42,19 @@ export default function EditorTabs({
   useEffect(() => {
     const wanted = new URLSearchParams(window.location.search).get('tab');
     if (wanted && tabs.some((t) => t.key === wanted)) setActive(wanted);
+  }, [tabs]);
+
+  // A button anywhere in the editor can send the organizer to a named tab.
+  useEffect(() => {
+    const onGoto = (e: Event) => {
+      const key = (e as CustomEvent<string>).detail;
+      if (typeof key === 'string' && tabs.some((t) => t.key === key)) {
+        setActive(key);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    };
+    window.addEventListener(GOTO_TAB_EVENT, onGoto);
+    return () => window.removeEventListener(GOTO_TAB_EVENT, onGoto);
   }, [tabs]);
 
   // Bound once per tab that asks for it; the switch is the whole behaviour, so
