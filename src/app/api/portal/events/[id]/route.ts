@@ -285,6 +285,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
     if ('totalCapacity' in body) {
       const v = intField(body.totalCapacity, 'The total capacity', 1, 200000);
+      // The fee is priced per seat and freezes when the transfer is confirmed.
+      // Nothing used to stop the capacity being raised afterwards, so an event
+      // could be paid for at 100 seats and then sell 200,000 — the amount was
+      // frozen, but what it BOUGHT was not, which made the whole per-ticket
+      // model optional for anyone who noticed.
+      //
+      // Lowering it is always fine: selling fewer seats than you paid for is
+      // the organizer's own loss, and refusing it would trap someone who moved
+      // to a smaller room.
+      if (event.feeStatus === 'paid' && event.feeCapacity !== null && v > event.feeCapacity) {
+        need(
+          false,
+          `This event's fee covers ${event.feeCapacity} tickets, which is what was paid for. ` +
+            `To sell more, get in touch and we will quote the difference — you can still lower it freely.`
+        );
+      }
       set('total_capacity', v);
       merged.totalCapacity = v;
     }

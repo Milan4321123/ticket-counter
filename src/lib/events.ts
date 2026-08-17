@@ -80,6 +80,12 @@ export interface EventRow {
   /** The amount quoted for this event, in cents. Null until it is first quoted. */
   feeCents: number | null;
   /**
+   * How many seats the PAID fee covers. Null until the fee is confirmed. The
+   * capacity can never be raised above this without the platform agreeing —
+   * see the totalCapacity branch in api/portal/events/[id].
+   */
+  feeCapacity: number | null;
+  /**
    * The organizer's chosen framing for each fixed-shape slot, as raw JSON —
    * parse with parseCropRect(). NULL means "never repositioned": fall back to
    * the automatic crop.
@@ -186,6 +192,7 @@ const EVENT_COLS = `
   fee_status AS feeStatus,
   fee_paid_at AS feePaidAt,
   fee_cents AS feeCents,
+  fee_capacity AS feeCapacity,
   cover_crop AS coverCrop,
   profile_crop AS profileCrop,
   poster_crop AS posterCrop,
@@ -325,10 +332,11 @@ export function markEventFeePaid(eventId: string): boolean {
   return (
     getDb()
       .prepare(
-        `UPDATE events SET fee_status = 'paid', fee_paid_at = datetime('now'), fee_cents = ?
+        `UPDATE events SET fee_status = 'paid', fee_paid_at = datetime('now'), fee_cents = ?, fee_capacity = ?
          WHERE id = ? AND fee_status != 'paid'`
       )
-      .run(eventFeeCentsFor(event), eventId).changes > 0
+      // Both frozen together: the amount paid, and the number of seats it bought.
+      .run(eventFeeCentsFor(event), event.totalCapacity, eventId).changes > 0
   );
 }
 

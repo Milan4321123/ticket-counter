@@ -304,6 +304,23 @@ function migrateToPlatform(db: Database.Database): void {
   // stored here the moment the organizer is shown what to transfer. Once the
   // fee is paid this number never moves again — nobody is re-billed for an
   // amount they already settled. NULL means "not quoted yet".
+  // How many seats the PAID fee covers.
+  //
+  // The fee is base + per-ticket x capacity and freezes when the owner confirms
+  // the transfer — but nothing stopped the capacity being raised afterwards, so
+  // an organizer could pay for 100 seats and then sell 200,000. The amount was
+  // frozen; what it bought was not written down anywhere.
+  //
+  // Existing paid events are backfilled at their CURRENT capacity: they are
+  // grandfathered at the size they are, which is also the size their fee was
+  // quoted from. Their fee_cents is NULL (never re-quoted), so it cannot be
+  // divided back into a seat count — this column is why the rule works for them
+  // at all.
+  const feeCapacityIsNew = !eventCols.includes('fee_capacity');
+  if (feeCapacityIsNew) {
+    db.exec(`ALTER TABLE events ADD COLUMN fee_capacity INTEGER`);
+    db.exec(`UPDATE events SET fee_capacity = total_capacity WHERE fee_status = 'paid'`);
+  }
   if (!eventCols.includes('fee_cents')) {
     db.exec(`ALTER TABLE events ADD COLUMN fee_cents INTEGER`);
   }
