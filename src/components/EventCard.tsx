@@ -68,8 +68,8 @@ export interface EventCardProps {
 
 export default function EventCard({ event, past = false, delayClass = '' }: EventCardProps) {
   const tiers = getEventTiers(event.id);
-  const minPrice = fromPriceCents(tiers);
   const availability = getAvailability(event.id);
+  const minPrice = fromPriceCents(tiers, availability);
   /**
    * What can actually be bought, not what is left in the room.
    *

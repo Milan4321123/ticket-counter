@@ -160,16 +160,31 @@ export function ticketState(
 }
 
 /**
- * The "from €x" headline price.
+ * The "from €x" headline price — the cheapest price the badge beside it is
+ * actually talking about.
  *
- * Only ticket types someone can actually buy count towards it. A coming-soon
- * type is usually the cheap teaser — an early-bird announced at €20 next to a
- * €50 door ticket — so counting it advertised a price that no button on the
- * page could reach. When NOTHING is on sale yet, the announced prices are all
- * there is, and showing them is the point of announcing.
+ * Three tiers of preference, and the order is the whole point:
+ *
+ *  1. What can be bought right now. A coming-soon type is usually the cheap
+ *     teaser — an early bird announced at €20 next to a €50 door ticket — so
+ *     counting it would advertise a price no button on the page can reach.
+ *  2. Failing that, what is coming. When the early bird has SOLD OUT and only
+ *     the €50 standard is still to come, the page said "Coming soon · from
+ *     €39.99" — the price of the one thing nobody can have. The badge and the
+ *     price have to describe the same ticket.
+ *  3. Failing that, any price at all, so an event whose sales are simply paused
+ *     still says what it costs.
+ *
+ * `availability` is optional: a caller that has not loaded it still gets the
+ * coming-soon/on-sale split right, just without the sold-out step.
  */
-export function fromPriceCents(tiers: EventTierRow[]): number | null {
-  const sellable = tiers.filter((t) => !t.comingSoon);
-  const pool = sellable.length ? sellable : tiers;
-  return pool.length ? Math.min(...pool.map((t) => t.priceCents)) : null;
+export function fromPriceCents(tiers: EventTierRow[], availability?: Availability): number | null {
+  const cheapest = (rows: EventTierRow[]) =>
+    rows.length ? Math.min(...rows.map((t) => t.priceCents)) : null;
+  const hasStock = (t: EventTierRow) =>
+    !availability || (availability.tiers[t.tierKey]?.remaining ?? 0) > 0;
+
+  const onSale = tiers.filter((t) => !t.comingSoon && hasStock(t));
+  const announced = tiers.filter((t) => t.comingSoon);
+  return cheapest(onSale) ?? cheapest(announced) ?? cheapest(tiers);
 }

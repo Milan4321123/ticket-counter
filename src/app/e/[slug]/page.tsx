@@ -348,7 +348,7 @@ export default async function EventPage({ params }: Params) {
   const state = ticketState(event, tiers, availability);
   const soldOut = !state.buyable;
   const buyableRemaining = state.remaining;
-  const minPrice = fromPriceCents(tiers);
+  const minPrice = fromPriceCents(tiers, availability);
 
   // ---------------- Media ----------------
 

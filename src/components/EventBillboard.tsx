@@ -86,8 +86,8 @@ export interface EventBillboardProps {
 
 export default function EventBillboard({ event, leading = false }: EventBillboardProps) {
   const tiers = getEventTiers(event.id);
-  const minPrice = fromPriceCents(tiers);
   const availability = getAvailability(event.id);
+  const minPrice = fromPriceCents(tiers, availability);
   // One shared decision for badge, button and note — see lib/ticketState.ts for
   // why these three used to disagree with each other.
   const state = ticketState(event, tiers, availability);
