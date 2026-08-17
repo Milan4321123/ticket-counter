@@ -6,6 +6,7 @@ import { getDb } from './db';
 import { getPaymentMode } from './config';
 import { getEventById, getEventTier, getEventTiers } from './events';
 import { claimInventory } from './inventory';
+import { effectivePayout } from './payout';
 import { generateTicketCode, normalizeTicketCode } from './tickets';
 import type { CheckinResponse } from './types';
 
@@ -31,6 +32,19 @@ export interface OrderRow {
    * not a person — nothing may be emailed to them.
    */
   buyerErasedAt: string | null;
+  /**
+   * The payout account this order was TOLD to pay, frozen when it was created.
+   *
+   * A receipt, not a pointer: the order page and its emails read these, so an
+   * organizer changing the event's IBAN afterwards can never rewrite the
+   * instructions a buyer already holds. '' on orders written before the
+   * snapshot existed — lib/payout.ts falls those back to the event.
+   */
+  payoutHolder: string;
+  payoutIban: string;
+  payoutBic: string;
+  payoutBankName: string;
+  payoutPaypal: string;
 }
 
 /**
@@ -100,7 +114,12 @@ const ORDER_COLS = `
   created_at AS createdAt,
   paid_at AS paidAt,
   capture_id AS captureId,
-  buyer_erased_at AS buyerErasedAt
+  buyer_erased_at AS buyerErasedAt,
+  payout_holder AS payoutHolder,
+  payout_iban AS payoutIban,
+  payout_bic AS payoutBic,
+  payout_bank_name AS payoutBankName,
+  payout_paypal AS payoutPaypal
 `;
 
 const TICKET_COLS = `
@@ -145,11 +164,31 @@ export function createOrder(params: {
   });
   const totalCents = resolved.reduce((sum, it) => sum + it.quantity * it.unitPriceCents, 0);
 
+  // Freeze where this buyer is being sent, now, before anything can move it.
+  // effectivePayout() rather than the raw columns: a payout change whose waiting
+  // period has already elapsed is the real account, even if the row has not been
+  // tidied up yet.
+  const payout = effectivePayout(event);
+
   const tx = db.transaction(() => {
     db.prepare(
-      `INSERT INTO orders (id, event_id, status, buyer_name, buyer_email, total_cents, currency, payment_mode)
-       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?)`
-    ).run(id, event.id, params.buyerName, params.buyerEmail, totalCents, event.currency, params.paymentMode);
+      `INSERT INTO orders (id, event_id, status, buyer_name, buyer_email, total_cents, currency, payment_mode,
+                           payout_holder, payout_iban, payout_bic, payout_bank_name, payout_paypal)
+       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      id,
+      event.id,
+      params.buyerName,
+      params.buyerEmail,
+      totalCents,
+      event.currency,
+      params.paymentMode,
+      payout.holder,
+      payout.iban,
+      payout.bic,
+      payout.bankName,
+      payout.paypal
+    );
     const ins = db.prepare(
       `INSERT INTO order_items (order_id, tier_id, quantity, unit_price_cents) VALUES (?, ?, ?, ?)`
     );

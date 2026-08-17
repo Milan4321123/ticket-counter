@@ -14,6 +14,7 @@ import {
 } from './events';
 import { formatMoney } from './money';
 import { getOrder, getOrderItems, getTicketsForOrder, paymentReference } from './orders';
+import { orderPayout } from './payout';
 import {
   eventFeeAmount,
   platformContactEmail,
@@ -686,15 +687,18 @@ export async function sendTransferInstructionsEmail(
     }
     const event = getEventById(order.eventId);
     if (!event) return { sent: false, reason: 'event-not-found' };
-    // The ORGANIZER's account — buyers pay each organizer directly.
-    if (!event.bankIban.trim() || !event.bankAccountHolder.trim()) {
+    // What THIS order was told to pay, frozen at creation — never the event's
+    // current details. A mail is a promise in writing; re-reading the event
+    // would let a later edit change what an already-issued instruction says.
+    const payout = orderPayout(order, event);
+    if (!payout.iban.trim() || !payout.holder.trim()) {
       return { sent: false, reason: 'transfer-not-configured' };
     }
     const bank = {
-      accountHolder: event.bankAccountHolder,
-      iban: event.bankIban,
-      bic: event.bankBic,
-      bankName: event.bankName,
+      accountHolder: payout.holder,
+      iban: payout.iban,
+      bic: payout.bic,
+      bankName: payout.bankName,
       payWithinDays: event.payWithinDays,
     };
 
@@ -1274,7 +1278,11 @@ export async function sendBuyerPaymentReminderEmail(
     }
     const event = getEventById(order.eventId);
     if (!event) return { sent: false, reason: 'event-not-found' };
-    if (!event.bankIban.trim() || !event.bankAccountHolder.trim()) {
+    // The account this order was given, frozen at creation. A reminder must
+    // repeat the ORIGINAL instruction — chasing a buyer with details that
+    // changed after they ordered is how one edit redirects the unpaid book.
+    const payout = orderPayout(order, event);
+    if (!payout.iban.trim() || !payout.holder.trim()) {
       return { sent: false, reason: 'transfer-not-configured' };
     }
 
@@ -1296,10 +1304,10 @@ export async function sendBuyerPaymentReminderEmail(
       'and you certainly should not pay twice.';
 
     const bankRows: DetailRow[] = [
-      { label: 'Account holder', value: event.bankAccountHolder },
-      { label: 'IBAN', value: event.bankIban, mono: true },
-      ...(event.bankBic ? [{ label: 'BIC', value: event.bankBic, mono: true }] : []),
-      ...(event.bankName ? [{ label: 'Bank', value: event.bankName }] : []),
+      { label: 'Account holder', value: payout.holder },
+      { label: 'IBAN', value: payout.iban, mono: true },
+      ...(payout.bic ? [{ label: 'BIC', value: payout.bic, mono: true }] : []),
+      ...(payout.bankName ? [{ label: 'Bank', value: payout.bankName }] : []),
     ];
 
     const bodyHtml =
@@ -1353,10 +1361,10 @@ export async function sendBuyerPaymentReminderEmail(
         '',
         ...textRows([
           ['Amount', amount],
-          ['Account holder', event.bankAccountHolder],
-          ['IBAN', event.bankIban],
-          ...(event.bankBic ? ([['BIC', event.bankBic]] as Array<[string, string]>) : []),
-          ...(event.bankName ? ([['Bank', event.bankName]] as Array<[string, string]>) : []),
+          ['Account holder', payout.holder],
+          ['IBAN', payout.iban],
+          ...(payout.bic ? ([['BIC', payout.bic]] as Array<[string, string]>) : []),
+          ...(payout.bankName ? ([['Bank', payout.bankName]] as Array<[string, string]>) : []),
           ['Reference', reference],
         ]),
         '',
@@ -1707,6 +1715,13 @@ export interface PayoutChangeDetails {
   paypalAccount: string;
   /** True when this filled an empty payout account rather than moving one. */
   firstTime: boolean;
+  /**
+   * Unix ms at which the new account starts being given to buyers, or null when
+   * it applied at once. Non-null is the important case: it is the window in
+   * which the reader can still stop this, and the message is worth little if it
+   * does not say how long they have.
+   */
+  effectiveAt?: number | null;
 }
 
 /**
@@ -1771,12 +1786,31 @@ export async function sendPayoutChangedEmail(
         : []),
     ];
 
-    const alarmHtml = change.firstTime
-      ? `<strong>If you did not do this</strong>, someone else is signed in to your organizer account. ` +
-        `Change your password now and reply to this email.`
-      : `<strong>If you did not make this change, act now.</strong> Someone else is signed in to your ` +
-        `organizer account and your buyers' payments are going to them. Change your password immediately, ` +
-        `set the correct account back, and reply to this email so we can help.`;
+    // The window, when there is one. This is the whole reason the delay exists:
+    // the message is worth far more if it says the change has NOT happened yet
+    // and names the moment it will.
+    const waiting = typeof change.effectiveAt === 'number' && change.effectiveAt > Date.now();
+    const whenDisplay = waiting
+      ? new Date(change.effectiveAt as number).toLocaleString('en-GB', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : '';
+
+    const alarmHtml = waiting
+      ? `<strong>This has not taken effect yet.</strong> Buyers are still being given your current account ` +
+        `until <strong>${escapeHtml(whenDisplay)}</strong>. If you did not make this change, open your event ` +
+        `now and cancel it — nothing will have moved. Then change your password, because someone else is ` +
+        `signed in to your organizer account.`
+      : change.firstTime
+        ? `<strong>If you did not do this</strong>, someone else is signed in to your organizer account. ` +
+          `Change your password now and reply to this email.`
+        : `<strong>If you did not make this change, act now.</strong> Someone else is signed in to your ` +
+          `organizer account and your buyers' payments are going to them. Change your password immediately, ` +
+          `set the correct account back, and reply to this email so we can help.`;
 
     const bodyHtml =
       pHtml(`Hi ${escapeHtml(organizer.name)},`) +
@@ -1816,13 +1850,19 @@ export async function sendPayoutChangedEmail(
             : []),
         ]),
         '',
-        change.firstTime
+        waiting
           ? wrapText(
-              'IF YOU DID NOT DO THIS, someone else is signed in to your organizer account. Change your password now and reply to this email.'
+              `THIS HAS NOT TAKEN EFFECT YET. Buyers are still being given your current account until ${whenDisplay}. ` +
+                'If you did not make this change, open your event now and cancel it — nothing will have moved. Then ' +
+                'change your password, because someone else is signed in to your organizer account.'
             )
-          : wrapText(
-              "IF YOU DID NOT MAKE THIS CHANGE, ACT NOW. Someone else is signed in to your organizer account and your buyers' payments are going to them. Change your password immediately, set the correct account back, and reply to this email so we can help."
-            ),
+          : change.firstTime
+            ? wrapText(
+                'IF YOU DID NOT DO THIS, someone else is signed in to your organizer account. Change your password now and reply to this email.'
+              )
+            : wrapText(
+                "IF YOU DID NOT MAKE THIS CHANGE, ACT NOW. Someone else is signed in to your organizer account and your buyers' payments are going to them. Change your password immediately, set the correct account back, and reply to this email so we can help."
+              ),
         '',
         wrapText(`You can check the details any time at ${editUrl}`),
       ],
@@ -1833,9 +1873,11 @@ export async function sendPayoutChangedEmail(
     await transporter.sendMail({
       from: process.env.EMAIL_FROM,
       to: organizer.email,
-      subject: change.firstTime
-        ? `Payment details set for ${event.name}`
-        : `Action may be needed: the payout account for ${event.name} changed`,
+      subject: waiting
+        ? `Confirm or cancel: the payout account for ${event.name} is being changed`
+        : change.firstTime
+          ? `Payment details set for ${event.name}`
+          : `Action may be needed: the payout account for ${event.name} changed`,
       text,
       html: renderEmail({
         title: headline,

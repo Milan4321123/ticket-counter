@@ -452,6 +452,88 @@ function migrateToPlatform(db: Database.Database): void {
      ON orders(event_id) WHERE buyer_erased_at IS NULL`
   );
 
+  // ---- Where THIS order's money was sent, frozen at the moment it was made --
+  //
+  // The order page and the transfer emails used to read the event's CURRENT
+  // bank details. That meant changing an event's IBAN silently rewrote the
+  // payment instructions of every order already placed: a buyer who ordered
+  // last week, opening their order page today, would be shown a different
+  // account under the same reference — and would pay it. One edit could
+  // redirect the entire unpaid book, not just future sales.
+  //
+  // An order now carries its own copy. It is a receipt: what it says is what
+  // the buyer was told, and nothing edited later can rewrite history. Orders
+  // written before this column existed keep '' and fall back to the event, so
+  // old orders still render (see lib/payout.ts).
+  for (const col of ['payout_holder', 'payout_iban', 'payout_bic', 'payout_bank_name', 'payout_paypal']) {
+    if (!orderCols.includes(col)) {
+      db.exec(`ALTER TABLE orders ADD COLUMN ${col} TEXT NOT NULL DEFAULT ''`);
+    }
+  }
+
+  // ---- A payout change on a selling event waits before it takes effect ------
+  //
+  // Proving who you are at the moment of the change can only ever be as strong
+  // as the factor used, and every factor can in principle be taken. So the
+  // second defence does not try to be a better proof — it removes the two
+  // things the attacker actually needs, speed and silence. The new account is
+  // parked here, the old one keeps being quoted to buyers, and both the
+  // organizer and the platform owner get a day in which to say no.
+  for (const col of [
+    'pending_bank_account_holder',
+    'pending_bank_iban',
+    'pending_bank_bic',
+    'pending_bank_name',
+    'pending_paypal_account',
+  ]) {
+    if (!eventCols.includes(col)) {
+      db.exec(`ALTER TABLE events ADD COLUMN ${col} TEXT`);
+    }
+  }
+  if (!eventCols.includes('pending_payout_effective_at')) {
+    db.exec(`ALTER TABLE events ADD COLUMN pending_payout_effective_at INTEGER`); // unix ms
+  }
+
+  // Monotonic: set the first time an event could ever have taken money, and
+  // NEVER cleared. It has to be its own flag rather than a look at status,
+  // because status can be moved back: unpublish, change the IBAN with no delay,
+  // republish would have walked straight around the waiting period.
+  const payoutLockIsNew = !eventCols.includes('payout_locked');
+  if (payoutLockIsNew) {
+    db.exec(`ALTER TABLE events ADD COLUMN payout_locked INTEGER NOT NULL DEFAULT 0`);
+    // Everything already selling, or already holding an order, starts locked.
+    db.exec(
+      `UPDATE events SET payout_locked = 1
+        WHERE status = 'published'
+           OR id IN (SELECT DISTINCT event_id FROM orders WHERE event_id IS NOT NULL)`
+    );
+  }
+
+  // ---- The record of every payout move ------------------------------------
+  //
+  // Until now the old IBAN was overwritten and gone. After an incident nobody
+  // could say what the account had been, when it changed, or what was used to
+  // authorise it — not the organizer, not their bank, not the police. This is
+  // append-only and deliberately keeps the values IN FULL: it is the forensic
+  // record, it is never shown to a buyer, and a masked audit trail would be
+  // useless for the one job it exists to do.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS payout_changes (
+      id TEXT PRIMARY KEY,
+      event_id TEXT NOT NULL,
+      organizer_id TEXT NOT NULL,
+      field TEXT NOT NULL,             -- bankIban | bankAccountHolder | paypalAccount
+      old_value TEXT NOT NULL DEFAULT '',
+      new_value TEXT NOT NULL DEFAULT '',
+      factor TEXT NOT NULL DEFAULT '', -- authenticator | password | none (first-time set)
+      actor TEXT NOT NULL DEFAULT 'organizer',
+      effective_at INTEGER,            -- unix ms; NULL = applied immediately
+      cancelled_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_payout_changes_event ON payout_changes(event_id, created_at);
+  `);
+
   // An organizer-account application has to carry enough for the owner to judge
   // it without a round of emails first. Every field is optional and free text —
   // "about 300" and "some time in November" are honest answers, so nothing here

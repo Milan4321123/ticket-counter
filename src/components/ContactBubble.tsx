@@ -33,8 +33,18 @@ export default function ContactBubble({
   // Not in the places where it is noise rather than help: the owner's own admin
   // area, the door scanner (staff mid-scan do not want a designer), or the
   // contact page itself, where following it would reload the page you are on.
+  //
+  // And NOT on the two pages where money is about to move — the checkout and the
+  // reservation page that shows the bank details. The platform's own face next
+  // to somebody else's IBAN reads as the platform vouching for that account, or
+  // even holding the money, and it does neither: buyers pay the organizer
+  // directly. On the one screen where a buyer might hesitate over an account
+  // number, the person to reach is the organizer who owns it, and putting a
+  // different face there sends the question to someone who cannot answer it.
+  const aboutToPay = pathname.startsWith('/order/') || /^\/e\/[^/]+\/checkout/.test(pathname);
   const hidden =
     !name.trim() ||
+    aboutToPay ||
     pathname.startsWith('/admin') ||
     pathname.startsWith('/scan') ||
     pathname.startsWith('/contact');

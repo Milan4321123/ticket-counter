@@ -19,6 +19,13 @@ import {
 import { readJsonLimited, BodyTooLargeError } from '@/lib/http';
 import { formatMoney } from '@/lib/money';
 import {
+  PAYOUT_DELAY_MS,
+  effectivePayout,
+  payoutChangeIsDelayed,
+  queuePayoutChange,
+  recordPayoutChange,
+} from '@/lib/payout';
+import {
   PAYOUT_STEP_UP_COOKIE,
   summarisePayoutChange,
   verifyStepUpToken,
@@ -154,12 +161,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // destination, only when the value genuinely moves, and never for the first
     // one set. The check happens BEFORE any validation or writing, so a request
     // that cannot pass it never touches the event at all.
+    // Compared against the EFFECTIVE account — the one buyers are being given
+    // right now — not the raw columns. A change whose waiting period has already
+    // elapsed is the real account even if the row has not been tidied up, and
+    // measuring against a stale value would ask for a code to "change" it back.
+    const payoutNow = effectivePayout(event);
     const payoutBefore = {
-      bankIban: event.bankIban,
-      bankAccountHolder: event.bankAccountHolder,
-      paypalAccount: event.paypalAccount ?? '',
+      bankIban: payoutNow.iban,
+      bankAccountHolder: payoutNow.holder,
+      paypalAccount: payoutNow.paypal,
     };
     const payoutChange = summarisePayoutChange(payoutBefore, body);
+    const stepUpMethod = payoutStepUpChallenge(organizer).method;
     if (payoutChange.changed.length > 0 && !payoutChange.firstTimeOnly) {
       const store = await cookies();
       if (!verifyStepUpToken(store.get(PAYOUT_STEP_UP_COOKIE)?.value ?? null, organizer.id)) {
@@ -290,10 +303,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     // ---- Bank details (the ORGANIZER's own account) ----------------------
+    //
+    // Gathered into ONE target account rather than five independent columns,
+    // because a payout destination is a single thing and, when it has to wait,
+    // it has to wait whole. Applying the holder today and the IBAN tomorrow
+    // would leave a day in which the two describe different accounts — which is
+    // exactly the confusion a buyer cannot be asked to resolve.
+    const payoutTarget = { ...payoutNow };
+    let payoutTouched = false;
+
     if ('bankAccountHolder' in body) {
-      const v = strField(body.bankAccountHolder, 'The account holder', 120);
-      set('bank_account_holder', v);
-      merged.bankAccountHolder = v;
+      payoutTarget.holder = strField(body.bankAccountHolder, 'The account holder', 120);
+      payoutTouched = true;
     }
     if ('bankIban' in body) {
       const v = strField(body.bankIban, 'The IBAN', 60);
@@ -302,15 +323,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         compact === '' || IBAN_RE.test(compact),
         'That does not look like a valid IBAN — it should look like DE89 3704 0044 0532 0130 00.'
       );
-      set('bank_iban', v);
-      merged.bankIban = v;
+      payoutTarget.iban = v;
+      payoutTouched = true;
     }
     if ('bankBic' in body) {
       const v = strField(body.bankBic, 'The BIC', 20);
       const compact = v.replace(/\s+/g, '').toUpperCase();
       need(compact === '' || BIC_RE.test(compact), 'That does not look like a valid BIC — it is 8 or 11 characters, like COBADEFFXXX.');
-      set('bank_bic', v);
-      merged.bankBic = v;
+      payoutTarget.bic = v;
+      payoutTouched = true;
     }
     if ('paypalAccount' in body) {
       const v = strField(body.paypalAccount, 'The PayPal address', 120);
@@ -318,14 +339,44 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         isValidPaypalAccount(v),
         'That does not look like a PayPal address — use the email address on your PayPal account, or your PayPal.Me link.'
       );
-      set('paypal_account', v);
-      merged.paypalAccount = v;
+      payoutTarget.paypal = v;
+      payoutTouched = true;
     }
     if ('bankName' in body) {
-      const v = strField(body.bankName, 'The bank name', 120);
-      set('bank_name', v);
-      merged.bankName = v;
+      payoutTarget.bankName = strField(body.bankName, 'The bank name', 120);
+      payoutTouched = true;
     }
+
+    /**
+     * Does this change have to wait before buyers are given it?
+     *
+     * Only once the event could ever have taken money (payout_locked), and only
+     * when a DESTINATION actually moves — correcting the bank's display name on
+     * a selling event is not worth a day's delay, and gating it would teach
+     * organizers that the waiting period is arbitrary.
+     *
+     * Note this deliberately does NOT spare a first-time set the way the step-up
+     * does. On an event that has already sold, adding a bank account where there
+     * was only PayPal is a brand-new place for money to go, and "there was
+     * nothing here before" is exactly the shape the attack would take.
+     */
+    const delayPayout = payoutTouched && payoutChange.changed.length > 0 && payoutChangeIsDelayed(event);
+
+    if (payoutTouched && !delayPayout) {
+      set('bank_account_holder', payoutTarget.holder);
+      set('bank_iban', payoutTarget.iban);
+      set('bank_bic', payoutTarget.bic);
+      set('bank_name', payoutTarget.bankName);
+      set('paypal_account', payoutTarget.paypal);
+      merged.bankAccountHolder = payoutTarget.holder;
+      merged.bankIban = payoutTarget.iban;
+      merged.bankBic = payoutTarget.bic;
+      merged.bankName = payoutTarget.bankName;
+      merged.paypalAccount = payoutTarget.paypal;
+    }
+    // When it is delayed, `merged` is left alone on purpose: the publish
+    // checklist below asks what buyers can pay TODAY, and today they still get
+    // the old account.
 
     // ---- Media / video ---------------------------------------------------
     if ('videoUrl' in body) {
@@ -527,10 +578,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (status !== event.status) {
         set('status', status);
         merged.status = status;
+        // From the first publish onwards this event can take money, so payout
+        // changes start having to wait. Monotonic and set here rather than
+        // inferred from status, because status can be moved back and
+        // "unpublish, change, republish" must not be a way around the delay.
+        if (status === 'published') set('payout_locked', 1);
       }
     }
 
-    need(sets.length > 0 || tiersPlan !== null, 'Nothing to save.');
+    need(sets.length > 0 || tiersPlan !== null || delayPayout, 'Nothing to save.');
+
+    // Fixed once, before the write, so the row, the record and the email all
+    // name the same moment.
+    const payoutEffectiveAt = delayPayout ? Date.now() + PAYOUT_DELAY_MS : null;
 
     const tx = db.transaction(() => {
       if (sets.length > 0) {
@@ -556,6 +616,27 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           }
         });
       }
+      // Same transaction as everything else: a queued payout change and the
+      // record of it either both happen or neither does. A change that was
+      // written but never recorded is the one case the audit trail must not
+      // have.
+      if (delayPayout) {
+        queuePayoutChange(event.id, payoutTarget, payoutEffectiveAt!);
+      }
+      for (const field of payoutChange.changed) {
+        recordPayoutChange({
+          eventId: event.id,
+          organizerId: organizer.id,
+          field,
+          oldValue: payoutBefore[field],
+          newValue: typeof body[field] === 'string' ? (body[field] as string) : '',
+          // Nothing was proved when nothing had to be: a first-time set is not
+          // challenged, and the record should say so rather than imply a check
+          // that never ran.
+          factor: payoutChange.firstTimeOnly ? 'none' : stepUpMethod,
+          effectiveAt: delayPayout ? payoutEffectiveAt! : null,
+        });
+      }
     });
     tx();
 
@@ -569,9 +650,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         { id: event.id, name: event.name },
         {
           labels: payoutChange.labels,
-          bankIban: merged.bankIban,
-          paypalAccount: merged.paypalAccount ?? '',
+          // The TARGET account, not `merged` — on a delayed change `merged`
+          // still holds the old details on purpose, and an alarm that described
+          // the account being replaced rather than the one replacing it would
+          // tell the reader nothing they need.
+          bankIban: payoutTarget.iban,
+          paypalAccount: payoutTarget.paypal,
           firstTime: payoutChange.firstTimeOnly,
+          effectiveAt: payoutEffectiveAt,
         }
       );
     }

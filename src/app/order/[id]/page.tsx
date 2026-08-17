@@ -6,6 +6,7 @@ import PrintButton from '@/components/PrintButton';
 import { getEventById, getEventTiers, paypalPayee } from '@/lib/events';
 import { formatMoney } from '@/lib/money';
 import { getOrder, getOrderItems, getTicketsForOrder, paymentReference } from '@/lib/orders';
+import { orderPayout } from '@/lib/payout';
 import { ticketQrDataUrl } from '@/lib/tickets';
 
 export const dynamic = 'force-dynamic';
@@ -43,18 +44,23 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   }
 
   if (order.paymentMode === 'transfer' && (order.status === 'claimed' || order.status === 'pending')) {
-    // The organizer's bank details live on the event.
+    // What THIS order was told to pay, frozen when it was created — never the
+    // event's current details. An organizer who changes their IBAN afterwards
+    // must not be able to rewrite the instructions this buyer already has, and
+    // an attacker who changes it must not be able to redirect a payment that
+    // was promised to somebody else.
+    const payout = orderPayout(order, event);
     const bank =
-      event && event.bankIban.trim() && event.bankAccountHolder.trim()
+      payout.iban.trim() && payout.holder.trim()
         ? {
-            accountHolder: event.bankAccountHolder,
-            iban: event.bankIban,
-            bic: event.bankBic,
-            bankName: event.bankName,
-            payWithinDays: event.payWithinDays,
+            accountHolder: payout.holder,
+            iban: payout.iban,
+            bic: payout.bic,
+            bankName: payout.bankName,
+            payWithinDays: event?.payWithinDays ?? 5,
           }
         : null;
-    const paypal = event ? paypalPayee(event) : null;
+    const paypal = paypalPayee({ paypalAccount: payout.paypal });
     const reference = paymentReference(order.id);
     const isStudentOrder = reference.includes('-S-');
     const amountPlain = (order.totalCents / 100).toFixed(2);

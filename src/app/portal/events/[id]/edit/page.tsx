@@ -23,6 +23,7 @@ import PlanExpired from '../../../PlanExpired';
 import PortalNav from '../../../PortalNav';
 import { requirePortalOrganizer } from '../../../guard';
 import AssistantPanel from './AssistantPanel';
+import { effectivePayout, queuedPayoutChange } from '@/lib/payout';
 import BankForm from './BankForm';
 import DangerZone from './DangerZone';
 import DesignPanel from './DesignPanel';
@@ -136,7 +137,13 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
       event.address.trim() &&
       event.description.trim()
   );
-  const bankDone = Boolean(event.bankIban.trim() && event.bankAccountHolder.trim());
+  // What buyers are being given today, and any change still inside its waiting
+  // period. The form shows the former and warns about the latter — showing the
+  // queued values as if they were live would hide the very thing the delay
+  // exists to make visible.
+  const effective = effectivePayout(event);
+  const queued = queuedPayoutChange(event);
+  const bankDone = Boolean(effective.iban.trim() && effective.holder.trim());
   const basicsDone = detailsDone && bankDone;
   const ticketsDone = tiers.length > 0;
   // Any visual at all counts — a video-only event still has something to show.
@@ -205,12 +212,20 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
           <BankForm
             eventId={event.id}
             initial={{
-              bankAccountHolder: event.bankAccountHolder,
-              bankIban: event.bankIban,
-              bankBic: event.bankBic,
-              bankName: event.bankName,
-              paypalAccount: event.paypalAccount,
+              bankAccountHolder: effective.holder,
+              bankIban: effective.iban,
+              bankBic: effective.bic,
+              bankName: effective.bankName,
+              paypalAccount: effective.paypal,
             }}
+            queued={
+              queued && {
+                holder: queued.holder,
+                iban: queued.iban,
+                paypal: queued.paypal,
+                effectiveAt: queued.effectiveAt,
+              }
+            }
           />
         </EditorSection>
       </EditorSectionGroup>

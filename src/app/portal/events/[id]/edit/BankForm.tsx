@@ -4,6 +4,14 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { saveEvent, type StepUpRequest } from './save';
 
+interface QueuedChange {
+  holder: string;
+  iban: string;
+  paypal: string;
+  /** Unix ms at which buyers start being given this account. */
+  effectiveAt: number;
+}
+
 interface Props {
   eventId: string;
   initial: {
@@ -13,13 +21,17 @@ interface Props {
     bankName: string;
     paypalAccount: string;
   };
+  /** A confirmed change still inside its waiting period, if any. */
+  queued?: QueuedChange | null;
 }
 
 /** The exact patch that was refused, held so the confirmed save is the same one. */
 type PendingPatch = Record<string, unknown>;
 
-export default function BankForm({ eventId, initial }: Props) {
+export default function BankForm({ eventId, initial, queued }: Props) {
   const router = useRouter();
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
   const [holder, setHolder] = useState(initial.bankAccountHolder);
   const [iban, setIban] = useState(initial.bankIban);
   const [bic, setBic] = useState(initial.bankBic);
@@ -206,12 +218,78 @@ export default function BankForm({ eventId, initial }: Props) {
     );
   }
 
+  async function cancelQueued() {
+    if (cancelling) return;
+    setCancelling(true);
+    setCancelError(null);
+    try {
+      const res = await fetch(`/api/portal/events/${eventId}/payout/cancel`, { method: 'POST' });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        setCancelError(data?.error ?? 'Could not cancel that change. Please try again.');
+        setCancelling(false);
+        return;
+      }
+    } catch {
+      setCancelError('Could not reach the server — please check your connection and try again.');
+      setCancelling(false);
+      return;
+    }
+    setCancelling(false);
+    router.refresh();
+  }
+
   return (
     <form onSubmit={submit}>
       <p className="muted small" style={{ marginTop: 0 }}>
         Buyers pay <strong>directly to you</strong> — the ticket money goes straight into your own account, the
         platform never touches it. You confirm each payment on the orders page and the tickets go out by email.
       </p>
+
+      {/* A confirmed change that has not landed yet. This is the whole payoff of
+          the waiting period: if it was not you, the account has not actually
+          moved and one click puts it back. */}
+      {queued && (
+        <div className="notice notice-warn">
+          <strong>A change to your payment details is waiting.</strong>
+          <p className="small" style={{ margin: '6px 0 0' }}>
+            Buyers are still being given the account below. From{' '}
+            <strong>
+              {new Date(queued.effectiveAt).toLocaleString('en-GB', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </strong>{' '}
+            they will be given this instead:
+          </p>
+          <p className="mono small" style={{ margin: '6px 0 0', wordBreak: 'break-word' }}>
+            {queued.holder || '(no account holder)'} — {queued.iban || '(no IBAN)'}
+            {queued.paypal ? ` · PayPal: ${queued.paypal}` : ''}
+          </p>
+          <p className="small" style={{ margin: '8px 0 0' }}>
+            If you did not make this change, cancel it now — nothing has moved yet — and then change your
+            password.
+          </p>
+          {cancelError && (
+            <div className="notice notice-error small" style={{ marginTop: 8 }}>
+              {cancelError}
+            </div>
+          )}
+          <button
+            type="button"
+            className="btn btn-sm btn-danger"
+            style={{ marginTop: 10 }}
+            onClick={cancelQueued}
+            disabled={cancelling}
+          >
+            {cancelling ? 'Cancelling…' : 'Cancel this change'}
+          </button>
+        </div>
+      )}
+
       {error && <div className="notice notice-error">{error}</div>}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', columnGap: 16 }}>
         <div className="field">

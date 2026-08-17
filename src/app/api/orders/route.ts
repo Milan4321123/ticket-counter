@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getPaymentMode, hasPaypalCredentials } from '@/lib/config';
 import { getEventById, getEventTier, type EventRow } from '@/lib/events';
 import { getAvailability, SoldOutError } from '@/lib/inventory';
+import { effectivePayout } from '@/lib/payout';
 import { createOrder, expireOverdueTransferReservations, markOrderFailed, setPaypalOrderId } from '@/lib/orders';
 import { createPaypalOrder } from '@/lib/paypal';
 import { sendTransferInstructionsEmail } from '@/lib/email';
@@ -146,7 +147,11 @@ export async function POST(req: Request) {
       return apiError(500, 'INTERNAL', 'Payment is not configured yet — please try again later or contact the organizer.');
     }
     // Bank details live on the EVENT: buyers transfer straight to the organizer.
-    if (mode === 'transfer' && (!event.bankIban.trim() || !event.bankAccountHolder.trim())) {
+    // effectivePayout(), not the raw columns, so a change still inside its
+    // waiting period is not treated as the account yet — createOrder freezes
+    // the same answer onto the order a moment later.
+    const payout = effectivePayout(event);
+    if (mode === 'transfer' && (!payout.iban.trim() || !payout.holder.trim())) {
       return apiError(500, 'INTERNAL', 'Payment is not configured yet — please try again later or contact the organizer.');
     }
 

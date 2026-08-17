@@ -50,6 +50,21 @@ export interface EventRow {
    * the whole point.
    */
   paypalAccount: string;
+  /**
+   * A payout change that has been confirmed but is WAITING. Until
+   * pendingPayoutEffectiveAt passes, buyers are still quoted the live columns
+   * above. Never read these directly — lib/payout.ts decides which of the two
+   * sets is the answer, and money-facing code must go through it.
+   */
+  pendingBankAccountHolder: string | null;
+  pendingBankIban: string | null;
+  pendingBankBic: string | null;
+  pendingBankName: string | null;
+  pendingPaypalAccount: string | null;
+  /** Unix ms; NULL when nothing is queued. */
+  pendingPayoutEffectiveAt: number | null;
+  /** 1 once the event could ever take money. Never cleared — see lib/payout.ts. */
+  payoutLocked: number;
   posterMediaId: string | null;
   profileMediaId: string | null;
   /** First/legacy uploaded video — an event can now hold several. */
@@ -161,6 +176,13 @@ const EVENT_COLS = `
   bank_bic AS bankBic,
   bank_name AS bankName,
   paypal_account AS paypalAccount,
+  pending_bank_account_holder AS pendingBankAccountHolder,
+  pending_bank_iban AS pendingBankIban,
+  pending_bank_bic AS pendingBankBic,
+  pending_bank_name AS pendingBankName,
+  pending_paypal_account AS pendingPaypalAccount,
+  pending_payout_effective_at AS pendingPayoutEffectiveAt,
+  payout_locked AS payoutLocked,
   poster_media_id AS posterMediaId,
   profile_media_id AS profileMediaId,
   video_media_id AS videoMediaId,
@@ -187,6 +209,7 @@ function rowToEvent(row: Record<string, unknown> | undefined): EventRow | null {
     // Added by migration, so it is NULL on every event created before it.
     assistantContext: (row.assistantContext as string | null) ?? '',
     paypalAccount: (row.paypalAccount as string | null) ?? '',
+    payoutLocked: Number(row.payoutLocked ?? 0),
   };
 }
 
