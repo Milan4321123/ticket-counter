@@ -131,6 +131,32 @@ const TICKET_COLS = `
 `;
 
 /**
+ * How many tickets this email is already holding UNPAID on this event.
+ *
+ * Counts tickets rather than orders: two reservations of eight seats is the
+ * problem, not the fact that there were two of them. 'claimed' is the only
+ * status that holds seats without money having arrived — 'paid' is settled and
+ * cancelled/expired have already released theirs.
+ *
+ * Deliberately reads the database rather than the in-memory limiter: this is a
+ * question about state that outlives a process, and a restart must not hand
+ * everyone a fresh allowance.
+ */
+export function heldUnpaidTicketsForEmail(eventId: string, buyerEmail: string): number {
+  const row = getDb()
+    .prepare(
+      `SELECT COALESCE(SUM(oi.quantity), 0) AS n
+         FROM orders o JOIN order_items oi ON oi.order_id = o.id
+        WHERE o.event_id = ?
+          AND o.status = 'claimed'
+          AND o.payment_mode = 'transfer'
+          AND LOWER(o.buyer_email) = LOWER(?)`
+    )
+    .get(eventId, buyerEmail) as { n: number };
+  return row.n;
+}
+
+/**
  * Create a local order for an event. Prices are ALWAYS looked up from the
  * event's tiers here — never trust amounts sent by the browser. The currency
  * is the event's currency.

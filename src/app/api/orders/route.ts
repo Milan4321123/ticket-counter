@@ -3,7 +3,7 @@ import { getPaymentMode, hasPaypalCredentials } from '@/lib/config';
 import { getEventById, getEventTier, type EventRow } from '@/lib/events';
 import { getAvailability, SoldOutError } from '@/lib/inventory';
 import { effectivePayout } from '@/lib/payout';
-import { createOrder, expireOverdueTransferReservations, markOrderFailed, setPaypalOrderId } from '@/lib/orders';
+import { heldUnpaidTicketsForEmail, createOrder, expireOverdueTransferReservations, markOrderFailed, setPaypalOrderId } from '@/lib/orders';
 import { createPaypalOrder } from '@/lib/paypal';
 import { sendTransferInstructionsEmail } from '@/lib/email';
 import { clientIp, rateLimit } from '@/lib/ratelimit';
@@ -116,9 +116,52 @@ export async function POST(req: Request) {
       return apiError(429, 'INTERNAL', 'The site is very busy right now — please try again in a minute.');
     }
 
+    // A slower per-IP ceiling behind the burst one above.
+    //
+    // Ten a minute stops a flood but still allows six hundred an hour, and the
+    // damage here is not request volume — it is seats held. A transfer
+    // reservation claims its seats immediately and only releases them after
+    // pay_within_days + 2, so a scripted caller could reserve an entire event
+    // in minutes and keep it sold out for a week without ever sending a cent.
+    if (!rateLimit(`orders:hour:${clientIp(req)}`, 30, 60 * 60_000)) {
+      return apiError(429, 'INTERNAL', 'You have reserved a lot of tickets recently — please try again later.');
+    }
+
     // Free any seats held by this event's transfer reservations whose payment
     // never came.
     expireOverdueTransferReservations(event.id);
+
+    // How many seats this address is ALREADY sitting on, unpaid.
+    //
+    // Rate limits bound how fast orders arrive; they say nothing about how many
+    // seats one party is holding. A transfer reservation claims its seats the
+    // moment it is made and releases them only after pay_within_days + 2, so
+    // the scarce thing being consumed is the room, not the request budget.
+    //
+    // Counted AFTER the expiry sweep above so seats that have already lapsed do
+    // not count against the buyer, and from the database rather than a
+    // limiter — a restart must not hand everyone a fresh allowance.
+    //
+    // The ceiling is deliberately generous: a family booking twice, or someone
+    // who reserved, hesitated, and came back for more, should never meet it.
+    // What it stops is one party quietly holding a whole room. It is not a
+    // complete answer on its own — a script can vary the address — but it turns
+    // "reserve the event from one script" into "keep hundreds of distinct
+    // mailboxes alive", and it costs a real buyer nothing.
+    if (getPaymentMode() === 'transfer') {
+      const alreadyHeld = heldUnpaidTicketsForEmail(event.id, validated.buyerEmail);
+      const wanted = validated.totalQuantity;
+      const ceiling = Math.max(event.maxPerOrder * 3, 12);
+      if (alreadyHeld + wanted > ceiling) {
+        return apiError(
+          409,
+          'VALIDATION',
+          `You already have ${alreadyHeld} ticket${alreadyHeld === 1 ? '' : 's'} reserved for this event and ` +
+            `not yet paid for. Please pay for those first — or ask the organizer to release them — before ` +
+            `reserving more.`
+        );
+      }
+    }
 
     // Soft availability check (the hard, atomic check happens at claim time).
     const avail = getAvailability(event.id);
