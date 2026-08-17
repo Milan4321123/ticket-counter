@@ -23,7 +23,11 @@ export interface Availability {
   totalCap: number;
   totalSold: number;
   totalRemaining: number;
-  /** True when the EVENT has no overall ceiling. */
+  /**
+   * Always false — every event now states a capacity and the room is the
+   * ceiling. Kept so the many display sites that branch on it keep compiling
+   * and keep reading honestly; `showRemaining` is what hides the number now.
+   */
   unlimited: boolean;
   /**
    * False when the organizer has turned the countdown off. Reservations still
@@ -98,23 +102,24 @@ export function getAvailability(eventId: string): Availability {
     if (!tiers[tierId]) totalSold += sold;
   }
 
-  const totalRemaining = event.capacityUnlimited
-    ? UNLIMITED_REMAINING
-    : Math.max(0, event.totalCapacity - totalSold);
-  // A tier can never have more remaining than the event as a whole. This still
-  // holds when either side is uncapped: an unlimited tier inside a 100-seat
-  // event is limited by the room, and a limited tier inside an uncapped event
-  // is limited by its own cap.
+  // Every event states a capacity, so the room is always the ceiling. Events
+  // used to be able to opt out of one entirely, which meant an organizer paid a
+  // fee priced on the number they typed and could then sell past it without
+  // limit — the fee and the tickets stopped describing the same event. A tier
+  // can still be uncapped; it simply inherits the room's ceiling.
+  const totalRemaining = Math.max(0, event.totalCapacity - totalSold);
   for (const t of Object.values(tiers)) {
     t.remaining = Math.min(t.remaining, totalRemaining);
-    t.unlimited = t.unlimited && event.capacityUnlimited;
+    // An uncapped TIER is not an uncapped event: whatever is left in the room is
+    // left for it, and that is a real number, so it stops claiming otherwise.
+    t.unlimited = false;
   }
 
   return {
     totalCap: event.totalCapacity,
     totalSold,
     totalRemaining,
-    unlimited: event.capacityUnlimited,
+    unlimited: false,
     showRemaining: event.showRemaining,
     tiers,
   };

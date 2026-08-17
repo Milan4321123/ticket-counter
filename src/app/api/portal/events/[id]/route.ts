@@ -275,12 +275,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       set('total_capacity', v);
       merged.totalCapacity = v;
     }
-    if ('capacityUnlimited' in body) {
-      need(typeof body.capacityUnlimited === 'boolean', 'The capacity limit switch must be on or off.');
-      const v = body.capacityUnlimited;
-      set('capacity_unlimited', v ? 1 : 0);
-      merged.capacityUnlimited = v;
-    }
     if ('showRemaining' in body) {
       need(typeof body.showRemaining === 'boolean', 'The tickets-left switch must be on or off.');
       const v = body.showRemaining;

@@ -164,9 +164,7 @@ export default async function PortalOrdersPage({
           <div className="stat-label">Tickets sold</div>
           <div className="stat-value">
             {stats.ticketsSold}
-            {event.capacityUnlimited ? null : (
-              <span className="muted small">/ {event.totalCapacity}</span>
-            )}
+            <span className="muted small">/ {event.totalCapacity}</span>
           </div>
         </div>
         <div className="stat-card anim-fade-up anim-d4">

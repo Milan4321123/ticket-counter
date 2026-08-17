@@ -3,8 +3,8 @@ import { formatMoney } from '@/lib/money';
 import {
   eventFeeAmount,
   platformContactEmail,
-  platformFeeMinAmount,
-  platformFeePerCustomerCents,
+  platformFeeBaseAmount,
+  platformFeePerTicketAmount,
 } from '@/lib/platform';
 import DashboardMock from '@/components/mockups/DashboardMock';
 import PlatformAssistant from '@/components/PlatformAssistant';
@@ -59,8 +59,8 @@ function FeatPoint({ children }: { children: React.ReactNode }) {
 
 export default function OrganizersPage() {
   const fee = eventFeeAmount(HEADLINE_CAPACITY);
-  const minFee = platformFeeMinAmount();
-  const perTenFee = formatMoney(platformFeePerCustomerCents() * 10, 'EUR');
+  const baseFee = platformFeeBaseAmount();
+  const perTicketFee = platformFeePerTicketAmount();
   const contactEmail = platformContactEmail();
 
   return (
@@ -298,7 +298,7 @@ export default function OrganizersPage() {
                 <span className="check-dot check-dot-done">&#10003;</span>
                 <span>
                   <strong>One fee per event, no cut of your sales.</strong> You pay once when you
-                  publish — from {minFee}, set by how many people your venue holds. Never a
+                  publish — {baseFee} plus {perTicketFee} for every ticket your venue holds. Never a
                   percentage. Every euro a buyer pays is yours.
                 </span>
               </li>
@@ -327,9 +327,9 @@ export default function OrganizersPage() {
                 </span>
               </div>
               <p className="muted small" style={{ margin: '2px 0 0' }}>
-                You pay {perTenFee} for every 10 tickets your venue holds, minimum {minFee}. Small
-                room, small fee. Pay only when you publish — no yearly fee, no commission on ticket
-                sales.
+                You pay {baseFee} to publish, plus {perTicketFee} for every ticket your venue
+                holds. Small room, small fee. One transfer before you publish — no yearly fee, no
+                commission on ticket sales, and nothing to settle afterwards.
               </p>
 
               <div className="table-wrap" style={{ margin: '14px 0 4px' }}>
@@ -346,9 +346,6 @@ export default function OrganizersPage() {
                         <td>{capacity} people</td>
                         <td style={{ fontWeight: 700 }}>
                           {eventFeeAmount(capacity)}
-                          {eventFeeAmount(capacity) === minFee ? (
-                            <span className="muted small"> · minimum</span>
-                          ) : null}
                         </td>
                       </tr>
                     ))}

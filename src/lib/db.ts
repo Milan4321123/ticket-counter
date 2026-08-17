@@ -340,8 +340,19 @@ function migrateToPlatform(db: Database.Database): void {
   // when this is set: it stays on as the organizer's EXPECTED attendance, which
   // is what the platform fee is priced from — an event with no ceiling still
   // has a size, and the fee has to be quoted from something.
+  // RETIRED. An event could opt out of having a ceiling at all, which meant the
+  // organizer paid a fee priced on the number they typed and could then sell
+  // past it without limit — the fee and the tickets stopped describing the same
+  // event. Every event now states a capacity, and hiding the COUNT from buyers
+  // (which is what organizers actually wanted here) is show_remaining instead.
+  //
+  // The column stays because SQLite makes dropping one awkward and nothing
+  // reads it any more; it is forced to 0 so a stale reader cannot find a stray
+  // 1 and start honouring it again.
   if (!eventCols.includes('capacity_unlimited')) {
     db.exec(`ALTER TABLE events ADD COLUMN capacity_unlimited INTEGER NOT NULL DEFAULT 0`);
+  } else {
+    db.exec(`UPDATE events SET capacity_unlimited = 0 WHERE capacity_unlimited != 0`);
   }
 
   // Who asked a question, so the answer can be emailed back rather than only

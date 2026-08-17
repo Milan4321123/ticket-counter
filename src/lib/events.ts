@@ -28,12 +28,6 @@ export interface EventRow {
   city: string;
   currency: string;
   totalCapacity: number;
-  /**
-   * True when the event has no overall ceiling. totalCapacity still holds the
-   * organizer's EXPECTED attendance in that case — it is what the platform fee
-   * is priced from, not a limit on sales.
-   */
-  capacityUnlimited: boolean;
   /** False hides the "only N left" countdown from buyers entirely. */
   showRemaining: boolean;
   salesOpen: boolean;
@@ -166,7 +160,6 @@ const EVENT_COLS = `
   city,
   currency,
   total_capacity AS totalCapacity,
-  capacity_unlimited AS capacityUnlimited,
   show_remaining AS showRemaining,
   sales_open AS salesOpen,
   max_per_order AS maxPerOrder,
@@ -204,7 +197,6 @@ function rowToEvent(row: Record<string, unknown> | undefined): EventRow | null {
   return {
     ...(row as unknown as EventRow),
     salesOpen: Boolean(row.salesOpen),
-    capacityUnlimited: Boolean(row.capacityUnlimited),
     showRemaining: Boolean(row.showRemaining),
     // Added by migration, so it is NULL on every event created before it.
     assistantContext: (row.assistantContext as string | null) ?? '',

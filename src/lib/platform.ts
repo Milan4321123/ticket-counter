@@ -3,11 +3,11 @@
 // details, which belong to organizers). Configured via environment variables.
 import { formatMoney } from './money';
 
-/** Charged per person the venue holds: 10 cents each, i.e. €1.00 per 10 tickets. */
-const DEFAULT_FEE_PER_CUSTOMER_CENTS = 10;
+/** The flat part, paid to publish at all (€15.00). */
+const DEFAULT_FEE_BASE_CENTS = 1500;
 
-/** Floor for small rooms — no event ever costs less than this (€15.00). */
-const DEFAULT_FEE_MIN_CENTS = 1500;
+/** The per-ticket part, charged on the capacity the organizer states (€0.15). */
+const DEFAULT_FEE_PER_TICKET_CENTS = 15;
 
 /** Positive-integer env override, or the built-in default. */
 function envCents(name: string, fallback: number): number {
@@ -15,12 +15,12 @@ function envCents(name: string, fallback: number): number {
   return Number.isInteger(n) && n > 0 ? n : fallback;
 }
 
-export function platformFeePerCustomerCents(): number {
-  return envCents('PLATFORM_FEE_PER_CUSTOMER_CENTS', DEFAULT_FEE_PER_CUSTOMER_CENTS);
+export function platformFeeBaseCents(): number {
+  return envCents('PLATFORM_FEE_BASE_CENTS', DEFAULT_FEE_BASE_CENTS);
 }
 
-export function platformFeeMinCents(): number {
-  return envCents('PLATFORM_FEE_MIN_CENTS', DEFAULT_FEE_MIN_CENTS);
+export function platformFeePerTicketCents(): number {
+  return envCents('PLATFORM_FEE_PER_TICKET_CENTS', DEFAULT_FEE_PER_TICKET_CENTS);
 }
 
 /** Whole seats, ignoring anything a bad caller passes in. */
@@ -29,54 +29,73 @@ function seatsOf(capacity: number): number {
 }
 
 /**
- * The capacity part of the fee, before the minimum applies. Rounded to whole
- * euros because this number goes on a bank transfer and "€33.70" helps nobody.
- */
-function feeBeforeMinimum(capacity: number): number {
-  return Math.round((seatsOf(capacity) * platformFeePerCustomerCents()) / 100) * 100;
-}
-
-/**
- * What ONE event costs its organizer: the venue capacity times the per-person
- * rate, never below the minimum. 500 seats -> €50.00, 100 seats -> the €15.00
- * floor. Pure: same capacity and env in, same cents out.
+ * What ONE event costs its organizer: a flat fee to publish, plus a per-ticket
+ * rate on the capacity they stated. 100 seats -> €30.00, 500 -> €90.00.
+ *
+ * WHY THE FLAT PART STAYS UP FRONT. It is what makes a draft into a commitment.
+ * Building a page costs the platform real work — the design, the review, the
+ * account — and a fee that scaled only with the room would let somebody take
+ * all of that for a few euros by declaring a small one. It also means the
+ * platform is paid something for every event it carries, including the ones
+ * that never sell a ticket.
+ *
+ * WHY THE PER-TICKET PART IS PRICED ON CAPACITY RATHER THAN SALES. The platform
+ * never touches ticket money — buyers pay organizers directly — so there is
+ * nothing to deduct a per-sale fee FROM, and collecting one afterwards would
+ * mean invoicing and chasing every organizer for small sums. Charging it on the
+ * stated capacity turns the whole thing into ONE transfer, known before they
+ * commit, with nothing left outstanding afterwards. The organizer prices the
+ * room they booked; a room they do not fill is their risk, and always was.
+ *
+ * This is also why an event can no longer opt out of a capacity: the number is
+ * what the fee is priced from, so an event able to sell past it would be one
+ * where the fee and the tickets describe different events.
+ *
+ * Pure: same capacity and env in, same cents out.
  */
 export function eventFeeCents(capacity: number): number {
-  return Math.max(platformFeeMinCents(), feeBeforeMinimum(capacity));
+  return platformFeeBaseCents() + seatsOf(capacity) * platformFeePerTicketCents();
 }
 
-/** One event's fee as money, e.g. '€50.00'. */
+/** One event's fee as money, e.g. '€90.00'. */
 export function eventFeeAmount(capacity: number): string {
   return formatMoney(eventFeeCents(capacity), 'EUR');
 }
 
-/** The floor as money, e.g. '€15.00' — the "from" price in generic copy. */
-export function platformFeeMinAmount(): string {
-  return formatMoney(platformFeeMinCents(), 'EUR');
+/** The flat part as money, e.g. '€15.00'. */
+export function platformFeeBaseAmount(): string {
+  return formatMoney(platformFeeBaseCents(), 'EUR');
+}
+
+/** The per-ticket part as money, e.g. '€0.15'. */
+export function platformFeePerTicketAmount(): string {
+  return formatMoney(platformFeePerTicketCents(), 'EUR');
 }
 
 /**
- * Pricing where no event — and so no capacity — is known, e.g. 'from €15.00 per
- * event'. Wherever an event IS known, quote its own amount instead
+ * Pricing where no event — and so no capacity — is known. States the rule
+ * rather than a "from" price, because with a per-ticket part nobody ever pays
+ * the flat fee alone and quoting it on its own would understate every real
+ * event. Wherever an event IS known, quote its own amount instead
  * (eventFeeCents / quoteEventFee).
  */
 export function platformFeeLabel(): string {
-  return `from ${platformFeeMinAmount()} per event`;
+  return `${platformFeeBaseAmount()} + ${platformFeePerTicketAmount()} per ticket`;
 }
 
-/** The whole pricing rule in one line, e.g. '€1.00 per 10 tickets, minimum €15.00'. */
+/** The whole pricing rule in one line. */
 export function platformFeeRule(): string {
-  const perTen = formatMoney(platformFeePerCustomerCents() * 10, 'EUR');
-  return `${perTen} per 10 tickets, minimum ${platformFeeMinAmount()}`;
+  return `${platformFeeBaseAmount()} to publish, plus ${platformFeePerTicketAmount()} for every ticket your venue holds`;
 }
 
 /** One plain line telling an organizer where their own event's amount came from. */
 export function eventFeeBasis(capacity: number): string {
-  const perTen = formatMoney(platformFeePerCustomerCents() * 10, 'EUR');
   const seats = seatsOf(capacity);
-  return feeBeforeMinimum(seats) < platformFeeMinCents()
-    ? `Your venue holds ${seats} — smaller rooms pay the ${platformFeeMinAmount()} minimum.`
-    : `Your venue holds ${seats} — that is ${perTen} for every 10 tickets.`;
+  const perTicket = formatMoney(seats * platformFeePerTicketCents(), 'EUR');
+  return (
+    `${platformFeeBaseAmount()} to publish, plus ${platformFeePerTicketAmount()} × ${seats} tickets ` +
+    `(${perTicket}) for the room you booked.`
+  );
 }
 
 /**

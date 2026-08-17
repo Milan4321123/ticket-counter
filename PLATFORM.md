@@ -4,7 +4,7 @@ This is the business manual for **you, the platform owner**. It explains how the
 
 ## 1. The business model in one paragraph
 
-Event organizers pay **you** a fee **per event** to put it on your platform, and the fee is sized to the room they booked: **€1 for every 10 tickets the venue holds, minimum €15** — so a 500-person event costs **€50** and a 150-person one costs €15 (you set both numbers with `PLATFORM_FEE_PER_CUSTOMER_CENTS` and `PLATFORM_FEE_MIN_CENTS`). Small organizers can afford to start; big ones pay in proportion to what they stand to sell. Signing up and building a draft costs nothing; the fee falls due when they want to publish. In return they get a self-service portal where they build their event page, sell tickets, and check guests in at the door. The ticket money itself **never touches you**: buyers transfer it directly to each organizer's own bank account. Your revenue is the event fees; the organizers' revenue is their ticket sales. Two completely separate streams.
+Event organizers pay **you** a fee **per event** to put it on your platform, and it is **€15 to publish, plus €0.15 for every ticket the venue holds** — so a 500-person event costs **€90** and a 150-person one €37.50 (you set both numbers with `PLATFORM_FEE_BASE_CENTS` and `PLATFORM_FEE_PER_TICKET_CENTS`). Small organizers can afford to start; big ones pay in proportion to what they stand to sell. It is charged on the capacity they state rather than on tickets sold: the platform never touches ticket money, so there is nothing to deduct a per-sale fee from — one transfer, known before they commit, nothing outstanding afterwards. Signing up and building a draft costs nothing; the fee falls due when they want to publish. In return they get a self-service portal where they build their event page, sell tickets, and check guests in at the door. The ticket money itself **never touches you**: buyers transfer it directly to each organizer's own bank account. Your revenue is the event fees; the organizers' revenue is their ticket sales. Two completely separate streams.
 
 ## 2. Why the money flows the way it does
 
@@ -105,8 +105,8 @@ Organizers can sign themselves up — no manual account creation needed. There's
 
 | Variable | What it does |
 | --- | --- |
-| `PLATFORM_FEE_PER_CUSTOMER_CENTS` | What each person the venue holds adds to the fee, in cents (default `10` = €1.00 per 10 tickets). The event fee is `capacity × this`, rounded to whole euros. |
-| `PLATFORM_FEE_MIN_CENTS` | The floor for small rooms, in cents (default `1500` = €15.00). With both defaults: 150 capacity → €15.00, 300 → €30.00, 500 → €50.00, 1000 → €100.00. Shown on `/organizers`, on each event's Publish tab, in `/admin/organizers`, and in the fee emails. |
+| `PLATFORM_FEE_BASE_CENTS` | The flat part, in cents (default `1500` = €15.00) — what it costs to publish at all. |
+| `PLATFORM_FEE_PER_TICKET_CENTS` | The per-ticket part, in cents (default `15` = €0.15), charged on the stated capacity. With both defaults: 150 capacity → €37.50, 300 → €60.00, 500 → €90.00, 1000 → €165.00. Shown on `/organizers`, on each event's Publish tab, in `/admin/organizers`, and in the fee emails. |
 | `PLATFORM_BANK_HOLDER` / `PLATFORM_BANK_IBAN` | **Your own** account for receiving fees (not any organizer's). Until both are set, the fee card and signup page show a friendly "being set up — contact us" note instead of bank details. |
 | `PLATFORM_BANK_BIC` / `PLATFORM_BANK_NAME` | Optional — shown alongside your payment details when set. |
 

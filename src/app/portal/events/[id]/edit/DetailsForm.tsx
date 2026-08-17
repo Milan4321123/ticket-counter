@@ -19,7 +19,6 @@ interface Props {
     city: string;
     currency: string;
     totalCapacity: number;
-    capacityUnlimited: boolean;
     showRemaining: boolean;
     maxPerOrder: number;
     payWithinDays: number;
@@ -38,7 +37,6 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
   const [address, setAddress] = useState(initial.address);
   const [city, setCity] = useState(initial.city);
   const [totalCapacity, setTotalCapacity] = useState(String(initial.totalCapacity));
-  const [capacityUnlimited, setCapacityUnlimited] = useState(initial.capacityUnlimited);
   const [showRemaining, setShowRemaining] = useState(initial.showRemaining);
   const [maxPerOrder, setMaxPerOrder] = useState(String(initial.maxPerOrder));
   const [payWithinDays, setPayWithinDays] = useState(String(initial.payWithinDays));
@@ -84,7 +82,6 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
       address,
       city,
       totalCapacity: capacity,
-      capacityUnlimited,
       showRemaining,
       maxPerOrder: perOrder,
       payWithinDays: payDays,
@@ -222,34 +219,17 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
             How many people the venue holds. Your event fee is worked out from this — the exact
             amount is on the Publish tab.
           </p>
-          {/* The number stays required even when this is on: the fee has to be
-              quoted from something, and "how many do you expect" is a question
-              an organizer can always answer. What the switch changes is whether
-              that number STOPS sales. */}
-          <label className="checkbox-row" style={{ marginTop: 10 }}>
-            <input
-              type="checkbox"
-              checked={capacityUnlimited}
-              onChange={(e) => setCapacityUnlimited(e.target.checked)}
-            />
-            <span>
-              No overall limit — keep selling past this number
-              <span className="muted small" style={{ display: 'block' }}>
-                Your page stops showing a countdown and never says sold out. The number above is
-                still what your fee is based on, as your expected attendance.
-              </span>
-            </span>
-          </label>
-
-          {/* Separate from the limit itself, because they answer different
-              questions: one is "is there a ceiling", this is "should buyers
-              see how close we are to it". */}
+          {/* There is no longer a way to opt out of the ceiling. The fee is
+              priced from this number, so an event that could sell past it would
+              be one where the fee and the tickets describe different events.
+              Hiding the COUNT is a different question, and it is the switch
+              below — which is what an organizer actually wanted when they
+              reached for "no limit". */}
           <label className="checkbox-row" style={{ marginTop: 10 }}>
             <input
               type="checkbox"
               checked={showRemaining}
               onChange={(e) => setShowRemaining(e.target.checked)}
-              disabled={capacityUnlimited}
             />
             <span>
               Show buyers how many tickets are left
