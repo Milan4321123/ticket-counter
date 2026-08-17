@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import GoToTab from './GoToTab';
 import SpeechInput from '@/components/SpeechInput';
 import { saveEvent } from './save';
 
@@ -25,6 +26,11 @@ interface Props {
     salesOpen: boolean;
     closedMessage: 'closed' | 'coming-soon';
     whatsapp: string;
+    whatsappName: string;
+    /** The event's round profile photo, or '' — the bubble wears this. */
+    profilePhotoUrl: string;
+    /** The account name, used when no bubble name is set. */
+    accountName: string;
   };
 }
 
@@ -45,6 +51,7 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
   const [salesOpen, setSalesOpen] = useState(initial.salesOpen);
   const [closedMessage, setClosedMessage] = useState(initial.closedMessage);
   const [whatsapp, setWhatsapp] = useState(initial.whatsapp ? `+${initial.whatsapp}` : '');
+  const [whatsappName, setWhatsappName] = useState(initial.whatsappName);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +99,7 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
       salesOpen,
       closedMessage,
       whatsapp,
+      whatsappName,
     });
     setBusy(false);
     if (!result.ok) {
@@ -280,25 +288,104 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
           </p>
         </div>
       </div>
-      <div className="field" style={{ maxWidth: 520 }}>
-        <label htmlFor="ev-whatsapp">Your WhatsApp number (optional)</label>
-        <input
-          id="ev-whatsapp"
-          className="input"
-          value={whatsapp}
-          onChange={(e) => setWhatsapp(e.target.value)}
-          placeholder="+49 170 1234567"
-          inputMode="tel"
-          autoComplete="tel"
-          maxLength={32}
-        />
-        <p className="muted small" style={{ margin: '6px 0 0' }}>
-          Adds a WhatsApp bubble to your event page and to the payment page, with your profile
-          photo on it. Buyers tap it and reach <strong style={{ color: 'var(--text)' }}>you</strong>,
-          with your event&rsquo;s name already in the message. It is the fastest way to settle the
-          one thing people hesitate over before paying — whether the bank account is really yours.
-          Start with your country code. Leave it empty and no bubble appears.
+      <div className="field" style={{ maxWidth: 640 }}>
+        <label htmlFor="ev-whatsapp">Talk to buyers on WhatsApp (optional)</label>
+        <p className="muted small" style={{ margin: '0 0 10px' }}>
+          Puts a bubble on your event page and on the payment page. Buyers tap it and reach{' '}
+          <strong style={{ color: 'var(--text)' }}>you</strong>, with your event&rsquo;s name already
+          in the message. It is the fastest way to settle the one thing people hesitate over before
+          paying — whether the bank account is really yours. Leave the number empty and no bubble
+          appears.
         </p>
+        <div style={grid}>
+          <div className="field" style={{ marginBottom: 12 }}>
+            <label htmlFor="ev-whatsapp-num" className="small">
+              WhatsApp number
+            </label>
+            <input
+              id="ev-whatsapp-num"
+              className="input"
+              value={whatsapp}
+              onChange={(e) => setWhatsapp(e.target.value)}
+              placeholder="+49 170 1234567"
+              inputMode="tel"
+              autoComplete="tel"
+              maxLength={32}
+            />
+            <p className="muted small" style={{ margin: '6px 0 0' }}>
+              Start with your country code.
+            </p>
+          </div>
+          <div className="field" style={{ marginBottom: 12 }}>
+            <label htmlFor="ev-whatsapp-name" className="small">
+              Name on the bubble
+            </label>
+            <input
+              id="ev-whatsapp-name"
+              className="input"
+              value={whatsappName}
+              onChange={(e) => setWhatsappName(e.target.value)}
+              placeholder={initial.accountName}
+              maxLength={60}
+            />
+            <p className="muted small" style={{ margin: '6px 0 0' }}>
+              Whoever actually answers. Empty uses {initial.accountName}.
+            </p>
+          </div>
+        </div>
+
+        {/* The real thing, not a description of it. An organizer should not have
+            to publish and open their own page to find out their bubble is
+            showing a letter because they never picked a profile photo. */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            padding: 12,
+            border: '1px solid var(--border)',
+            borderRadius: 12,
+            background: 'var(--bg-elevated)',
+          }}
+        >
+          <span className="contact-fab-photo-wrap" style={{ position: 'relative', display: 'inline-flex' }}>
+            {initial.profilePhotoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={initial.profilePhotoUrl}
+                alt=""
+                className="contact-fab-photo"
+                style={{ borderRadius: '50%' }}
+              />
+            ) : (
+              <span className="contact-fab-photo contact-fab-initial" aria-hidden="true">
+                {((whatsappName || initial.accountName).trim().charAt(0) || 'O').toUpperCase()}
+              </span>
+            )}
+            <span className="contact-fab-wa-badge" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" role="presentation">
+                <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.86 9.86 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm5.8 14.09c-.25.69-1.45 1.32-1.99 1.37-.53.05-1.02.24-3.44-.72-2.9-1.14-4.73-4.1-4.87-4.29-.14-.19-1.16-1.54-1.16-2.94 0-1.4.73-2.09.99-2.37.26-.29.57-.36.76-.36l.54.01c.17 0 .41-.07.64.49.24.58.81 2 .88 2.15.07.14.12.31.02.5-.09.19-.14.31-.28.48l-.42.49c-.14.14-.28.29-.12.57.16.29.71 1.17 1.53 1.9 1.05.93 1.93 1.22 2.21 1.36.28.14.44.12.6-.07.17-.19.69-.81.88-1.09.19-.29.38-.24.64-.14.26.09 1.66.78 1.95.93.28.14.47.21.54.33.07.12.07.69-.18 1.37Z" />
+              </svg>
+            </span>
+          </span>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ fontWeight: 700 }}>
+              WhatsApp {((whatsappName || initial.accountName).trim().split(/\s+/)[0] || 'you')}
+            </div>
+            <p className="muted small" style={{ margin: '2px 0 0' }}>
+              {initial.profilePhotoUrl ? (
+                <>This is your bubble. The circle is your event&rsquo;s profile photo.</>
+              ) : (
+                <>
+                  No profile photo yet, so the circle shows a letter. Upload one under{' '}
+                  <strong style={{ color: 'var(--text)' }}>Photos &amp; videos</strong> and pick it as
+                  your profile photo — a face gets far more messages than an initial.
+                </>
+              )}
+            </p>
+          </div>
+          {!initial.profilePhotoUrl && <GoToTab tab="media">Add a photo →</GoToTab>}
+        </div>
       </div>
       <label className="checkbox-row" htmlFor="ev-sales-open">
         <input

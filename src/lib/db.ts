@@ -119,6 +119,7 @@ CREATE TABLE IF NOT EXISTS events (
   sales_open INTEGER NOT NULL DEFAULT 1,
   closed_message TEXT NOT NULL DEFAULT 'closed', -- how a PAUSE reads: 'closed' | 'coming-soon'
   whatsapp TEXT NOT NULL DEFAULT '',      -- organizer's WhatsApp, digits only (see lib/whatsapp.ts)
+  whatsapp_name TEXT NOT NULL DEFAULT '', -- who the bubble says you are; '' = the account name
   max_per_order INTEGER NOT NULL DEFAULT 8,
   pay_within_days INTEGER NOT NULL DEFAULT 5,
   bank_account_holder TEXT NOT NULL DEFAULT '',
@@ -402,6 +403,12 @@ function migrateToPlatform(db: Database.Database): void {
   // account it is. Stored digits-only; see lib/whatsapp.ts for why.
   if (!eventCols.includes('whatsapp')) {
     db.exec(`ALTER TABLE events ADD COLUMN whatsapp TEXT NOT NULL DEFAULT ''`);
+  }
+  // Who the bubble says you are. Separate from the account name because the
+  // person on WhatsApp is often not the person the account is registered to —
+  // a team's ticket phone, or a first name where the account is a company.
+  if (!eventCols.includes('whatsapp_name')) {
+    db.exec(`ALTER TABLE events ADD COLUMN whatsapp_name TEXT NOT NULL DEFAULT ''`);
   }
   // The same choice for the event as a whole. total_capacity is NOT dropped
   // when this is set: it stays on as the organizer's EXPECTED attendance, which

@@ -42,6 +42,8 @@ export interface EventRow {
    * every use goes through lib/whatsapp.ts.
    */
   whatsapp: string;
+  /** Name shown on the WhatsApp bubble. '' falls back to the account name. */
+  whatsappName: string;
   maxPerOrder: number;
   payWithinDays: number;
   bankAccountHolder: string;
@@ -186,6 +188,7 @@ const EVENT_COLS = `
   sales_open AS salesOpen,
   closed_message AS closedMessage,
   whatsapp,
+  whatsapp_name AS whatsappName,
   max_per_order AS maxPerOrder,
   pay_within_days AS payWithinDays,
   bank_account_holder AS bankAccountHolder,
@@ -226,6 +229,7 @@ function rowToEvent(row: Record<string, unknown> | undefined): EventRow | null {
     // falls back to the wording that is always safe to show.
     closedMessage: row.closedMessage === 'coming-soon' ? 'coming-soon' : 'closed',
     whatsapp: (row.whatsapp as string | null) ?? '',
+    whatsappName: (row.whatsappName as string | null) ?? '',
     showRemaining: Boolean(row.showRemaining),
     // Added by migration, so it is NULL on every event created before it.
     assistantContext: (row.assistantContext as string | null) ?? '',

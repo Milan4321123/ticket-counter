@@ -37,7 +37,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const organizerWhatsApp = event ? (
     <OrganizerWhatsApp
       number={event.whatsapp}
-      organizerName={organizer?.name?.trim() || 'the organizer'}
+      organizerName={event.whatsappName || organizer?.name?.trim() || 'the organizer'}
       eventName={event.name}
       photoUrl={
         event.profileMediaId

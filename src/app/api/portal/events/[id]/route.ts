@@ -364,6 +364,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       set('whatsapp', digits);
       merged.whatsapp = digits;
     }
+    if ('whatsappName' in body) {
+      need(typeof body.whatsappName === 'string', 'That name does not look right.');
+      // Single-line and bounded: it is rendered into the bubble's accessible
+      // label as well as its visible text, and a name carrying newlines would
+      // break that label into something a screen reader reads as two things.
+      const name = (body.whatsappName as string)
+        .replace(/[\u0000-\u001F\u007F]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 60);
+      set('whatsapp_name', name);
+      merged.whatsappName = name;
+    }
     if ('closedMessage' in body) {
       // Whitelisted, not stored as given: this string is chosen by an
       // organizer and read back onto a public page, so only the two values the

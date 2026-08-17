@@ -6091,7 +6091,6 @@ html:has(.event-page.has-section-nav) {
 
 .contact-fab-label {
   white-space: nowrap;
-  padding-right: 12px;
   font-weight: 700;
   font-size: 0.88rem;
 }
@@ -6144,13 +6143,7 @@ html:has(.event-page.has-section-nav) {
   overflow: hidden;
 }
 
-/* The label still has to be clipped while the bubble is a 56px circle, or the
-   text would spill across the page before the hover expands it. */
-.contact-fab-wa .contact-fab-label {
-  overflow: hidden;
-  text-overflow: clip;
-  white-space: nowrap;
-}
+
 
 /* Holds the badge against the photo's corner. */
 .contact-fab-photo-wrap {
@@ -6251,10 +6244,53 @@ html:has(.event-page.has-section-nav) {
   color: #fff;
 }
 
-/* No hover on a phone, so it stays a circle and the label never appears. */
+/* ---- Both fabs: the label has NO WIDTH until the bubble expands -----------
+
+   It used to rely on the parent's `overflow: hidden` alone, and overflow clips
+   at the PADDING box, not the content box — so the label's first letter painted
+   into the fab's own right padding and a stray "A" and "W" sat beside the two
+   circles at rest. On a phone there is no hover, so the bubbles never expanded
+   and those letters never went away: two circles with a random letter next to
+   each. Collapsing the label itself fixes both, and it no longer matters
+   whether the parent clips — which the WhatsApp bubble must not do, or its
+   glyph badge gets sliced. */
+.chat-fab-label,
+.contact-fab-label {
+  display: inline-block;
+  max-width: 0;
+  padding-right: 0;
+  overflow: hidden;
+  transition:
+    max-width 0.28s ease,
+    padding-right 0.28s ease;
+}
+
+.chat-fab:hover .chat-fab-label,
+.chat-fab:focus-visible .chat-fab-label {
+  max-width: 200px;
+  padding-right: 2px;
+}
+
+.contact-fab:hover .contact-fab-label,
+.contact-fab:focus-visible .contact-fab-label {
+  max-width: 200px;
+  padding-right: 12px;
+}
+
+/* No hover on a phone, so both stay circles and neither label ever appears —
+   a tap synthesises :hover on mobile browsers, which is why the label rules
+   have to be overridden here and not just the widths. */
 @media (hover: none) {
   .chat-fab:hover {
     max-width: 56px;
+  }
+
+  .chat-fab:hover .chat-fab-label,
+  .chat-fab:focus-visible .chat-fab-label,
+  .contact-fab:hover .contact-fab-label,
+  .contact-fab:focus-visible .contact-fab-label {
+    max-width: 0;
+    padding-right: 0;
   }
 }
 

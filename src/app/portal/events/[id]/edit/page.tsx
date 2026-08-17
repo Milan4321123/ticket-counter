@@ -7,6 +7,7 @@ import {
   getEventMedia,
   getEventTiers,
   getEventVideos,
+  cropTag,
   listEventPosts,
   listEventQuestions,
   mediaUrl,
@@ -215,6 +216,14 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
               salesOpen: event.salesOpen,
               closedMessage: event.closedMessage,
               whatsapp: event.whatsapp,
+              whatsappName: event.whatsappName,
+              // The bubble wears the event's own profile photo rather than a
+              // second upload of the same face — one picture, already cropped
+              // to a circle, already inside the media quota.
+              profilePhotoUrl: event.profileMediaId
+                ? mediaUrl(event.profileMediaId, 'avatar', cropTag(parseCropRect(event.profileCrop)))
+                : '',
+              accountName: organizer.name?.trim() || 'you',
             }}
           />
         </EditorSection>

@@ -1019,7 +1019,7 @@ export default async function EventPage({ params }: Params) {
       {!preview && (
         <OrganizerWhatsApp
           number={event.whatsapp}
-          organizerName={organizerDisplayName}
+          organizerName={event.whatsappName || organizerDisplayName}
           eventName={event.name}
           photoUrl={profileUrl}
         />
