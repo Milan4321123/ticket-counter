@@ -51,6 +51,21 @@ const MAX_IMAGE_PIXELS = 50_000_000; // 50 MP — comfortably above any phone or
 const MAX_IMAGE_ASPECT = 20; // a strip 20x longer than it is tall is not a photo
 const MIN_IMAGE_EDGE = 16; // anything thinner is a rendering artefact
 
+/**
+ * What sharp says the bytes ACTUALLY are -> the mime we store.
+ *
+ * The inverse of EXT_BY_MIME, and deliberately a whitelist: anything sharp can
+ * decode but that is not on this list (svg, gif, tiff, avif, pdf, heif) is
+ * refused, because the point is to keep a vector or an animation from ever
+ * reaching the resizer.
+ */
+const MIME_BY_FORMAT: Record<string, string> = {
+  jpeg: 'image/jpeg',
+  jpg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+};
+
 /** Store an uploaded photo and register it. Caller must have authorized the event. */
 export async function saveEventPhoto(eventId: string, mime: string, bytes: Buffer): Promise<EventMediaRow> {
   if (!allowedImageMime(mime)) throw new Error('Only JPEG, PNG, and WebP photos are supported.');
@@ -62,14 +77,38 @@ export async function saveEventPhoto(eventId: string, mime: string, bytes: Buffe
 
   // Header only — metadata() does not decode the pixels, so this stays cheap
   // even for the pathological files it exists to reject.
+  //
+  // The FORMAT here is the security-relevant part, not just the dimensions.
+  // Everything above this point trusts `mime`, which is the Content-Type the
+  // browser put on the multipart part — attacker-controlled text, not evidence.
+  // Believing it let an SVG be stored as `<uuid>.png` with mime image/png, and
+  // an SVG's width/height are attacker-authored attributes rather than a real
+  // raster size, so every shape guard below passed on a file that is a program.
+  //
+  // It detonated later, on an UNAUTHENTICATED request: GET /api/media/<id>?v=cover
+  // rasterises through librsvg, a filter-heavy 6 KB file burns ~18 seconds of
+  // CPU, and lib/imageVariants.ts only writes its cache on SUCCESS — so a
+  // payload that never finishes is re-rendered from scratch on every request,
+  // with no amortisation, in a single-process Node server shared by every
+  // tenant. Ticket sales and door check-in stall with it.
+  //
+  // So the decoded format decides what this file is, and the client's label is
+  // used for nothing but an early rejection.
   let width = 0;
   let height = 0;
+  let realMime = '';
   try {
     const meta = await sharp(bytes).metadata();
     width = meta.width ?? 0;
     height = meta.height ?? 0;
+    realMime = MIME_BY_FORMAT[String(meta.format)] ?? '';
   } catch {
     throw new Error('That file does not look like a real photo — please re-save it and try again.');
+  }
+  if (!realMime) {
+    // Names the three we take rather than what was sent: an organizer who
+    // exported an SVG or a HEIC needs to know what to convert TO.
+    throw new Error('Only JPEG, PNG, and WebP photos are supported — please re-save it as one of those.');
   }
   if (!width || !height) {
     throw new Error('That file does not look like a real photo — please re-save it and try again.');
@@ -87,7 +126,9 @@ export async function saveEventPhoto(eventId: string, mime: string, bytes: Buffe
   }
 
   const id = crypto.randomUUID();
-  const fileName = `${id}.${EXT_BY_MIME[mime]}`;
+  // From the DECODED format, never the declared one, so what is on disk and what
+  // the database says are both the truth about the bytes.
+  const fileName = `${id}.${EXT_BY_MIME[realMime]}`;
   const dir = uploadsDir(eventId);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, fileName), bytes);
@@ -95,8 +136,8 @@ export async function saveEventPhoto(eventId: string, mime: string, bytes: Buffe
   const sort = getEventMedia(eventId).length;
   getDb()
     .prepare(`INSERT INTO event_media (id, event_id, file_name, mime, sort) VALUES (?, ?, ?, ?, ?)`)
-    .run(id, eventId, fileName, mime, sort);
-  return { id, eventId, fileName, mime, sort, createdAt: new Date().toISOString() };
+    .run(id, eventId, fileName, realMime, sort);
+  return { id, eventId, fileName, mime: realMime, sort, createdAt: new Date().toISOString() };
 }
 
 /** Absolute file path for a media row (from DB values only). */
