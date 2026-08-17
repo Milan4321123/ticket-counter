@@ -9,7 +9,7 @@ import nodemailer from 'nodemailer';
 import { getDb } from './db';
 import { getEventConfig } from './config';
 import { isEmailConfigured } from './email';
-import { emailFromOrganizers } from './platform';
+import { bareAddress, emailFromOrganizers } from './platform';
 import { adminPhones, isSmsConfigured, maskPhone, sendOtpSms } from './sms';
 import { isTotpEnrolled } from './totp';
 
@@ -194,6 +194,7 @@ export async function sendOtpEmail(code: string): Promise<{ sent: boolean; reaso
     const transport = createCodeTransport();
     await transport.sendMail({
       from: emailFromOrganizers(),
+      replyTo: bareAddress(emailFromOrganizers()),
       to: recipients.join(', '),
       subject: `${code} is your admin sign-in code`,
       text:
@@ -240,6 +241,7 @@ export async function sendOrganizerResetCodeEmail(
     const transport = createCodeTransport();
     await transport.sendMail({
       from: emailFromOrganizers(),
+      replyTo: bareAddress(emailFromOrganizers()),
       to,
       subject: `Your ${brand} password reset code`,
       text:
@@ -287,6 +289,7 @@ export async function sendOrganizerLoginCodeEmail(
     const transport = createCodeTransport();
     await transport.sendMail({
       from: emailFromOrganizers(),
+      replyTo: bareAddress(emailFromOrganizers()),
       to,
       subject: `${code} is your ${brand} sign-in code`,
       text:
