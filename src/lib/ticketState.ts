@@ -54,6 +54,29 @@ export interface TicketState {
    * makes the feature invisible everywhere except the event page.
    */
   upcoming: number;
+  /**
+   * The announced types by name, in page order.
+   *
+   * A bare "Coming soon" beside a bare "Sold out" tells a visitor that
+   * SOMETHING is gone and SOMETHING is coming, and leaves them to guess which —
+   * on an event with an early bird, a standard and a student ticket that is
+   * three guesses. The names are here so a badge can say "Standard coming soon".
+   */
+  upcomingNames: string[];
+  /** On-sale types with nothing left, by name — same reason. */
+  soldOutNames: string[];
+}
+
+/**
+ * "Standard coming soon", or "2 more coming soon" when there is more than one.
+ *
+ * Naming every type would overflow a 216px feed tile, and the event page lists
+ * them all a screen below anyway — so one gets named and several get counted.
+ */
+export function comingSoonLabel(state: TicketState): string | null {
+  if (state.upcomingNames.length === 0) return null;
+  if (state.upcomingNames.length === 1) return `${state.upcomingNames[0]} coming soon`;
+  return `${state.upcomingNames.length} more coming soon`;
 }
 
 /** Ticket types a visitor should see at all — 'hidden' is off the page. */
@@ -99,7 +122,11 @@ export function ticketState(
   // the page at all, so they count for nothing either way.
   const visible = visibleTiers(tiers);
   const sellable = visible.filter((t) => t.status === 'on-sale');
-  const upcoming = visible.filter((t) => t.status === 'coming-soon').length;
+  const announced = visible.filter((t) => t.status === 'coming-soon');
+  const upcoming = announced.length;
+  const upcomingNames = announced.map((t) => t.name);
+  const left = (t: EventTierRow) => Math.max(0, availability.tiers[t.tierKey]?.remaining ?? 0);
+  const soldOutNames = sellable.filter((t) => left(t) === 0).map((t) => t.name);
   /**
    * Nothing has been offered for sale yet.
    *
@@ -120,7 +147,7 @@ export function ticketState(
   );
 
   if (opts.past) {
-    return { kind: 'past', buyable: false, remaining: 0, badge: 'Finished', cta: 'See page', showCount, upcoming };
+    return { kind: 'past', buyable: false, remaining: 0, badge: 'Finished', cta: 'See page', showCount, upcoming, upcomingNames, soldOutNames };
   }
   // Announced-but-not-yet-selling is checked before BOTH the pause and sold out.
   //
@@ -131,13 +158,27 @@ export function ticketState(
   // The count is dropped: what is sitting unsold is not "left", it was never
   // offered.
   if (nothingOnSaleYet) {
-    return { kind: 'coming-soon', buyable: false, remaining: 0, badge: 'Coming soon', cta: 'Coming soon', showCount, upcoming };
+    return { kind: 'coming-soon', buyable: false, remaining: 0, badge: 'Coming soon', cta: 'Coming soon', showCount, upcoming, upcomingNames, soldOutNames };
   }
   if (!event.salesOpen) {
-    return { kind: 'closed', buyable: false, remaining, badge: 'Sales closed', cta: 'Sales closed', showCount, upcoming };
+    return { kind: 'closed', buyable: false, remaining, badge: 'Sales closed', cta: 'Sales closed', showCount, upcoming, upcomingNames, soldOutNames };
   }
   if (remaining === 0) {
-    return { kind: 'sold-out', buyable: false, remaining: 0, badge: 'Sold out', cta: 'Sold out', showCount, upcoming };
+    // Named only when there was exactly ONE type to sell. With two both gone,
+    // naming one of them would be picking a winner out of a tie.
+    const badge = soldOutNames.length === 1 ? `${soldOutNames[0]} sold out` : 'Sold out';
+    return {
+      kind: 'sold-out',
+      buyable: false,
+      remaining: 0,
+      badge,
+      // The button stays short: it is a control, not a sentence.
+      cta: 'Sold out',
+      showCount,
+      upcoming,
+      upcomingNames,
+      soldOutNames,
+    };
   }
   return {
     kind: 'on-sale',
@@ -147,6 +188,8 @@ export function ticketState(
     cta: 'Get tickets',
     showCount,
     upcoming,
+    upcomingNames,
+    soldOutNames,
   };
 }
 

@@ -66,6 +66,13 @@ interface Props {
    * this promise and that behaviour must never be two separate numbers.
    */
   retentionDays: number;
+  /**
+   * The ticket type the buyer tapped on the event page, already validated by the
+   * server as one that is on sale with stock left. Starts at 1 so someone who
+   * picked "Standard" does not land on a page of zeroes and have to pick it
+   * again — the tap WAS the choice.
+   */
+  preselectTier?: string | null;
 }
 
 /** POST /api/orders body — matches the platform orders API contract. */
@@ -171,11 +178,12 @@ export default function CheckoutClient({
   transferConfigured,
   paypalOffered,
   retentionDays,
+  preselectTier = null,
 }: Props) {
   const router = useRouter();
 
   const [qty, setQty] = useState<Record<string, number>>(() =>
-    Object.fromEntries(config.tiers.map((t) => [t.id, 0]))
+    Object.fromEntries(config.tiers.map((t) => [t.id, t.id === preselectTier ? 1 : 0]))
   );
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');

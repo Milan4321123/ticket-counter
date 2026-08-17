@@ -6,7 +6,7 @@ import CardVideo from '@/components/CardVideo';
 import { getEventTiers, parsePageDesign } from '@/lib/events';
 import type { EventRow, PageDesign } from '@/lib/events';
 import { getAvailability } from '@/lib/inventory';
-import { ticketState, fromPriceCents } from '@/lib/ticketState';
+import { ticketState, fromPriceCents, comingSoonLabel } from '@/lib/ticketState';
 import { listingTileMedia } from '@/lib/listing';
 import { formatMoney } from '@/lib/money';
 
@@ -124,8 +124,8 @@ export default function EventCard({ event, past = false, delayClass = '' }: Even
           {/* A second pill, not a replacement: an event can be on sale AND have
               a type still to come, and a sold-out one with something coming is
               exactly the card a buyer wants to keep an eye on. */}
-          {!past && state.kind !== 'coming-soon' && state.upcoming > 0 ? (
-            <span className="badge badge-green">Coming soon</span>
+          {!past && state.kind !== 'coming-soon' && comingSoonLabel(state) ? (
+            <span className="badge badge-green">{comingSoonLabel(state)}</span>
           ) : null}
         </span>
         {/* Fades the photo into the card body so the two are one object rather

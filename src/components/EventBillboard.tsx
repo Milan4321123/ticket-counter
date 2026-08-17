@@ -13,7 +13,7 @@ import {
 } from '@/lib/events';
 import type { EventRow } from '@/lib/events';
 import { getAvailability } from '@/lib/inventory';
-import { ticketState, fromPriceCents } from '@/lib/ticketState';
+import { ticketState, fromPriceCents, comingSoonLabel } from '@/lib/ticketState';
 import { formatMoney } from '@/lib/money';
 import { dateChipLabel } from './EventCard';
 import { listingStillUrl } from '@/lib/listing';
@@ -141,8 +141,8 @@ export default function EventBillboard({ event, leading = false }: EventBillboar
               badge rather than only as a line of text below the buttons — a
               sold-out headline with the good news in small print underneath is
               read as simply sold out. */}
-          {state.kind !== 'coming-soon' && state.upcoming > 0 ? (
-            <span className="badge badge-green billboard-kicker-badge">Coming soon</span>
+          {state.kind !== 'coming-soon' && comingSoonLabel(state) ? (
+            <span className="badge badge-green billboard-kicker-badge">{comingSoonLabel(state)}</span>
           ) : null}
         </p>
         <h2 className="billboard-title" id={`billboard-title-${event.slug}`}>
@@ -184,11 +184,13 @@ export default function EventBillboard({ event, leading = false }: EventBillboar
             Only {state.remaining} ticket{state.remaining === 1 ? '' : 's'} left
           </p>
         ) : null}
-        {/* The detail behind the badge above: which, and how many. */}
-        {state.kind !== 'coming-soon' && state.upcoming > 0 ? (
+        {/* The badge above names one type; this names them all, since there is
+            room for a sentence here and none on a chip. */}
+        {state.kind !== 'coming-soon' && state.upcomingNames.length > 0 ? (
           <p className="billboard-note">
-            {state.upcoming === 1 ? 'Another ticket type is' : `${state.upcoming} more ticket types are`} coming
-            soon — see the event page for what is on the way.
+            {state.upcomingNames.join(', ')}{' '}
+            {state.upcomingNames.length === 1 ? 'is' : 'are'} coming soon — see the event page for
+            what is on the way.
           </p>
         ) : null}
       </div>

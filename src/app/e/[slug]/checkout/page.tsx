@@ -15,6 +15,7 @@ export const dynamic = 'force-dynamic';
 
 interface Params {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
@@ -29,7 +30,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   };
 }
 
-export default async function EventCheckoutPage({ params }: Params) {
+export default async function EventCheckoutPage({ params, searchParams }: Params) {
   const { slug } = await params;
   const event = getEventBySlug(slug);
   if (!event || event.status !== 'published') notFound();
@@ -71,6 +72,21 @@ export default async function EventCheckoutPage({ params }: Params) {
     );
   }
 
+  // ?tier= comes from tapping a ticket card on the event page. Validated here
+  // rather than trusted: it reaches the client as a preselected quantity, so a
+  // hand-typed value must not be able to preselect a type that is coming soon,
+  // hidden, sold out, or belongs to another event. Anything unrecognised is
+  // simply ignored — a wrong link should open a normal checkout, not an error.
+  const wantTier = (await searchParams).tier;
+  const wantedKey = Array.isArray(wantTier) ? wantTier[0] : wantTier;
+  const preselectTier =
+    getEventTiers(event.id).find(
+      (t) =>
+        t.tierKey === wantedKey &&
+        t.status === 'on-sale' &&
+        (availability.tiers[t.tierKey]?.remaining ?? 0) > 0
+    )?.tierKey ?? null;
+
   const mode = getPaymentMode();
   const paypalClientId = process.env.PAYPAL_CLIENT_ID ?? null;
   // Per-event bank details: transfers only work once the organizer filled them
@@ -87,6 +103,7 @@ export default async function EventCheckoutPage({ params }: Params) {
   return (
     <CheckoutClient
       eventId={event.id}
+      preselectTier={preselectTier}
       config={{
         eventName: event.name,
         artist: event.artist,
