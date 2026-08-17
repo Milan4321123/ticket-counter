@@ -88,6 +88,17 @@ export default function EventBillboard({ event, leading = false }: EventBillboar
   const tiers = getEventTiers(event.id);
   const availability = getAvailability(event.id);
   const minPrice = fromPriceCents(tiers, availability);
+  /**
+   * The cheapest announced type's price, for the badge that names it.
+   *
+   * The from-price above is about what can be BOUGHT, so on a sold-out event it
+   * says nothing about the ticket that is still coming — which is the one piece
+   * of information a visitor on that card actually wants.
+   */
+  const comingPrice = (() => {
+    const announced = tiers.filter((t) => t.status === 'coming-soon');
+    return announced.length ? Math.min(...announced.map((t) => t.priceCents)) : null;
+  })();
   // One shared decision for badge, button and note — see lib/ticketState.ts for
   // why these three used to disagree with each other.
   const state = ticketState(event, tiers, availability);
@@ -140,9 +151,17 @@ export default function EventBillboard({ event, leading = false }: EventBillboar
               once: this batch has gone AND another is on the way. Said as a
               badge rather than only as a line of text below the buttons — a
               sold-out headline with the good news in small print underneath is
-              read as simply sold out. */}
+              read as simply sold out.
+              With the price, because the from-price on the button is about what
+              can be BOUGHT and says nothing about the one ticket a visitor on a
+              sold-out card still has a reason to care about. */}
           {state.kind !== 'coming-soon' && comingSoonLabel(state) ? (
-            <span className="badge badge-green billboard-kicker-badge">{comingSoonLabel(state)}</span>
+            <span className="badge badge-green billboard-kicker-badge">
+              {comingSoonLabel(state)}
+              {state.upcomingNames.length === 1 && comingPrice !== null
+                ? ` · ${formatMoney(comingPrice, event.currency)}`
+                : ''}
+            </span>
           ) : null}
         </p>
         <h2 className="billboard-title" id={`billboard-title-${event.slug}`}>
@@ -184,13 +203,14 @@ export default function EventBillboard({ event, leading = false }: EventBillboar
             Only {state.remaining} ticket{state.remaining === 1 ? '' : 's'} left
           </p>
         ) : null}
-        {/* The badge above names one type; this names them all, since there is
-            room for a sentence here and none on a chip. */}
-        {state.kind !== 'coming-soon' && state.upcomingNames.length > 0 ? (
+        {/* Only when the badge could not fit the whole answer. With ONE type
+            still to come the badge already names it and prices it, and repeating
+            that in a sentence underneath was the third time the card said the
+            same thing — after the kicker and the button. */}
+        {state.kind !== 'coming-soon' && state.upcomingNames.length > 1 ? (
           <p className="billboard-note">
-            {state.upcomingNames.join(', ')}{' '}
-            {state.upcomingNames.length === 1 ? 'is' : 'are'} coming soon — see the event page for
-            what is on the way.
+            {state.upcomingNames.join(', ')} are coming soon — see the event page for what is on the
+            way.
           </p>
         ) : null}
       </div>
