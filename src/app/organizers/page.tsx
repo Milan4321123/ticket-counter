@@ -319,6 +319,66 @@ export default function OrganizersPage() {
       </section>
 
 
+      {/* ---- Your account, your rules ----
+           Sits after "you own your own data" because it is the same promise
+           looked at from the other side: that section says what we will not do
+           with the account, this one says what only YOU can do to it. */}
+      <section className="section">
+        <div className="container container-narrow">
+          <p className="feed-kicker anim-fade-up">Your account</p>
+          <h2 className="feed-section-title anim-fade-up">Locked to you, and easy to run</h2>
+          <p className="muted anim-fade-up" style={{ marginTop: -6 }}>
+            You get your own sign-in the day we set you up. Everything below is yours to change,
+            from your phone, without asking us.
+          </p>
+          <div className="card anim-fade-up anim-d1">
+            <ul className="check-list" style={{ margin: 0 }}>
+              <li className="check-item">
+                <span className="check-dot check-dot-done">&#10003;</span>
+                <span>
+                  <strong>Change your password whenever you want.</strong> The one we send you is
+                  temporary — the portal asks you to replace it the first time you sign in, and you
+                  can change it again any time from Settings. Forgotten it? Ask for a reset and a
+                  code comes to your own email.
+                </span>
+              </li>
+              <li className="check-item">
+                <span className="check-dot check-dot-done">&#10003;</span>
+                <span>
+                  <strong>Add an authenticator app for a second lock.</strong> A free app on your
+                  phone shows a 6-digit code, and signing in asks for it as well as your password —
+                  so a stolen password on its own is not enough to get in. It works offline and
+                  takes about a minute to set up. We ask you to turn it on before you publish,
+                  because from that moment real people are sending you real money.
+                </span>
+              </li>
+              <li className="check-item">
+                <span className="check-dot check-dot-done">&#10003;</span>
+                <span>
+                  <strong>Nobody can quietly change where your money goes.</strong> Moving the bank
+                  account on a selling event needs that code, then waits a day before buyers are
+                  given the new details — and we email you the moment it is requested. If it was not
+                  you, one click cancels it and nothing has moved.
+                </span>
+              </li>
+              <li className="check-item">
+                <span className="check-dot check-dot-done">&#10003;</span>
+                <span>
+                  <strong>And if any of that sounds like hard work — it isn&rsquo;t, and we&rsquo;ll
+                  show you.</strong> Write to us and a real person walks you through setting up your
+                  page, your tickets and your security. We&rsquo;re happy to do it on a video call
+                  and share screens, so you end up running it yourself rather than depending on us.
+                </span>
+              </li>
+            </ul>
+            <p className="muted small" style={{ margin: '14px 0 0' }}>
+              No jargon, no charge, and no obligation to use the custom design service &mdash; this
+              is just help getting started.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* ---- Pricing ---- */}
       <section className="section">
         <div className="container">
