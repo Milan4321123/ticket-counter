@@ -142,6 +142,22 @@ summary {
   }
 }
 
+/* The home feed's "Browse events" jump lands the first event card clear of the
+   sticky header instead of underneath it.
+   
+   Without this the browser puts the top of #events at the very top of the
+   viewport, where the header is already sitting — so the card's top edge, the
+   "NEXT UP" label and part of the artwork were hidden behind it, and the jump
+   looked like it had overshot.
+   
+   70px is the measured header (65px on desktop, 67px on a phone) plus a few
+   pixels. The section inside #events contributes another 8px of its own padding,
+   which lands the card about 12px below the header at both sizes. If the header
+   ever changes height, this is the number that has to move with it. */
+#events {
+  scroll-margin-top: 70px;
+}
+
 /* ---------- Header / footer ---------- */
 
 .site-header {
