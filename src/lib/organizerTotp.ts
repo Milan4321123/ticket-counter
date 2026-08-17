@@ -22,7 +22,7 @@
 import crypto from 'crypto';
 import QRCode from 'qrcode';
 import { getDb } from './db';
-import { base32Encode, verifyTotpAgainstSecret } from './totp';
+import { base32Encode, totpStepFor, verifyTotpAgainstSecret } from './totp';
 
 const DIGITS = 6;
 const STEP_SECONDS = 30;
@@ -34,12 +34,18 @@ function platformName(): string {
 interface TotpRow {
   secret: string | null;
   enabled: number;
+  /** Highest 30-second step already spent by this account. */
+  lastStep: number;
 }
 
 function readRow(organizerId: string): TotpRow | null {
   return (
     (getDb()
-      .prepare(`SELECT totp_secret AS secret, totp_enabled AS enabled FROM organizers WHERE id = ?`)
+      .prepare(
+        `SELECT totp_secret AS secret, totp_enabled AS enabled,
+                COALESCE(totp_last_step, 0) AS lastStep
+           FROM organizers WHERE id = ?`
+      )
       .get(organizerId) as TotpRow | undefined) ?? null
   );
 }
@@ -89,6 +95,10 @@ export function startOrganizerTotpEnrolment(organizerId: string): string {
 export function confirmOrganizerTotp(organizerId: string, rawCode: string): boolean {
   const row = readRow(organizerId);
   if (!row?.secret) return false;
+  // Stateless on purpose: enrolment happens inside a session that is already
+  // signed in, so the code proves a phone was configured rather than granting
+  // anything. Consuming the step here would make the organizer wait thirty
+  // seconds before their first real sign-in for no gain.
   if (!verifyTotpAgainstSecret(row.secret, rawCode)) return false;
   getDb().prepare(`UPDATE organizers SET totp_enabled = 1 WHERE id = ?`).run(organizerId);
   return true;
@@ -96,7 +106,11 @@ export function confirmOrganizerTotp(organizerId: string, rawCode: string): bool
 
 /** Turn it off and forget the secret — the "I lost my phone" path. */
 export function disableOrganizerTotp(organizerId: string): void {
-  getDb().prepare(`UPDATE organizers SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?`).run(organizerId);
+  // Clear the spent-step marker too, so a future enrolment starts clean rather
+  // than inheriting a high-water mark from a secret that no longer exists.
+  getDb()
+    .prepare(`UPDATE organizers SET totp_secret = NULL, totp_enabled = 0, totp_last_step = 0 WHERE id = ?`)
+    .run(organizerId);
 }
 
 /**
@@ -107,7 +121,28 @@ export function disableOrganizerTotp(organizerId: string): void {
 export function verifyOrganizerTotp(organizerId: string, rawCode: string): boolean {
   const row = readRow(organizerId);
   if (!row?.secret || row.enabled !== 1) return false;
-  return verifyTotpAgainstSecret(row.secret, rawCode);
+
+  // SINGLE USE. A code stays arithmetically valid for about ninety seconds —
+  // the current step plus one either side for clock drift — so without this the
+  // same six digits could be spent more than once. That is not theoretical
+  // here: an authenticator code is what signs an organizer in AND what releases
+  // a payout change, so one code read over a shoulder, or replayed from a
+  // phished login page, satisfied both.
+  //
+  // Remembering the highest step already spent makes a code good exactly once.
+  // The write is conditional on the stored value in the same statement, so two
+  // requests racing with the same code cannot both come back true: the second
+  // UPDATE matches no row and is refused.
+  const step = totpStepFor(row.secret, rawCode);
+  if (step < 0) return false;
+
+  const changed = getDb()
+    .prepare(
+      `UPDATE organizers SET totp_last_step = ?
+        WHERE id = ? AND COALESCE(totp_last_step, 0) < ?`
+    )
+    .run(step, organizerId, step).changes;
+  return changed > 0;
 }
 
 /** otpauth:// URI an authenticator app imports. Labelled per account. */

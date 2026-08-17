@@ -18,6 +18,8 @@ const DIGITS = 6;
 const DRIFT_WINDOWS = 1;
 
 const SECRET_KEY = 'admin_totp_secret';
+/** Highest 30-second step the admin's authenticator has already spent. */
+const LAST_STEP_KEY = 'admin_totp_last_step';
 const ENABLED_KEY = 'admin_totp_enabled';
 
 // ---- base32 (RFC 4648, no padding) — the encoding authenticator apps expect --
@@ -99,6 +101,7 @@ export function getOrCreateTotpSecret(): string {
   if (existing) return existing;
   const secret = base32Encode(crypto.randomBytes(20)); // 160-bit secret
   writeKv(SECRET_KEY, secret);
+  writeKv(LAST_STEP_KEY, '0');
   return secret;
 }
 
@@ -147,31 +150,54 @@ export function totpQrDataUrl(secret: string): Promise<string> {
  */
 export function verifyTotp(rawCode: string): boolean {
   if (!isTotpEnrolled()) return false;
-  const code = (rawCode || '').replace(/\D/g, '');
-  if (code.length !== DIGITS) return false;
   const secretB32 = readKv(SECRET_KEY);
   if (!secretB32) return false;
-  const secret = base32Decode(secretB32);
+
+  // SINGLE USE, for the same reason as the organizer's (lib/organizerTotp.ts):
+  // a code stays arithmetically valid for about ninety seconds, so without a
+  // record of what was already spent, one code observed on a phishing page or
+  // over a shoulder can be replayed for a second sign-in.
+  const step = totpStepFor(secretB32, rawCode);
+  if (step < 0) return false;
+
+  const last = Number(readKv(LAST_STEP_KEY) ?? '0');
+  if (Number.isFinite(last) && step <= last) return false;
+  writeKv(LAST_STEP_KEY, String(step));
+  return true;
+}
+
+/**
+ * Which 30-second step a code belongs to, or -1 when it matches none.
+ *
+ * The step NUMBER is what makes a code single-use. A plain true/false says the
+ * code was valid but not WHICH code, so there is nothing to remember and
+ * nothing to compare a later attempt against — the same six digits then stay
+ * valid for the whole drift window, roughly ninety seconds. That is long enough
+ * for one observed code to be spent twice: once to sign in, and again on the
+ * payout step-up waiting behind it. Callers that store the returned step can
+ * refuse anything they have already accepted.
+ */
+export function totpStepFor(secret: string, rawCode: string): number {
+  const code = (rawCode || '').replace(/\D/g, '');
+  if (code.length !== DIGITS) return -1;
+  const bytes = base32Decode(secret);
   const now = Math.floor(Date.now() / 1000);
   for (let w = -DRIFT_WINDOWS; w <= DRIFT_WINDOWS; w++) {
-    const candidate = totpCode(secret, now + w * STEP_SECONDS);
-    // Constant-time compare per window.
-    if (crypto.timingSafeEqual(Buffer.from(candidate), Buffer.from(code))) return true;
+    const t = now + w * STEP_SECONDS;
+    if (totpCode(bytes, t) === code) return Math.floor(t / STEP_SECONDS);
   }
-  return false;
+  return -1;
 }
 
 /**
  * Check a proposed code WITHOUT the enrolled flag — used during setup to confirm
  * the admin scanned correctly before we switch authenticator login on.
+ *
+ * Stateless, so it does NOT stop a replay. Only use it where replay does not
+ * matter (enrolment, where the account is already signed in and the code proves
+ * a phone was configured); anywhere a code grants access, go through a caller
+ * that records the step.
  */
 export function verifyTotpAgainstSecret(secret: string, rawCode: string): boolean {
-  const code = (rawCode || '').replace(/\D/g, '');
-  if (code.length !== DIGITS) return false;
-  const bytes = base32Decode(secret);
-  const now = Math.floor(Date.now() / 1000);
-  for (let w = -DRIFT_WINDOWS; w <= DRIFT_WINDOWS; w++) {
-    if (totpCode(bytes, now + w * STEP_SECONDS) === code) return true;
-  }
-  return false;
+  return totpStepFor(secret, rawCode) >= 0;
 }

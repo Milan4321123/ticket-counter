@@ -472,6 +472,11 @@ function migrateToPlatform(db: Database.Database): void {
   // reset), because that password travelled by email and the organizer never
   // chose it. The portal is unreachable until they replace it. Existing
   // accounts default to 0 — they already picked their own.
+  // The last authenticator step this account spent, so a code cannot be spent
+  // twice. See lib/organizerTotp.ts.
+  if (!orgCols.includes('totp_last_step')) {
+    db.exec(`ALTER TABLE organizers ADD COLUMN totp_last_step INTEGER NOT NULL DEFAULT 0`);
+  }
   if (!orgCols.includes('must_change_password')) {
     db.exec(`ALTER TABLE organizers ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0`);
   }
