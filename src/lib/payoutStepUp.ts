@@ -100,7 +100,25 @@ export function summarisePayoutChange(
   patch: Record<string, unknown>
 ): PayoutChangeSummary {
   const changed: PayoutField[] = [];
-  let sawEstablished = false;
+
+  /**
+   * Is this account ALREADY taking money somewhere?
+   *
+   * Asked of the whole account, not of the field being written, and that
+   * distinction was a real hole. Judged per field, an account with an
+   * established IBAN and no PayPal treated `{paypalAccount: "attacker@..."}` as
+   * a first-time set and waved it through with no second factor — while the
+   * checkout offers PayPal FIRST, labelled "Fastest", so the address added
+   * without a challenge is the one buyers are steered to. Adding a destination
+   * is not setting one up; it is a redirect with extra steps.
+   *
+   * An IBAN or a PayPal address, and deliberately NOT the account holder: a
+   * name on its own is not somewhere money can go, and counting it would
+   * challenge an organizer who typed their name, saved, and then reached for
+   * the IBAN — the honest first-time setup this exemption exists for.
+   */
+  const anyDestinationEstablished =
+    (current.bankIban ?? '').trim() !== '' || (current.paypalAccount ?? '').trim() !== '';
 
   for (const field of Object.keys(PAYOUT_FIELDS) as PayoutField[]) {
     if (!(field in patch)) continue;
@@ -109,14 +127,11 @@ export function summarisePayoutChange(
     const before = current[field] ?? '';
     if (comparable(before) === comparable(next)) continue; // no-op save
     changed.push(field);
-    // Clearing an established destination counts too: emptying the IBAN is how
-    // you force every buyer onto a PayPal address you just put in.
-    if (before.trim() !== '') sawEstablished = true;
   }
 
   return {
     changed,
-    firstTimeOnly: changed.length > 0 && !sawEstablished,
+    firstTimeOnly: changed.length > 0 && !anyDestinationEstablished,
     labels: changed.map((f) => PAYOUT_FIELDS[f].label),
   };
 }
