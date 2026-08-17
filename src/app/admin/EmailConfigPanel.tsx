@@ -8,6 +8,7 @@ import {
   replyToOrganizers,
 } from '@/lib/platform';
 import { getBaseUrl } from '@/lib/config';
+import EmailTestButton from './EmailTestButton';
 
 /**
  * What the RUNNING server thinks its email settings are.
@@ -99,6 +100,10 @@ export default function EmailConfigPanel() {
           </tbody>
         </table>
       </div>
+
+      {/* Reading the settings is not the same as proving they work — this sends
+          one message and shows what the server replied. */}
+      <EmailTestButton />
 
       {mismatched.length > 0 && (
         <div className="notice notice-warn small" style={{ marginBottom: 0 }}>
