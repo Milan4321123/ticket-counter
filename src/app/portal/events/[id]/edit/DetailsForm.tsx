@@ -24,6 +24,7 @@ interface Props {
     payWithinDays: number;
     salesOpen: boolean;
     closedMessage: 'closed' | 'coming-soon';
+    whatsapp: string;
   };
 }
 
@@ -43,6 +44,7 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
   const [payWithinDays, setPayWithinDays] = useState(String(initial.payWithinDays));
   const [salesOpen, setSalesOpen] = useState(initial.salesOpen);
   const [closedMessage, setClosedMessage] = useState(initial.closedMessage);
+  const [whatsapp, setWhatsapp] = useState(initial.whatsapp ? `+${initial.whatsapp}` : '');
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,6 +91,7 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
       payWithinDays: payDays,
       salesOpen,
       closedMessage,
+      whatsapp,
     });
     setBusy(false);
     if (!result.ok) {
@@ -276,6 +279,26 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
             All events use EUR for now.
           </p>
         </div>
+      </div>
+      <div className="field" style={{ maxWidth: 520 }}>
+        <label htmlFor="ev-whatsapp">Your WhatsApp number (optional)</label>
+        <input
+          id="ev-whatsapp"
+          className="input"
+          value={whatsapp}
+          onChange={(e) => setWhatsapp(e.target.value)}
+          placeholder="+49 170 1234567"
+          inputMode="tel"
+          autoComplete="tel"
+          maxLength={32}
+        />
+        <p className="muted small" style={{ margin: '6px 0 0' }}>
+          Adds a WhatsApp bubble to your event page and to the payment page, with your profile
+          photo on it. Buyers tap it and reach <strong style={{ color: 'var(--text)' }}>you</strong>,
+          with your event&rsquo;s name already in the message. It is the fastest way to settle the
+          one thing people hesitate over before paying — whether the bank account is really yours.
+          Start with your country code. Leave it empty and no bubble appears.
+        </p>
       </div>
       <label className="checkbox-row" htmlFor="ev-sales-open">
         <input

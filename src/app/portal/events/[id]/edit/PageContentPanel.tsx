@@ -30,6 +30,8 @@ interface Props {
   media: MediaOption[];
   posts: PostItem[];
   faqs: FaqItem[];
+  /** Which half to render — the two live in separate editor tabs. */
+  show: 'updates' | 'faq';
   /** The event's gallery caps — an update's upload counts against them too. */
   maxPhotos: number;
   maxVideos: number;
@@ -93,10 +95,24 @@ function postDate(createdAt: string): string {
 }
 
 /**
- * Organizer-facing "Page content": update posts (a mini feed shown publicly
- * on the event page) and the FAQ list. Both talk to their own portal routes.
+ * Organizer-facing page content: update posts (a mini feed shown publicly on
+ * the event page) and the FAQ list. Both talk to their own portal routes.
+ *
+ * `show` picks which half to render. They used to be one long scroll under a
+ * single "Updates & FAQ" heading, which buried the update composer — the thing
+ * an organizer comes back to weekly — under a form they fill in once. Each half
+ * is its own tab now; the component stays one file because they share the
+ * upload plumbing and the same busy/error/notice state.
  */
-export default function PageContentPanel({ eventId, media, posts, faqs, maxPhotos, maxVideos }: Props) {
+export default function PageContentPanel({
+  eventId,
+  media,
+  posts,
+  faqs,
+  maxPhotos,
+  maxVideos,
+  show,
+}: Props) {
   const router = useRouter();
   // 'post' | 'faqs' | 'compress' | 'upload' | post id
   const [busy, setBusy] = useState<string | null>(null);
@@ -134,17 +150,19 @@ export default function PageContentPanel({ eventId, media, posts, faqs, maxPhoto
    */
   useEffect(
     () =>
-      onFaqSuggestions((incoming) => {
-        setFaqRows((prev) => {
-          const kept = prev.filter((r) => r.question.trim() !== '' || r.answer.trim() !== '');
-          const room = MAX_FAQS - kept.length;
-          return room <= 0 ? kept : [...kept, ...incoming.slice(0, room)];
-        });
-        setError(null);
-        setNotice('Suggestions added below — have a last look, then press Save FAQ to put them on your page.');
-        faqFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }),
-    []
+      show !== 'faq'
+        ? undefined
+        : onFaqSuggestions((incoming) => {
+            setFaqRows((prev) => {
+              const kept = prev.filter((r) => r.question.trim() !== '' || r.answer.trim() !== '');
+              const room = MAX_FAQS - kept.length;
+              return room <= 0 ? kept : [...kept, ...incoming.slice(0, room)];
+            });
+            setError(null);
+            setNotice('Suggestions added below — have a last look, then press Save FAQ to put them on your page.');
+            faqFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }),
+    [show]
   );
 
   function resetFileInput() {
@@ -384,6 +402,8 @@ export default function PageContentPanel({ eventId, media, posts, faqs, maxPhoto
       {!error && notice && <div className="notice notice-success">{notice}</div>}
 
       {/* ---------------- Updates (posts) ---------------- */}
+      {show === 'updates' && (
+      <>
       <p className="muted small" style={{ marginTop: 0 }}>
         Post updates the way you would on a social page — lineup news, door times, sold-out warnings. Share a photo or a
         short video straight from your phone, like a post on social media. They appear publicly in an{' '}
@@ -613,12 +633,12 @@ export default function PageContentPanel({ eventId, media, posts, faqs, maxPhoto
         </div>
       )}
 
+      </>
+      )}
+
       {/* ---------------- FAQ ---------------- */}
-      <form
-        ref={faqFormRef}
-        onSubmit={saveFaqs}
-        style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 20 }}
-      >
+      {show === 'faq' && (
+      <form ref={faqFormRef} onSubmit={saveFaqs}>
         <p className="muted small" style={{ marginTop: 0 }}>
           Answer the questions buyers keep asking — age limits, parking, refunds. The list shows as a tap-to-open
           <strong> FAQ</strong> section near the bottom of your event page. Up to {MAX_FAQS} entries.
@@ -688,6 +708,7 @@ export default function PageContentPanel({ eventId, media, posts, faqs, maxPhoto
           </button>
         </div>
       </form>
+      )}
     </div>
   );
 }

@@ -4780,6 +4780,20 @@ summary {
   z-index: 2;
   top: 10px;
   right: 10px;
+  /* A tile can carry TWO badges — "Sold out" and "Coming soon" are both true
+     at once when one type has gone and another is still to come. As a bare
+     block with `right` and no width this shrink-to-fit box overflowed to the
+     left edge and stacked them flush-left over the artwork. Flex, wrapping,
+     right-aligned: the pair never fits on one 240px tile, so wrapping is the
+     normal case and it has to look deliberate. `left` bounds the box so it
+     cannot escape its corner. */
+  left: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  /* The card is a link; the badges are decoration and must not eat the tap. */
+  pointer-events: none;
 }
 
 /* The photo dissolves into the card body instead of stopping at a hard line. */
@@ -6088,6 +6102,79 @@ html:has(.event-page.has-section-nav) {
   .contact-fab:hover {
     max-width: 56px;
   }
+}
+
+/* A count on a tab button — "3 new". Sized down so the tab keeps its height
+   whether or not it carries one. */
+.editor-tab-badge {
+  margin-left: 2px;
+  padding: 1px 8px;
+  font-size: 0.72rem;
+}
+
+/* Sits inside the billboard kicker, which is uppercase and letter-spaced —
+   the badge opts out of both so it reads as a badge and not as more kicker. */
+.billboard-kicker-badge {
+  margin-left: 10px;
+  text-transform: none;
+  letter-spacing: 0;
+  vertical-align: middle;
+}
+
+/* ---- The organizer's WhatsApp bubble -------------------------------------
+   Built ON .contact-fab rather than beside it, so the rules that keep that
+   bubble clear of the assistant and lift it above the sticky checkout bar
+   apply here too, from one place. Only what differs lives below. */
+
+.contact-fab-wa:hover,
+.contact-fab-wa:focus-visible {
+  border-color: #25d366;
+}
+
+/* .contact-fab clips to a circle so a square photo reads as round. The glyph
+   badge sits on the photo's outer corner, which is OUTSIDE that circle — it
+   came out sliced. The photo gets its own round clip instead, so the bubble no
+   longer has to do the clipping and the badge survives whole. */
+.contact-fab-wa {
+  overflow: visible;
+}
+
+.contact-fab-wa .contact-fab-photo {
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+/* The label still has to be clipped while the bubble is a 56px circle, or the
+   text would spill across the page before the hover expands it. */
+.contact-fab-wa .contact-fab-label {
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+/* Holds the badge against the photo's corner. */
+.contact-fab-photo-wrap {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  line-height: 0;
+}
+
+.contact-fab-wa-badge {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #25d366;
+  color: #06281a;
+  /* Rings the badge in the bubble's own background, so it reads as sitting ON
+     the photo rather than dissolving into whatever the photo happens to be. */
+  box-shadow: 0 0 0 2px var(--bg-card);
 }
 
 /* A picture on a platform announcement. Bounded in height so a tall poster

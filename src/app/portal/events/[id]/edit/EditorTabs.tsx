@@ -7,6 +7,19 @@ export interface EditorTabDef {
   label: string;
   /** 'done' = green check, 'todo' = amber dot, 'neutral' = optional section. */
   status: 'done' | 'todo' | 'neutral';
+  /**
+   * A green count on the tab itself — for something waiting on the organizer
+   * that a status dot cannot express, like unanswered visitor questions.
+   */
+  badge?: string;
+  /**
+   * A window event name that switches TO this tab when it fires.
+   *
+   * The assistant panel hands accepted FAQ suggestions to the FAQ editor, and
+   * the two now live in different tabs — so the hand-off has to bring the
+   * organizer with it, or the rows land somewhere they cannot see.
+   */
+  revealOn?: string;
 }
 
 /**
@@ -28,6 +41,19 @@ export default function EditorTabs({
   useEffect(() => {
     const wanted = new URLSearchParams(window.location.search).get('tab');
     if (wanted && tabs.some((t) => t.key === wanted)) setActive(wanted);
+  }, [tabs]);
+
+  // Bound once per tab that asks for it; the switch is the whole behaviour, so
+  // there is nothing to clean up beyond the listener itself.
+  useEffect(() => {
+    const bound = tabs
+      .filter((t): t is EditorTabDef & { revealOn: string } => Boolean(t.revealOn))
+      .map((t) => {
+        const onReveal = () => setActive(t.key);
+        window.addEventListener(t.revealOn, onReveal);
+        return () => window.removeEventListener(t.revealOn, onReveal);
+      });
+    return () => bound.forEach((off) => off());
   }, [tabs]);
 
   function select(key: string) {
@@ -61,6 +87,7 @@ export default function EditorTabs({
               </span>
             )}
             {t.label}
+            {t.badge ? <span className="badge badge-green editor-tab-badge">{t.badge}</span> : null}
           </button>
         ))}
       </div>

@@ -118,6 +118,7 @@ CREATE TABLE IF NOT EXISTS events (
   total_capacity INTEGER NOT NULL DEFAULT 100,
   sales_open INTEGER NOT NULL DEFAULT 1,
   closed_message TEXT NOT NULL DEFAULT 'closed', -- how a PAUSE reads: 'closed' | 'coming-soon'
+  whatsapp TEXT NOT NULL DEFAULT '',      -- organizer's WhatsApp, digits only (see lib/whatsapp.ts)
   max_per_order INTEGER NOT NULL DEFAULT 8,
   pay_within_days INTEGER NOT NULL DEFAULT 5,
   bank_account_holder TEXT NOT NULL DEFAULT '',
@@ -393,6 +394,14 @@ function migrateToPlatform(db: Database.Database): void {
   // started. Defaults to the old wording, so no existing event changes.
   if (!eventCols.includes('closed_message')) {
     db.exec(`ALTER TABLE events ADD COLUMN closed_message TEXT NOT NULL DEFAULT 'closed'`);
+  }
+  // The organizer's own WhatsApp, so a buyer can reach a PERSON before paying.
+  //
+  // The one question buyers actually stop on is "is this bank account really
+  // yours" — and the only person who can answer it is the organizer whose
+  // account it is. Stored digits-only; see lib/whatsapp.ts for why.
+  if (!eventCols.includes('whatsapp')) {
+    db.exec(`ALTER TABLE events ADD COLUMN whatsapp TEXT NOT NULL DEFAULT ''`);
   }
   // The same choice for the event as a whole. total_capacity is NOT dropped
   // when this is set: it stays on as the organizer's EXPECTED attendance, which

@@ -160,13 +160,22 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
     { key: 'basics', label: 'Basics', status: basicsDone ? ('done' as const) : ('todo' as const) },
     { key: 'tickets', label: 'Tickets', status: ticketsDone ? ('done' as const) : ('todo' as const) },
     { key: 'media', label: 'Photos & videos', status: photosDone ? ('done' as const) : ('todo' as const) },
-    // Otherwise this tab is pure polish and never nags — but a buyer waiting
-    // for an answer is a real job, and the dot is the only way to see it from
-    // the tab strip.
+    // One tab per job, rather than four unrelated jobs stacked inside a single
+    // "Page & content" page. Posting an update is a weekly errand; writing the
+    // FAQ is a once-off; answering a visitor is somebody waiting on a reply.
+    // Behind one heading, the two that matter were the two you had to scroll
+    // past a form to reach.
+    { key: 'design', label: 'Design', status: 'neutral' as const },
+    { key: 'updates', label: 'Updates', status: 'neutral' as const },
+    { key: 'faq', label: 'FAQ', status: 'neutral' as const, revealOn: FAQ_SUGGESTIONS_EVENT },
     {
-      key: 'page',
-      label: 'Page & content',
-      status: openQuestions.length > 0 ? ('todo' as const) : ('neutral' as const),
+      key: 'questions',
+      label: 'Questions',
+      status: 'neutral' as const,
+      // Green, and on the tab itself: this is the only thing in the editor with
+      // a person on the other end of it, and it should be readable from the
+      // strip without opening anything.
+      badge: openQuestions.length > 0 ? `${openQuestions.length} new` : undefined,
     },
     { key: 'publish', label: 'Publish', status: publishDone ? ('done' as const) : ('todo' as const) },
   ];
@@ -204,6 +213,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
               payWithinDays: event.payWithinDays,
               salesOpen: event.salesOpen,
               closedMessage: event.closedMessage,
+              whatsapp: event.whatsapp,
             }}
           />
         </EditorSection>
@@ -278,12 +288,8 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
         />
       </div>
     ),
-    // Everything here is polish on top of a working event, so nothing is
-    // marked as needing work and the tab opens fully collapsed — unless
-    // visitors are waiting on an answer, which is the one thing in this tab
-    // with someone on the other end of it.
-    page: (
-      <EditorSectionGroup initialOpen={openQuestions.length > 0 ? 'questions' : null}>
+    design: (
+      <EditorSectionGroup initialOpen="design">
         <EditorSection
           id="design"
           title="Page design"
@@ -293,9 +299,10 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
           <DesignPanel eventId={event.id} aiEnabled={aiDesignerEnabled()} initial={design} />
         </EditorSection>
 
-        {/* Sits above the FAQ section on purpose: accepted suggestions drop into
-            the FAQ editor just below, where the organizer saves them. That
-            section is usually collapsed, so it opens itself on the same event. */}
+        {/* Kept beside the design rather than beside the FAQ, even though its
+            suggestions land there: both of these are things you set up once so
+            the page can look after itself. The FAQ tab opens on its own when
+            suggestions arrive, so the hand-off still works across tabs. */}
         <EditorSection
           id="assistant"
           title="What the assistant should know"
@@ -304,52 +311,64 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
         >
           <AssistantPanel eventId={event.id} aiEnabled={aiAssistantEnabled()} initial={event.assistantContext} />
         </EditorSection>
-
-        <EditorSection
-          id="content"
-          title="Updates & FAQ"
-          hint="Post news and answer the questions buyers keep asking."
-          status="optional"
-          revealOn={FAQ_SUGGESTIONS_EVENT}
-        >
-          <PageContentPanel
-            eventId={event.id}
-            media={attachables}
-            posts={posts.map((p) => ({ id: p.id, body: p.body, mediaId: p.mediaId, createdAt: p.createdAt }))}
-            faqs={faqs.map((f) => ({ question: f.question, answer: f.answer }))}
-            maxPhotos={MAX_PHOTOS_PER_EVENT}
-            maxVideos={MAX_VIDEOS_PER_EVENT}
-          />
-        </EditorSection>
-
-        {/* Deliberately right below the FAQ, because the two are easy to mix
-            up: the FAQ above is what the organizer writes in advance, this is
-            what buyers actually asked and nobody has answered yet. Answering
-            here publishes to the same Questions section of the event page. */}
-        <EditorSection
-          id="questions"
+      </EditorSectionGroup>
+    ),
+    updates: (
+      <div className="card">
+        <SectionHead
+          title="Updates"
+          hint="Post news the way you would on a social page — it appears in the Updates feed on your event page."
+        />
+        <PageContentPanel
+          show="updates"
+          eventId={event.id}
+          media={attachables}
+          posts={posts.map((p) => ({ id: p.id, body: p.body, mediaId: p.mediaId, createdAt: p.createdAt }))}
+          faqs={faqs.map((f) => ({ question: f.question, answer: f.answer }))}
+          maxPhotos={MAX_PHOTOS_PER_EVENT}
+          maxVideos={MAX_VIDEOS_PER_EVENT}
+        />
+      </div>
+    ),
+    faq: (
+      <div className="card">
+        <SectionHead
+          title="FAQ"
+          hint="Answer the questions buyers keep asking, so they do not have to ask you at all."
+        />
+        <PageContentPanel
+          show="faq"
+          eventId={event.id}
+          media={attachables}
+          posts={posts.map((p) => ({ id: p.id, body: p.body, mediaId: p.mediaId, createdAt: p.createdAt }))}
+          faqs={faqs.map((f) => ({ question: f.question, answer: f.answer }))}
+          maxPhotos={MAX_PHOTOS_PER_EVENT}
+          maxVideos={MAX_VIDEOS_PER_EVENT}
+        />
+      </div>
+    ),
+    // Its own tab, because it is the one place in the editor where somebody is
+    // waiting. The FAQ above is what the organizer writes in advance; this is
+    // what buyers actually asked and nobody has answered yet. A reply here
+    // publishes to the event page and teaches the assistant.
+    questions: (
+      <div className="card">
+        <SectionHead
           title="Visitor questions"
           hint="Questions buyers asked on your page that the assistant could not answer — your reply goes live and teaches it."
-          status={openQuestions.length > 0 ? 'todo' : 'optional'}
-          badge={
-            openQuestions.length > 0 ? (
-              <span className="badge badge-amber">{openQuestions.length} open</span>
-            ) : undefined
-          }
-        >
-          <QuestionsPanel
-            eventId={event.id}
-            questions={openQuestions.map((q) => ({
-              id: q.id,
-              question: q.question,
-              askedAt: q.askedAt,
-              askerName: q.askerName,
-              askerEmail: q.askerEmail,
-            }))}
-            answeredCount={answeredQuestionCount}
-          />
-        </EditorSection>
-      </EditorSectionGroup>
+        />
+        <QuestionsPanel
+          eventId={event.id}
+          questions={openQuestions.map((q) => ({
+            id: q.id,
+            question: q.question,
+            askedAt: q.askedAt,
+            askerName: q.askerName,
+            askerEmail: q.askerEmail,
+          }))}
+          answeredCount={answeredQuestionCount}
+        />
+      </div>
     ),
     publish: (
       <EditorSectionGroup initialOpen={firstTodo([{ id: 'publish', done: publishDone }])}>

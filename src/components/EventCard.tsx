@@ -125,7 +125,7 @@ export default function EventCard({ event, past = false, delayClass = '' }: Even
               a type still to come, and a sold-out one with something coming is
               exactly the card a buyer wants to keep an eye on. */}
           {!past && state.kind !== 'coming-soon' && state.upcoming > 0 ? (
-            <span className="badge badge-green">More coming soon</span>
+            <span className="badge badge-green">Coming soon</span>
           ) : null}
         </span>
         {/* Fades the photo into the card body so the two are one object rather

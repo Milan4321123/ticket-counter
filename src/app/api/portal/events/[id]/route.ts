@@ -38,6 +38,7 @@ import { eventFeeReference, platformBank } from '@/lib/platform';
 import type { ApiErrorResponse } from '@/lib/types';
 import { planGate, requireOrganizerApi, requireOwnedEvent } from '../../auth';
 import { payoutStepUpChallenge } from '../../payout/method';
+import { isValidWhatsApp, normalizeWhatsApp } from '@/lib/whatsapp';
 
 export const dynamic = 'force-dynamic';
 
@@ -346,6 +347,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       need(typeof body.salesOpen === 'boolean', 'Sales open must be on or off.');
       set('sales_open', body.salesOpen ? 1 : 0);
       merged.salesOpen = body.salesOpen;
+    }
+    if ('whatsapp' in body) {
+      // Stored NORMALISED, never as typed. Everything downstream builds a
+      // wa.me link from this column, so the column is where the guarantee that
+      // it is nothing but digits has to hold — not at each render site.
+      // Typed BEFORE it is coerced. Falling back to '' for a non-string quietly
+      // cleared a working number instead of refusing the request — the one
+      // outcome an organizer would never have asked for.
+      need(typeof body.whatsapp === 'string', 'That WhatsApp number does not look right.');
+      const digits = normalizeWhatsApp(body.whatsapp as string);
+      need(
+        digits === '' || isValidWhatsApp(digits),
+        'That WhatsApp number does not look right — include your country code, like +49 170 1234567.'
+      );
+      set('whatsapp', digits);
+      merged.whatsapp = digits;
     }
     if ('closedMessage' in body) {
       // Whitelisted, not stored as given: this string is chosen by an

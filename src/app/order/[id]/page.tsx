@@ -1,9 +1,11 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import CheckPaymentButton from '@/components/CheckPaymentButton';
+import OrganizerWhatsApp from '@/components/OrganizerWhatsApp';
 import CopyButton from '@/components/CopyButton';
 import PrintButton from '@/components/PrintButton';
-import { getEventById, getEventTiers, paypalPayee } from '@/lib/events';
+import { cropTag, getEventById, getEventTiers, mediaUrl, parseCropRect, paypalPayee } from '@/lib/events';
+import { getOrganizer } from '@/lib/organizers';
 import { formatMoney } from '@/lib/money';
 import { getOrder, getOrderItems, getTicketsForOrder, paymentReference } from '@/lib/orders';
 import { orderPayout } from '@/lib/payout';
@@ -27,6 +29,23 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const event = getEventById(order.eventId);
   const eventVenue = event ? [event.venueName, event.city].filter(Boolean).join(', ') : '';
   const checkoutHref = event ? `/e/${event.slug}/checkout` : '/';
+
+  // Reaching the organizer matters most on THIS page: it is where a buyer is
+  // looking at a stranger's IBAN and deciding whether to send real money to it.
+  // The one person who can settle that is the organizer whose account it is.
+  const organizer = event ? getOrganizer(event.organizerId) : null;
+  const organizerWhatsApp = event ? (
+    <OrganizerWhatsApp
+      number={event.whatsapp}
+      organizerName={organizer?.name?.trim() || 'the organizer'}
+      eventName={event.name}
+      photoUrl={
+        event.profileMediaId
+          ? mediaUrl(event.profileMediaId, 'avatar', cropTag(parseCropRect(event.profileCrop)))
+          : null
+      }
+    />
+  ) : null;
 
   if (order.status === 'capturing') {
     return (
@@ -293,6 +312,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           confirmed. These instructions have been emailed to you as well.
         </p>
         <p className="mono small muted">Order ID: {order.id}</p>
+        {organizerWhatsApp}
       </div>
     );
   }

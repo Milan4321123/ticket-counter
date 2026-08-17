@@ -37,6 +37,11 @@ export interface EventRow {
    * are coming, not that sales CLOSED, which sounds like something ended.
    */
   closedMessage: 'closed' | 'coming-soon';
+  /**
+   * The organizer's WhatsApp number, digits only, or ''. Never rendered raw —
+   * every use goes through lib/whatsapp.ts.
+   */
+  whatsapp: string;
   maxPerOrder: number;
   payWithinDays: number;
   bankAccountHolder: string;
@@ -180,6 +185,7 @@ const EVENT_COLS = `
   show_remaining AS showRemaining,
   sales_open AS salesOpen,
   closed_message AS closedMessage,
+  whatsapp,
   max_per_order AS maxPerOrder,
   pay_within_days AS payWithinDays,
   bank_account_holder AS bankAccountHolder,
@@ -219,6 +225,7 @@ function rowToEvent(row: Record<string, unknown> | undefined): EventRow | null {
     // Added by migration, and a free-text column, so anything unrecognised
     // falls back to the wording that is always safe to show.
     closedMessage: row.closedMessage === 'coming-soon' ? 'coming-soon' : 'closed',
+    whatsapp: (row.whatsapp as string | null) ?? '',
     showRemaining: Boolean(row.showRemaining),
     // Added by migration, so it is NULL on every event created before it.
     assistantContext: (row.assistantContext as string | null) ?? '',

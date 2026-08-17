@@ -243,12 +243,11 @@ export default async function PortalDashboardPage({
                         <span className="badge badge-amber">Fee due</span>
                       )}
                       {openQuestions > 0 && (
-                        // Straight to where they can actually be answered: the
-                        // questions inbox sits in the editor's Page & content
-                        // tab, beside the FAQ.
+                        // Straight into the Questions tab, which is now its own
+                        // tab rather than a section buried in Page & content.
                         <Link
-                          href={`/portal/events/${event.id}/edit?tab=page`}
-                          className="badge badge-amber"
+                          href={`/portal/events/${event.id}/edit?tab=questions`}
+                          className="badge badge-green"
                           style={{ textDecoration: 'none' }}
                         >
                           {openQuestions} question{openQuestions === 1 ? '' : 's'}
@@ -287,6 +286,17 @@ export default async function PortalDashboardPage({
                     <Link href={`/portal/events/${event.id}/edit`} className="btn btn-brand btn-sm">
                       Edit
                     </Link>
+                    {openQuestions > 0 && (
+                      // Its own green button among the actions. The badge in
+                      // the title row says a number; this says what to do about
+                      // it, in the row an organizer actually clicks from.
+                      <Link
+                        href={`/portal/events/${event.id}/edit?tab=questions`}
+                        className="btn btn-sm btn-green"
+                      >
+                        Answer {openQuestions} message{openQuestions === 1 ? '' : 's'}
+                      </Link>
+                    )}
                     <Link href={`/portal/events/${event.id}/orders`} className="btn btn-sm">
                       Orders
                     </Link>

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import AskOrganizerForm from '@/components/AskOrganizerForm';
 import ChatWidget from '@/components/ChatWidget';
+import OrganizerWhatsApp from '@/components/OrganizerWhatsApp';
 import FeedPhoto from '@/components/FeedPhoto';
 import FeedVideo from '@/components/FeedVideo';
 import MediaSwiper from '@/components/MediaSwiper';
@@ -623,6 +624,12 @@ export default async function EventPage({ params }: Params) {
               >
                 {state.badge}
               </span>
+              {/* Both at once: this batch has gone, another is on the way. The
+                  hero used to say only the first, so an event with tickets
+                  still to come read as finished. */}
+              {state.kind !== 'coming-soon' && state.upcoming > 0 ? (
+                <span className="badge badge-green">Coming soon</span>
+              ) : null}
               {state.buyable && minPrice !== null ? (
                 <span className="event-hero-price">
                   from {formatMoney(minPrice, event.currency)}
@@ -1003,6 +1010,18 @@ export default async function EventPage({ params }: Params) {
               ? `from ${formatMoney(minPrice, event.currency)}`
               : state.badge
           }
+        />
+      )}
+
+      {/* The organizer's own WhatsApp, above the assistant. Not in preview:
+          an organizer testing their page does not need a link to message
+          themselves, and it would sit over the controls they came to check. */}
+      {!preview && (
+        <OrganizerWhatsApp
+          number={event.whatsapp}
+          organizerName={organizerDisplayName}
+          eventName={event.name}
+          photoUrl={profileUrl}
         />
       )}
 

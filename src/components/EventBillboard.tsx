@@ -136,6 +136,14 @@ export default function EventBillboard({ event, leading = false }: EventBillboar
             : leading && event.eventDate
               ? 'Next up'
               : 'On sale now'}
+          {/* Both states, side by side, because an event really is in both at
+              once: this batch has gone AND another is on the way. Said as a
+              badge rather than only as a line of text below the buttons — a
+              sold-out headline with the good news in small print underneath is
+              read as simply sold out. */}
+          {state.kind !== 'coming-soon' && state.upcoming > 0 ? (
+            <span className="badge badge-green billboard-kicker-badge">Coming soon</span>
+          ) : null}
         </p>
         <h2 className="billboard-title" id={`billboard-title-${event.slug}`}>
           {event.name}
@@ -176,9 +184,7 @@ export default function EventBillboard({ event, leading = false }: EventBillboar
             Only {state.remaining} ticket{state.remaining === 1 ? '' : 's'} left
           </p>
         ) : null}
-        {/* Said here too, because the headline already spent its one line on the
-            state of what IS on sale, and a ticket type still to come is news the
-            billboard would otherwise keep to the event page. */}
+        {/* The detail behind the badge above: which, and how many. */}
         {state.kind !== 'coming-soon' && state.upcoming > 0 ? (
           <p className="billboard-note">
             {state.upcoming === 1 ? 'Another ticket type is' : `${state.upcoming} more ticket types are`} coming
