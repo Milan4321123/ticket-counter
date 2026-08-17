@@ -1722,6 +1722,17 @@ export interface PayoutChangeDetails {
    * does not say how long they have.
    */
   effectiveAt?: number | null;
+  /** The account holder name now on the payout account. */
+  holderName?: string;
+  /**
+   * True when that name shares nothing with the organizer we approved.
+   *
+   * Shown only on the OWNER's copy. To the organizer it would be noise — they
+   * know whose account it is — but to the platform it is the clearest mule
+   * signal available without holding the money: a redirected payout has to
+   * carry a stranger's name, and this is where that becomes visible.
+   */
+  nameMismatch?: boolean;
 }
 
 /**
@@ -1901,18 +1912,27 @@ export async function sendPayoutChangedEmail(
         `${organizer.name} (${organizer.email}) ` +
         (change.firstTime ? 'set the payment details for' : 'CHANGED the payout account for') +
         ` "${event.name}" — ${what}.`;
+      const mismatchText = change.nameMismatch
+        ? `NAME MISMATCH: the account holder is now "${change.holderName ?? ''}", which shares no name with ` +
+          `the approved organizer "${organizer.name}". That is what a redirected payout looks like. ` +
+          `Check it with them directly, on a number you already had — not one on this platform — ` +
+          (waiting ? 'and cancel the change before it takes effect.' : 'and switch the account off if in doubt.')
+        : '';
       try {
         await transporter.sendMail({
           from: process.env.EMAIL_FROM,
           to: ownerInbox,
-          subject: change.firstTime
-            ? `Payment details set — ${event.name}`
-            : `Payout account changed — ${event.name}`,
+          subject: change.nameMismatch
+            ? `NAME MISMATCH on the payout account — ${event.name}`
+            : change.firstTime
+              ? `Payment details set — ${event.name}`
+              : `Payout account changed — ${event.name}`,
           text: renderText({
             headline: change.firstTime ? 'Payment details set' : 'Payout account changed',
             lines: [
               wrapText(ownerLine),
               '',
+              ...(mismatchText ? [wrapText(mismatchText), ''] : []),
               ...textRows([
                 ['Organizer', `${organizer.name} <${organizer.email}>`],
                 ['Event', event.name],
@@ -1938,6 +1958,7 @@ export async function sendPayoutChangedEmail(
             headline: change.firstTime ? 'Payment details set' : 'Payout account changed',
             bodyHtml:
               pHtml(escapeHtml(ownerLine), 20) +
+              (mismatchText ? calloutHtml(`<strong>${escapeHtml(mismatchText)}</strong>`) : '') +
               panelHtml(
                 detailRowsHtml([
                   { label: 'Organizer', value: `${organizer.name} <${organizer.email}>` },

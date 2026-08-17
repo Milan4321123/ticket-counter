@@ -21,7 +21,9 @@ import { formatMoney } from '@/lib/money';
 import {
   PAYOUT_DELAY_MS,
   effectivePayout,
+  isValidIban,
   payoutChangeIsDelayed,
+  payoutNameMatchesOrganizer,
   queuePayoutChange,
   recordPayoutChange,
 } from '@/lib/payout';
@@ -56,7 +58,6 @@ function intField(v: unknown, label: string, min: number, max: number): number {
   return v;
 }
 
-const IBAN_RE = /^[A-Z]{2}\d{2}[A-Z0-9]{8,30}$/;
 const BIC_RE = /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/;
 const TIER_KEY_RE = /^[a-z0-9-]{1,40}$/;
 const MAX_TIERS = 20;
@@ -318,10 +319,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
     if ('bankIban' in body) {
       const v = strField(body.bankIban, 'The IBAN', 60);
-      const compact = v.replace(/\s+/g, '').toUpperCase();
+      // A real check now — country length and the mod-97 check digits, not just
+      // the shape. The two check digits exist so a mistyped account is caught
+      // before anyone sends money to it; validating only the shape meant a
+      // transposed pair of digits was stored, printed on every order page and
+      // emailed to every buyer, and discovered when the transfers bounced.
       need(
-        compact === '' || IBAN_RE.test(compact),
-        'That does not look like a valid IBAN — it should look like DE89 3704 0044 0532 0130 00.'
+        isValidIban(v),
+        'That IBAN is not valid — please check it digit by digit. It should look like DE89 3704 0044 0532 0130 00.'
       );
       payoutTarget.iban = v;
       payoutTouched = true;
@@ -658,6 +663,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           paypalAccount: payoutTarget.paypal,
           firstTime: payoutChange.firstTimeOnly,
           effectiveAt: payoutEffectiveAt,
+          // Reported, never refused. The honest variations on a person's own
+          // name are endless, so a strict compare would mostly block real
+          // organizers — but an account holder who shares no name at all with
+          // the party we approved is the single clearest mule signal there is,
+          // and it belongs in front of the one person who can act on it.
+          holderName: payoutTarget.holder,
+          nameMismatch:
+            payoutTarget.holder.trim() !== '' &&
+            !payoutNameMatchesOrganizer(organizer.name, payoutTarget.holder),
         }
       );
     }

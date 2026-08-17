@@ -40,6 +40,112 @@ export interface PayoutAccount {
   paypal: string;
 }
 
+// ---------------- Is this actually an IBAN? ----------------
+
+/**
+ * Expected total length per country. An IBAN's length is fixed by its country,
+ * so this catches a whole class of mistake the checksum alone can miss — a
+ * digit dropped or doubled often still produces a self-consistent number.
+ *
+ * SEPA plus the handful of neighbours a German-based organizer realistically
+ * banks with. An unlisted country is NOT rejected: the checksum still has to
+ * pass, and refusing an IBAN outright because this table has not heard of the
+ * country would be a worse failure than accepting a rare valid one.
+ */
+const IBAN_LENGTHS: Record<string, number> = {
+  AD: 24, AT: 20, BE: 16, BG: 22, CH: 21, CY: 28, CZ: 24, DE: 22, DK: 18,
+  EE: 20, ES: 24, FI: 18, FR: 27, GB: 22, GI: 23, GR: 27, HR: 21, HU: 28,
+  IE: 22, IS: 26, IT: 27, LI: 21, LT: 20, LU: 20, LV: 21, MC: 27, MT: 31,
+  NL: 18, NO: 15, PL: 28, PT: 25, RO: 24, SE: 24, SI: 19, SK: 24, SM: 27,
+  TR: 26,
+};
+
+/** Basic shape: two letters, two check digits, then alphanumerics. */
+const IBAN_SHAPE = /^[A-Z]{2}\d{2}[A-Z0-9]{8,30}$/;
+
+/**
+ * A real IBAN check — shape, country length, and the ISO 7064 mod-97 checksum.
+ *
+ * The shape test alone used to be the whole validation, which meant
+ * "DE00 0000 0000 0000 0000 00" saved happily. That is not a pedantic gap: the
+ * two check digits exist precisely so a mistyped account number is caught
+ * before anybody sends money to it, and without verifying them a transposed
+ * pair of digits is stored, printed on the order page, emailed to every buyer,
+ * and only discovered when the transfers start bouncing — or worse, when they
+ * do not, because the wrong-but-valid account belongs to somebody real.
+ *
+ * Empty is accepted here; whether a payout account is REQUIRED is a separate
+ * question the publish checklist asks.
+ */
+export function isValidIban(raw: string): boolean {
+  const compact = (raw || '').replace(/\s+/g, '').toUpperCase();
+  if (compact === '') return true;
+  if (!IBAN_SHAPE.test(compact)) return false;
+
+  const expected = IBAN_LENGTHS[compact.slice(0, 2)];
+  if (expected !== undefined && compact.length !== expected) return false;
+
+  // Move the first four characters to the end, turn letters into numbers
+  // (A=10 … Z=35), and the whole thing read as one integer must be 1 mod 97.
+  const rearranged = compact.slice(4) + compact.slice(0, 4);
+  let remainder = 0;
+  for (const ch of rearranged) {
+    const code = ch.charCodeAt(0);
+    const part = code >= 65 ? String(code - 55) : ch; // 'A'.charCodeAt(0) === 65
+    for (const digit of part) {
+      remainder = (remainder * 10 + (digit.charCodeAt(0) - 48)) % 97;
+    }
+  }
+  return remainder === 1;
+}
+
+// ---------------- Does the account belong to who we approved? ----------------
+
+/** Lowercase, unaccented, punctuation-free words. */
+function nameTokens(value: string): string[] {
+  return (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // combining accents
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+/**
+ * Does the payout account holder plausibly name the organizer we approved?
+ *
+ * The strongest control available at this scale, and the one real platforms
+ * lean on hardest: the platform owner approves a named person or company, and
+ * the account the money goes to has to answer to that same name. An attacker
+ * who redirects the IBAN to a mule account has to put a stranger's name on it,
+ * and that is visible.
+ *
+ * Deliberately GENEROUS, because the honest variations are endless — "M.
+ * Adhikari", "Adhikari Milan", "Milan Adhikari Events UG" are all the same
+ * party, and an organizer blocked at midnight by a strict string compare will
+ * simply be an organizer who cannot get paid. A match needs either one name to
+ * contain the other, or half the shorter name's words to appear in the longer
+ * one including at least one real word. Everything else is reported, never
+ * refused — see the owner's copy of the payout-change alarm.
+ */
+export function payoutNameMatchesOrganizer(organizerName: string, accountHolder: string): boolean {
+  const a = nameTokens(organizerName);
+  const b = nameTokens(accountHolder);
+  if (a.length === 0 || b.length === 0) return true; // nothing to compare against
+
+  const joinedA = a.join(' ');
+  const joinedB = b.join(' ');
+  if (joinedA === joinedB || joinedA.includes(joinedB) || joinedB.includes(joinedA)) return true;
+
+  const [shorter, longer] = a.length <= b.length ? [a, b] : [b, a];
+  const longerSet = new Set(longer);
+  const shared = shorter.filter((t) => longerSet.has(t));
+  // An initial matching an initial ("m" vs "m") is not evidence of anything, so
+  // at least one shared word has to be long enough to actually be a name.
+  return shared.length * 2 >= shorter.length && shared.some((t) => t.length >= 3);
+}
+
 /** The columns this module reads. EventRow satisfies it structurally. */
 export interface EventPayoutColumns {
   bankAccountHolder: string;
