@@ -33,6 +33,7 @@ import { getAvailability } from '@/lib/inventory';
 import { ticketState, fromPriceCents, visibleTiers, comingSoonLabel } from '@/lib/ticketState';
 import { currentOrganizer, getOrganizer } from '@/lib/organizers';
 import { formatMoney } from '@/lib/money';
+import { platformFeeLabel } from '@/lib/platform';
 import {
   SITE_NAME,
   absoluteUrl,
@@ -1007,6 +1008,37 @@ export default async function EventPage({ params }: Params) {
               from the organizer&rsquo;s own event details.
             </p>
           </div>
+        </div>
+      </section>
+
+      {/* The one thing on this page that is not about this event.
+          Organizers share their own event link directly, so most people who
+          land here never see the home page — and somebody who could be running
+          their own night has no way to learn that this is a thing they could
+          do. The header's "Organizer sign in" is not that door either: it
+          leads to a password box, which is a dead end for anyone who does not
+          have an account yet.
+          Placed dead last, after everything that helps someone buy a ticket,
+          and kept deliberately quiet: this page belongs to the organizer who
+          made it, and it must never compete with their sale. */}
+      <section className="section event-section">
+        <div className="container">
+          <aside className="org-pitch">
+            <div className="org-pitch-text">
+              <p className="org-pitch-kicker">Thinking of putting on your own event?</p>
+              <h2 className="org-pitch-title">You could have a page like this one</h2>
+              <p className="org-pitch-body">
+                Build your event page, sell tickets straight into your own bank account, and
+                scan guests in at the door — {platformFeeLabel()}, and never a commission on a
+                single ticket.
+              </p>
+            </div>
+            <p className="org-pitch-actions">
+              <Link href="/organizers" className="btn btn-green">
+                See how it works
+              </Link>
+            </p>
+          </aside>
         </div>
       </section>
 

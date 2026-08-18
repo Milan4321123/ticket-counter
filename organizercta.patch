@@ -1,0 +1,391 @@
+From 7bdef9544f6b2ba10309f28463de16e12627e187 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 16 Aug 2026 14:57:46 +0000
+Subject: [PATCH 1/2] Stop the hero's three facts from looking like buttons
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+They were bordered pills sitting ABOVE the call to action, so the first thing
+the page offered was three things shaped like buttons that do nothing, followed
+by the two that actually go somewhere. Nobody could tell which was which.
+
+The facts are a caption, so they now look like one — plain text with a tinted
+icon, no border, no background — and they sit below the buttons rather than in
+front of them. On a narrow screen they stack into a short list instead of
+wrapping into three ragged lines.
+
+"For organizers" is green rather than outlined. Beside a filled crimson button
+an outlined one reads as a caption too, and half the audience for this page is
+the organizer who needs to see that a second door exists.
+
+The sub-headline also stopped promising bank transfer alone on a site where
+organizers take PayPal — it follows the same live check as the rest of the page.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HCGzTuDo7F1dMmTxTdk2ui
+---
+ src/app/globals.css | 38 +++++++++++++++++++++++++++++++++++---
+ src/app/page.tsx    | 33 +++++++++++++++++++++------------
+ 2 files changed, 56 insertions(+), 15 deletions(-)
+
+diff --git a/src/app/globals.css b/src/app/globals.css
+index 78b4a96..dd548f3 100644
+--- a/src/app/globals.css
++++ b/src/app/globals.css
+@@ -4928,12 +4928,44 @@ html:has(.event-page.has-section-nav) {
+ 
+ /* ---------- Hero additions ---------- */
+ 
+-/* Reuses .hero-chip-row/.hero-chip from the event page — this only strips the
+-   list semantics' default styling, since here the chips are a real <ul>. */
++/* The three facts under the hero's buttons.
++   Deliberately NOT .hero-chip: a bordered pill with a background is the shape
++   of something you press, and three of them stacked above the two real buttons
++   made the actual call to action impossible to pick out. Plain text with a
++   tinted icon says the same thing and competes with nothing. */
+ .feed-trust {
++  display: flex;
++  justify-content: center;
++  flex-wrap: wrap;
++  gap: 8px 26px;
+   list-style: none;
+   padding: 0;
+-  margin: 0 0 24px;
++  margin: 22px 0 0;
++}
++
++.feed-trust-item {
++  display: inline-flex;
++  align-items: center;
++  gap: 8px;
++  font-size: 0.9rem;
++  font-weight: 500;
++  color: var(--text-dim);
++}
++
++.feed-trust-item svg {
++  flex: none;
++  color: var(--brand-text);
++  opacity: 0.85;
++}
++
++/* On a narrow screen the row becomes a short stacked list rather than three
++   ragged lines, which is easier to take in at a glance. */
++@media (max-width: 520px) {
++  .feed-trust {
++    flex-direction: column;
++    align-items: center;
++    gap: 9px;
++  }
+ }
+ 
+ .feed-hero-count {
+diff --git a/src/app/page.tsx b/src/app/page.tsx
+index 582e5b2..ef72379 100644
+--- a/src/app/page.tsx
++++ b/src/app/page.tsx
+@@ -329,26 +329,35 @@ export default function HomePage() {
+           <h1 className="anim-fade-up anim-d1">Nepali concerts &amp; events, near you</h1>
+           <p className="feed-hero-sub anim-fade-up anim-d2">
+             Live shows, cultural nights and parties from Nepali organizers — reserve your
+-            tickets in one click, pay by bank transfer, and your QR tickets arrive by email.
++            tickets in one click, pay {anyPaypal ? 'by bank transfer or PayPal' : 'by bank transfer'},
++            and your QR tickets arrive by email.
+           </p>
+-          <ul className="hero-chip-row feed-trust anim-fade-up anim-d2" aria-label="How buying works here">
+-            {heroChips(anyPaypal).map((chip) => (
+-              <li className="hero-chip" key={chip.label}>
+-                {chip.icon}
+-                {chip.label}
+-              </li>
+-            ))}
+-          </ul>
+-          <p className="feed-hero-actions anim-fade-up anim-d3">
++          <p className="feed-hero-actions anim-fade-up anim-d2">
+             <a href="#events" className="btn btn-brand btn-lg">
+               Browse events
+             </a>
+             {/* The pitch, not the sign-in door: someone who does not have an
+-                account yet needs the price and the explanation first. */}
+-            <Link href="/organizers" className="btn btn-lg">
++                account yet needs the price and the explanation first. Green
++                rather than outlined: side by side with the crimson button, an
++                outline reads as a caption, and half the audience for this page
++                is the organizer who needs to see a second door. */}
++            <Link href="/organizers" className="btn btn-green btn-lg">
+               For organizers
+             </Link>
+           </p>
++          {/* Reassurance, not a third row of buttons. These were pill-shaped
++              chips sitting ABOVE the call to action, which put three things
++              that look pressable in front of the two that are — so nobody
++              could tell which was which. They read as a caption now, and they
++              read it after the buttons rather than instead of them. */}
++          <ul className="feed-trust anim-fade-up anim-d3" aria-label="How buying works here">
++            {heroChips(anyPaypal).map((chip) => (
++              <li className="feed-trust-item" key={chip.label}>
++                {chip.icon}
++                {chip.label}
++              </li>
++            ))}
++          </ul>
+           {events.length > 0 && (
+             <p className="feed-hero-count anim-fade-up anim-d3">
+               {events.length} {events.length === 1 ? 'event' : 'events'} on sale
+-- 
+2.43.0
+
+
+From 4a8b32279314ef44ceef20e4e0829230dd024c6c Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 18 Aug 2026 14:20:57 +0000
+Subject: [PATCH 2/2] Give every event page a way in for the next organizer
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+An organizer shares a link to their own event page, so that is where most
+visitors meet this site — and that page said nothing about the fact that anyone
+could be running one. The home page's pitch is never seen by the people best
+placed to act on it.
+
+So every event page now ends with a short invitation to the organizer pitch.
+It is the last thing on the page, after everything that helps somebody buy a
+ticket, and it is deliberately the quietest panel there: the page belongs to
+the organizer who built it, and this must never pull attention off their sale.
+It uses the neutral surface rather than the per-event accent, because it is the
+platform speaking rather than the event.
+
+"Organizer sign in" was not that door either — it leads to a password box,
+which is a dead end for anyone who does not have an account yet. The two are
+now distinct: sign in for people who already work with us, the pitch for people
+deciding whether to.
+
+In the header, "Browse events" was a dim text link next to a real button, on
+the one bar that tells an arriving visitor the rest of the site exists. It is a
+filled green button now — green so it never reads as the ticket button that
+owns every event page.
+
+That second button then broke the header on phones: both labels wrapped onto
+two lines each, and once they were stopped from wrapping the row needed 411px
+of a 320px screen and cut the sign-in button off at the edge. Below 460px the
+wordmark gives way instead — the flag mark still identifies the site and still
+links home, the name is repeated in the page and the footer, and shortening the
+labels would have left the only navigation reading "Browse" and "Sign in".
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HCGzTuDo7F1dMmTxTdk2ui
+---
+ src/app/e/[slug]/page.tsx |  32 +++++++++++
+ src/app/globals.css       | 118 ++++++++++++++++++++++++++++++++++++++
+ src/app/layout.tsx        |  17 +++---
+ 3 files changed, 158 insertions(+), 9 deletions(-)
+
+diff --git a/src/app/e/[slug]/page.tsx b/src/app/e/[slug]/page.tsx
+index fc4ed0d..2c6f574 100644
+--- a/src/app/e/[slug]/page.tsx
++++ b/src/app/e/[slug]/page.tsx
+@@ -30,6 +30,7 @@ import type { EventRow, PageDesign } from '@/lib/events';
+ import { getAvailability } from '@/lib/inventory';
+ import { getOrganizer } from '@/lib/organizers';
+ import { formatMoney } from '@/lib/money';
++import { platformFeeLabel } from '@/lib/platform';
+ import {
+   SITE_NAME,
+   absoluteUrl,
+@@ -807,6 +808,37 @@ export default async function EventPage({ params }: Params) {
+         </section>
+       )}
+ 
++      {/* The one thing on this page that is not about this event.
++          Organizers share their own event link directly, so most people who
++          land here never see the home page — and somebody who could be running
++          their own night has no way to learn that this is a thing they could
++          do. The header's "Organizer sign in" is not that door either: it
++          leads to a password box, which is a dead end for anyone who does not
++          have an account yet.
++          Placed dead last, after everything that helps someone buy a ticket,
++          and kept deliberately quiet: this page belongs to the organizer who
++          made it, and it must never compete with their sale. */}
++      <section className="section event-section">
++        <div className="container">
++          <aside className="org-pitch">
++            <div className="org-pitch-text">
++              <p className="org-pitch-kicker">Thinking of putting on your own event?</p>
++              <h2 className="org-pitch-title">You could have a page like this one</h2>
++              <p className="org-pitch-body">
++                Build your event page, sell tickets straight into your own bank account, and
++                scan guests in at the door — {platformFeeLabel()}, and never a commission on a
++                single ticket.
++              </p>
++            </div>
++            <p className="org-pitch-actions">
++              <Link href="/organizers" className="btn btn-green">
++                See how it works
++              </Link>
++            </p>
++          </aside>
++        </div>
++      </section>
++
+       {/* Sticky mobile checkout bar — appears below 640px via CSS, and only
+           once the hero's own button has scrolled away. */}
+       {canBuy && (
+diff --git a/src/app/globals.css b/src/app/globals.css
+index dd548f3..9238eaf 100644
+--- a/src/app/globals.css
++++ b/src/app/globals.css
+@@ -5681,3 +5681,121 @@ html:has(.event-page.has-section-nav) {
+     transition: none;
+   }
+ }
++
++/* ---------- "Become an organizer" invitation (event page) ----------
++   Sits at the foot of every event page, because an organizer's link is how
++   most people reach this site at all and the home page's pitch never gets
++   seen. Deliberately the quietest panel on the page: the event belongs to the
++   organizer who built it, and this must never pull attention off their sale.
++   Neutral surface rather than the per-event accent — it is the platform
++   speaking, not the event. */
++
++.org-pitch {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 22px;
++  flex-wrap: wrap;
++  max-width: 780px;
++  padding: 22px 24px;
++  border: 1px solid var(--border);
++  border-radius: var(--radius);
++  background: var(--bg-elevated);
++}
++
++.org-pitch-text {
++  flex: 1 1 320px;
++  min-width: 0;
++}
++
++.org-pitch-kicker {
++  margin: 0 0 4px;
++  font-size: 0.74rem;
++  font-weight: 700;
++  letter-spacing: 0.14em;
++  text-transform: uppercase;
++  color: var(--green);
++}
++
++.org-pitch-title {
++  font-family: var(--font-display, var(--font));
++  font-size: 1.15rem;
++  font-weight: 700;
++  letter-spacing: -0.01em;
++  margin: 0 0 6px;
++}
++
++.org-pitch-body {
++  margin: 0;
++  color: var(--text-dim);
++  font-size: 0.9rem;
++  max-width: 54ch;
++}
++
++.org-pitch-actions {
++  margin: 0;
++  flex: none;
++}
++
++/* On a phone the button goes full width rather than sitting orphaned under a
++   paragraph it is no longer beside. */
++@media (max-width: 560px) {
++  .org-pitch-actions,
++  .org-pitch-actions .btn {
++    width: 100%;
++    justify-content: center;
++  }
++}
++
++/* ---------- Header navigation ----------
++   Two real buttons now live up here, so the row needs rules of its own rather
++   than an inline gap. On a narrow screen both labels were wrapping onto two
++   lines each, which doubled the header's height and made the whole thing look
++   broken — so the labels never wrap, and the buttons tighten instead. */
++
++.header-nav {
++  display: flex;
++  align-items: center;
++  gap: 10px;
++}
++
++.header-nav .btn {
++  white-space: nowrap;
++}
++
++@media (min-width: 560px) {
++  .header-nav {
++    gap: 14px;
++  }
++}
++
++@media (max-width: 420px) {
++  .header-nav {
++    gap: 7px;
++  }
++
++  .header-nav .btn {
++    padding-left: 10px;
++    padding-right: 10px;
++    font-size: 0.78rem;
++  }
++
++  /* The wordmark yields first: it is a link home, and the header already has
++     the flag icon carrying the brand. */
++  .header-inner {
++    gap: 10px;
++  }
++}
++
++/* Below ~460px the wordmark, two full-width button labels and the gaps between
++   them need 411px of a 320px row, and the sign-in button was being cut off at
++   the screen edge. The wordmark yields rather than the buttons: the flag mark
++   beside it still identifies the site and still links home, the brand name is
++   repeated in the page below and in the footer, and shortening the two actions
++   instead would leave the only navigation on the page reading "Browse" and
++   "Sign in" — which is the half that has to stay unambiguous. */
++@media (max-width: 460px) {
++  .site-header .logo-word {
++    display: none;
++  }
++}
+diff --git a/src/app/layout.tsx b/src/app/layout.tsx
+index b46edac..afe0958 100644
+--- a/src/app/layout.tsx
++++ b/src/app/layout.tsx
+@@ -93,15 +93,14 @@ export default function RootLayout({ children }: { children: React.ReactNode })
+             <Link href="/" className="brand" aria-label={`${PLATFORM_NAME} — home`}>
+               <Logo size={22} />
+             </Link>
+-            <nav
+-              aria-label="Main"
+-              style={{ display: 'flex', alignItems: 'center', gap: 18 }}
+-            >
+-              <Link
+-                href="/"
+-                className="small"
+-                style={{ color: 'var(--text-dim)', fontWeight: 600 }}
+-              >
++            <nav aria-label="Main" className="header-nav">
++              {/* A filled button, not a dim text link. Most visitors arrive on
++                  an event page from a link an organizer shared, so this is the
++                  only thing on their screen telling them the rest of the site
++                  exists — it has to look pressable. Green rather than crimson
++                  keeps it distinct from the ticket button that owns every
++                  event page. */}
++              <Link href="/" className="btn btn-sm btn-green">
+                 Browse events
+               </Link>
+               {/* Named for what it does. The home page's "For organizers"
+-- 
+2.43.0
+

@@ -6341,3 +6341,78 @@ html:has(.event-page.has-section-nav) {
     animation: none;
   }
 }
+
+/* ---------- "Become an organizer" invitation (event page) ----------
+   Sits at the foot of every event page: an organizer's link is how most people
+   reach this site at all, so the home page's pitch is never seen by the people
+   best placed to act on it. Deliberately the quietest panel on the page — the
+   event belongs to the organizer who built it, and this must never pull
+   attention off their sale. */
+
+.org-pitch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  flex-wrap: wrap;
+  max-width: 780px;
+  padding: 22px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+}
+
+.org-pitch-text {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.org-pitch-kicker {
+  margin: 0 0 4px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--green);
+}
+
+.org-pitch-title {
+  font-family: var(--font-display, var(--font));
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 6px;
+}
+
+.org-pitch-body {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  max-width: 54ch;
+}
+
+.org-pitch-actions {
+  margin: 0;
+  flex: none;
+}
+
+@media (max-width: 560px) {
+  .org-pitch-actions,
+  .org-pitch-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Browse is a button now, so the nowrap that .header-link carried no longer
+   reaches it, and it has to shrink alongside the sign-in button on a phone. */
+.header-nav .btn {
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .header-nav .btn {
+    padding: 7px 12px;
+    font-size: 0.84rem;
+  }
+}
