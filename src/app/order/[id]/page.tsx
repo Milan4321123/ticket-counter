@@ -20,7 +20,9 @@ import { getBaseUrl } from '@/lib/config';
 import { getOrder, getOrderItems, getTicketsForOrder, paymentReference } from '@/lib/orders';
 import { orderPayout } from '@/lib/payout';
 import { paymentQrDataUrl } from '@/lib/paymentQr';
+import { machineDate } from '@/lib/seo';
 import { ticketQrDataUrl } from '@/lib/tickets';
+import { vocabFor } from '@/lib/vocab';
 import { whatsappShareUrl } from '@/lib/whatsapp';
 
 export const dynamic = 'force-dynamic';
@@ -41,11 +43,38 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const event = getEventById(order.eventId);
   const eventVenue = event ? [event.venueName, event.city].filter(Boolean).join(', ') : '';
   const checkoutHref = event ? `/e/${event.slug}/checkout` : '/';
+  const v = vocabFor(event?.kind ?? 'event');
+
+  // What this order IS, bundle-aware: quantities count BOOKINGS, and a
+  // "2× Table of 8" line has to say somewhere that sixteen QR tickets come out
+  // of it — on this page and in the pending state below, where no ticket grid
+  // exists yet to make the count obvious.
+  const orderItems = getOrderItems(order.id);
+  const orderTiers = event ? getEventTiers(event.id) : [];
+  const tierFor = (tierId: string) => orderTiers.find((t) => t.tierKey === tierId) ?? null;
+  const totalTickets = orderItems.reduce(
+    (s, it) => s + it.quantity * (tierFor(it.tierId)?.seatsPerUnit ?? 1),
+    0
+  );
+  const hasBundle = orderItems.some((it) => (tierFor(it.tierId)?.seatsPerUnit ?? 1) > 1);
+  const itemsLine = orderItems
+    .map((it) => `${it.quantity}× ${tierFor(it.tierId)?.name ?? it.tierId}`)
+    .join(', ');
 
   // Reaching the organizer matters most on THIS page: it is where a buyer is
   // looking at a stranger's IBAN and deciding whether to send real money to it.
   // The one person who can settle that is the organizer whose account it is.
   const organizer = event ? getOrganizer(event.organizerId) : null;
+
+  // Offered while the order is still awaiting payment too, not only once paid —
+  // people block the evening out the moment they reserve. Only for event-kind
+  // orders with a machine date (shops have no date, and free-text dateDisplay
+  // is never parsed — see machineDate in lib/seo), and only while published,
+  // because the calendar route answers 404 for everything else.
+  const calendarHref =
+    event && event.status === 'published' && event.kind === 'event' && machineDate(event)
+      ? `/api/events/${event.id}/calendar`
+      : null;
   const organizerWhatsApp = event ? (
     <OrganizerWhatsApp
       number={event.whatsapp}
@@ -141,6 +170,14 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         {event ? (
           <p className="muted anim-fade-up" style={{ margin: '-8px 0 16px' }}>
             {[event.name, event.dateDisplay, eventVenue].filter(Boolean).join(' · ')}
+          </p>
+        ) : null}
+        {itemsLine ? (
+          <p className="muted small anim-fade-up" style={{ margin: '-8px 0 16px' }}>
+            {itemsLine}
+            {/* Only bundles need the translation to tickets — for ordinary
+                orders the quantities already are the ticket count. */}
+            {hasBundle ? ` — ${totalTickets} QR ${totalTickets === 1 ? v.code : v.codes} once paid` : ''}
           </p>
         ) : null}
         <div className="notice notice-success anim-fade-up anim-d1">
@@ -456,6 +493,14 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           </div>
         ) : null}
 
+        {calendarHref ? (
+          <p className="anim-fade-up anim-d4" style={{ margin: '16px 0' }}>
+            <a href={calendarHref} className="btn btn-sm">
+              Add to calendar
+            </a>
+          </p>
+        ) : null}
+
         <p className="muted small anim-fade-up anim-d4">
           Tip: bookmark this page — your tickets will appear here the moment your payment is
           confirmed. These instructions have been emailed to you as well.
@@ -524,9 +569,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   }
 
   // status === 'paid'
-  const items = getOrderItems(order.id);
-  const tiers = event ? getEventTiers(event.id) : [];
-  const tierName = (tierId: string) => tiers.find((t) => t.tierKey === tierId)?.name ?? tierId;
+  const items = orderItems;
+  const tierName = (tierId: string) => tierFor(tierId)?.name ?? tierId;
   const tickets = await Promise.all(
     getTicketsForOrder(order.id).map(async (t) => ({ ...t, qr: await ticketQrDataUrl(t.code) }))
   );
@@ -579,14 +623,26 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           <span className="muted">Email</span>
           <span>{order.buyerEmail}</span>
         </div>
-        {items.map((it) => (
-          <div className="summary-row" key={it.tierId}>
-            <span>
-              {it.quantity}&times; {tierName(it.tierId)}
-            </span>
-            <span>{formatMoney(it.quantity * it.unitPriceCents, order.currency)}</span>
-          </div>
-        ))}
+        {items.map((it) => {
+          const seatsPerUnit = tierFor(it.tierId)?.seatsPerUnit ?? 1;
+          return (
+            <div className="summary-row" key={it.tierId}>
+              <span>
+                {it.quantity}&times; {tierName(it.tierId)}
+                {/* A bundled booking translated into tickets, right on the
+                    line that would otherwise read "2× Table of 8" against a
+                    grid of sixteen codes below with nothing connecting them. */}
+                {seatsPerUnit > 1 ? (
+                  <span className="muted small">
+                    {' '}
+                    — {it.quantity * seatsPerUnit} QR {v.codes} ({seatsPerUnit} per booking)
+                  </span>
+                ) : null}
+              </span>
+              <span>{formatMoney(it.quantity * it.unitPriceCents, order.currency)}</span>
+            </div>
+          );
+        })}
         <div className="summary-row total">
           <span>Total</span>
           <span>{order.totalCents === 0 ? 'Free' : formatMoney(order.totalCents, order.currency)}</span>
@@ -629,7 +685,14 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       </div>
 
       <div className="anim-fade-up anim-d4">
-        <PrintButton label="Print or save tickets" />
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <PrintButton label="Print or save tickets" />
+          {calendarHref ? (
+            <a href={calendarHref} className="btn no-print">
+              Add to calendar
+            </a>
+          ) : null}
+        </div>
         <p className="muted small no-print" style={{ marginTop: 12 }}>
           Each QR code admits one person and can only be scanned once. A copy has been emailed to
           you if email is configured.

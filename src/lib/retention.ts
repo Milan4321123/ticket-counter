@@ -89,6 +89,17 @@ const PAYMENT_WINDOW_GRACE_DAYS = 2;
 export const SHOP_UNCOLLECTED_LONG_STOP_DAYS = 365;
 
 /**
+ * Days a NOTIFIED waitlist address survives its one email before it is
+ * deleted. The signup form promised "one email, then your address is deleted",
+ * so this is a grace period, not a retention window: long enough that someone
+ * whose mail bounced can write in and be told what happened, short enough that
+ * the promise stays recognisably true. The waitlist email and /privacy both
+ * read THIS constant, so what the site says and what the sweep does cannot
+ * drift apart.
+ */
+export const WAITLIST_NOTIFIED_RETENTION_DAYS = 14;
+
+/**
  * Orders due for erasure: the buyer has not been erased yet, and the thing
  * their details were needed for is genuinely over.
  *
@@ -230,9 +241,45 @@ export function runBuyerDataRetentionSweep(force = false): { erased: number } {
     );
     const askersErased = eraseAskers.run(ERASED_BUYER_NAME, ERASED_BUYER_EMAIL, cutoff, cutoff).changes;
 
+    // Waitlist addresses are DELETED rather than overwritten: unlike an order,
+    // a waitlist row reconciles no money and mints no ticket — the email IS
+    // the row, so keeping an emptied husk would preserve nothing.
+    //
+    // Three clocks, one per way a row stops having a job:
+    //  - NOTIFIED rows: the single promised email has gone out, so the
+    //    address's only job is done. WAITLIST_NOTIFIED_RETENTION_DAYS of grace
+    //    covers "my mail bounced, what happened?" before the form's "deleted
+    //    afterwards" promise comes due.
+    //  - UNNOTIFIED rows on a past event: the notify sweep refuses events past
+    //    their date, so this address can never earn its email — waiting longer
+    //    changes nothing, and holding data that can never be used is exactly
+    //    what this sweep exists to stop. A SHOP row deliberately stays: a shop
+    //    can restock any day, so an unnotified shop address still has its job.
+    //  - Anything on an event whose BUYERS are being erased (same cutoff as
+    //    the orders above): whatever the other clocks say, someone who only
+    //    typed an email must never outlive the people who actually paid.
+    const waitlistDeleted = db
+      .prepare(
+        `DELETE FROM waitlist
+         WHERE (notified_at IS NOT NULL
+                AND date(notified_at) <= date('now', '-${WAITLIST_NOTIFIED_RETENTION_DAYS} days'))
+            OR (notified_at IS NULL AND event_id IN (
+                  SELECT id FROM events
+                  WHERE kind != 'shop' AND event_date IS NOT NULL AND date(event_date) < date('now')
+                ))
+            OR event_id IN (
+                  SELECT id FROM events
+                  WHERE kind != 'shop' AND event_date IS NOT NULL AND date(event_date) <= date('now', ?)
+                )`
+      )
+      .run(cutoff).changes;
+
     if (erased > 0) console.log(`Retention sweep: erased buyer details on ${erased} order(s).`);
     if (askersErased > 0) {
       console.log(`Retention sweep: erased the asker on ${askersErased} question(s).`);
+    }
+    if (waitlistDeleted > 0) {
+      console.log(`Retention sweep: deleted ${waitlistDeleted} waitlist address(es).`);
     }
     return { erased };
   } catch (e) {

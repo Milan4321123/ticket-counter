@@ -87,8 +87,11 @@ export function setEventCapacity(
     }
     const sold = availability.tiers[tier.tierKey]?.sold ?? 0;
     if (next < sold) {
+      // A tier's sold count is in BOOKINGS of it — for a bundled tier "3
+      // tickets" would undercount the 24 people sitting at 3 tables of 8.
+      const noun = (availability.tiers[tier.tierKey]?.seatsPerUnit ?? 1) > 1 ? 'booking' : 'ticket';
       throw new CapacityError(
-        `“${tier.name}” has already sold ${sold} tickets, so its limit cannot be set below that.`
+        `“${tier.name}” has already sold ${sold} ${noun}${sold === 1 ? '' : 's'}, so its limit cannot be set below that.`
       );
     }
     if (next !== tier.cap) tierChanges.push({ tierKey: tier.tierKey, from: tier.cap, to: next });

@@ -15,6 +15,7 @@ interface Row {
   status: 'on-sale' | 'coming-soon' | 'hidden';
   studentOnly: boolean;
   description: string;
+  seatsPerUnit: string; // as typed; blank means 1 (an ordinary single ticket)
 }
 
 interface Props {
@@ -36,6 +37,7 @@ function toRow(t: SavedTier): Row {
     status: t.status ?? 'on-sale',
     studentOnly: t.studentOnly,
     description: t.description,
+    seatsPerUnit: String(t.seatsPerUnit ?? 1),
   };
 }
 
@@ -53,7 +55,7 @@ export default function TiersEditor({ eventId, kind, initialTiers, soldByTierKey
   }
 
   function addRow() {
-    setRows((prev) => [...prev, { tierKey: null, name: '', price: '', cap: '', unlimited: false, status: 'on-sale', studentOnly: false, description: '' }]);
+    setRows((prev) => [...prev, { tierKey: null, name: '', price: '', cap: '', unlimited: false, status: 'on-sale', studentOnly: false, description: '', seatsPerUnit: '1' }]);
   }
 
   function removeRow(index: number) {
@@ -85,6 +87,7 @@ export default function TiersEditor({ eventId, kind, initialTiers, soldByTierKey
       status: 'on-sale' | 'coming-soon' | 'hidden';
       studentOnly: boolean;
       description: string;
+      seatsPerUnit: number;
     }[] =
       [];
     for (const row of rows) {
@@ -106,6 +109,13 @@ export default function TiersEditor({ eventId, kind, initialTiers, soldByTierKey
         setError(`Please enter a valid ticket limit for "${name}" (0 stops sales for it).`);
         return;
       }
+      // Blank means an ordinary single ticket — nobody should have to think
+      // about this field unless they are selling tables or bundles.
+      const seatsPerUnit = row.seatsPerUnit.trim() === '' ? 1 : Number(row.seatsPerUnit);
+      if (!Number.isInteger(seatsPerUnit) || seatsPerUnit < 1 || seatsPerUnit > 20) {
+        setError(`Seats per booking for "${name}" must be a whole number between 1 and 20.`);
+        return;
+      }
       tiers.push({
         tierKey: row.tierKey,
         name,
@@ -115,6 +125,7 @@ export default function TiersEditor({ eventId, kind, initialTiers, soldByTierKey
         studentOnly: row.studentOnly,
         status: row.status,
         description: row.description.trim(),
+        seatsPerUnit,
       });
     }
 
@@ -261,6 +272,35 @@ export default function TiersEditor({ eventId, kind, initialTiers, soldByTierKey
                   </p>
                 </div>
               </div>
+            </div>
+            {/* Optional, and quiet on purpose: almost every tier is one seat per
+                booking, and this only matters for table/group tickets. Buyer
+                pages show the tier as a table the moment it is above 1. */}
+            <div className="field" style={{ marginBottom: 10, maxWidth: 240 }}>
+              <label htmlFor={`tier-seats-${i}`}>
+                {kind === 'shop' ? 'Items per booking' : 'Seats per booking'}
+              </label>
+              <input
+                id={`tier-seats-${i}`}
+                className="input"
+                type="number"
+                min={1}
+                max={20}
+                value={row.seatsPerUnit}
+                onChange={(e) => patchRow(i, { seatsPerUnit: e.target.value })}
+                placeholder="1"
+                // Frozen once anything has sold — the server refuses the change
+                // too, because existing bookings would silently re-weigh
+                // against the room and mint a different number of QR codes.
+                disabled={sold > 0}
+              />
+              <p className="muted small" style={{ margin: '6px 0 0' }}>
+                {sold > 0
+                  ? `Locked — ${sold} already sold at this size. To sell a different size, hide this ${v.unitType} and add a new one.`
+                  : kind === 'shop'
+                    ? 'For bundles: one booking issues this many QR collection codes and uses this much stock.'
+                    : 'For table or group tickets: one booking issues this many QR tickets and uses this many seats.'}
+              </p>
             </div>
             <div className="field" style={{ marginBottom: 10 }}>
               <label htmlFor={`tier-desc-${i}`}>Short description</label>

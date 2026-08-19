@@ -6,8 +6,12 @@ import { useRouter } from 'next/navigation';
 export interface CapacityTier {
   tierKey: string;
   name: string;
+  /** In BOOKINGS of this tier — a "Table of 8" tier with cap 10 sells 10 tables. */
   cap: number;
+  /** Also in bookings. */
   sold: number;
+  /** Seats one booking occupies — the weight between this tier and the room. */
+  seatsPerUnit: number;
 }
 
 export interface CapacityFormProps {
@@ -76,10 +80,16 @@ export default function CapacityForm({ eventId, totalCapacity, totalSold, tiers 
     setTotal(String(nextTotal));
     // Only lift a tier that is currently the thing standing in the way. A tier
     // the organizer deliberately set small (early bird, students) stays small.
+    // The comparison weighs the cap by seatsPerUnit because the cap counts
+    // BOOKINGS while the capacity counts SEATS — and the lifted value is
+    // converted back to bookings, or a "Table of 8" tier would get a seats
+    // number written into its bookings field.
     setCaps((cur) => {
       const next = { ...cur };
       for (const t of tiers) {
-        if (t.cap >= totalCapacity) next[t.tierKey] = String(nextTotal);
+        if (t.cap * t.seatsPerUnit >= totalCapacity) {
+          next[t.tierKey] = String(Math.ceil(nextTotal / t.seatsPerUnit));
+        }
       }
       return next;
     });
@@ -145,8 +155,12 @@ export default function CapacityForm({ eventId, totalCapacity, totalSold, tiers 
           </button>
         ))}
         <span className="muted small">
-          Fills the boxes — nothing is saved until you press Save. {totalSold} sold so far, so no
-          limit can go below that.
+          {/* The total is in seats but each type's limit is in bookings, so the
+              two floors are named separately — one shared number would be wrong
+              for any tier that seats more than one person per booking. */}
+          Fills the boxes — nothing is saved until you press Save. {totalSold} seat
+          {totalSold === 1 ? '' : 's'} sold so far: the total can&rsquo;t go below that, and no
+          type&rsquo;s limit can go below its own sold count.
         </span>
       </div>
     </form>

@@ -168,6 +168,12 @@ export async function POST(req: Request) {
       return sum + (tier ? tier.priceCents : 0) * it.quantity;
     }, 0);
     const isFree = orderTotalCents === 0;
+    // Seats this order occupies — quantities count BOOKINGS, and a bundled
+    // tier ("Table of 8") puts several people in the room per booking. Every
+    // comparison against the room or the per-address ceiling uses this.
+    const orderSeats = validated.items.reduce((sum, it) => {
+      return sum + it.quantity * (getEventTier(event.id, it.tierId)?.seatsPerUnit ?? 1);
+    }, 0);
 
     // The browser states the total it SHOWED the buyer. On mismatch, refuse
     // before anything is claimed: an organizer repricing a tier mid-checkout
@@ -233,13 +239,28 @@ export async function POST(req: Request) {
       const alreadyHeld =
         heldUnpaidTicketsForEmail(event.id, validated.buyerEmail) +
         (isFree ? freeTicketsForEmail(event.id, validated.buyerEmail) : 0);
-      const wanted = validated.totalQuantity;
-      // Also bounded by the room. Derived only from maxPerOrder, the ceiling
-      // could exceed a small event's whole capacity — a 12-seat event with a
-      // per-order limit of 6 gave a ceiling of 18, so one address could still
-      // hold every seat and the cap never fired at all. A quarter of the room
-      // is the most any single buyer has a reason to hold at once.
-      const ceiling = Math.max(1, Math.min(Math.max(event.maxPerOrder * 3, 12), Math.ceil(event.totalCapacity / 4)));
+      // In SEATS, like the two counters above: the ceiling protects the room,
+      // and one bundled booking sits on several seats of it.
+      const wanted = orderSeats;
+      // The ceiling is in SEATS too, so maxPerOrder (which counts BOOKINGS)
+      // has to be weighted before it can shape one: a per-order limit of 8 on
+      // an event selling tables of 8 permits a 64-seat order, and a ceiling
+      // still derived from the bare 8 would refuse orders the checkout itself
+      // offers.
+      const maxSeatsPerOrder =
+        event.maxPerOrder * getEventTiers(event.id).reduce((m, t) => Math.max(m, t.seatsPerUnit), 1);
+      // Also bounded by the room. Derived only from the per-order limit, the
+      // ceiling could exceed a small event's whole capacity — a 12-seat event
+      // with a per-order limit of 6 gave a ceiling of 18, so one address could
+      // still hold every seat and the cap never fired at all. A quarter of the
+      // room is the most any single buyer has a reason to hold at once — but
+      // the floor is one full order, or a "Table of 20" tier in a small room
+      // could never sell its first booking at all (the room-level check below
+      // still refuses anything that genuinely does not fit).
+      const ceiling = Math.max(
+        maxSeatsPerOrder,
+        Math.min(Math.max(maxSeatsPerOrder * 3, 12), Math.ceil(event.totalCapacity / 4))
+      );
       if (alreadyHeld + wanted > ceiling) {
         return apiError(
           409,
@@ -259,17 +280,24 @@ export async function POST(req: Request) {
     const avail = getAvailability(event.id);
     for (const it of validated.items) {
       const tierAvail = avail.tiers[it.tierId];
-      const tierName = getEventTier(event.id, it.tierId)?.name ?? it.tierId;
+      const tier = getEventTier(event.id, it.tierId);
+      const tierName = tier?.name ?? it.tierId;
       if (!tierAvail || tierAvail.remaining < it.quantity) {
         const remaining = tierAvail?.remaining ?? 0;
+        // A tier's remaining counts BOOKINGS of it, not people — "2 Table of 8
+        // tickets left" would read as 2 seats when it means 2 whole tables.
+        const noun = (tier?.seatsPerUnit ?? 1) > 1 ? 'booking' : 'ticket';
         const msg =
           remaining > 0
-            ? `Only ${remaining} ${tierName} ticket${remaining === 1 ? '' : 's'} left — please adjust your order.`
-            : `${tierName} tickets are sold out.`;
+            ? `Only ${remaining} ${tierName} ${noun}${remaining === 1 ? '' : 's'} left — please adjust your order.`
+            : `${tierName} ${noun}s are sold out.`;
         return apiError(409, 'SOLD_OUT', msg);
       }
     }
-    if (avail.totalRemaining < validated.totalQuantity) {
+    // The room is counted in SEATS, so the order weighs in seats too — raw
+    // booking counts would let table orders slip past a nearly-full room here
+    // (the atomic claim would still refuse them, but with a worse message).
+    if (avail.totalRemaining < orderSeats) {
       const msg =
         avail.totalRemaining > 0
           ? `Only ${avail.totalRemaining} ticket${avail.totalRemaining === 1 ? '' : 's'} left for this event — please adjust your order.`

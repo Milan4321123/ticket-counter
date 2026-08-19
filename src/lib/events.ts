@@ -147,6 +147,14 @@ export interface EventTierRow {
   /** True when this ticket type is not capped — `cap` is then ignored. */
   unlimited: boolean;
   /**
+   * How many people ONE sold unit of this tier admits (a "Table of 8" is one
+   * booking, eight seats, eight QR tickets). `cap` counts UNITS of the tier;
+   * the room's total_capacity counts SEATS — every place that converts between
+   * the two multiplies by this. 1 on every ordinary ticket. Range 1..20,
+   * enforced on write and re-clamped on read.
+   */
+  seatsPerUnit: number;
+  /**
    * Announced but not yet on sale. Shown on the event page with a "Coming soon"
    * badge and refused by every purchase path — see the guard in api/orders.
    */
@@ -391,7 +399,8 @@ export function getEventTiers(eventId: string): EventTierRow[] {
   const rows = getDb()
     .prepare(
       `SELECT id, event_id AS eventId, tier_key AS tierKey, name, price_cents AS priceCents,
-              cap, unlimited, status, student_only AS studentOnly, description, sort
+              cap, unlimited, status, student_only AS studentOnly, description, sort,
+              seats_per_unit AS seatsPerUnit
        FROM event_tiers WHERE event_id = ? ORDER BY sort, tier_key`
     )
     .all(eventId) as (Omit<EventTierRow, 'studentOnly' | 'unlimited'> & {
@@ -405,6 +414,10 @@ export function getEventTiers(eventId: string): EventTierRow[] {
     // Whitelisted on the way out as well as in: an unrecognised value must not
     // silently hide a ticket type an organizer is trying to sell.
     status: r.status === 'coming-soon' || r.status === 'hidden' ? r.status : 'on-sale',
+    // Re-clamped on read for the same reason status is whitelisted: this number
+    // multiplies seat consumption and ticket minting, so a hand-edited row must
+    // never be able to zero out (or explode) an event's inventory arithmetic.
+    seatsPerUnit: Math.min(20, Math.max(1, Math.round(Number(r.seatsPerUnit) || 1))),
   }));
 }
 

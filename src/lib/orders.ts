@@ -208,12 +208,17 @@ const TICKET_COLS = `
  * Deliberately reads the database rather than the in-memory limiter: this is a
  * question about state that outlives a process, and a restart must not hand
  * everyone a fresh allowance.
+ *
+ * Weighted by seats_per_unit because the cap is on PEOPLE'S SEATS, not
+ * bookings: two held "Table of 8" bookings are sixteen seats off the market,
+ * and counting them as two would let one address hold a room with tables.
  */
 export function heldUnpaidTicketsForEmail(eventId: string, buyerEmail: string): number {
   const row = getDb()
     .prepare(
-      `SELECT COALESCE(SUM(oi.quantity), 0) AS n
+      `SELECT COALESCE(SUM(oi.quantity * COALESCE(et.seats_per_unit, 1)), 0) AS n
          FROM orders o JOIN order_items oi ON oi.order_id = o.id
+         LEFT JOIN event_tiers et ON et.event_id = o.event_id AND et.tier_key = oi.tier_id
         WHERE o.event_id = ?
           AND o.status = 'claimed'
           AND o.payment_mode = 'transfer'
@@ -236,10 +241,14 @@ export function heldUnpaidTicketsForEmail(eventId: string, buyerEmail: string): 
  * anyone a fresh allowance.
  */
 export function freeTicketsForEmail(eventId: string, buyerEmail: string): number {
+  // Weighted by seats_per_unit for the same reason as the transfer counter
+  // above: the ceiling protects seats, and one free bundled booking sits on
+  // several of them.
   const row = getDb()
     .prepare(
-      `SELECT COALESCE(SUM(oi.quantity), 0) AS n
+      `SELECT COALESCE(SUM(oi.quantity * COALESCE(et.seats_per_unit, 1)), 0) AS n
          FROM orders o JOIN order_items oi ON oi.order_id = o.id
+         LEFT JOIN event_tiers et ON et.event_id = o.event_id AND et.tier_key = oi.tier_id
         WHERE o.event_id = ?
           AND o.status = 'paid'
           AND o.payment_mode = 'free'
@@ -389,7 +398,12 @@ export function finalizePaidOrder(orderId: string, captureId: string | null): Ti
     );
     const ins = db.prepare(`INSERT INTO tickets (code, order_id, tier_id) VALUES (?, ?, ?)`);
     for (const it of getOrderItems(orderId)) {
-      for (let i = 0; i < it.quantity; i++) {
+      // One QR ticket per PERSON, not per booking: a paid "2× Table of 8"
+      // mints sixteen codes, each still admitting one person for one scan.
+      // Missing tier (legacy deleted-tier data) falls back to one, which is
+      // what every order meant before bundles existed.
+      const seatsPerUnit = getEventTier(order.eventId, it.tierId)?.seatsPerUnit ?? 1;
+      for (let i = 0; i < it.quantity * seatsPerUnit; i++) {
         // Retry on the (astronomically unlikely) code collision.
         for (let attempt = 0; ; attempt++) {
           try {
@@ -479,7 +493,12 @@ function withItemsSummary(rows: OrderRow[]): OrderListRow[] {
     const itemsSummary = items
       .map((it) => `${it.quantity}× ${getEventTier(o.eventId, it.tierId)?.name ?? it.tierId}`)
       .join(', ');
-    const ticketCount = items.reduce((s, it) => s + it.quantity, 0);
+    // Counts QR TICKETS (people), not bookings — every surface showing this
+    // labels it as codes/tickets, and a "2× Table of 8" order is 16 of them.
+    const ticketCount = items.reduce(
+      (s, it) => s + it.quantity * (getEventTier(o.eventId, it.tierId)?.seatsPerUnit ?? 1),
+      0
+    );
     return { ...o, itemsSummary, ticketCount };
   });
 }
@@ -563,6 +582,11 @@ export function countOrdersByFilter(
 export interface TierStats {
   tierId: string;
   name: string;
+  /**
+   * UNITS of the tier sold (bookings), matching `cap`, which is also in
+   * units — a "Table of 8" tier reads "3 sold of 10 tables" here, never 24.
+   * Attendance-style numbers (Stats.ticketsSold, checkedIn) count PEOPLE.
+   */
   sold: number;
   cap: number;
   revenueCents: number;
@@ -570,6 +594,11 @@ export interface TierStats {
 
 export interface Stats {
   ordersPaid: number;
+  /**
+   * QR tickets minted on paid orders — PEOPLE, since each admits one. A paid
+   * "Table of 8" booking counts 8 here, which is what makes the portal's
+   * "sold / capacity" meters honest (capacity is seats).
+   */
   ticketsSold: number;
   /** Money CONFIRMED received (real payments only — test-mode excluded). */
   revenueCents: number;
@@ -664,11 +693,14 @@ export function getStats(eventId?: string): Stats {
        FROM orders WHERE status = 'claimed' AND payment_mode = 'transfer' ${scope}`
     )
     .get(...scopeArgs) as { n: number; cents: number };
+  // In TICKETS (people), matching its label everywhere it is shown: a waiting
+  // "2× Table of 8" reservation is 16 tickets on their way, not 2.
   const awaitingTickets = (
     db
       .prepare(
-        `SELECT COALESCE(SUM(oi.quantity), 0) AS n
+        `SELECT COALESCE(SUM(oi.quantity * COALESCE(et.seats_per_unit, 1)), 0) AS n
          FROM order_items oi JOIN orders o ON o.id = oi.order_id
+         LEFT JOIN event_tiers et ON et.event_id = o.event_id AND et.tier_key = oi.tier_id
          WHERE o.status = 'claimed' AND o.payment_mode = 'transfer' ${ticketScope}`
       )
       .get(...scopeArgs) as { n: number }

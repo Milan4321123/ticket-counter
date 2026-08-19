@@ -40,7 +40,11 @@ export interface TicketState {
   kind: TicketStateKind;
   /** True only when a buyer can actually complete a purchase. */
   buyable: boolean;
-  /** How many tickets can genuinely be bought — never more than the room. */
+  /**
+   * How many SEATS can genuinely still be bought — never more than the room.
+   * In seats, not bookings, because that is what every "Only N left" surface
+   * means to a visitor: a bundled tier's one remaining table counts as eight.
+   */
   remaining: number;
   /** Short label for a badge: "Sold out", "Coming soon", … */
   badge: string;
@@ -139,12 +143,18 @@ export function ticketState(
    */
   const nothingOnSaleYet = sellable.length === 0;
 
-  // Each tier's remaining is already clamped to the room by getAvailability, so
-  // summing several can overshoot when they are clamped to the same headroom —
-  // hence the final min against the room itself.
+  // In SEATS on both sides of the min: a tier's remaining counts BOOKINGS of
+  // it, so each one is weighted by its seatsPerUnit before it can be compared
+  // with (or capped by) the room. Each tier's remaining is already clamped to
+  // the room by getAvailability, so summing several can overshoot when they
+  // are clamped to the same headroom — hence the final min against the room
+  // itself.
   const remaining = Math.min(
     availability.totalRemaining,
-    sellable.reduce((n, t) => n + Math.max(0, availability.tiers[t.tierKey]?.remaining ?? 0), 0)
+    sellable.reduce((n, t) => {
+      const a = availability.tiers[t.tierKey];
+      return n + Math.max(0, a?.remaining ?? 0) * (a?.seatsPerUnit ?? 1);
+    }, 0)
   );
 
   if (opts.past) {

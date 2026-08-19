@@ -123,6 +123,7 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
             priceCents: t.priceCents,
             studentOnly: t.studentOnly,
             description: t.description,
+            seatsPerUnit: t.seatsPerUnit,
           })),
       }}
       availability={availability}

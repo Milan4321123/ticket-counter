@@ -29,6 +29,7 @@ import {
   replyToBuyers,
   replyToOrganizers,
 } from './platform';
+import { WAITLIST_NOTIFIED_RETENTION_DAYS } from './retention';
 import { whatsappShareUrl } from './whatsapp';
 import type { ContactRequestRow } from './contact';
 
@@ -617,6 +618,11 @@ export async function sendTicketEmail(
     const tierName = (tierId: string) => getEventTier(event.id, tierId)?.name ?? tierId;
     const total = formatMoney(order.totalCents, order.currency);
     const one = tickets.length === 1;
+    // Bundle-aware order line: the stubs below list every code, but a buyer of
+    // "2× Table of 8" needs the sentence connecting two bookings to sixteen
+    // codes — without it the mail looks like it minted fourteen too many.
+    const hasBundle = items.some((it) => (getEventTier(event.id, it.tierId)?.seatsPerUnit ?? 1) > 1);
+    const itemsLine = items.map((it) => `${it.quantity}× ${tierName(it.tierId)}`).join(', ');
     // Who confirmed the payment and issued these codes. The buyer paid the
     // organizer's own account, and the organizer marked it received — this mail
     // used to say only "payment received", which read as if the platform had
@@ -685,6 +691,12 @@ export async function sendTicketEmail(
             : `Show the QR code at the door, we scan it, and you are in.`),
         20
       ) +
+      (hasBundle
+        ? pHtml(
+            `Your order: ${escapeHtml(itemsLine)} — ${tickets.length} QR ${tickets.length === 1 ? v.code : v.codes} in total.`,
+            20
+          )
+        : '') +
       stubsHtml +
       (isFreeOrder ? '' : pHtml(`Total paid: ${strong(total)}`, 20)) +
       buttonHtml(orderUrl, `Open your ${one ? v.code : v.codes} online`) +
@@ -736,6 +748,14 @@ export async function sendTicketEmail(
             `${ticketCount} listed below. The QR codes are in the HTML version of this email — if you ` +
             `cannot see them, open your order page and show the code there.`
         ),
+        ...(hasBundle
+          ? [
+              '',
+              wrapText(
+                `Your order: ${itemsLine} — ${tickets.length} QR ${tickets.length === 1 ? v.code : v.codes} in total.`
+              ),
+            ]
+          : []),
         '',
         ...tickets.flatMap((t, i) => [
           tickets.length > 1
@@ -897,9 +917,23 @@ export async function sendTransferInstructionsEmail(
     const venue = venueDisplay(event);
     const orderUrl = `${getBaseUrl()}/order/${orderId}`;
     const reference = paymentReference(orderId);
-    const hasStudentTickets = getOrderItems(orderId).some(
+    const items = getOrderItems(orderId);
+    const hasStudentTickets = items.some(
       (it) => getEventTier(event.id, it.tierId)?.studentOnly === true
     );
+    // What is being held, bundle-aware: quantities count BOOKINGS, so a
+    // "2× Table of 8" reservation says here that sixteen QR tickets come out
+    // of it — this mail is the buyer's receipt-in-waiting and must not leave
+    // that number to be discovered at the door.
+    const v = vocabFor(event.kind);
+    const tierOf = (tierId: string) => getEventTier(event.id, tierId);
+    const totalTickets = items.reduce(
+      (s, it) => s + it.quantity * (tierOf(it.tierId)?.seatsPerUnit ?? 1),
+      0
+    );
+    const itemsLine = items
+      .map((it) => `${it.quantity}× ${tierOf(it.tierId)?.name ?? it.tierId}`)
+      .join(', ');
     const amount = formatMoney(order.totalCents, order.currency);
     const paymentQrCid = `bank-payment-${orderId.toLowerCase()}@tickets`;
     const paymentQrPng = await bankPaymentQrPng(
@@ -946,6 +980,10 @@ export async function sendTransferInstructionsEmail(
         `${sellerIntroHtml} — the payment details below are their own, and your money goes straight to them.`,
         20
       ) +
+      pHtml(
+        `Your reservation: ${escapeHtml(itemsLine)} — ${totalTickets} QR ${totalTickets === 1 ? v.code : v.codes} once the payment is confirmed.`,
+        20
+      ) +
       paypalNoteHtml(payee, reference, amount) +
       panelHtml(amountRowHtml('Amount to transfer', amount) + detailRowsHtml(bankRows)) +
       referenceBoxHtml(
@@ -990,6 +1028,10 @@ export async function sendTransferInstructionsEmail(
       lines: [
         wrapText(
           `${sellerIntroText} — the payment details below are their own, and your money goes straight to them.`
+        ),
+        '',
+        wrapText(
+          `Your reservation: ${itemsLine} — ${totalTickets} QR ${totalTickets === 1 ? v.code : v.codes} once the payment is confirmed.`
         ),
         '',
         wrapText(
@@ -2142,6 +2184,111 @@ export async function sendPayoutChangedEmail(
     return { sent: true };
   } catch (err) {
     console.error('[email] Failed to send payout-change notice:', err instanceof Error ? err.message : err);
+    return { sent: false, reason: 'send-failed' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Waitlist: the single "there is space again" email a sold-out signup buys
+// ---------------------------------------------------------------------------
+
+/**
+ * Tell one waitlisted address that the sold-out listing can be bought again.
+ *
+ * Everyone on the list gets this at the same moment and nothing is reserved
+ * for anyone, so the one thing this mail must NOT do is read like a held
+ * ticket: it says plainly that the whole list is being told at once and that
+ * whoever books first gets the spots. It is also the LAST thing the address
+ * ever hears from us — the sweep (lib/waitlist.ts) stamps the row before
+ * sending and never re-notifies, and retention deletes the address itself
+ * within WAITLIST_NOTIFIED_RETENTION_DAYS — so the mail says that too, in so
+ * many words, because one email is exactly what the signup form promised.
+ *
+ * Never throws — the sweep has already spent the row's one notification, and
+ * a mail failure must not take the whole sweep down with it.
+ */
+export async function sendWaitlistSpotsOpenEmail(
+  to: string,
+  event: EventRow
+): Promise<{ sent: boolean; reason?: string }> {
+  try {
+    if (!isEmailConfigured()) return { sent: false, reason: 'email-not-configured' };
+
+    const v = vocabFor(event.kind);
+    const isShop = event.kind === 'shop';
+    const eventUrl = `${getBaseUrl()}/e/${event.slug}`;
+    const venue = venueDisplay(event);
+    const whenLine = isShop ? firstLineOf(event.pickupInfo) : event.dateDisplay;
+    const headline = `${v.Units} for ${event.name} are available again`;
+
+    const bodyHtml =
+      pHtml(`Hi,`) +
+      pHtml(
+        `You asked to hear if ${v.units} for ${strong(event.name)} became available again — and right ` +
+          `now they are.`,
+        20
+      ) +
+      calloutHtml(
+        `<strong>First come, first served.</strong> Everyone on the waitlist is getting this same email ` +
+          `right now, and nothing is being held for anybody — if you want ${isShop ? 'your items' : 'to go'}, ` +
+          `book now, before the ${v.units} are gone again.`
+      ) +
+      buttonHtml(eventUrl, v.cta) +
+      smallHtml(
+        `This is the one email you asked for when you joined the waitlist — we will not write to you ` +
+          `again, and your address is deleted from the waitlist within ${WAITLIST_NOTIFIED_RETENTION_DAYS} days.`
+      );
+
+    const text = renderText({
+      headline,
+      context: [event.name, whenLine, venue],
+      lines: [
+        'Hi,',
+        '',
+        wrapText(
+          `You asked to hear if ${v.units} for ${event.name} became available again — and right now ` +
+            `they are.`
+        ),
+        '',
+        wrapText(
+          `FIRST COME, FIRST SERVED: everyone on the waitlist is getting this same email right now, ` +
+            `and nothing is being held for anybody. If you want ${isShop ? 'your items' : 'to go'}, book now.`
+        ),
+        '',
+        `${v.cta}: ${eventUrl}`,
+        '',
+        wrapText(
+          `This is the one email you asked for when you joined the waitlist — we will not write to ` +
+            `you again, and your address is deleted from the waitlist within ` +
+            `${WAITLIST_NOTIFIED_RETENTION_DAYS} days.`
+        ),
+      ],
+      footer: [[event.name, whenLine, venue].filter(Boolean).join(' · ')],
+    });
+
+    await createTransporter().sendMail({
+      from: emailFromBuyers(),
+      replyTo: replyToBuyers(),
+      to,
+      subject: headline,
+      text,
+      html: renderEmail({
+        title: headline,
+        preheader: `Space just opened up — the whole waitlist is being told at once, and ${v.units} go to whoever books first.`,
+        kicker: 'Available again',
+        headline: event.name,
+        metaLines: [whenLine, venue],
+        bodyHtml,
+        footerLines: [
+          `${escapeHtml(event.name)}${whenLine ? ` · ${escapeHtml(whenLine)}` : ''}`,
+          escapeHtml(venue),
+          `You are getting this because you joined the waitlist for this ${escapeHtml(v.listing)} on ${escapeHtml(platformName())}. It is the only email the waitlist ever sends.`,
+        ],
+      }),
+    });
+    return { sent: true };
+  } catch (err) {
+    console.error('[email] Failed to send waitlist notification:', err instanceof Error ? err.message : err);
     return { sent: false, reason: 'send-failed' };
   }
 }

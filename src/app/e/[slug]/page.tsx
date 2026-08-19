@@ -32,6 +32,8 @@ import type { EventRow, PageDesign } from '@/lib/events';
 import type { EventKind } from '@/lib/types';
 import { vocabFor } from '@/lib/vocab';
 import { getAvailability } from '@/lib/inventory';
+import { runWaitlistNotifySweep } from '@/lib/waitlist';
+import WaitlistForm from '@/components/WaitlistForm';
 import { ticketState, fromPriceCents, visibleTiers, comingSoonLabel } from '@/lib/ticketState';
 import { currentOrganizer, getOrganizer } from '@/lib/organizers';
 import { formatMoney } from '@/lib/money';
@@ -348,6 +350,11 @@ export default async function EventPage({ params }: Params) {
 
   const tiers = getEventTiers(event.id);
   const availability = getAvailability(event.id);
+  // Every event-page render is also the waitlist's clock. Availability was
+  // just computed anyway, and the sweep self-throttles to a Date.now() check
+  // when nothing is due — so the people waiting on a sold-out event get told
+  // about freed spots by the very traffic still looking at it, with no cron.
+  void runWaitlistNotifySweep();
 
   /**
    * How many tickets can ACTUALLY be bought right now.
@@ -783,6 +790,16 @@ export default async function EventPage({ params }: Params) {
                       <div className="tier-price">
                         {tier.priceCents === 0 ? 'Free' : formatMoney(tier.priceCents, event.currency)}
                       </div>
+                      {/* A bundled tier is bought as ONE booking for a group —
+                          said plainly on the card, because the price above is
+                          per table, not per person, and a buyer comparing it
+                          against single tickets must know that before tapping. */}
+                      {tier.seatsPerUnit > 1 && (
+                        <p className="small muted" style={{ margin: '0 0 6px' }}>
+                          Includes {tier.seatsPerUnit} {isShop ? v.units : 'seats'} — you get{' '}
+                          {tier.seatsPerUnit} QR {v.codes} per booking.
+                        </p>
+                      )}
                       <p className="tier-desc">{tier.description}</p>
                       {tier.studentOnly && (
                         <p className="small muted" style={{ margin: 0 }}>
@@ -834,6 +851,18 @@ export default async function EventPage({ params }: Params) {
                     {isShop ? 'Place your order' : 'Get your tickets'}
                   </Link>
                 </p>
+              )}
+              {/* Sold out is the one state where this page can still DO
+                  something for the visitor, so it is the only state that gets
+                  the waitlist — a paused or coming-soon event is not "full",
+                  and offering to watch for freed spots there would promise an
+                  email on the wrong condition. Not in preview: the API would
+                  refuse an unpublished event anyway, and the organizer does
+                  not need a form that signs them up to their own list. */}
+              {state.kind === 'sold-out' && !preview && (
+                <div style={{ marginTop: 16, maxWidth: 480 }}>
+                  <WaitlistForm eventId={event.id} kind={event.kind} checkoutHref={checkoutHref} />
+                </div>
               )}
             </div>
 

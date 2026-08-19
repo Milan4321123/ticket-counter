@@ -12,16 +12,28 @@ import { getEventById, getEventTiers, getPrimaryEvent } from './events';
 
 export interface TierAvailability {
   tierId: string;
+  /** In UNITS of this tier — a "Table of 8" tier with cap 10 sells 10 tables. */
   cap: number;
-  sold: number; // claimed + capturing + paid
-  /** UNLIMITED_REMAINING when uncapped — always check `unlimited` before showing this. */
+  /** Units sold: claimed + capturing + paid. */
+  sold: number;
+  /**
+   * Units still sellable — bounded by the tier's own cap AND by how many whole
+   * bookings still fit in the room's remaining SEATS (weighted by
+   * seatsPerUnit). UNLIMITED_REMAINING when uncapped — always check
+   * `unlimited` before showing this.
+   */
   remaining: number;
   unlimited: boolean;
+  /** Seats one sold unit consumes (and QR tickets it mints). 1 normally. */
+  seatsPerUnit: number;
 }
 
 export interface Availability {
+  /** SEATS — people the room holds, not bookings. */
   totalCap: number;
+  /** SEATS consumed: every sold unit weighted by its tier's seatsPerUnit. */
   totalSold: number;
+  /** SEATS still free in the room. */
   totalRemaining: number;
   /**
    * Always false — every event now states a capacity and the room is the
@@ -85,19 +97,26 @@ export function getAvailability(eventId: string): Availability {
 
   const soldByTier = new Map(rows.map((r) => [r.tierId, r.sold]));
   const tiers: Record<string, TierAvailability> = {};
+  // The tier's sold/cap/remaining stay in UNITS of that tier; the ROOM is
+  // counted in SEATS, so each sold unit weighs seatsPerUnit against it — a
+  // sold "Table of 8" is one unit of its tier and eight seats of the room.
   let totalSold = 0;
   for (const t of eventTiers) {
     const sold = soldByTier.get(t.tierKey) ?? 0;
-    totalSold += sold;
+    totalSold += sold * t.seatsPerUnit;
     tiers[t.tierKey] = {
       tierId: t.tierKey,
       cap: t.cap,
       sold,
       remaining: t.unlimited ? UNLIMITED_REMAINING : Math.max(0, t.cap - sold),
       unlimited: t.unlimited,
+      seatsPerUnit: t.seatsPerUnit,
     };
   }
   // Seats sold against tiers that were later deleted still occupy capacity.
+  // Their seats_per_unit is gone with the row, so each unit weighs one seat —
+  // the meaning every tier had before bundles existed (and tiers with orders
+  // cannot be deleted anymore, so this is legacy data only).
   for (const [tierId, sold] of soldByTier) {
     if (!tiers[tierId]) totalSold += sold;
   }
@@ -109,7 +128,9 @@ export function getAvailability(eventId: string): Availability {
   // can still be uncapped; it simply inherits the room's ceiling.
   const totalRemaining = Math.max(0, event.totalCapacity - totalSold);
   for (const t of Object.values(tiers)) {
-    t.remaining = Math.min(t.remaining, totalRemaining);
+    // A tier's next unit only exists if a WHOLE booking still fits in the
+    // room — a table of 8 with 5 seats left is sold out, not "0.6 available".
+    t.remaining = Math.min(t.remaining, Math.floor(totalRemaining / t.seatsPerUnit));
     // An uncapped TIER is not an uncapped event: whatever is left in the room is
     // left for it, and that is a real number, so it stops claiming otherwise.
     t.unlimited = false;
@@ -174,13 +195,16 @@ export function claimInventory(orderId: string): void {
       .all(orderId) as { tierId: string; quantity: number }[];
 
     const avail = getAvailability(order.eventId);
-    let totalQty = 0;
+    // The room check is in SEATS: a booking of a bundled tier ("Table of 8")
+    // consumes seatsPerUnit seats, and comparing raw quantities against the
+    // seat count would let tables oversell the room.
+    let totalSeats = 0;
     for (const it of items) {
-      totalQty += it.quantity;
       const tier = avail.tiers[it.tierId];
       if (!tier || tier.remaining < it.quantity) throw new SoldOutError(it.tierId);
+      totalSeats += it.quantity * tier.seatsPerUnit;
     }
-    if (avail.totalRemaining < totalQty) throw new SoldOutError();
+    if (avail.totalRemaining < totalSeats) throw new SoldOutError();
 
     db.prepare(`UPDATE orders SET status = 'claimed' WHERE id = ?`).run(orderId);
   });

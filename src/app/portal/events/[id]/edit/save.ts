@@ -12,6 +12,8 @@ export interface SavedTier {
   status: 'on-sale' | 'coming-soon' | 'hidden';
   studentOnly: boolean;
   description: string;
+  /** Seats one booking covers (1..20). 1 on every ordinary tier. */
+  seatsPerUnit: number;
 }
 
 export interface SaveData {

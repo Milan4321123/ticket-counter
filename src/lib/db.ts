@@ -404,6 +404,18 @@ function migrateToPlatform(db: Database.Database): void {
     db.exec(`ALTER TABLE event_tiers ADD COLUMN status TEXT NOT NULL DEFAULT 'on-sale'`);
     db.exec(`UPDATE event_tiers SET status = 'coming-soon' WHERE coming_soon = 1`);
   }
+  // Table/group bookings: one sold unit of a tier can admit several people.
+  //
+  // Nepali cultural nights are table-based dinners — a "Table of 8" is bought
+  // as ONE booking. The tier's cap stays in UNITS (how many tables exist);
+  // the event's total_capacity stays in SEATS (people in the room). One paid
+  // unit consumes seats_per_unit seats of the room and mints seats_per_unit QR
+  // tickets, each still admitting one person for one scan. Default 1 keeps
+  // every existing tier meaning exactly what it always did: one booking, one
+  // seat, one ticket.
+  if (!tierCols.includes('seats_per_unit')) {
+    db.exec(`ALTER TABLE event_tiers ADD COLUMN seats_per_unit INTEGER NOT NULL DEFAULT 1`);
+  }
   // RETIRED. It let an organizer choose whether a PAUSE read "Sales closed" or
   // "Tickets coming soon" — a second way to say what the per-ticket status
   // below already says, and it overrode every ticket type at once. An organizer
@@ -570,6 +582,32 @@ function migrateToPlatform(db: Database.Database): void {
   if (!ppCols.includes('photo_url')) {
     db.exec(`ALTER TABLE platform_posts ADD COLUMN photo_url TEXT NOT NULL DEFAULT ''`);
   }
+
+  // Who asked to hear when a sold-out listing has space again: one email
+  // address per (event, person), stored for exactly one job — a single "there
+  // is space again" email from the notify sweep (lib/waitlist.ts).
+  //
+  // Its own table rather than a column anywhere else because these rows have
+  // their own lifecycle: they are personal data that lib/retention.ts DELETES
+  // outright (nothing here reconciles money or tickets, so unlike buyer rows
+  // there is no husk worth keeping), and a separate table makes that deletion
+  // a one-line statement instead of a scrub.
+  //
+  // UNIQUE(event_id, email) is both the no-duplicates rule and the enumeration
+  // defence: the API can INSERT OR IGNORE and answer "you're on the list"
+  // either way, so the response never reveals whether an address was already
+  // there. notified_at is the one-email-EVER stamp — the sweep claims it
+  // before sending and nothing ever clears it.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS waitlist (
+      id TEXT PRIMARY KEY,
+      event_id TEXT NOT NULL REFERENCES events(id),
+      email TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      notified_at TEXT,
+      UNIQUE (event_id, email)
+    );
+  `);
 
   // Whether the public page counts down the remaining tickets.
   //

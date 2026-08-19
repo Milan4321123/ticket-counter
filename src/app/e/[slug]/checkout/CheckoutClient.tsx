@@ -22,6 +22,12 @@ export interface CheckoutTier {
   priceCents: number;
   studentOnly: boolean;
   description: string;
+  /**
+   * Seats one booking covers — a "Table of 8" is one booking, eight seats,
+   * eight QR tickets. The stepper counts BOOKINGS; everything compared against
+   * the room's remaining is weighted by this.
+   */
+  seatsPerUnit: number;
 }
 
 export interface CheckoutConfig {
@@ -215,11 +221,15 @@ export default function CheckoutClient({
   const [capturing, setCapturing] = useState(false); // PayPal capture in flight
   const [sdkState, setSdkState] = useState<'loading' | 'ready' | 'error'>('loading');
 
-  const overallMax = Math.min(config.maxTicketsPerOrder, availability.totalRemaining);
   const tierMax = (tierId: string) =>
     Math.min(availability.tiers[tierId]?.remaining ?? 0, config.maxTicketsPerOrder);
 
+  // The stepper counts BOOKINGS; the room counts SEATS. A bundled tier (a
+  // "Table of 8") is one booking against maxTicketsPerOrder but eight seats
+  // against the room, so the two ceilings are tracked separately.
   const totalQty = config.tiers.reduce((sum, t) => sum + (qty[t.id] ?? 0), 0);
+  const totalSeats = config.tiers.reduce((sum, t) => sum + (qty[t.id] ?? 0) * t.seatsPerUnit, 0);
+  const hasBundle = config.tiers.some((t) => t.seatsPerUnit > 1 && (qty[t.id] ?? 0) > 0);
   const totalCents = config.tiers.reduce((sum, t) => sum + (qty[t.id] ?? 0) * t.priceCents, 0);
 
   /**
@@ -272,12 +282,20 @@ export default function CheckoutClient({
   function changeQty(tierId: string, delta: number) {
     setQty((prev) => {
       const current = prev[tierId] ?? 0;
+      const spu = config.tiers.find((t) => t.id === tierId)?.seatsPerUnit ?? 1;
       const othersTotal = config.tiers.reduce(
         (sum, t) => (t.id === tierId ? sum : sum + (prev[t.id] ?? 0)),
         0
       );
+      const othersSeats = config.tiers.reduce(
+        (sum, t) => (t.id === tierId ? sum : sum + (prev[t.id] ?? 0) * t.seatsPerUnit),
+        0
+      );
       let next = Math.max(0, Math.min(current + delta, tierMax(tierId)));
-      next = Math.min(next, Math.max(0, overallMax - othersTotal));
+      // Bookings against the per-order limit, SEATS against the room: a table
+      // must not be addable when only part of it would still fit.
+      next = Math.min(next, Math.max(0, config.maxTicketsPerOrder - othersTotal));
+      next = Math.min(next, Math.floor(Math.max(0, availability.totalRemaining - othersSeats) / spu));
       if (next === current) return prev;
       return { ...prev, [tierId]: next };
     });
@@ -522,7 +540,12 @@ export default function CheckoutClient({
           {config.tiers.map((tier) => {
             const remaining = availability.tiers[tier.id]?.remaining ?? 0;
             const q = qty[tier.id] ?? 0;
-            const canAdd = !working && q < tierMax(tier.id) && totalQty < overallMax;
+            const canAdd =
+              !working &&
+              q < tierMax(tier.id) &&
+              totalQty < config.maxTicketsPerOrder &&
+              // One more booking of THIS tier has to fit in the room whole.
+              totalSeats + tier.seatsPerUnit <= availability.totalRemaining;
             return (
               <div className="qty-row" key={tier.id}>
                 <div>
@@ -543,6 +566,15 @@ export default function CheckoutClient({
                     {tier.priceCents === 0 ? 'Free' : `${formatMoney(tier.priceCents, config.currency)} each`}
                     {tier.studentOnly ? ' · student ID required at the entrance' : ''}
                   </div>
+                  {/* A bundled booking has to say what one of it IS before
+                      anyone steps the counter: the stepper counts bookings,
+                      and "1" of a table is eight people. */}
+                  {tier.seatsPerUnit > 1 && (
+                    <div className="muted small">
+                      Includes {tier.seatsPerUnit} {isShop ? v.units : 'seats'} — you get{' '}
+                      {tier.seatsPerUnit} QR {v.codes} per booking.
+                    </div>
+                  )}
                 </div>
                 <div className="qty-stepper">
                   <button
@@ -568,7 +600,11 @@ export default function CheckoutClient({
           })}
         </div>
         <p className={`muted small ${styles.hint}`}>
-          Up to {config.maxTicketsPerOrder} {v.units} per order.
+          {/* The limit counts BOOKINGS. Saying "tickets" is right until a
+              bundled tier exists — then one booking is several tickets and the
+              honest word changes. */}
+          Up to {config.maxTicketsPerOrder}{' '}
+          {config.tiers.some((t) => t.seatsPerUnit > 1) ? 'bookings' : v.units} per order.
         </p>
 
         <div className={styles.summaryBlock}>
@@ -588,6 +624,14 @@ export default function CheckoutClient({
                 <span>Total</span>
                 <span>{totalCents === 0 ? 'Free' : formatMoney(totalCents, config.currency)}</span>
               </div>
+              {/* Only when a bundle is in the cart — for ordinary tickets the
+                  quantities above already ARE the ticket count, and repeating
+                  it would read as a second, mysterious number. */}
+              {hasBundle && (
+                <p className="muted small" style={{ margin: '8px 0 0' }}>
+                  You will receive {totalSeats} QR {totalSeats === 1 ? v.code : v.codes} in total.
+                </p>
+              )}
             </>
           )}
         </div>

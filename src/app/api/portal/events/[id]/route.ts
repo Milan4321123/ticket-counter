@@ -99,6 +99,11 @@ interface TierPayload {
   status: TierStatus;
   studentOnly: boolean;
   description: string;
+  /**
+   * Seats one booking of this tier covers (a "Table of 8" is one booking,
+   * eight seats, eight QR tickets). 1..20; 1 on every ordinary tier.
+   */
+  seatsPerUnit: number;
 }
 
 function tierKeyFromName(name: string, taken: Set<string>): string {
@@ -591,7 +596,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         } else {
           tierKey = tierKeyFromName(name, taken);
         }
-        keep.push({ tierKey, name, priceCents, cap, unlimited, status, studentOnly: r.studentOnly, description });
+
+        const prior = existingTiers.find((t) => t.tierKey === tierKey);
+        // Absent on bodies from older clients. For an EXISTING row that means
+        // "unchanged" — a stale edit tab saving a price tweak must not quietly
+        // turn a Table of 8 into a single ticket — and for a new row it means
+        // one seat per booking, which is what every tier meant before bundles
+        // existed. The 1..20 range is the rule everywhere this column is written.
+        const seatsPerUnit =
+          r.seatsPerUnit === undefined
+            ? prior?.seatsPerUnit ?? 1
+            : intField(r.seatsPerUnit, `Seats per booking for "${name}"`, 1, 20);
+        // Frozen once anything has sold. Availability, unpaid holds and the QR
+        // codes a confirmation mints are all derived from the CURRENT value, so
+        // editing it would silently re-weight sold history — freeing phantom
+        // seats in a full room, or changing how many tickets a table that was
+        // already paid for hands out.
+        if (prior && prior.seatsPerUnit !== seatsPerUnit) {
+          need(
+            !tierHasOrders(event.id, tierKey),
+            `“${name}” already has orders, so its ${merged.kind === 'shop' ? 'items' : 'seats'} per booking can't change from ${prior.seatsPerUnit}. Hide it and add a new ${vocabFor(merged.kind).unitType} instead.`
+          );
+        }
+        keep.push({ tierKey, name, priceCents, cap, unlimited, status, studentOnly: r.studentOnly, description, seatsPerUnit });
       }
 
       // On a MIXED listing, a free tier must state a number. The room is one
@@ -707,19 +734,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const del = db.prepare(`DELETE FROM event_tiers WHERE event_id = ? AND tier_key = ?`);
         for (const key of tiersPlan.removeKeys) del.run(event.id, key);
         const upd = db.prepare(
-          `UPDATE event_tiers SET name = ?, price_cents = ?, cap = ?, unlimited = ?, status = ?, student_only = ?, description = ?, sort = ?
+          `UPDATE event_tiers SET name = ?, price_cents = ?, cap = ?, unlimited = ?, status = ?, student_only = ?, description = ?, sort = ?, seats_per_unit = ?
            WHERE event_id = ? AND tier_key = ?`
         );
         const ins = db.prepare(
-          `INSERT INTO event_tiers (id, event_id, tier_key, name, price_cents, cap, unlimited, status, student_only, description, sort)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO event_tiers (id, event_id, tier_key, name, price_cents, cap, unlimited, status, student_only, description, sort, seats_per_unit)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         );
         const existingKeys = new Set(existingTiers.map((t) => t.tierKey));
         tiersPlan.keep.forEach((t, sort) => {
           if (existingKeys.has(t.tierKey)) {
-            upd.run(t.name, t.priceCents, t.cap, t.unlimited ? 1 : 0, t.status, t.studentOnly ? 1 : 0, t.description, sort, event.id, t.tierKey);
+            upd.run(t.name, t.priceCents, t.cap, t.unlimited ? 1 : 0, t.status, t.studentOnly ? 1 : 0, t.description, sort, t.seatsPerUnit, event.id, t.tierKey);
           } else {
-            ins.run(newId(), event.id, t.tierKey, t.name, t.priceCents, t.cap, t.unlimited ? 1 : 0, t.status, t.studentOnly ? 1 : 0, t.description, sort);
+            ins.run(newId(), event.id, t.tierKey, t.name, t.priceCents, t.cap, t.unlimited ? 1 : 0, t.status, t.studentOnly ? 1 : 0, t.description, sort, t.seatsPerUnit);
           }
         });
       }
@@ -793,6 +820,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
               status: t.status,
               studentOnly: t.studentOnly,
               description: t.description,
+              seatsPerUnit: t.seatsPerUnit,
             })),
           }
         : {}),

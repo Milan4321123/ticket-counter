@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { platformContactEmail, platformName } from '@/lib/platform';
-import { BUYER_RETENTION_DAYS } from '@/lib/retention';
+import { BUYER_RETENTION_DAYS, WAITLIST_NOTIFIED_RETENTION_DAYS } from '@/lib/retention';
 
 // The retention window is read from the same constant the erasure sweep uses,
 // so this page cannot promise one thing while the server does another.
@@ -142,6 +142,20 @@ export default function PrivacyPage() {
               not attach one. But if the organizer answers it, the question and the answer are
               published on that event&rsquo;s page for everyone to read — so write it as though it
               will be public, because it may well be.
+            </p>
+          </div>
+
+          <div className="card anim-fade-up anim-d3">
+            <h2 className="card-title">The sold-out waitlist</h2>
+            <p style={{ marginBottom: 0 }}>
+              When an event has sold out, you can leave your email address to hear if spots free up.
+              That address is the only thing we store — no name, no account — and it exists for
+              exactly one job: if spots do free up, we send you one email saying so. Everyone on the
+              list gets that email at the same moment, spots go to whoever books first, and there is
+              no mailing list behind any of it. Once your one email has gone out, your address is
+              deleted within {WAITLIST_NOTIFIED_RETENTION_DAYS} days; if the event passes without
+              anything freeing up, it is deleted then instead. Want it gone sooner? Ask, and we
+              will.
             </p>
           </div>
 

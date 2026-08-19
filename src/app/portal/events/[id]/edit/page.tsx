@@ -279,6 +279,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
               status: t.status,
               studentOnly: t.studentOnly,
               description: t.description,
+              seatsPerUnit: t.seatsPerUnit,
             }))}
           soldByTierKey={soldByTierKey}
         />

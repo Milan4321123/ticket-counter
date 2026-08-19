@@ -81,6 +81,9 @@ export default async function AdminEventsPage() {
               name: t.name,
               cap: t.cap,
               sold: availability.tiers[t.tierKey]?.sold ?? 0,
+              // The form needs the weight between this tier's bookings and the
+              // room's seats to lift caps in the right denomination.
+              seatsPerUnit: t.seatsPerUnit,
             }));
             const log = readCapacityLog(event.id);
             const soldOut = availability.totalRemaining === 0;
