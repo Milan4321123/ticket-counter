@@ -102,6 +102,9 @@ export default async function AdminDashboardPage() {
           <Link href="/admin/organizers" className="btn btn-sm">
             Organizers
           </Link>
+          <Link href="/admin/events" className="btn btn-sm">
+            Ticket limits
+          </Link>
           <Link href="/admin/sales" className="btn btn-sm">
             Sales
           </Link>

@@ -104,7 +104,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   hiding: the visitor asked for BOTH of these to stay visible,
                   and a nav that drops an item on small screens is a nav that
                   hides the thing you were looking for. */}
-              <Link href="/" className="small header-link" aria-label="Browse events">
+              <Link href="/" className="btn btn-sm btn-green" aria-label="Browse events">
                 <span className="header-label-long">Browse events</span>
                 <span className="header-label-short" aria-hidden="true">
                   Browse
