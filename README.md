@@ -1,8 +1,8 @@
-# Multi-Organizer Ticket Platform
+# MartNepali — Multi-Organizer Ticket Platform
 
 ## 1. What this is
 
-A complete, self-contained **ticketing platform for multiple event organizers**. You — the platform owner — charge organizers a fee **per event** they publish: €15 to publish, plus €0.15 for every ticket the venue holds, so a 500-person event costs €90 (accounts are free). Each organizer gets a self-service portal where they build their event page (photos, video, description, address, ticket tiers), publish it to the public feed, and sell tickets. Buyers pay by **bank transfer directly to the organizer's own bank account** — the platform never holds ticket money. When the organizer sees the money on their bank statement, they confirm the payment and the site instantly creates QR-code tickets and emails them to the buyer.
+A complete, self-contained **ticketing platform for multiple event organizers**, running as **MartNepali** at [martnepali.com](https://martnepali.com). The platform is **completely free for organizers**: accounts are free, publishing is free, and the platform takes no cut of ticket sales. Each organizer gets a self-service portal where they build their event page (photos, video, description, address, ticket tiers), publish it to the public feed, and sell tickets. Buyers pay by **bank transfer directly to the organizer's own bank account** — the platform never holds ticket money. When the organizer sees the money on their bank statement, they confirm the payment and the site instantly creates QR-code tickets and emails them to the buyer.
 
 Every ticket has a unique code and scans exactly once at the door. Seat counts and prices are enforced on the server, so nobody can oversell an event or tamper with prices from a browser. Everything is stored in a single data folder that you control — no monthly software fees, no third-party ticketing cut.
 
@@ -12,10 +12,10 @@ Three kinds of people use the site, in three separate areas:
 | --- | --- | --- |
 | **Buyers** | `/` and `/e/…` | Browse events, buy tickets, receive QR tickets by email. No account needed. |
 | **Organizers** | `/portal` | Manage their events, tiers, photos, bank details; confirm payments; create door-scanner links. |
-| **You (platform owner)** | `/admin` | Manage organizer accounts, confirm event fees, oversee everything. |
+| **You (platform owner)** | `/admin` | Manage organizer accounts, oversee everything. |
 | **Door staff** | `/scan` | Check tickets in via a time-limited scanner link — nothing else. |
 
-**New here?** The business side (fees, onboarding organizers, support) is in **[PLATFORM.md](PLATFORM.md)**. The click-by-click launch guide is in **[GO-LIVE.md](GO-LIVE.md)**.
+**New here?** The business side (why it's free, onboarding organizers, support) is in **[PLATFORM.md](PLATFORM.md)**. The click-by-click launch guide is in **[GO-LIVE.md](GO-LIVE.md)**.
 
 ## 2. Quick start (try it in 2 minutes)
 
@@ -38,7 +38,7 @@ Then:
 
 1. Sign in to the admin area at [http://localhost:3000/admin](http://localhost:3000/admin) with your `ADMIN_PASSWORD`. (During development, emailed sign-in codes are also printed to the server console, so broken email settings never lock you out.)
 2. Create an organizer account under **/admin/organizers** — the site shows you a one-time password.
-3. Log in as that organizer at [http://localhost:3000/portal/login](http://localhost:3000/portal/login), create an event, and give it a tier and an IBAN (any test value). Publishing is locked until the event fee is confirmed — hop back to **/admin/organizers → Event fees**, click *Fee received*, type the last 4 characters of the event's `EVENT-…` reference, then publish from the portal.
+3. Log in as that organizer at [http://localhost:3000/portal/login](http://localhost:3000/portal/login) (you'll be asked to replace the one-time password), create an event, and give it a tier and an IBAN (any test value). Publishing is free — the Publish tab shows a checklist of anything still missing (for priced tiers that includes a way to be paid, and by default an authenticator app set up in the portal's Settings); finish it and publish.
 4. Visit the homepage, buy a ticket as a buyer, then confirm the "payment" from the portal and watch the QR ticket arrive.
 
 ## 3. How the site fits together
@@ -47,7 +47,7 @@ Then:
 - **`/e/[slug]` — event pages.** Each event's own page: photos, video, description, an "Open in Maps" address link, and the ticket shop. Organizers style it with a theme — or, if the AI designer is enabled, describe the vibe in their own words and let the AI pick the look and write the copy.
 - **`/checkout`, `/order/[id]`, `/ticket/[code]` — the buyer flow.** Reserve seats, see payment instructions (amount, the organizer's IBAN, a personal reference like `TICKETS-AB12CD34`), then find the QR tickets on the personal order page and in email. References containing `S-` mark orders with student tickets, visible right on the bank statement.
 - **`/portal` — the organizer portal.** Email + password login (accounts are created by the platform admin). Organizers see only their own events and orders — ownership is checked on the server for every single request.
-- **`/admin` — the platform admin.** Password plus emailed one-time code. Manage organizer accounts (create, activate, reset password, disable), confirm the per-event fees that unlock publishing, and oversee platform-wide activity.
+- **`/admin` — the platform admin.** Password plus emailed one-time code. Manage organizer accounts (create, approve applications, reset password, disable) and oversee platform-wide activity.
 - **`/scan` — door check-in.** Opened via time-limited scanner links that organizers (or you) generate per event. A scanner link gives access to that one event's check-in screen only: staff scan a ticket's QR code or type its short code; each ticket works exactly once, student tickets show a "check student ID" reminder, and a ticket from a different event is clearly rejected.
 
 ## 4. How payment works (bank transfer)
@@ -58,27 +58,16 @@ Then:
 4. **The organizer confirms the payment.** The site mints the QR tickets and emails them to the buyer automatically.
 5. **If no payment arrives**, the reservation expires on its own (pay-within days + 2 grace days) and the seats go back on sale. Late payments are handled gracefully: marking an expired reservation paid re-reserves the seats if any are left.
 
-The platform itself is never in the money flow — ticket revenue goes buyer → organizer, and organizers pay the platform owner a per-event fee separately. Why that matters (and how to run it as a business) is explained in [PLATFORM.md](PLATFORM.md).
+The platform itself is never in the money flow — ticket revenue goes straight from buyer to organizer, and the platform charges nothing on top. Why the money flows this way (and why the platform is free) is explained in [PLATFORM.md](PLATFORM.md).
 
-### The event fee (how you get paid)
+### Publishing is free (there is no platform fee)
 
-Your own revenue runs on the same bank-transfer idea, one event at a time:
+There used to be a per-event fee here — a base amount plus a per-ticket rate on the venue's capacity, paid to the platform's own bank account before an event could be published. All of that machinery was **deliberately deleted**: the platform is free while it grows, and if pricing ever returns it should return as a decision, not as a leftover (the header comment in `src/lib/platform.ts` records this).
 
-1. **An organizer builds an event** in their portal. Drafts are free and unlimited.
-2. **The Publish tab shows the fee card**: the amount for *that* event, *your* bank details, and that event's Verwendungszweck — a reference like `EVENT-1A2B3C4D` derived from the event id. The Publish button stays locked, and the same details are emailed to the organizer.
-   The amount is €15.00 to publish plus €0.15 for every ticket the venue holds, so a 500-person event costs €90.00 (`PLATFORM_FEE_BASE_CENTS` / `PLATFORM_FEE_PER_TICKET_CENTS`). It is charged on the capacity the organizer states, not on tickets sold: the platform never touches ticket money, so there is nothing to deduct a per-sale fee from and nothing left to invoice afterwards. It is quoted the moment the organizer is shown it and stored on the event, so the Publish tab, the email, and your confirm screen always name the same number. While the fee is unpaid, changing the capacity re-quotes it; once you confirm the payment the amount is frozen.
-3. **They transfer the fee** with that reference in the purpose line.
-4. **You confirm it** at `/admin/organizers` → **Event fees**: click *Fee received* and type the last 4 characters of the reference from your bank statement (the same two-step confirm as ticket payments). Publishing unlocks instantly and the organizer gets a "your event can go live" email.
+What that means in practice:
 
-Events that were already published before this pricing landed are grandfathered in as paid — nobody is charged retroactively.
-
-Three emails carry this flow (all fail silently when SMTP is unset, since every detail is on screen too):
-
-| Email | When | What's in it |
-| --- | --- | --- |
-| Signup instructions | Right after someone signs up at `/organizers/signup` | Welcome, "the account is free, events cost X", your bank box, their account reference, portal link. |
-| Event fee instructions | When they try to publish an event whose fee hasn't arrived | Your bank box and that event's `EVENT-…` Verwendungszweck, plus a link to the Publish tab. |
-| Event can go live | When you confirm that event's fee | "Publishing is unlocked" and a link straight to the Publish tab. |
+- **Publishing gates on nothing but the listing being complete.** The Publish tab is a checklist, not a paywall: it lists whatever is still missing (for example a way to be paid when any ticket costs money, or the authenticator app the portal requires before an account can sell — see `PORTAL_REQUIRE_AUTHENTICATOR`), and the organizer publishes themselves the moment it's done.
+- **No money ever flows to the platform.** There is no fee to confirm, no platform bank account to configure — the organizers' own payout details are the only bank accounts in the system.
 
 ## 5. Email
 
@@ -89,7 +78,7 @@ SMTP_HOST=smtp.sendgrid.net
 SMTP_PORT=587
 SMTP_USER=apikey
 SMTP_PASS=your-api-key
-EMAIL_FROM="Your Platform <tickets@yourdomain.com>"
+EMAIL_FROM="MartNepali <support@eventsticketbuy.com>"
 ```
 
 Email is used for payment instructions after a reservation, the QR-ticket emails after a confirmed payment, and the platform admin's sign-in codes. If SMTP is blank, sales still work (buyers see everything on their order page), but for a real launch set it up — [GO-LIVE.md](GO-LIVE.md) walks through SendGrid step by step.
@@ -106,23 +95,21 @@ Locally these go in `.env.local`; on a hosting service, into its environment-var
 
 | Variable | Required? | What it does |
 | --- | --- | --- |
-| `PLATFORM_NAME` | Recommended | Your platform's public name, shown in the site header, page titles, and emails. |
-| `PLATFORM_FEE_BASE_CENTS` | No | The flat part, in cents (default `1500` = €15.00) — what it costs to publish at all. |
-| `PLATFORM_FEE_PER_TICKET_CENTS` | No | The per-ticket part, in cents (default `15` = €0.15), charged on the capacity the organizer states. With both defaults: 100 capacity → €30.00, 300 → €60.00, 500 → €90.00, 1000 → €165.00. Charged once per event, before it can be published — organizer accounts themselves are free. Shown on `/organizers`, on each event's Publish tab, in `/admin/organizers`, and in the fee emails. |
-| `PLATFORM_BANK_HOLDER` / `PLATFORM_BANK_IBAN` | For collecting fees | **Your own** bank account, shown to organizers paying an event fee. Until both are set, the fee card and signup page show a "being set up — contact us" note instead. |
-| `PLATFORM_BANK_BIC` / `PLATFORM_BANK_NAME` | No | Optional BIC and bank name shown alongside your payment details. |
-| `PLATFORM_CONTACT_EMAIL` | Recommended | Where organizers reach you about a **custom-designed page**: shown as a mailto link on `/contact` and `/organizers`, and used as the recipient of every enquiry from the contact form. Falls back to the first `ADMIN_EMAIL` address, then to a demo address. |
+| `PLATFORM_NAME` | Recommended | Your platform's public name, shown in the site header, page titles, and emails. Defaults to `MartNepali`. |
+| `PLATFORM_CONTACT_EMAIL` | Recommended | Where organizers reach you about a **custom-designed page**: shown as a mailto link on `/contact`, `/privacy` and `/organizers`, and used as the recipient of every enquiry from the contact form. Falls back to `EMAIL_FROM_ORGANIZERS`, then `EMAIL_FROM`; with none set the pages simply omit the address. (It deliberately does **not** fall back to `ADMIN_EMAIL` — that's the inbox your own sign-in codes arrive in.) |
 | `PAYMENT_MODE` | **Yes, for real sales** | `transfer` = bank transfer (the platform's payment model). `mock` = fake test payments for development. |
 | `ADMIN_PASSWORD` | **Yes** | The platform admin password. Production requires 10+ characters and rejects placeholders. Without it, `/admin` is disabled. |
 | `APP_SECRET` | **Yes, in production** | A long random string used to sign admin sessions, organizer sessions, and scanner links. Changing it logs everyone out. |
 | `ADMIN_EMAIL` | Recommended | Where admin sign-in codes are emailed. Comma-separate multiple addresses. Also used as the seeded owner account's email on first migration. |
 | `ADMIN_OTP` | No | Set to `off` to disable the emailed one-time code (password-only admin login). |
-| `NEXT_PUBLIC_BASE_URL` | **Yes, in production** | The site's public address, e.g. `https://tickets.example.com` — used in emailed links and scanner links. |
+| `NEXT_PUBLIC_BASE_URL` | **Yes, in production** | The site's public address, e.g. `https://martnepali.com` — used in emailed links and scanner links. |
 | `DATA_DIR` | On hosted setups | The data folder — SQLite database **and uploaded event photos**. Defaults to `./data`. Point it at the persistent disk (e.g. `/data`). |
 | `GEMINI_API_KEY` | No | Free key from Google AI Studio — powers the Q&A assistants (the event-page question box and the platform help bot); falls back to `ANTHROPIC_API_KEY`, or to organizer-answered questions when neither is set. |
 | `ANTHROPIC_API_KEY` | No | Enables the AI page designer for organizers (section 6). Also the fallback model for the Q&A assistants when `GEMINI_API_KEY` is unset or over quota. Leave unset to offer the manual theme picker only. |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | For email | Your email provider's SMTP settings (for SendGrid: host `smtp.sendgrid.net`, port `587`, user literally `apikey`, pass = your API key). |
-| `EMAIL_FROM` | For email | The sender, e.g. `"Your Platform <tickets@yourdomain.com>"`. Emails don't send without it. |
+| `EMAIL_FROM` | For email | The sender, e.g. `"MartNepali <support@eventsticketbuy.com>"`. Emails don't send without it. Use a mailbox that can receive as well as send. |
+| `EMAIL_FROM_BUYERS` / `EMAIL_FROM_ORGANIZERS` | No | Optional split senders: buyer-facing mail (tickets, payment instructions, reminders) vs organizer-facing mail (credentials, sign-in codes, security alerts). Each falls back to `EMAIL_FROM`; both must be verified senders at your SMTP provider. `EMAIL_REPLY_TO_BUYERS` / `EMAIL_REPLY_TO_ORGANIZERS` override where replies go while the sending domain can't receive mail yet. |
+| `PORTAL_REQUIRE_AUTHENTICATOR` | No | On by default: organizers must set up an authenticator app before they can publish (the moment an account starts taking strangers' money). Set to `off` only to unblock an organizer who genuinely cannot run one. |
 | `ADMIN_GATE_PATH` | No | A secret word that hides `/admin` behind a 404 until you visit `https://yourdomain.com/<gate-path>` once per device. |
 | `ADMIN_PHONE` + `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM` | No | Also text the admin sign-in code to your phone via Twilio. |
 | `ADMIN_MASTER_OTP` | No | A fixed code accepted in place of the emailed one — for testing only. Leave unset in production. |

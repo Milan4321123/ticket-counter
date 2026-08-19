@@ -17,10 +17,10 @@ A quick map of what you're about to set up:
 
 ## 1. Name your platform and buy a domain
 
-You're launching a platform, so it needs a name — the name organizers will recommend to each other and buyers will see on their tickets. Keep it short, easy to say out loud, and not tied to one event or one artist.
+You're launching a platform, so it needs a name — the name organizers will recommend to each other and buyers will see on their tickets. This platform's name is **MartNepali**, and its domain is **martnepali.com** — the domain *is* the platform name, which is the ideal.
 
-1. Pick the name and set it as the `PLATFORM_NAME` environment variable (step 2.4) — it appears in the site header, page titles, and emails.
-2. Go to any domain registrar — Namecheap, Cloudflare, IONOS, GoDaddy, and Porkbun are all fine — and buy the matching domain. A normal `.com` or `.de` costs about **10–15 EUR per year**. Ideally the domain *is* the platform name (e.g. `nachtkasse.com` → platform name "Nachtkasse").
+1. Set the name as the `PLATFORM_NAME` environment variable (step 2.4) — it appears in the site header, page titles, and emails. (`MartNepali` is also the built-in default, so leaving it unset shows the same name.)
+2. Go to any domain registrar — Namecheap, Cloudflare, IONOS, GoDaddy, and Porkbun are all fine — and buy the matching domain. A normal `.com` or `.de` costs about **10–15 EUR per year**.
 3. That's it for now — you'll connect the domain to the site in step 2.6.
 
 ## 2. Put the site on the internet (Render)
@@ -70,9 +70,9 @@ In the service's **Environment** tab, add these (values without quotes unless sh
 
 | Key | Value |
 | --- | --- |
-| `PLATFORM_NAME` | Your platform's name from step 1, e.g. `Nachtkasse` |
+| `PLATFORM_NAME` | Your platform's name from step 1: `MartNepali` (also the built-in default) |
 | `PAYMENT_MODE` | `transfer` |
-| `NEXT_PUBLIC_BASE_URL` | `https://yourdomain.com` — your real address from step 1, with `https://` |
+| `NEXT_PUBLIC_BASE_URL` | `https://martnepali.com` — your real address from step 1, with `https://` |
 | `DATA_DIR` | `/data` |
 | `APP_SECRET` | A long random string, 40+ characters. On a Mac, run `openssl rand -hex 32` in Terminal and paste the result. Never reuse a password here. |
 | `ADMIN_PASSWORD` | A strong password, **at least 10 characters** — the site refuses weak or placeholder passwords in production. |
@@ -85,7 +85,7 @@ In the service's **Environment** tab, add these (values without quotes unless sh
 | `SMTP_PORT` | `587` |
 | `SMTP_USER` | `apikey` (literally that word — see step 3) |
 | `SMTP_PASS` | Your SendGrid API key (from step 3) |
-| `EMAIL_FROM` | `Your Platform <tickets@yourdomain.com>` — must be the address you verify in step 3 |
+| `EMAIL_FROM` | `MartNepali <support@eventsticketbuy.com>` — must be the address you verify in step 3. (The support mailbox stays at the old domain for now; swap it for a `martnepali.com` address once mail there is authenticated **and** can receive.) |
 
 Note what is *not* in this list anymore: event details and bank accounts. Those now live in the database — each organizer enters their own event details and **their own IBAN** in their portal. You never configure anyone's bank details.
 
@@ -163,7 +163,7 @@ By default the 6-digit sign-in code arrives by email. If you'd also like it text
 
 ## 5. Your first organizer (and the migrated event)
 
-Organizers can sign themselves up at `/organizers/signup` (you just switch the account on), or **you** create the account by hand. Either way the account is free — your money comes per event, when they publish one; see [PLATFORM.md](PLATFORM.md) for the whole playbook. The short version of creating one yourself:
+Organizers apply for an account through the site — the sales page at `/organizers` sends them to the application form at `/contact?intent=account`, and you approve the application from `/admin/contact` (one click creates the account and emails them their sign-in details) — or **you** create the account by hand. Either way it's free: the account, publishing, everything — the platform charges organizers nothing; see [PLATFORM.md](PLATFORM.md) for the whole playbook. The short version of creating one yourself:
 
 1. Sign in at `/admin` and open **`/admin/organizers`**.
 2. Create the account: name and email. Accounts never expire, so there is no plan date to pick.
@@ -190,7 +190,7 @@ Fresh installs without an old database simply start with an empty platform — n
 Do one complete dress rehearsal on the real site, wearing all four hats: admin, organizer, buyer, door staff. Have your phone and your inbox ready.
 
 1. **As admin:** create a test organizer account for yourself (use your own email).
-2. **As organizer:** log in at `/portal/login` and create a small test event — a photo, one or two tiers, your own IBAN. The Publish tab shows the event fee card with your own bank details and an `EVENT-…` reference; go back to **`/admin/organizers` → Event fees**, click *Fee received* and type the last 4 characters of that reference, then publish. Check it appears in the feed and its page at `/e/…` looks right (address link, photos, video).
+2. **As organizer:** log in at `/portal/login` and create a small test event — a photo, one or two tiers, your own IBAN. Publishing is free: the Publish tab shows a checklist of anything still missing (a way to be paid for priced tiers, and the authenticator app the portal asks every selling account to set up); finish it and publish. Check the event appears in the feed and its page at `/e/…` looks right (address link, photos, video).
 3. **As buyer:** reserve 1 ticket using your own name and email. Within a minute you should get the payment-instructions email with the amount, the IBAN, and a reference like `TICKETS-AB12CD34`. Check the spam folder too — if it's there, revisit step 3.2 (domain authentication helps).
 4. **As organizer again:** your reservation appears in the portal's awaiting-transfer list. Confirm it as paid — exactly what you'll later do while reading your real bank statement. (You know no money actually moved; the site doesn't — that's fine for the test.)
 5. **Check the ticket email.** The QR-ticket email should arrive; open its button link — the order page with the QR code.
@@ -246,7 +246,7 @@ At the door:
 ## 8. Money: who gets what
 
 - **Ticket money goes directly to each organizer's own bank account** — the IBAN they entered in their portal. It never passes through you or the platform: no middleman, no payout schedule, each buyer's transfer arrives on the organizer's statement with a personal reference in the purpose line. References starting with `TICKETS-S-` contain student tickets — organizers can tally those straight off the statement.
-- **Your money is the event fees** — one fee per event: €15 to publish plus €0.15 for every ticket the venue holds, so a 500-person event costs €90 (`PLATFORM_FEE_BASE_CENTS` / `PLATFORM_FEE_PER_TICKET_CENTS`). It is transferred to your own account with that event's `EVENT-…` reference, before it can be published. You confirm each one under **Event fees** in `/admin/organizers`, which unlocks publishing and emails the organizer. Accounts themselves are free and never expire, so there is nothing to renew.
+- **The platform itself takes nothing.** There is no event fee and no cut of ticket sales — the platform is free for organizers while it grows (the why is in [PLATFORM.md](PLATFORM.md)). No money ever flows to you as the platform owner, so there is no platform bank account to configure and nothing for you to confirm. Accounts are free and never expire, so there is nothing to renew either.
 - **Refunds are between organizer and buyer.** The platform never moves money, so it can't refund either — the organizer simply transfers the amount back. You, the platform owner, never refund ticket money, because you never had it. The full support playbook is in [PLATFORM.md](PLATFORM.md).
 - After each event, the organizer's bank statements plus your database backup are the complete, auditable record of the sale.
 
