@@ -29,6 +29,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // standing compounds. Weekly — the events listed on them change.
     { url: `${base}/dashain`, changeFrequency: 'weekly', priority: 0.8 },
     { url: `${base}/tihar`, changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${base}/digest`, changeFrequency: 'weekly', priority: 0.5 },
     { url: `${base}/contact`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/privacy`, changeFrequency: 'yearly', priority: 0.3 },
   ];

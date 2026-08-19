@@ -157,6 +157,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <Link href="/">Browse events</Link>
                 </li>
                 <li>
+                  <Link href="/digest">यो हप्ता के छ · weekly digest</Link>
+                </li>
+                <li>
                   <Link href="/organizers">For organizers</Link>
                 </li>
                 <li>
