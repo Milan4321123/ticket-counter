@@ -4,6 +4,7 @@ import DashboardMock from '@/components/mockups/DashboardMock';
 import PlatformAssistant from '@/components/PlatformAssistant';
 import EditorMock from '@/components/mockups/EditorMock';
 import EventPageMock from '@/components/mockups/EventPageMock';
+import InsightsMock from '@/components/mockups/InsightsMock';
 
 // The brand name comes from an env var — read it fresh on every request.
 export const dynamic = 'force-dynamic';
@@ -32,11 +33,16 @@ const INCLUDED: string[] = [
   'Payments straight to your bank',
   'QR tickets emailed automatically',
   'Door scanning links for staff',
+  'Sales analytics & guest insights',
+  'WhatsApp poster in one tap',
+  'Sold-out waitlist',
+  'Table & group bookings',
+  'Announcements to opted-in fans',
   'AI page designer',
   'AI question assistant, 24/7',
   'Automatic payment reminders',
   'Student tiers with ID checks',
-  'Announcements and built-in FAQ',
+  'Event page updates and built-in FAQ',
   'Free account, free publishing',
 ];
 
@@ -230,6 +236,34 @@ export default function OrganizersPage() {
             </div>
             <div className="anim-fade-up anim-d1">
               <EventPageMock />
+            </div>
+          </div>
+
+          {/* Insights. Last of the rows on purpose: dashboard, editor and
+              event page answer "can I run a sale at all?", and this one is
+              the reason to stay once the first event has sold — flipped to
+              keep the left-right rhythm going. */}
+          <div className="feat-row feat-row-flip">
+            <div className="feat-copy anim-fade-up">
+              <p className="feed-kicker">Your numbers</p>
+              <h2 className="feat-title">See who is coming — and who brought them</h2>
+              <ul className="feat-points">
+                <FeatPoint>
+                  <strong>Sales &amp; check-in analytics, live</strong> — money, tickets
+                  sold and door rate, with a spreadsheet download.
+                </FeatPoint>
+                <FeatPoint>
+                  <strong>Every guest&rsquo;s history at a glance</strong> — bookings,
+                  tickets, check-ins, and who keeps coming back.
+                </FeatPoint>
+                <FeatPoint>
+                  <strong>Referrals and your fan list</strong> — see whose shared links
+                  brought friends, and who opted in to hear about your next event.
+                </FeatPoint>
+              </ul>
+            </div>
+            <div className="anim-fade-up anim-d1">
+              <InsightsMock />
             </div>
           </div>
         </div>

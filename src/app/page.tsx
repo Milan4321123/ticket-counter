@@ -105,6 +105,11 @@ function faqs(anyPaypal: boolean) {
       'A few days. The exact deadline is shown on your order page and in your confirmation email. If nothing arrives by then the reservation is released so someone else can take the seats — but a transfer you sent in time will not lose them, even if it is still travelling.',
   },
   {
+    question: 'The event I want is sold out. Is there any hope?',
+    answer:
+      'Sometimes, yes. A sold-out event page lets you leave your email on a waitlist. If seats free up — a reservation expires unpaid, or the organizer opens more — everyone on the list gets one email, and the seats go to whoever books first. That single heads-up is the only thing your address is used for.',
+  },
+  {
     question: 'I cannot find my ticket email. What now?',
     answer:
       'Check the order page you were sent when you reserved — your tickets live there permanently, which is why it is worth bookmarking. If you cannot find that either, contact the organizer of the event: they issued your ticket and can send it again.',
