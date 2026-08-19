@@ -71,21 +71,31 @@ export default function FestivalPage({ festival }: { festival: Festival }) {
 
       <section className="section" style={{ paddingTop: 20 }}>
         <div className="container container-narrow">
-          {occurrence && (
+          {/* A one-day festival's whole story is already in the hero line, so a
+              "The days" table with a single row would be scaffolding around
+              nothing — skip it, keeping only the dateNote when there is one. */}
+          {occurrence && (occurrence.days.length > 1 || occurrence.dateNote) && (
             <div className="card anim-fade-up">
-              <h2 className="card-title">The days</h2>
-              <div>
-                {occurrence.days.map((d) => (
-                  <div className="summary-row" key={d.date}>
-                    <span className="muted" style={{ whiteSpace: 'nowrap' }}>
-                      {humanDate(d.date)}
-                    </span>
-                    <span style={{ textAlign: 'right' }}>{d.name}</span>
+              {occurrence.days.length > 1 && (
+                <>
+                  <h2 className="card-title">The days</h2>
+                  <div>
+                    {occurrence.days.map((d) => (
+                      <div className="summary-row" key={d.date}>
+                        <span className="muted" style={{ whiteSpace: 'nowrap' }}>
+                          {humanDate(d.date)}
+                        </span>
+                        <span style={{ textAlign: 'right' }}>{d.name}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </>
+              )}
               {occurrence.dateNote && (
-                <p className="muted small" style={{ margin: '10px 0 0' }}>
+                <p
+                  className="muted small"
+                  style={{ margin: occurrence.days.length > 1 ? '10px 0 0' : 0 }}
+                >
                   {occurrence.dateNote}
                 </p>
               )}

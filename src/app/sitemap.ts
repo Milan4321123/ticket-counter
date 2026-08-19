@@ -29,6 +29,19 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // standing compounds. Weekly — the events listed on them change.
     { url: `${base}/dashain`, changeFrequency: 'weekly', priority: 0.8 },
     { url: `${base}/tihar`, changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${base}/teej`, changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${base}/chhath`, changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${base}/nepali-new-year`, changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${base}/holi`, changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${base}/sonam-lhosar`, changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${base}/tamu-lhosar`, changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${base}/gyalpo-lhosar`, changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${base}/saraswati-puja`, changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${base}/buddha-jayanti`, changeFrequency: 'weekly', priority: 0.8 },
+    // The calendar surfaces: the index of every festival above, and the patro
+    // with today's BS date and the converter. Daily — the patro changes daily.
+    { url: `${base}/festivals`, changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${base}/patro`, changeFrequency: 'daily', priority: 0.8 },
     { url: `${base}/digest`, changeFrequency: 'weekly', priority: 0.5 },
     { url: `${base}/contact`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/privacy`, changeFrequency: 'yearly', priority: 0.3 },
