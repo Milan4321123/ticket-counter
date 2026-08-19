@@ -19,7 +19,7 @@ interface Props {
   /** When set, a second row shows the event name and its section tabs. */
   event?: PortalNavEvent;
   /** Which event tab is the current page. */
-  tab?: 'edit' | 'orders' | 'checkin';
+  tab?: 'edit' | 'orders' | 'insights' | 'checkin';
 }
 
 /**
@@ -71,6 +71,12 @@ export default function PortalNav({ active, event, tab }: Props) {
                 className={`portal-tab${tab === 'orders' ? ' portal-tab-active' : ''}`}
               >
                 Orders
+              </Link>
+              <Link
+                href={`/portal/events/${event.id}/insights`}
+                className={`portal-tab${tab === 'insights' ? ' portal-tab-active' : ''}`}
+              >
+                Insights
               </Link>
               <Link
                 href={`/portal/events/${event.id}/checkin`}

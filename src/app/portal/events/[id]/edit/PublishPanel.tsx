@@ -83,6 +83,22 @@ export default function PublishPanel({ eventId, kind, status, slug, checklist }:
             it here exactly as before. Publish again whenever you like — going offline and back on
             costs nothing. {v.Codes} people already bought stay valid either way.
           </p>
+
+          {/* Only while live: the poster's QR code opens the public page, and a
+              draft's link answers nothing — handing that into a group chat would
+              burn the one moment people were curious. A plain <a>, not a fetch:
+              the route streams a PNG and the browser's own download handling is
+              exactly the right amount of UI. */}
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 20 }}>
+            <div className="card-title" style={{ fontSize: 16 }}>Poster for WhatsApp</div>
+            <p className="muted small" style={{ margin: '6px 0 12px' }}>
+              A picture of your {v.listing} sized for group chats and statuses, with a QR code that
+              opens your page — forward it wherever your buyers already are.
+            </p>
+            <a href={`/api/portal/events/${eventId}/poster`} download className="btn btn-sm">
+              Download poster
+            </a>
+          </div>
         </div>
       ) : (
         <div>
