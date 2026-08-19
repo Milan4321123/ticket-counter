@@ -17,7 +17,7 @@ import {
 import { formatMoney } from './money';
 import { girocodePayload } from './girocode';
 import { vocabFor } from './vocab';
-import { getOrder, getOrderItems, getTicketsForOrder, paymentReference } from './orders';
+import { getOrder, getOrderItems, getTicketsForOrder, paymentReference, referralCode } from './orders';
 import { orderPayout } from './payout';
 import {
   bareAddress,
@@ -29,6 +29,7 @@ import {
   replyToBuyers,
   replyToOrganizers,
 } from './platform';
+import { confirmSubscriptionUrl, oneClickUnsubscribeUrl, unsubscribeUrl } from './marketing';
 import { WAITLIST_NOTIFIED_RETENTION_DAYS } from './retention';
 import { whatsappShareUrl } from './whatsapp';
 import type { ContactRequestRow } from './contact';
@@ -671,12 +672,22 @@ export async function sendTicketEmail(
     // The share link the order page also offers: no number, so WhatsApp's own
     // picker chooses the group. The buyer holding fresh codes is the single
     // best moment to ask, and an email survives to be re-found later.
+    //
+    // ?ref= is this buyer's own referral code (the order's random share_code —
+    // see lib/orders referralCode — NEVER the payment reference's short id,
+    // which support treats as weak proof of owning the order and so must not
+    // be broadcast), so the organizer's insights can see who brought friends.
+    // Analysis only, no reward. Pre-share_code orders have no code — their
+    // link simply carries no ref. The TEXT here and on the order page must
+    // stay word-for-word identical — change one, change both.
+    const refCode = referralCode(order);
+    const shareEventUrl = `${getBaseUrl()}/e/${event.slug}${refCode ? `?ref=${refCode}` : ''}`;
     const shareUrl =
       event.status === 'published'
         ? whatsappShareUrl(
             isFreeOrder
-              ? `I'm going to ${event.name} — it's free! Reserve your spot: ${getBaseUrl()}/e/${event.slug}`
-              : `I just got my tickets for ${event.name}! Get yours: ${getBaseUrl()}/e/${event.slug}`
+              ? `I'm going to ${event.name} — it's free! Reserve your spot: ${shareEventUrl}`
+              : `I just got my tickets for ${event.name}! Get yours: ${shareEventUrl}`
           )
         : null;
     const bodyHtml =
@@ -2289,6 +2300,203 @@ export async function sendWaitlistSpotsOpenEmail(
     return { sent: true };
   } catch (err) {
     console.error('[email] Failed to send waitlist notification:', err instanceof Error ? err.message : err);
+    return { sent: false, reason: 'send-failed' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Announcements: the one email a "keep me posted" tick buys per new listing
+// ---------------------------------------------------------------------------
+
+/**
+ * Tell ONE subscriber that the organizer they asked to hear from has published
+ * something new. Only ever called by the announce route, which walks the
+ * CONFIRMED, not-unsubscribed audience and claims a marketing_sends row per
+ * address BEFORE calling this — so this mail can never reach anyone who did
+ * not ask (and confirm from their own inbox), and never twice about one event.
+ *
+ * The organizer is the sender-in-spirit: the subject and the first line name
+ * THEM as the party announcing, because the tick at checkout was about their
+ * future listings, not about the platform. The event link is deliberately
+ * plain — no referral code, no tracking: nobody "referred" this reader, the
+ * organizer did.
+ *
+ * Refuses to send at all when no unsubscribe link can be built (unsigned
+ * deployment): a marketing email without a working way out breaks the exact
+ * promise /privacy makes about it. Never throws — a failed address is the
+ * route's loop to log and carry on past.
+ */
+export async function sendOrganizerAnnouncementEmail(
+  to: string,
+  event: EventRow
+): Promise<{ sent: boolean; reason?: string }> {
+  try {
+    if (!isEmailConfigured()) return { sent: false, reason: 'email-not-configured' };
+    const unsubUrl = unsubscribeUrl(event.organizerId, to);
+    const oneClickUrl = oneClickUnsubscribeUrl(event.organizerId, to);
+    if (!unsubUrl || !oneClickUrl) return { sent: false, reason: 'unsubscribe-unavailable' };
+
+    const v = vocabFor(event.kind);
+    const isShop = event.kind === 'shop';
+    const organizerName = organizerDisplayName(event.organizerId) || 'The organizer';
+    const eventUrl = `${getBaseUrl()}/e/${event.slug}`;
+    const venue = venueDisplay(event);
+    const whenLine = isShop ? firstLineOf(event.pickupInfo) : event.dateDisplay;
+    const headline = `${organizerName} has a new ${v.listing} on ${platformName()}`;
+
+    const bodyHtml =
+      pHtml(`Hi,`) +
+      pHtml(
+        `You asked ${strong(organizerName)} to keep you posted — here is what they just announced: ` +
+          `${strong(event.name)}${whenLine ? `, ${escapeHtml(whenLine)}` : ''}${venue ? ` at ${escapeHtml(venue)}` : ''}.`,
+        20
+      ) +
+      buttonHtml(eventUrl, `See the ${v.listing}`) +
+      buttonNoteHtml(`Everything — ${isShop ? 'items, prices and how to collect' : 'tickets, prices and details'} — is on the page.`) +
+      smallHtml(
+        `You get at most one email per new listing, and you can ` +
+          `<a href="${escapeHtml(unsubUrl)}" style="color:${C.brandDeep};font-weight:700;">unsubscribe any time</a> — ` +
+          `one button on the page that opens, no sign-in, and it works immediately and forever.`
+      );
+
+    const text = renderText({
+      headline,
+      context: [event.name, whenLine, venue],
+      lines: [
+        'Hi,',
+        '',
+        wrapText(
+          `You asked ${organizerName} to keep you posted — here is what they just announced: ` +
+            `${event.name}${whenLine ? `, ${whenLine}` : ''}${venue ? ` at ${venue}` : ''}.`
+        ),
+        '',
+        `See the ${v.listing}: ${eventUrl}`,
+        '',
+        wrapText(
+          `You get at most one email per new listing. Unsubscribe any time — one button, no ` +
+            `sign-in, works immediately and forever: ${unsubUrl}`
+        ),
+      ],
+      footer: [[event.name, whenLine, venue].filter(Boolean).join(' · ')],
+    });
+
+    await createTransporter().sendMail({
+      from: emailFromBuyers(),
+      replyTo: replyToBuyers(),
+      to,
+      subject: headline,
+      text,
+      // The standard machine-readable way out, on top of the visible link —
+      // mail clients surface it as their own Unsubscribe button. RFC 8058
+      // one-click: the client POSTs to the API endpoint, which acts at once —
+      // unlike the visible page link, which waits for a human button press so
+      // that link-prefetching mail scanners cannot unsubscribe anyone.
+      headers: {
+        'List-Unsubscribe': `<${oneClickUrl}>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      },
+      html: renderEmail({
+        title: headline,
+        preheader: `${organizerName} just published ${event.name} — you asked them to keep you posted.`,
+        kicker: 'New from an organizer you follow',
+        headline: event.name,
+        metaLines: [whenLine, venue],
+        bodyHtml,
+        footerLines: [
+          `${escapeHtml(event.name)}${whenLine ? ` · ${escapeHtml(whenLine)}` : ''}`,
+          escapeHtml(venue),
+          `You are getting this because you ticked "keep me posted" about ${escapeHtml(organizerName)} at a ` +
+            `checkout on ${escapeHtml(platformName())}. ` +
+            `<a class="brandtext" href="${escapeHtml(unsubUrl)}" style="color:${C.brandDeep};font-weight:600;">Unsubscribe</a> ` +
+            `any time — one button, no sign-in.`,
+        ],
+      }),
+    });
+    return { sent: true };
+  } catch (err) {
+    console.error('[email] Failed to send announcement:', err instanceof Error ? err.message : err);
+    return { sent: false, reason: 'send-failed' };
+  }
+}
+
+/**
+ * The double-opt-in confirmation: one email asking the address's owner to
+ * press a button before they hear anything from the organizer. Anyone can
+ * type any address into a checkout, so the tick alone must never subscribe —
+ * this email is the proof-of-ownership step, and it is deliberately neutral:
+ * no event pitch, no links except the confirm button, because a confirmation
+ * request that advertises is itself the marketing it is supposed to gate.
+ *
+ * Refuses to send when no confirm link can be built (unsigned deployment or
+ * no pending row): a confirmation email without a working button is spam.
+ * Never throws — the orders route fires and forgets it.
+ */
+export async function sendMarketingConfirmationEmail(
+  to: string,
+  organizerId: string
+): Promise<{ sent: boolean; reason?: string }> {
+  try {
+    if (!isEmailConfigured()) return { sent: false, reason: 'email-not-configured' };
+    const confirmUrl = confirmSubscriptionUrl(organizerId, to);
+    if (!confirmUrl) return { sent: false, reason: 'confirm-unavailable' };
+
+    const organizerName = organizerDisplayName(organizerId) || 'the organizer';
+    const headline = `Confirm it: hear from ${organizerName} on ${platformName()}`;
+
+    const bodyHtml =
+      pHtml(`Hi,`) +
+      pHtml(
+        `At a ${escapeHtml(platformName())} checkout just now, someone asked ${strong(organizerName)} ` +
+          `to keep this address posted about their future listings. Nothing is sent until you say so yourself:`,
+        20
+      ) +
+      buttonHtml(confirmUrl, 'Yes, keep me posted') +
+      buttonNoteHtml(`One press and you are on the list — at most one email per new listing, unsubscribe any time.`) +
+      smallHtml(
+        `Not you, or changed your mind? Do nothing. Without that button press this address is never ` +
+          `subscribed, and this is the only email about it.`
+      );
+
+    const text = renderText({
+      headline,
+      lines: [
+        'Hi,',
+        '',
+        wrapText(
+          `At a ${platformName()} checkout just now, someone asked ${organizerName} to keep this ` +
+            `address posted about their future listings. Nothing is sent until you say so yourself.`
+        ),
+        '',
+        `Yes, keep me posted: ${confirmUrl}`,
+        '',
+        wrapText(
+          `Not you, or changed your mind? Do nothing. Without that confirmation this address is ` +
+            `never subscribed, and this is the only email about it.`
+        ),
+      ],
+    });
+
+    await createTransporter().sendMail({
+      from: emailFromBuyers(),
+      replyTo: replyToBuyers(),
+      to,
+      subject: headline,
+      text,
+      html: renderEmail({
+        title: headline,
+        preheader: `One button press subscribes you to ${organizerName}'s announcements — doing nothing does nothing.`,
+        kicker: 'Please confirm',
+        headline: `Hear from ${organizerName}?`,
+        bodyHtml,
+        footerLines: [
+          `Sent because "keep me posted" was ticked at a ${escapeHtml(organizerName)} checkout on ` +
+            `${escapeHtml(platformName())}. If that was not you, no action is needed.`,
+        ],
+      }),
+    });
+    return { sent: true };
+  } catch (err) {
+    console.error('[email] Failed to send marketing confirmation:', err instanceof Error ? err.message : err);
     return { sent: false, reason: 'send-failed' };
   }
 }

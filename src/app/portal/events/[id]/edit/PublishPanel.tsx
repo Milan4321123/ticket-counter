@@ -17,6 +17,14 @@ interface Props {
   status: 'draft' | 'published' | 'archived';
   slug: string;
   checklist: ChecklistItem[];
+  /**
+   * How many subscribers an announcement about THIS listing would reach right
+   * now: the organizer's confirmed, not-unsubscribed addresses minus anyone
+   * already announced-to for this event. Computed server-side by the same
+   * query the announce route walks (lib/marketing.ts), so the number shown is
+   * the number sent.
+   */
+  announceAudience: number;
 }
 
 // There used to be a fee card here — the per-event platform fee, its bank
@@ -24,12 +32,50 @@ interface Props {
 // platform is free while it grows, so publishing now waits on nothing but the
 // checklist. The card was removed rather than hidden so this tab can never
 // show a price again by accident.
-export default function PublishPanel({ eventId, kind, status, slug, checklist }: Props) {
+export default function PublishPanel({ eventId, kind, status, slug, checklist, announceAudience }: Props) {
   const router = useRouter();
   const v = vocabFor(kind);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ready = checklist.every((c) => c.ok);
+
+  // The announcement flow: one confirm step (a second button press — no typing),
+  // because the audience count on the first button already says exactly what is
+  // about to happen, and the server's send-tracking makes even a double send of
+  // one event harmless. 'sent' keeps the result on screen until the next visit.
+  const [announceStep, setAnnounceStep] = useState<'idle' | 'confirm' | 'sending' | 'sent'>('idle');
+  const [announceResult, setAnnounceResult] = useState<string | null>(null);
+  const [announceError, setAnnounceError] = useState<string | null>(null);
+
+  async function sendAnnouncement() {
+    if (announceStep === 'sending') return;
+    setAnnounceStep('sending');
+    setAnnounceError(null);
+    try {
+      const res = await fetch(`/api/portal/events/${eventId}/announce`, { method: 'POST' });
+      const data = (await res.json().catch(() => null)) as
+        | { ok?: boolean; sent?: number; failed?: number; error?: string }
+        | null;
+      if (!res.ok || !data?.ok) {
+        setAnnounceError(data?.error ?? 'Something went wrong — nothing extra was sent. Please try again.');
+        setAnnounceStep('confirm');
+        return;
+      }
+      setAnnounceResult(
+        data.sent === 0
+          ? 'Everyone had already been told — no new emails to send.'
+          : `Sent to ${data.sent} subscriber${data.sent === 1 ? '' : 's'}.${
+              data.failed ? ` ${data.failed} could not be delivered — they stay eligible for a retry.` : ''
+            }`
+      );
+      setAnnounceStep('sent');
+      // The audience count comes from the server — refresh so it shows 0 next.
+      router.refresh();
+    } catch {
+      setAnnounceError('We could not reach the server — please check your connection and try again.');
+      setAnnounceStep('confirm');
+    }
+  }
 
   async function setStatus(next: 'draft' | 'published') {
     if (busy) return;
@@ -98,6 +144,56 @@ export default function PublishPanel({ eventId, kind, status, slug, checklist }:
             <a href={`/api/portal/events/${eventId}/poster`} download className="btn btn-sm">
               Download poster
             </a>
+          </div>
+
+          {/* Only while live, like the poster: the email links to the public
+              page. The audience is ONLY people who ticked "keep me posted" at
+              one of this organizer's checkouts and have not unsubscribed — the
+              server enforces that, and also that nobody hears about one
+              listing twice, however often this button is pressed. */}
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 20 }}>
+            <div className="card-title" style={{ fontSize: 16 }}>Tell your subscribers</div>
+            <p className="muted small" style={{ margin: '6px 0 12px' }}>
+              {announceAudience === 0 && announceStep !== 'sent'
+                ? `Nobody to email yet. Buyers can tick “keep me posted” at your checkouts and confirm it from their inbox — everyone who has (and has not already been told about this ${v.listing}) shows up here.`
+                : `People who ticked “keep me posted” at one of your checkouts and confirmed it from their inbox get one email about this ${v.listing} — at most one per listing, each with a one-button unsubscribe link.`}
+            </p>
+            {announceError && <div className="notice notice-error">{announceError}</div>}
+            {announceStep === 'sent' ? (
+              <p className="small" style={{ margin: 0 }}>
+                <span className="badge badge-green">Done</span> {announceResult}
+              </p>
+            ) : announceStep === 'idle' ? (
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => setAnnounceStep('confirm')}
+                disabled={announceAudience === 0}
+              >
+                Announce to {announceAudience} subscriber{announceAudience === 1 ? '' : 's'}
+              </button>
+            ) : (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn btn-brand btn-sm"
+                  onClick={() => void sendAnnouncement()}
+                  disabled={announceStep === 'sending'}
+                >
+                  {announceStep === 'sending'
+                    ? 'Sending…'
+                    : `Yes — email ${announceAudience} subscriber${announceAudience === 1 ? '' : 's'} now`}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => setAnnounceStep('idle')}
+                  disabled={announceStep === 'sending'}
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
         </div>
       ) : (

@@ -7,6 +7,7 @@ import { getAvailability } from '@/lib/inventory';
 import { ticketState } from '@/lib/ticketState';
 import { vocabFor } from '@/lib/vocab';
 import { expireOverdueTransferReservations } from '@/lib/orders';
+import { getOrganizer } from '@/lib/organizers';
 import { effectivePayout } from '@/lib/payout';
 import { BUYER_RETENTION_DAYS } from '@/lib/retention';
 import CheckoutClient from './CheckoutClient';
@@ -78,7 +79,8 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
   // hand-typed value must not be able to preselect a type that is coming soon,
   // hidden, sold out, or belongs to another event. Anything unrecognised is
   // simply ignored — a wrong link should open a normal checkout, not an error.
-  const wantTier = (await searchParams).tier;
+  const sp = await searchParams;
+  const wantTier = sp.tier;
   const wantedKey = Array.isArray(wantTier) ? wantTier[0] : wantTier;
   const preselectTier =
     getEventTiers(event.id).find(
@@ -87,6 +89,21 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
         t.status === 'on-sale' &&
         (availability.tiers[t.tierKey]?.remaining ?? 0) > 0
     )?.tierKey ?? null;
+
+  // ?ref= is the referral code from a shared link, carried as a PLAIN query
+  // param end to end (no cookie): event page → here → the create-order POST.
+  // Only shape-checked at this hop — the orders API is the guard that decides
+  // whether it names a real paid order; a wrong code must still check out.
+  const wantRef = sp.ref;
+  const rawRef = Array.isArray(wantRef) ? wantRef[0] : wantRef;
+  const refCode =
+    typeof rawRef === 'string' && /^[A-Za-z0-9]{8}$/.test(rawRef.trim())
+      ? rawRef.trim().toUpperCase()
+      : null;
+
+  // Who the "keep me posted" box is ABOUT. The consent is per-organizer, so
+  // the box must name them — a tick about "somebody" is not informed consent.
+  const organizerName = getOrganizer(event.organizerId)?.name?.trim() ?? '';
 
   const mode = getPaymentMode();
   const paypalClientId = process.env.PAYPAL_CLIENT_ID ?? null;
@@ -132,6 +149,8 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
       transferConfigured={transferConfigured}
       paypalOffered={paypalOffered}
       retentionDays={BUYER_RETENTION_DAYS}
+      organizerName={organizerName}
+      refCode={refCode}
     />
   );
 }

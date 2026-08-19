@@ -9,13 +9,15 @@ import {
   expireOverdueTransferReservations,
   finalizePaidOrder,
   freeTicketsForEmail,
+  getPaidOrderByReferralCode,
   heldUnpaidTicketsForEmail,
   markOrderFailed,
   setPaypalOrderId,
   type PaymentMethod,
 } from '@/lib/orders';
+import { requestMarketingConsent } from '@/lib/marketing';
 import { createPaypalOrder } from '@/lib/paypal';
-import { sendTicketEmail, sendTransferInstructionsEmail } from '@/lib/email';
+import { sendMarketingConfirmationEmail, sendTicketEmail, sendTransferInstructionsEmail } from '@/lib/email';
 import { clientIp, rateLimit } from '@/lib/ratelimit';
 import { BodyTooLargeError, readJsonLimited } from '@/lib/http';
 import type { ApiErrorResponse, CreateOrderRequest, CreateOrderResponse } from '@/lib/types';
@@ -318,6 +320,27 @@ export async function POST(req: Request) {
       return apiError(500, 'INTERNAL', 'Payment is not configured yet — please try again later or contact the organizer.');
     }
 
+    // Referral code, validated hard before it may be stored. The code arrives
+    // from a shared URL anyone can edit, so the rule fails closed to '': it
+    // must be exactly 8 chars of [A-Z0-9] after uppercasing, it must name a
+    // PAID order of THIS event, and that order's buyer must not be this buyer
+    // (self-referral counts nothing). Analysis only — no reward rides on it,
+    // which is why '' is always a safe answer.
+    let referredBy = '';
+    const rawRef = (raw as Partial<CreateOrderRequest>).ref;
+    if (typeof rawRef === 'string') {
+      const code = rawRef.trim().toUpperCase();
+      if (/^[A-Z0-9]{8}$/.test(code)) {
+        const referrer = getPaidOrderByReferralCode(event.id, code);
+        if (
+          referrer &&
+          referrer.buyerEmail.trim().toLowerCase() !== validated.buyerEmail.trim().toLowerCase()
+        ) {
+          referredBy = code;
+        }
+      }
+    }
+
     // For transfer orders createOrder also reserves the seats immediately —
     // the buyer's bank transfer takes days, and the reservation must hold
     // until the organizer confirms the money (or it expires via
@@ -329,6 +352,7 @@ export async function POST(req: Request) {
         buyerName: validated.buyerName,
         buyerEmail: validated.buyerEmail,
         payerName: validated.payerName,
+        referredBy,
         items: validated.items,
         paymentMode: mode,
       });
@@ -337,6 +361,32 @@ export async function POST(req: Request) {
         return apiError(409, 'SOLD_OUT', 'Those tickets were taken just before you — please adjust your order.');
       }
       throw e;
+    }
+
+    // The OPTIONAL "keep me posted" tick. Strictly `=== true`: absence, null,
+    // or anything a script sends that is not the literal tick records nothing —
+    // consent is an action, never a default. The tick alone only files a
+    // PENDING request; the subscription exists once the address's owner presses
+    // the button in the confirmation email (double opt-in — anyone can type
+    // any address in here, so the tick must never subscribe by itself). And it
+    // must never block checkout: a consent row that cannot be written is a
+    // logged error, not a lost sale, and the confirmation email is
+    // fire-and-forget like every other send in this route.
+    if ((raw as Partial<CreateOrderRequest>).marketingOptIn === true) {
+      try {
+        const consent = requestMarketingConsent({
+          organizerId: event.organizerId,
+          email: validated.buyerEmail,
+          sourceOrderId: order.id,
+        });
+        if (consent === 'confirmation-needed') {
+          void sendMarketingConfirmationEmail(validated.buyerEmail, event.organizerId)
+            .then((r) => console.log(`Marketing confirmation email for order ${order.id}:`, r))
+            .catch((e) => console.error(`Marketing confirmation email for order ${order.id} threw unexpectedly:`, e));
+        }
+      } catch (e) {
+        console.error(`Recording marketing consent request for order ${order.id} failed:`, e);
+      }
     }
 
     if (mode === 'free') {

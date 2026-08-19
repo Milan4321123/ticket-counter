@@ -274,6 +274,34 @@ export function runBuyerDataRetentionSweep(force = false): { erased: number } {
       )
       .run(cutoff).changes;
 
+    // Deliberately NOT swept: CONFIRMED marketing_consents (lib/marketing.ts).
+    // A buyer who ticked the optional "keep me posted" box at checkout and
+    // pressed the confirm button in their inbox asked for their address to
+    // OUTLIVE this erasure — that confirmed consent is its own lawful basis
+    // with its own lifecycle (it ends when they unsubscribe, or on an explicit
+    // deletion request), and /privacy promises exactly that. Adding those rows
+    // to this sweep would not be a privacy fix; it would break a subscription
+    // the buyer explicitly created. The consent row also never points back at
+    // an identifiable order once this sweep has run: source_order_id keeps
+    // resolving to an order whose buyer fields are already overwritten.
+    //
+    // What IS swept: pending requests that were never confirmed. An address
+    // whose owner did not press the button may be a typo or someone else's
+    // entirely, so it must not sit in a marketing table forever — once the
+    // confirmation email is stale (the buyer retention window is generous;
+    // real confirms happen within minutes) the request is deleted outright.
+    // Suppression records (unsubscribed_at set) are kept regardless: they are
+    // what stops a re-add, and /privacy promises they persist.
+    const pendingConsentsDeleted = db
+      .prepare(
+        `DELETE FROM marketing_consents
+         WHERE confirmed_at IS NULL AND unsubscribed_at IS NULL
+           AND date(consented_at) <= date('now', '-${BUYER_RETENTION_DAYS} days')`
+      )
+      .run().changes;
+    if (pendingConsentsDeleted > 0) {
+      console.log(`Retention sweep: deleted ${pendingConsentsDeleted} unconfirmed keep-me-posted request(s).`);
+    }
     if (erased > 0) console.log(`Retention sweep: erased buyer details on ${erased} order(s).`);
     if (askersErased > 0) {
       console.log(`Retention sweep: erased the asker on ${askersErased} question(s).`);

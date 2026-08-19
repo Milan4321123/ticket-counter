@@ -59,6 +59,19 @@ export interface OrderRow {
   payoutBic: string;
   payoutBankName: string;
   payoutPaypal: string;
+  /**
+   * The referral code of the paid order whose share link brought this buyer —
+   * that order's share_code — or '' for everyone else. Analysis only
+   * (Insights' "Top referrers"): no reward, no money.
+   */
+  referredBy: string;
+  /**
+   * This order's own referral code — the ?ref= its share links broadcast —
+   * minted at creation. '' only on orders written before the column existed;
+   * those share nothing rather than falling back to the id prefix (see
+   * referralCode below for why).
+   */
+  shareCode: string;
 }
 
 /**
@@ -151,6 +164,56 @@ export function getOrderByPaymentReference(reference: string): OrderRow | null {
   return rows.length === 1 ? rows[0] : null;
 }
 
+// Referral share codes match what the orders API accepts (/^[A-Z0-9]{8}$/).
+// Unlike ticket codes they ride inside URLs rather than being read aloud, so
+// the full alphabet costs nothing and buys entropy.
+const SHARE_CODE_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
+/** Random, unguessable referral share code like "Q7KX2M9A". */
+function generateShareCode(): string {
+  const bytes = crypto.randomBytes(8);
+  let s = '';
+  for (let i = 0; i < 8; i++) s += SHARE_CODE_ALPHABET[bytes[i] % SHARE_CODE_ALPHABET.length];
+  return s;
+}
+
+/**
+ * The code a buyer shares — the order's stored share_code — or null when the
+ * order predates the column.
+ *
+ * This used to be the first 8 chars of the order id, i.e. byte-for-byte the
+ * payment reference's short id (TICKETS-XXXXXXXX). But that reference is a
+ * quasi-authenticator: the admin support flow treats a buyer quoting it as
+ * weak proof they own the order, and a code designed to be broadcast into
+ * WhatsApp groups must be a DIFFERENT secret — otherwise every share hands
+ * strangers the proof. Pre-migration orders therefore get NO referral code
+ * (null, share links carry no ref) rather than any fallback to the id prefix.
+ */
+export function referralCode(order: Pick<OrderRow, 'shareCode'>): string | null {
+  return order.shareCode || null;
+}
+
+/**
+ * The PAID order of THIS event a referral code points at, or null.
+ *
+ * The strict half of the referral feature: the code arrives from a URL anyone
+ * can type, so only the exact 8-char form is accepted, and it must resolve to
+ * exactly one paid order of the same event via its share_code — junk, another
+ * event's order, an unpaid reservation, or the (astronomically unlikely)
+ * duplicated code all fail closed to null, and the caller stores '' instead.
+ */
+export function getPaidOrderByReferralCode(eventId: string, code: string): OrderRow | null {
+  const key = code.trim().toUpperCase();
+  if (!/^[A-Z0-9]{8}$/.test(key)) return null;
+  const rows = getDb()
+    .prepare(
+      `SELECT ${ORDER_COLS} FROM orders
+       WHERE share_code = ? AND event_id = ? AND status = 'paid' LIMIT 2`
+    )
+    .all(key, eventId) as OrderRow[];
+  return rows.length === 1 ? rows[0] : null;
+}
+
 export interface OrderItemRow {
   orderId: string;
   tierId: string;
@@ -186,7 +249,9 @@ const ORDER_COLS = `
   payout_iban AS payoutIban,
   payout_bic AS payoutBic,
   payout_bank_name AS payoutBankName,
-  payout_paypal AS payoutPaypal
+  payout_paypal AS payoutPaypal,
+  referred_by AS referredBy,
+  share_code AS shareCode
 `;
 
 const TICKET_COLS = `
@@ -275,6 +340,12 @@ export function createOrder(params: {
   buyerEmail: string;
   /** Optional: whose name the payment will show up under, if not the buyer's. */
   payerName?: string;
+  /**
+   * Optional: an ALREADY-VALIDATED referral code (see the orders API — this
+   * function trusts its caller checked it names a paid order of this event
+   * that is not the buyer's own). '' or absent means unreferred.
+   */
+  referredBy?: string;
   items: { tierId: string; quantity: number }[];
   paymentMode: PaymentMethod;
 }): OrderRow {
@@ -303,8 +374,9 @@ export function createOrder(params: {
   const tx = db.transaction(() => {
     db.prepare(
       `INSERT INTO orders (id, event_id, status, buyer_name, buyer_email, payer_name, total_cents, currency,
-                           payment_mode, payout_holder, payout_iban, payout_bic, payout_bank_name, payout_paypal)
-       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                           payment_mode, payout_holder, payout_iban, payout_bic, payout_bank_name, payout_paypal,
+                           referred_by, share_code)
+       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       id,
       event.id,
@@ -318,7 +390,11 @@ export function createOrder(params: {
       payout.iban,
       payout.bic,
       payout.bankName,
-      payout.paypal
+      payout.paypal,
+      (params.referredBy ?? '').trim(),
+      // Minted here, once, so the code the buyer will broadcast never has to
+      // be derived from anything a payment or support flow also relies on.
+      generateShareCode()
     );
     const ins = db.prepare(
       `INSERT INTO order_items (order_id, tier_id, quantity, unit_price_cents) VALUES (?, ?, ?, ?)`

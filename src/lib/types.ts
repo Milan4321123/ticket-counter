@@ -33,6 +33,18 @@ export interface CreateOrderRequest {
    * on PayPal.
    */
   payerName?: string;
+  /**
+   * Optional: the buyer TICKED the "keep me posted" box — an action, never a
+   * default. True records a per-organizer marketing consent (lib/marketing);
+   * anything else records nothing. Checkout never blocks on it either way.
+   */
+  marketingOptIn?: boolean;
+  /**
+   * Optional: the ?ref= referral code the buyer arrived with. The server
+   * validates it hard and stores '' for anything that does not name a paid
+   * order of the same event by somebody else.
+   */
+  ref?: string;
   items: { tierId: string; quantity: number }[];
   /**
    * The total the checkout DISPLAYED, in cents. Purely a guard: the server

@@ -16,6 +16,7 @@ import {
   parseCropRect,
   parsePageDesign,
 } from '@/lib/events';
+import { listAnnouncementAudience } from '@/lib/marketing';
 import { MAX_PHOTOS_PER_EVENT, MAX_VIDEOS_PER_EVENT } from '@/lib/media';
 import { getStats } from '@/lib/orders';
 import { organizerPlanActive } from '@/lib/organizers';
@@ -415,6 +416,9 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
             slug={event.slug}
             kind={event.kind}
             checklist={checklist}
+            // The same query the announce route walks — the count promised on
+            // the button is the count the route would email.
+            announceAudience={listAnnouncementAudience(organizer.id, event.id).length}
           />
         </EditorSection>
 

@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { listBuyers, paymentSplit, returningBuyerCount, salesByDay, waitlistWaitingCount } from '@/lib/analytics';
+import { listBuyers, paymentSplit, returningBuyerCount, salesByDay, topReferrers, waitlistWaitingCount } from '@/lib/analytics';
 import { getEventById } from '@/lib/events';
+import { activeConsentCount } from '@/lib/marketing';
 import { formatMoney } from '@/lib/money';
 import { getStats } from '@/lib/orders';
 import { organizerPlanActive } from '@/lib/organizers';
@@ -23,7 +24,10 @@ export const metadata = { title: 'Insights — Organizer portal', robots: { inde
  * can change an order.
  *
  * Deliberately NOT here: any way to message the buyers. They gave their
- * address to receive what they bought, not to receive offers.
+ * address to receive what they bought, not to receive offers. (The Publish
+ * tab's announce button is not an exception — it reaches ONLY people who
+ * ticked the optional "keep me posted" box, which is a different list with
+ * its own consent; see lib/marketing.ts.)
  */
 export default async function PortalInsightsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -41,6 +45,12 @@ export default async function PortalInsightsPage({ params }: { params: Promise<{
   const buyers = listBuyers(event.id);
   const cameBefore = returningBuyerCount(event.id, organizer.id);
   const waiting = waitlistWaitingCount(event.id);
+  // Account-wide, not per-listing: a confirmed "keep me posted" tick
+  // subscribes to the ORGANIZER's future announcements, whichever checkout
+  // carried it. Counts only confirmed, not-unsubscribed addresses — a pending
+  // request is not a subscriber.
+  const subscribers = activeConsentCount(organizer.id);
+  const referrers = topReferrers(event.id);
 
   const hasSales = stats.ordersPaid > 0 || stats.awaitingTransferOrders > 0;
   const checkinPct = stats.ticketsSold > 0 ? Math.round((stats.checkedIn / stats.ticketsSold) * 100) : 0;
@@ -109,6 +119,13 @@ export default async function PortalInsightsPage({ params }: { params: Promise<{
             <div className="stat-label">Waitlist</div>
             <div className="stat-value">{waiting}</div>
             <div className="stat-sub">{waiting === 1 ? 'person waiting' : 'people waiting'} for space</div>
+          </div>
+          <div className="stat-card anim-fade-up anim-d4">
+            <div className="stat-label">Subscribers</div>
+            <div className="stat-value">{subscribers}</div>
+            <div className="stat-sub">
+              asked to hear about your new listings — announce from the Publish tab
+            </div>
           </div>
         </div>
 
@@ -180,6 +197,40 @@ export default async function PortalInsightsPage({ params }: { params: Promise<{
             </>
           )}
         </div>
+
+        {/* ---- Top referrers ---- */}
+        {/* Only when at least one referred paid order exists: an empty "nobody
+            shared your event" table is a worse message than no table. */}
+        {referrers.length > 0 && (
+          <div className="card anim-fade-up anim-d3">
+            <div className="card-title">Top referrers</div>
+            <p className="muted small" style={{ marginTop: 0 }}>
+              Buyers whose shared link brought in a confirmed order. Just for you to see who spreads
+              the word — nothing is owed to anyone, and buyers erased by the privacy sweep show as
+              &ldquo;a past guest&rdquo;.
+            </p>
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Referrer</th>
+                    <th>Orders brought</th>
+                    <th>{v.Units} brought</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {referrers.map((r, i) => (
+                    <tr key={`${r.name}-${i}`}>
+                      <td>{r.name}</td>
+                      <td>{r.referredOrders}</td>
+                      <td>{r.referredSeats}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* ---- Buyers ---- */}
         <div className="card anim-fade-up anim-d4">

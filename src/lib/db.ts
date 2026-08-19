@@ -609,6 +609,84 @@ function migrateToPlatform(db: Database.Database): void {
     );
   `);
 
+  // Who ticked "keep me posted" at checkout. Consent is per-ORGANIZER: the
+  // buyer ticked a box about ONE organizer's future events, not about the
+  // platform — so the row names the organizer, and an announcement can only
+  // ever go to people who asked THAT organizer to write.
+  //
+  // Double opt-in: the checkout tick creates the row with confirmed_at NULL
+  // (a pending request that receives ONE confirmation email and nothing
+  // else); only the confirm click from inside the mailbox sets confirmed_at,
+  // and only confirmed rows are ever marketed to (see lib/marketing.ts).
+  //
+  // An unsubscribed row is NOT deleted: it is kept as a suppression record,
+  // so a re-import or any stale data can never quietly re-add the address —
+  // unsubscribed_at is the do-not-email stamp, only a NEW confirmed click
+  // lifts it, and only an explicit "delete my data" request removes the row.
+  //
+  // Deliberately NO name column: announcements open "Hi," and suppression
+  // needs only the address, so storing a name would be data with no job.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS marketing_consents (
+      id TEXT PRIMARY KEY,
+      organizer_id TEXT NOT NULL REFERENCES organizers(id),
+      email TEXT NOT NULL COLLATE NOCASE,
+      consented_at TEXT NOT NULL DEFAULT (datetime('now')),
+      confirmed_at TEXT,
+      source_order_id TEXT,
+      unsubscribed_at TEXT,
+      UNIQUE (organizer_id, email)
+    );
+    CREATE INDEX IF NOT EXISTS idx_marketing_consents_org ON marketing_consents(organizer_id);
+  `);
+
+  // Databases created by the pre-double-opt-in build: add the confirmed_at
+  // column (left NULL on purpose — those rows were never confirmed from a
+  // mailbox, so they must re-request; failing toward "not subscribed" is the
+  // only safe direction), and blank the name column that build stored, since
+  // nothing uses a name and /privacy says only the address survives.
+  const consentCols = (db.pragma(`table_info(marketing_consents)`) as { name: string }[]).map((c) => c.name);
+  if (!consentCols.includes('confirmed_at')) {
+    db.exec(`ALTER TABLE marketing_consents ADD COLUMN confirmed_at TEXT`);
+  }
+  if (consentCols.includes('name')) {
+    db.exec(`UPDATE marketing_consents SET name = '' WHERE name != ''`);
+  }
+
+  // One row per announcement actually sent: which consent heard about which
+  // event. The UNIQUE pair is the whole point — the announce route claims a
+  // row BEFORE sending, so a subscriber can never get two emails about one
+  // event, however often the organizer presses the button.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS marketing_sends (
+      consent_id TEXT NOT NULL REFERENCES marketing_consents(id),
+      event_id TEXT NOT NULL REFERENCES events(id),
+      sent_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (consent_id, event_id)
+    );
+  `);
+
+  // Which paid order's share link brought this buyer in — the referring
+  // order's share_code (see below), or '' for an unreferred order. Analysis
+  // only: no reward, no money, nothing a buyer can game their way into.
+  // Validated hard at the orders API (must name a PAID order of the SAME
+  // event, never the buyer's own address) so junk in a URL can only ever
+  // store ''.
+  if (!orderCols.includes('referred_by')) {
+    db.exec(`ALTER TABLE orders ADD COLUMN referred_by TEXT NOT NULL DEFAULT ''`);
+  }
+
+  // The order's own referral code — the ?ref= its share links broadcast.
+  // A RANDOM code of its own, deliberately NOT the payment reference's short
+  // id (TICKETS-XXXXXXXX): quoting that reference is what the admin support
+  // flow accepts as weak proof of owning the order, and a code designed to be
+  // pasted into WhatsApp groups must be a different secret from one that acts
+  // as a quasi-authenticator. '' on orders written before this existed — their
+  // share links simply carry no ref (lib/orders referralCode returns null).
+  if (!orderCols.includes('share_code')) {
+    db.exec(`ALTER TABLE orders ADD COLUMN share_code TEXT NOT NULL DEFAULT ''`);
+  }
+
   // Whether the public page counts down the remaining tickets.
   //
   // Defaults to 1, which is what every event did before this existed. It is a

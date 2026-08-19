@@ -76,6 +76,19 @@ interface Props {
    */
   retentionDays: number;
   /**
+   * The organizer's display name, for the OPTIONAL "keep me posted" box — the
+   * consent is per-organizer, so the box has to say whose announcements it is
+   * about. '' when the account has no usable name; the copy falls back to
+   * "this organizer".
+   */
+  organizerName: string;
+  /**
+   * The referral code from the ?ref= the buyer arrived with (already
+   * shape-checked by the server page), or null. Included in the create-order
+   * POST as-is — the orders API decides whether it counts.
+   */
+  refCode: string | null;
+  /**
    * The ticket type the buyer tapped on the event page, already validated by the
    * server as one that is on sale with stock left. Starts at 1 so someone who
    * picked "Standard" does not land on a page of zeroes and have to pick it
@@ -94,6 +107,10 @@ interface CreateOrderBody {
   items: { tierId: string; quantity: number }[];
   /** What this page showed as the total — the server 409s if prices moved. */
   expectedTotalCents: number;
+  /** True ONLY when the buyer ticked the optional "keep me posted" box. */
+  marketingOptIn: boolean;
+  /** The ?ref= referral code the buyer arrived with, '' when there was none. */
+  ref: string;
 }
 
 type ApiCode = NonNullable<ApiErrorResponse['code']>;
@@ -191,6 +208,8 @@ export default function CheckoutClient({
   transferConfigured,
   paypalOffered,
   retentionDays,
+  organizerName,
+  refCode,
   preselectTier = null,
 }: Props) {
   const router = useRouter();
@@ -215,6 +234,10 @@ export default function CheckoutClient({
   // without having ticked this themselves — it starts false, it is never
   // pre-ticked, and no payment button works until it is on.
   const [privacyAck, setPrivacyAck] = useState(false);
+  // The SEPARATE, optional "keep me posted" consent. Also never pre-ticked —
+  // and unlike the privacy tick above it gates nothing: checkout works exactly
+  // the same whether this is on or off.
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
   const [touched, setTouched] = useState<Touched>({});
   const [message, setMessage] = useState<InlineMessage | null>(null);
   const [busy, setBusy] = useState(false); // mock payment in flight
@@ -271,8 +294,8 @@ export default function CheckoutClient({
 
   // Latest state snapshot for PayPal callbacks (they are registered once and
   // would otherwise close over stale state).
-  const latestRef = useRef({ qty, name, email, payerName, formReady, totalQty });
-  latestRef.current = { qty, name, email, payerName, formReady, totalQty };
+  const latestRef = useRef({ qty, name, email, payerName, marketingOptIn, formReady, totalQty });
+  latestRef.current = { qty, name, email, payerName, marketingOptIn, formReady, totalQty };
 
   const localOrderIdRef = useRef<string | null>(null);
   const suppressPaypalErrorRef = useRef(false);
@@ -333,6 +356,8 @@ export default function CheckoutClient({
         payerName: payerName.trim(),
         items: buildItems(qty),
         expectedTotalCents: totalCents,
+        marketingOptIn,
+        ref: refCode ?? '',
       };
       const created = await postJson<CreateOrderResponse>('/api/orders', req);
       await postJson<CaptureOrderResponse>(`/api/orders/${created.orderId}/capture`, {});
@@ -365,6 +390,8 @@ export default function CheckoutClient({
         payerName: payerName.trim(),
         items: buildItems(qty),
         expectedTotalCents: totalCents,
+        marketingOptIn,
+        ref: refCode ?? '',
       };
       const created = await postJson<CreateOrderResponse>('/api/orders', req);
       // The order page shows the bank details, amount, and reference.
@@ -456,6 +483,8 @@ export default function CheckoutClient({
                 (sum, t) => sum + (s.qty[t.id] ?? 0) * t.priceCents,
                 0
               ),
+              marketingOptIn: s.marketingOptIn,
+              ref: refCode ?? '',
             };
             const created = await postJson<CreateOrderResponse>('/api/orders', req);
             localOrderIdRef.current = created.orderId;
@@ -799,6 +828,33 @@ export default function CheckoutClient({
               Please tick the box above to continue — we cannot take your details without it.
             </p>
           )}
+        </div>
+
+        {/* The OPTIONAL "keep me posted" box — deliberately quieter than the
+            required privacy tick above (muted, smaller, no border), because
+            visual parity would read as "also required". Never pre-ticked, and
+            nothing on this page waits for it. */}
+        <div className="muted small" style={{ marginTop: 14 }}>
+          <label className="checkbox-row" style={{ fontWeight: 400 }}>
+            <input
+              type="checkbox"
+              checked={marketingOptIn}
+              onChange={(e) => setMarketingOptIn(e.target.checked)}
+              disabled={working}
+            />
+            <span>
+              Keep me posted when {organizerName || 'this organizer'} announces something new — at
+              most one email per new listing, unsubscribe any time.
+            </span>
+          </label>
+          <p className="small" style={{ margin: '6px 0 0' }}>
+            Optional. If you tick it, you first get one email asking you to confirm — nothing is
+            sent until you press the button in it. Once confirmed, we keep your email for{' '}
+            {organizerName || 'this organizer'}&rsquo;s announcements only — it is not erased after{' '}
+            {isShop ? 'collection' : 'the event'} like the rest of your details, because you asked to
+            hear more. Every email carries an unsubscribe link, and unsubscribing ends it for good.
+            Leave it unticked and nothing changes.
+          </p>
         </div>
       </div>
 

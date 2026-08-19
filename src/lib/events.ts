@@ -814,6 +814,13 @@ export function deleteEventCompletely(eventId: string): DeletedEventSummary {
     // longer exists, readable by nothing and deletable by no one.
     db.prepare(`DELETE FROM payout_changes WHERE event_id = ?`).run(eventId);
 
+    // Announcement send-tracking rows point at this event (foreign key), so
+    // they go with it. The CONSENTS deliberately do NOT: a buyer's "keep me
+    // posted" tick was about the ORGANIZER's future listings, not about this
+    // one event, so deleting an event must never silence a subscription the
+    // buyer still wants. See lib/marketing.ts.
+    db.prepare(`DELETE FROM marketing_sends WHERE event_id = ?`).run(eventId);
+
     // The door-scanner revocation counter is keyed per event (lib/auth), so it
     // would otherwise outlive every link it was ever counting for.
     db.prepare(`DELETE FROM kv WHERE key = ?`).run(`scan_epoch:${eventId}`);

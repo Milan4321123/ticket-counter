@@ -238,6 +238,7 @@ function PinIcon() {
 
 interface Params {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 /**
@@ -317,10 +318,21 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   };
 }
 
-export default async function EventPage({ params }: Params) {
+export default async function EventPage({ params, searchParams }: Params) {
   const { slug } = await params;
   const event = getEventBySlug(slug);
   if (!event) notFound();
+
+  // ?ref= arrives on shared links (a buyer's own order page and ticket email
+  // both append their referral code) and rides every checkout link below as a
+  // PLAIN query param — no cookie, nothing stored on this page. Shape-checked
+  // only; the orders API is the guard that decides whether it counts.
+  const sp = await searchParams;
+  const rawRef = Array.isArray(sp.ref) ? sp.ref[0] : sp.ref;
+  const refCode =
+    typeof rawRef === 'string' && /^[A-Za-z0-9]{8}$/.test(rawRef.trim())
+      ? rawRef.trim().toUpperCase()
+      : null;
 
   /**
    * An unpublished event is visible to exactly one person: the organizer who
@@ -465,7 +477,11 @@ export default async function EventPage({ params }: Params) {
       ? event.pickupInfo.trim() || event.venueName || event.address || event.city
       : event.dateDisplay || event.venueName || event.address || event.city
   );
-  const checkoutHref = `/e/${event.slug}/checkout`;
+  // Every checkout link on this page carries the referral code the visitor
+  // arrived with, so it survives the hop to checkout and into the create-order
+  // POST. refCode is already reduced to /^[A-Z0-9]{8}$/, so it is URL-safe.
+  const checkoutBase = `/e/${event.slug}/checkout`;
+  const checkoutHref = refCode ? `${checkoutBase}?ref=${refCode}` : checkoutBase;
   const headline = design.headline || event.name;
   // Never buyable in preview. The event is not public, its fee may be unpaid,
   // and POST /api/orders would refuse the order anyway — offering a button that
@@ -816,7 +832,7 @@ export default async function EventPage({ params }: Params) {
                       // Carries WHICH ticket was tapped, so the checkout opens
                       // with it already at one. The server re-checks the key
                       // before honouring it.
-                      href={`${checkoutHref}?tier=${encodeURIComponent(tier.tierKey)}`}
+                      href={`${checkoutBase}?tier=${encodeURIComponent(tier.tierKey)}${refCode ? `&ref=${refCode}` : ''}`}
                       aria-label={isShop ? `Order ${tier.name}` : `Get ${tier.name} tickets`}
                     >
                       {card}

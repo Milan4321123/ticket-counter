@@ -17,7 +17,7 @@ import { getOrganizer } from '@/lib/organizers';
 import { girocodePayload } from '@/lib/girocode';
 import { formatMoney } from '@/lib/money';
 import { getBaseUrl } from '@/lib/config';
-import { getOrder, getOrderItems, getTicketsForOrder, paymentReference } from '@/lib/orders';
+import { getOrder, getOrderItems, getTicketsForOrder, paymentReference, referralCode } from '@/lib/orders';
 import { orderPayout } from '@/lib/payout';
 import { paymentQrDataUrl } from '@/lib/paymentQr';
 import { machineDate } from '@/lib/seo';
@@ -579,12 +579,22 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   // The one moment a buyer is happiest is the moment they hold their codes —
   // and they are standing in exactly the WhatsApp groups the next buyers are
   // in. One pre-written tap; WhatsApp's own picker chooses who hears it.
+  //
+  // ?ref= is this buyer's own referral code (the order's random share_code —
+  // see lib/orders referralCode — NEVER the payment reference's short id,
+  // which support treats as weak proof of owning the order and so must not be
+  // broadcast), so the organizer's insights can see who brought friends.
+  // Analysis only, no reward. Pre-share_code orders have no code — their link
+  // simply carries no ref. The TEXT here and in the ticket email must stay
+  // word-for-word identical — change one, change both.
+  const refCode = referralCode(order);
+  const shareEventUrl = event ? `${getBaseUrl()}/e/${event.slug}${refCode ? `?ref=${refCode}` : ''}` : null;
   const shareUrl =
     event && event.status === 'published'
       ? whatsappShareUrl(
           isFreeOrder
-            ? `I'm going to ${event.name} — it's free! Reserve your spot: ${getBaseUrl()}/e/${event.slug}`
-            : `I just got my tickets for ${event.name}! Get yours: ${getBaseUrl()}/e/${event.slug}`
+            ? `I'm going to ${event.name} — it's free! Reserve your spot: ${shareEventUrl}`
+            : `I just got my tickets for ${event.name}! Get yours: ${shareEventUrl}`
         )
       : null;
 

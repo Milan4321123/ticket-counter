@@ -116,9 +116,39 @@ export default function PrivacyPage() {
                 <strong>Nobody else.</strong> We do not sell or share any of it, and booking a ticket
                 does not put you on a mailing list. The only emails we send a buyer are your ticket,
                 your transfer instructions, and — if your transfer has not arrived after a few days —
-                one reminder.
+                one reminder. The single exception is one you create yourself: the optional
+                &ldquo;keep me posted&rdquo; box at checkout, explained below.
               </li>
             </ul>
+          </div>
+
+          <div className="card anim-fade-up anim-d2">
+            <h2 className="card-title">The &ldquo;keep me posted&rdquo; box</h2>
+            <p>
+              At checkout there is an optional box asking whether that event&rsquo;s organizer may
+              tell you when they announce something new. It is never pre-ticked, and leaving it empty
+              changes nothing — your order works exactly the same either way.
+            </p>
+            <p>
+              Ticking it does not subscribe you by itself — anyone could type anyone&rsquo;s address
+              into a checkout. Instead you get a single confirmation email, and only pressing the
+              button in it puts you on the list. No press, no subscription, and that confirmation
+              request is the only email about it.
+            </p>
+            <p>
+              Once you confirm, we keep your email address — the address alone, not your name — for
+              exactly one job: that one organizer&rsquo;s announcements, at most one email per new
+              listing, and never anyone else&rsquo;s. Because you asked to hear more, this address
+              is the one detail that survives the after-event erasure described above; it stays
+              until you unsubscribe.
+            </p>
+            <p style={{ marginBottom: 0 }}>
+              Every announcement carries an unsubscribe link — one button, no sign-in, and it never
+              expires. Once you unsubscribe, your address is kept only as a do-not-email record, so
+              nothing can quietly add you back; only ticking the box yourself again, and confirming
+              it again from your own inbox, would. Want even that record erased entirely? Ask, and
+              we will.
+            </p>
           </div>
 
           <div className="card anim-fade-up anim-d2">

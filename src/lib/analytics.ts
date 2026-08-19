@@ -169,6 +169,67 @@ export function returningBuyerCount(eventId: string, organizerId: string): numbe
   return row.n;
 }
 
+/** One referring buyer: how many paid orders their shared link brought in. */
+export interface ReferrerRow {
+  /** The referrer's display name, or 'a past guest' once retention erased them. */
+  name: string;
+  /** PAID orders that arrived through their link. */
+  referredOrders: number;
+  /** Seats/items those orders brought — QR codes minted, one scan each. */
+  referredSeats: number;
+}
+
+/**
+ * Who brought friends: paid orders grouped by the referral code they arrived
+ * with, resolved back to the referring buyer's name. Analysis only — no reward
+ * rides on this, which is also why it is honest to show at all.
+ *
+ * The referring order is looked up the same way the orders API validated the
+ * code (the share_code of a paid order of THIS event — a random code of its
+ * own, never the payment reference's short id, which support treats as weak
+ * proof of ownership), so the two can never disagree about who a code belongs
+ * to. A referrer whose buyer details the
+ * retention sweep has erased still shows their COUNT — the seats they brought
+ * are the organizer's arithmetic — but as 'a past guest', because the person
+ * is no longer identifiable and must stay that way.
+ */
+export function topReferrers(eventId: string): ReferrerRow[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT o.referred_by AS code,
+              COUNT(DISTINCT o.id) AS referredOrders,
+              COUNT(t.code) AS referredSeats
+       FROM orders o
+       LEFT JOIN tickets t ON t.order_id = o.id
+       WHERE o.event_id = ? AND o.status = 'paid' AND o.payment_mode != 'mock'
+         AND o.referred_by != ''
+       GROUP BY o.referred_by
+       ORDER BY referredOrders DESC, referredSeats DESC`
+    )
+    .all(eventId) as { code: string; referredOrders: number; referredSeats: number }[];
+
+  const nameOf = db.prepare(
+    `SELECT buyer_name AS name, buyer_erased_at AS erasedAt
+     FROM orders WHERE share_code = ? AND event_id = ? AND status = 'paid' LIMIT 2`
+  );
+  return rows.map((r) => {
+    const referrers = nameOf.all(r.code, eventId) as {
+      name: string;
+      erasedAt: string | null;
+    }[];
+    // Exactly one un-erased match names a person; anything else — erased,
+    // vanished, a code from before share_code existed, or the (astronomically
+    // unlikely) duplicated code — stays a guest.
+    const referrer = referrers.length === 1 && !referrers[0].erasedAt ? referrers[0] : null;
+    return {
+      name: referrer?.name?.trim() || 'a past guest',
+      referredOrders: r.referredOrders,
+      referredSeats: r.referredSeats,
+    };
+  });
+}
+
 /**
  * People currently WAITING on this listing's waitlist — signed up and not yet
  * sent their one "there is space again" email. Notified rows are excluded:
