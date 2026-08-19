@@ -5,7 +5,6 @@ import { sendPayoutChangedEmail } from '@/lib/email';
 import {
   countPaidOrdersForEvent,
   deleteEventCompletely,
-  getEventById,
   getEventMedia,
   getEventTiers,
   getMediaById,

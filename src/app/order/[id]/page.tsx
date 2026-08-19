@@ -181,8 +181,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                     the only place that choice can be prompted is here. */}
                 <p className="muted small" style={{ margin: '2px 0 0' }}>
                   {paypal
-                    ? 'PayPal arrives within minutes. A bank transfer takes 1–2 business days — or seconds, if you choose “instant” (“Echtzeit”) in your banking app, which your bank cannot charge extra for. As soon as yours lands, it is confirmed.'
-                    : 'A transfer takes 1–2 business days — or seconds, if you choose “instant” (“Echtzeit”) in your banking app, which your bank cannot charge extra for. As soon as yours lands, it is confirmed.'}
+                    ? 'PayPal arrives within minutes. A bank transfer takes 1–2 business days — or seconds, if you choose “instant” (“Echtzeit”) in your banking app, which your bank cannot charge extra for. Once yours lands, the organizer sees it on their statement and confirms it.'
+                    : 'A transfer takes 1–2 business days — or seconds, if you choose “instant” (“Echtzeit”) in your banking app, which your bank cannot charge extra for. Once yours lands, the organizer sees it on their statement and confirms it.'}
                 </p>
               </div>
             </li>
@@ -548,9 +548,12 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     <div className="container section">
       <h1 className="page-title anim-fade-up">Your tickets</h1>
       <div className="notice notice-success anim-fade-up anim-d1">
+        {/* "confirmed", not "received": the money went to the organizer, and the
+            organizer confirming it is the event this banner reports — the ticket
+            email says it the same way. */}
         {isFreeOrder
           ? "You're on the list — reservation confirmed. See you there!"
-          : 'Payment received — you’re all set. See you at the show!'}
+          : 'Payment confirmed — you’re all set. See you at the show!'}
       </div>
       {shareUrl && (
         <p className="anim-fade-up anim-d1" style={{ margin: '0 0 16px' }}>

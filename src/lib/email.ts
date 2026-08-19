@@ -840,12 +840,14 @@ export async function sendTransferInstructionsEmail(
     // account and buying from them — the platform never touches the money. The
     // mail has to say so, plainly, before it asks anyone to transfer anything.
     const organizerName = organizerDisplayName(event.organizerId);
+    // A shop's buyer is not going to an "event" — same seller story, its own noun.
+    const sellerRole = event.kind === 'shop' ? 'the seller behind this shop' : 'the organizer of this event';
     const sellerIntroHtml = organizerName
-      ? `You are buying from ${strong(organizerName)}, the organizer of this event`
-      : `You are buying from the organizer of ${strong(event.name)}`;
+      ? `You are buying from ${strong(organizerName)}, ${sellerRole}`
+      : `You are buying from ${event.kind === 'shop' ? 'the seller behind' : 'the organizer of'} ${strong(event.name)}`;
     const sellerIntroText = organizerName
-      ? `You are buying from ${organizerName}, the organizer of this event`
-      : `You are buying from the organizer of ${event.name}`;
+      ? `You are buying from ${organizerName}, ${sellerRole}`
+      : `You are buying from ${event.kind === 'shop' ? 'the seller behind' : 'the organizer of'} ${event.name}`;
 
     const venue = venueDisplay(event);
     const orderUrl = `${getBaseUrl()}/order/${orderId}`;

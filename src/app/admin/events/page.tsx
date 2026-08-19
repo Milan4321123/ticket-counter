@@ -55,7 +55,7 @@ export default async function AdminEventsPage() {
           <p className="muted small" style={{ margin: '4px 0 0', maxWidth: 640 }}>
             Release more tickets for any event. Two numbers decide what can be sold — the event
             total and each ticket type&rsquo;s own limit — and the lower one always wins, so both
-            are here together. Changes take effect immediately and never re-charge the event fee.
+            are here together. Changes take effect immediately.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>

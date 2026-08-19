@@ -35,7 +35,6 @@ import { getAvailability } from '@/lib/inventory';
 import { ticketState, fromPriceCents, visibleTiers, comingSoonLabel } from '@/lib/ticketState';
 import { currentOrganizer, getOrganizer } from '@/lib/organizers';
 import { formatMoney } from '@/lib/money';
-import { platformFeeLabel } from '@/lib/platform';
 import {
   SITE_NAME,
   absoluteUrl,
@@ -1112,9 +1111,12 @@ export default async function EventPage({ params }: Params) {
             <div className="org-pitch-text">
               <p className="org-pitch-kicker">Thinking of putting on your own event?</p>
               <h2 className="org-pitch-title">You could have a page like this one</h2>
+              {/* platformFeeLabel() used to live here; the fee machinery was
+                  deleted (see lib/platform.ts) and this merge-survivor was the
+                  last call site — it broke the production build. */}
               <p className="org-pitch-body">
                 Build your event page, sell tickets straight into your own bank account, and
-                scan guests in at the door — {platformFeeLabel()}, and never a commission on a
+                scan guests in at the door — free while we grow, and never a commission on a
                 single ticket.
               </p>
             </div>

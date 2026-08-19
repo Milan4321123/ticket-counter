@@ -850,8 +850,11 @@ export default function CheckoutClient({
                   payment reference (also sent to you by email)
                 </li>
                 <li>
-                  Your QR-code {v.codes} are emailed as soon as your transfer arrives — usually
-                  within 1–2 business days
+                  {/* Not "as soon as your transfer arrives": nothing here can see
+                      the organizer's bank account — THEY confirm the payment, and
+                      that confirmation is what sends the tickets. */}
+                  Your QR-code {v.codes} are emailed the moment the organizer confirms your
+                  transfer — it usually lands within 1–2 business days
                 </li>
                 <li>
                   You&rsquo;ll have a few days to pay — the exact deadline is shown on the next
