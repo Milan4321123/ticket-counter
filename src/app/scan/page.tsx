@@ -5,7 +5,7 @@ import ScanClient from './ScanClient';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Door check-in', robots: { index: false, follow: false } };
+export const metadata = { title: 'Scanner', robots: { index: false, follow: false } };
 
 /**
  * Door-staff scanner page. Opened via a time-limited scanner link created in
@@ -18,5 +18,5 @@ export default async function ScanPage() {
   const store = await cookies();
   const scan = verifyScanToken(store.get(SCAN_COOKIE_NAME)?.value ?? null);
   const event = scan ? getEventById(scan.eventId) : null;
-  return <ScanClient eventName={event?.name ?? null} />;
+  return <ScanClient eventName={event?.name ?? null} kind={event?.kind ?? 'event'} />;
 }

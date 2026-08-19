@@ -1,8 +1,8 @@
 import Link from 'next/link';
-import { platformContactEmail, platformFeeLabel } from '@/lib/platform';
+import { platformContactEmail } from '@/lib/platform';
 import ContactForm from './ContactForm';
 
-// Contact address and fee both come from env vars — read them fresh.
+// The contact address comes from an env var — read it fresh.
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
@@ -32,7 +32,6 @@ export default async function ContactPage({
   const raw = (await searchParams).intent;
   const wantsAccount = (Array.isArray(raw) ? raw[0] : raw) === 'account';
   const contactEmail = platformContactEmail();
-  const feeLabel = platformFeeLabel();
 
   return (
     <>
@@ -48,13 +47,15 @@ export default async function ContactPage({
           {wantsAccount ? (
             <>
               <p className="feed-hero-sub anim-fade-up anim-d2" style={{ marginBottom: 0 }}>
-                This is how you get an account — there is no signup button. Tell us what you are
-                putting on, a real person reads it, and if it all looks right we set the account up
-                and email you your sign-in details.
+                Every event on this site started exactly here: a few sentences in this form.
+                There is no signup button — tell us what you are putting on, a real person
+                reads it, and if it all looks right we set your account up and email you your
+                sign-in details.
               </p>
               <p className="feed-hero-sub anim-fade-up anim-d2" style={{ marginTop: 14 }}>
-                The account is free. You only pay when you publish an event ({feeLabel}), and never a
-                cut of your ticket sales. Nothing to pay to apply, and no payment details to enter.
+                The account is free, publishing is free, and we never take a cut of your ticket
+                sales. Nothing to pay at all, and no payment details to enter — just the story
+                of your event.
               </p>
 
               {/* A way back OUT of the form. Someone who arrived here from a
@@ -88,13 +89,13 @@ export default async function ContactPage({
 
               {/* The honest order of operations, said before the form rather than
                   after it. Most organizers do not need this page at all: the
-                  self-service editor is included in the fee they already pay, and
-                  it is a better first move than a conversation with a queue in
-                  front of it. Sending everyone here would fill the inbox with
-                  requests that the editor answers in ten minutes. */}
+                  self-service editor comes free with every event, and it is a
+                  better first move than a conversation with a queue in front of
+                  it. Sending everyone here would fill the inbox with requests
+                  that the editor answers in ten minutes. */}
               <div className="contact-firststep anim-fade-up anim-d2">
                 <p style={{ margin: 0 }}>
-                  <strong>Build it yourself first — it is already paid for.</strong> Every event
+                  <strong>Build it yourself first — it is already included, free.</strong> Every event
                   comes with a page editor: your own photos and video, ticket types, colours, an
                   FAQ. Most organizers never need more than that, and it takes minutes.
                 </p>
@@ -138,8 +139,8 @@ export default async function ContactPage({
               style={{ textAlign: 'center', margin: '0 0 18px' }}
             >
               {wantsAccount
-                ? `Everything below is optional except your name, email, and a few words about the event — a rough answer is better than none. Publishing an event costs ${feeLabel}; the account itself is free.`
-                : `The standard self-service page is already included in your normal event fee (${feeLabel}) — this is for when you want more than that.`}
+                ? 'Everything below is optional except your name, email, and a few words about the event — a rough answer is better than none. The account is free, and so is publishing.'
+                : 'The standard self-service page is free and already included — this is for when you want more than that.'}
             </p>
 
             <div className="card glow-card anim-fade-up anim-d1">

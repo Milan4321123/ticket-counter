@@ -22,6 +22,7 @@
 // again. Adding a new surface means calling this rather than rewriting it.
 import type { EventRow, EventTierRow } from './events';
 import type { Availability } from './inventory';
+import { vocabFor } from './vocab';
 
 export type TicketStateKind =
   /** Buyable now. */
@@ -180,12 +181,15 @@ export function ticketState(
       soldOutNames,
     };
   }
+  // The only two labels a shop says differently — the rest ("Sold out",
+  // "Sales closed", "Coming soon") read correctly for anything on sale.
+  const v = vocabFor(event.kind);
   return {
     kind: 'on-sale',
     buyable: true,
     remaining,
-    badge: showCount && remaining <= 50 ? `Only ${remaining} left` : 'Tickets available',
-    cta: 'Get tickets',
+    badge: showCount && remaining <= 50 ? `Only ${remaining} left` : `${v.Units} available`,
+    cta: v.cta,
     showCount,
     upcoming,
     upcomingNames,

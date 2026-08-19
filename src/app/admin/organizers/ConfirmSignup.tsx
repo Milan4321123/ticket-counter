@@ -13,7 +13,8 @@ interface Props {
  * Two-step activation for a pending self-service signup, matching the
  * bank-transfer confirm flow: the admin must type the last 4 characters of the
  * signup reference, so a stray click can never let an account in. The account
- * itself is free — the platform fee is charged per event, later.
+ * is free and so is publishing — activation is only a sanity check that the
+ * signup looks real.
  */
 export default function ConfirmSignup({ organizerId, name, reference }: Props) {
   const router = useRouter();
@@ -61,7 +62,7 @@ export default function ConfirmSignup({ organizerId, name, reference }: Props) {
     return (
       <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4, whiteSpace: 'normal' }}>
         <span className="badge badge-green">Account activated ✓</span>
-        <span className="muted small">They can build events now and pay per event to publish.</span>
+        <span className="muted small">They can build and publish events now — free.</span>
       </span>
     );
   }
@@ -101,7 +102,7 @@ export default function ConfirmSignup({ organizerId, name, reference }: Props) {
     >
       <p className="small" style={{ marginTop: 0, marginBottom: 10 }}>
         Let <strong>{name}</strong> into the portal — free, reference{' '}
-        <span className="mono">{reference}</span>. Their events still cost the platform fee each.
+        <span className="mono">{reference}</span>. Publishing is free for them too.
       </p>
       <div className="field" style={{ marginBottom: 10 }}>
         <label htmlFor={`confirm-signup-${organizerId}`}>

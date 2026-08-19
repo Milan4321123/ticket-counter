@@ -30,23 +30,23 @@ function howItWorks(anyPaypal: boolean) {
   return [
   {
     title: 'Reserve your seats',
-    body: 'Pick your tickets and reserve them in one click. No account, no password, no card number — just a name and an email so the ticket can be issued to you.',
+    body: 'Pick your tickets and they are held for you on the spot. No account to create, no password to invent, no card number to dig out — just your name and an email, so the ticket knows who it belongs to.',
   },
   {
     title: anyPaypal ? 'Pay by bank transfer or PayPal' : 'Pay by bank transfer',
     body: anyPaypal
-      ? 'You get the organizer’s payment details and your own reference. Send a normal bank transfer from any banking app — or, where the organizer offers it, pay by PayPal. Either way the reference goes in the message.'
-      : 'You get the organizer’s bank details and your own payment reference. Send a normal transfer from any banking app, with that reference in the purpose line.',
+      ? 'You get the organizer’s payment details and a reference that belongs to your order alone. Open your banking app wherever you are and send a normal transfer — or, where the organizer offers it, pay by PayPal. Either way, the reference goes in the message: it is how your payment finds its way back to your seats.'
+      : 'You get the organizer’s bank details and a payment reference that belongs to your order alone. Open your banking app wherever you are and send a normal transfer with that reference in the purpose line — it is how your payment finds its way back to your seats.',
   },
   {
     title: 'The organizer confirms',
     body: anyPaypal
-      ? 'PayPal usually lands within minutes, a bank transfer in 1–2 business days. You do not have to do anything while you wait — your seats stay held.'
-      : 'Usually within 1–2 business days of your transfer arriving. You do not have to do anything while you wait — your seats stay held.',
+      ? 'PayPal lands in minutes; a bank transfer travels at bank speed, usually 1–2 business days. Your part is already done — your seats wait for you the whole time, and there is nothing to refresh and nobody to chase.'
+      : 'A bank transfer travels at bank speed — usually 1–2 business days. Your part is already done: your seats wait for you the whole time, and there is nothing to refresh and nobody to chase.',
   },
   {
     title: 'Your QR tickets arrive',
-    body: 'By email, and on your order page so they cannot get lost. Show the code on your phone at the door — one scan per ticket and you are in.',
+    body: 'Then the good part: your QR tickets land in your inbox, and stay on your order page where they cannot get lost. At the door, show the code on your phone — one scan per ticket and you are in.',
   },
   ];
 }
@@ -56,20 +56,20 @@ function assurances(anyPaypal: boolean) {
   {
     title: 'The money goes straight to the organizer',
     body: anyPaypal
-      ? 'Your payment lands in the account of the people putting on the show — their bank account or their own PayPal. It never passes through us. No card fees, and nobody sitting on your money.'
-      : 'Your transfer lands in the account of the people putting on the show — it never passes through us. No card fees, and nobody sitting on your payment.',
+      ? 'You are buying from the people actually putting on the show, and your payment lands in their account — their bank account or their own PayPal. It never passes through us. No card fees skimmed off along the way, and nobody sitting on your money.'
+      : 'You are buying from the people actually putting on the show, and your transfer lands in their account — it never passes through us. No card fees skimmed off along the way, and nobody sitting on your payment.',
   },
   {
     title: 'Your seats are held while you pay',
-    body: 'Reserving holds them immediately. You get a few days to send the transfer, and the exact deadline is on your order page. A transfer sent in time never loses your seats.',
+    body: 'Reserving holds them immediately. You get a few days to send the transfer — the exact deadline is printed on your order page — and a transfer sent in time never loses your seats, even if the banks take the scenic route.',
   },
   {
     title: 'A ticket you cannot misplace',
-    body: 'QR tickets arrive by email and stay on your order page. Bookmark it and you can pull your tickets up at the door even if the email is buried.',
+    body: 'Ticket emails get buried under newsletters; order pages don’t. Your QR tickets arrive by email and live on your order page for good — bookmark it, and at the door you need nothing but your phone.',
   },
   {
     title: 'A name and an email. That is all',
-    body: `We never ask for card or bank details. Your name and email go to that event’s organizer so they can issue your ticket, and ${BUYER_RETENTION_DAYS} days after the event they are erased from our system for good.`,
+    body: `We never ask for card or bank details — there is nothing here that needs them. Your name and email go to that event’s organizer so they can issue your ticket, and ${BUYER_RETENTION_DAYS} days after the event they are erased from our system for good.`,
   },
   ];
 }
@@ -166,8 +166,15 @@ interface Row {
  * at least one row. "All events" is that guarantee — it is always last and
  * always complete, so nothing can be lost between the curated rows above it.
  */
-function buildRows(events: EventRow[]): Row[] {
+function buildRows(listings: EventRow[]): Row[] {
   const today = todayIso();
+  // Shops are pulled out before anything else. Every row below is built around
+  // a date — soonest first, near you, already happened — and a shop has none;
+  // dropped into those rows it would sink to the bottom of the undated tail and
+  // never be seen. It gets a shelf of its own instead, which is also the more
+  // honest heading: "what's on" and "what you can order" are different questions.
+  const shops = listings.filter((e) => e.kind === 'shop');
+  const events = listings.filter((e) => e.kind !== 'shop');
   const upcoming = events.filter((e) => !isPast(e, today));
   const past = events.filter((e) => isPast(e, today));
   const rows: Row[] = [];
@@ -219,6 +226,17 @@ function buildRows(events: EventRow[]): Row[] {
       kicker: 'Explore',
       title: soon.length > 0 ? 'More events' : 'What’s on',
       events: remaining,
+    });
+  }
+
+  // Above the archive, below what is on: a shop is live and orderable today,
+  // so it belongs with the present, not filed after events that have finished.
+  if (shops.length > 0) {
+    rows.push({
+      key: 'shops',
+      kicker: 'Order & collect',
+      title: 'Buy from local sellers',
+      events: shops,
     });
   }
 
@@ -332,9 +350,11 @@ export default function HomePage() {
           </div>
           <h1 className="anim-fade-up anim-d1">Nepali concerts &amp; events, near you</h1>
           <p className="feed-hero-sub anim-fade-up anim-d2">
-            Live shows, cultural nights and parties from Nepali organizers — reserve your
-            tickets in one click, pay {anyPaypal ? 'by bank transfer or PayPal' : 'by bank transfer'},
-            and your QR tickets arrive by email.
+            It starts the same way every time: a poster lands in the family group chat, and
+            suddenly Saturday has a plan. This is where that poster leads — concerts, cultural
+            nights and parties from Nepali organizers. Reserve your tickets in one click,
+            pay {anyPaypal ? 'by bank transfer or PayPal' : 'by bank transfer'}, and your QR
+            tickets arrive by email before you have picked what to wear.
           </p>
           <p className="feed-hero-actions anim-fade-up anim-d2">
             <a href="#events" className="btn btn-brand btn-lg">
@@ -384,11 +404,11 @@ export default function HomePage() {
                 style={{ maxWidth: 560, margin: '0 auto', textAlign: 'center', padding: 36 }}
               >
                 <h2 className="card-title" style={{ fontSize: '1.3rem' }}>
-                  No events yet
+                  The stage is being set
                 </h2>
                 <p className="muted">
-                  New events appear here the moment organizers publish them — check back
-                  soon.
+                  New events appear here the very moment an organizer presses publish —
+                  check back soon, or be the reason everyone else does.
                 </p>
                 <p style={{ margin: 0 }}>
                   <Link href="/portal" className="btn btn-brand">
@@ -473,8 +493,8 @@ export default function HomePage() {
           <h2 className="feed-section-title anim-fade-up">Four steps, and no card required</h2>
           <p className="info-lede anim-fade-up">
             {anyPaypal
-              ? 'Tickets here are paid the way you already pay for everything else — a normal bank transfer, or PayPal where the organizer offers it. Here is the whole of it, start to finish.'
-              : 'Tickets here are paid the way you already pay for everything else — a normal bank transfer. Here is the whole of it, start to finish.'}
+              ? 'No app to install, no account to open, no card to dig out of a coat pocket. You pay the way you already pay for everything else — a normal bank transfer, or PayPal where the organizer offers it. Here is the whole journey, start to finish, so nothing surprises you.'
+              : 'No app to install, no account to open, no card to dig out of a coat pocket. You pay the way you already pay for everything else — a normal bank transfer. Here is the whole journey, start to finish, so nothing surprises you.'}
           </p>
           <ol className="how-grid">
             {steps.map((step, i) => (
@@ -540,9 +560,14 @@ export default function HomePage() {
           <div className="cta-band anim-fade-up">
             <div>
               <h2 className="cta-band-title">Putting on an event yourself?</h2>
+              {/* "Free while we grow", not "one fee per event": the fee machinery
+                  was deliberately deleted (see lib/platform.ts) and this band was
+                  the last place still charging for it. */}
               <p className="cta-band-body">
-                Build your event page, sell tickets straight to your own bank account, and scan
-                guests in at the door. One fee per event, no commission on a single ticket.
+                You know the other way: the poster in three group chats, the payment
+                screenshots, the guest list in a note on your phone. Build your event page
+                instead — tickets sell straight into your own bank account, and you scan
+                guests in at the door. Free while we grow: no fee, no commission, nothing.
               </p>
             </div>
             <p className="cta-band-actions">

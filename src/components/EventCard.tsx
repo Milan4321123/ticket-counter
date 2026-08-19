@@ -83,7 +83,18 @@ export default function EventCard({ event, past = false, delayClass = '' }: Even
   const { videoUrl, stillUrl } = listingTileMedia(event);
   const accent = parsePageDesign(event.pageDesign).accent ?? 'violet';
   const location = [event.venueName, event.city].filter(Boolean).join(', ');
-  const chip = dateChipLabel(event);
+  // One line only — the tile is 216px wide and the full collection details are
+  // a paragraph. The rest is on the shop's own page.
+  const collectLine =
+    event.pickupInfo
+      .split('\n')
+      .map((l) => l.trim())
+      .find(Boolean) ?? '';
+  // A shop has no date, so the corner chip that would sit empty says what the
+  // tile IS instead — the one thing a browser scanning a mixed feed needs, and
+  // the thing the date was communicating on the tiles beside it.
+  const isShop = event.kind === 'shop';
+  const chip = isShop ? 'Shop' : dateChipLabel(event);
 
   return (
     <Link
@@ -135,11 +146,17 @@ export default function EventCard({ event, past = false, delayClass = '' }: Even
       <div className="event-card-body">
         <div className="event-card-title">{event.name}</div>
         {event.artist ? <div className="event-card-meta">{event.artist}</div> : null}
-        {event.dateDisplay ? <div className="event-card-meta">{event.dateDisplay}</div> : null}
+        {isShop ? (
+          collectLine ? <div className="event-card-meta">{collectLine}</div> : null
+        ) : event.dateDisplay ? (
+          <div className="event-card-meta">{event.dateDisplay}</div>
+        ) : null}
         {location ? <div className="event-card-meta">{location}</div> : null}
         <div className="event-card-foot">
           {minPrice !== null && !past ? (
-            <span className="event-card-price">from {formatMoney(minPrice, event.currency)}</span>
+            <span className="event-card-price">
+              {minPrice === 0 ? 'Free' : `from ${formatMoney(minPrice, event.currency)}`}
+            </span>
           ) : (
             <span />
           )}

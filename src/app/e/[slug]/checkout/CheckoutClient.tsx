@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatMoney } from '@/lib/money';
-import type { ApiErrorResponse, CaptureOrderResponse, CreateOrderResponse } from '@/lib/types';
+import type { ApiErrorResponse, CaptureOrderResponse, CreateOrderResponse, EventKind } from '@/lib/types';
+import { vocabFor, type Vocab } from '@/lib/vocab';
 import styles from './checkout.module.css';
 
 declare global {
@@ -30,6 +31,8 @@ export interface CheckoutConfig {
   venue: string;
   currency: string;
   maxTicketsPerOrder: number;
+  /** Event or shop — decides every noun on this page. See lib/vocab. */
+  kind: EventKind;
   tiers: CheckoutTier[];
 }
 
@@ -80,7 +83,11 @@ interface CreateOrderBody {
   eventId: string;
   buyerName: string;
   buyerEmail: string;
+  /** '' unless the buyer said the money comes from someone else's account. */
+  payerName: string;
   items: { tierId: string; quantity: number }[];
+  /** What this page showed as the total — the server 409s if prices moved. */
+  expectedTotalCents: number;
 }
 
 type ApiCode = NonNullable<ApiErrorResponse['code']>;
@@ -131,17 +138,17 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   return data as T;
 }
 
-function friendlyError(e: unknown): string {
+function friendlyError(e: unknown, v: Vocab): string {
   if (e instanceof ApiError) {
     switch (e.code) {
       case 'SOLD_OUT':
-        return 'Some of those tickets just sold out. Please lower your quantities and try again.';
+        return `Some of those ${v.units} just sold out. Please lower your quantities and try again.`;
       case 'SALES_CLOSED':
         // The server picks between "sales are closed" and "not on sale yet"
         // from the organizer's own setting. Hardcoding one of them here told a
         // buyer sales had CLOSED on an event whose every other surface said
         // the tickets were still to come.
-        return e.message || 'Ticket sales are currently closed.';
+        return e.message || `${v.Sales} are currently closed.`;
       case 'PAYMENT_FAILED':
         return 'The payment could not be completed and you have not been charged. Please try again.';
       case 'NOT_FOUND':
@@ -181,12 +188,22 @@ export default function CheckoutClient({
   preselectTier = null,
 }: Props) {
   const router = useRouter();
+  // Identical checkout either way — same stepper, same reservation, same
+  // transfer. Only the nouns change: seats and tickets, or items to collect.
+  const v = vocabFor(config.kind);
+  const isShop = config.kind === 'shop';
 
   const [qty, setQty] = useState<Record<string, number>>(() =>
     Object.fromEntries(config.tiers.map((t) => [t.id, t.id === preselectTier ? 1 : 0]))
   );
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  // Whose name the money will arrive under. Optional, and collapsed behind a
+  // link by default: the great majority pay from an account in their own name,
+  // and a field everybody has to read past is a worse checkout for all of them
+  // than a line of text is for the few who need it.
+  const [payerOpen, setPayerOpen] = useState(false);
+  const [payerName, setPayerName] = useState('');
   const [studentAck, setStudentAck] = useState(false);
   // Consent is an ACTION, not a notice. Nobody may hand us a name and an email
   // without having ticked this themselves — it starts false, it is never
@@ -205,6 +222,18 @@ export default function CheckoutClient({
   const totalQty = config.tiers.reduce((sum, t) => sum + (qty[t.id] ?? 0), 0);
   const totalCents = config.tiers.reduce((sum, t) => sum + (qty[t.id] ?? 0) * t.priceCents, 0);
 
+  /**
+   * A zero-total order is an RSVP: the server finalizes it in the same request
+   * and the buyer lands on their codes, so no payment UI should ever appear.
+   *
+   * Two flavours on purpose. An event whose EVERY tier is free shows the RSVP
+   * flow before anything is selected — its visitors should never glimpse bank
+   * copy at all. A mixed event (free + paid tiers) decides by the current
+   * selection, because "which flow" genuinely depends on what is in the cart.
+   */
+  const allTiersFree = config.tiers.every((t) => t.priceCents === 0);
+  const isFreeOrder = allTiersFree || (totalQty > 0 && totalCents === 0);
+
   const needsStudentAck = config.tiers.some((t) => t.studentOnly && (qty[t.id] ?? 0) > 0);
   const nameOk = name.trim().length >= 2;
   const emailOk = EMAIL_RE.test(email.trim());
@@ -219,7 +248,7 @@ export default function CheckoutClient({
    */
   const blockedReason =
     totalQty === 0
-      ? 'Choose at least one ticket to continue.'
+      ? `Choose at least one ${v.unit} to continue.`
       : !nameOk || !emailOk
         ? 'Fill in your name and email to continue.'
         : !ackOk
@@ -232,8 +261,8 @@ export default function CheckoutClient({
 
   // Latest state snapshot for PayPal callbacks (they are registered once and
   // would otherwise close over stale state).
-  const latestRef = useRef({ qty, name, email, formReady, totalQty });
-  latestRef.current = { qty, name, email, formReady, totalQty };
+  const latestRef = useRef({ qty, name, email, payerName, formReady, totalQty });
+  latestRef.current = { qty, name, email, payerName, formReady, totalQty };
 
   const localOrderIdRef = useRef<string | null>(null);
   const suppressPaypalErrorRef = useRef(false);
@@ -272,7 +301,7 @@ export default function CheckoutClient({
     if (!formReady || busy) {
       setMessage({
         kind: 'error',
-        text: 'Please choose at least one ticket and fill in your details above.',
+        text: `Please choose at least one ${v.unit} and fill in your details above.`,
       });
       return;
     }
@@ -283,14 +312,16 @@ export default function CheckoutClient({
         eventId,
         buyerName: name.trim(),
         buyerEmail: email.trim(),
+        payerName: payerName.trim(),
         items: buildItems(qty),
+        expectedTotalCents: totalCents,
       };
       const created = await postJson<CreateOrderResponse>('/api/orders', req);
       await postJson<CaptureOrderResponse>(`/api/orders/${created.orderId}/capture`, {});
       router.replace(`/order/${created.orderId}`);
       // Keep the button disabled while the redirect happens.
     } catch (e) {
-      setMessage({ kind: 'error', text: friendlyError(e) });
+      setMessage({ kind: 'error', text: friendlyError(e, v) });
       setBusy(false);
     }
   }
@@ -302,7 +333,7 @@ export default function CheckoutClient({
     if (!formReady || busy) {
       setMessage({
         kind: 'error',
-        text: 'Please choose at least one ticket and fill in your details above.',
+        text: `Please choose at least one ${v.unit} and fill in your details above.`,
       });
       return;
     }
@@ -313,14 +344,16 @@ export default function CheckoutClient({
         eventId,
         buyerName: name.trim(),
         buyerEmail: email.trim(),
+        payerName: payerName.trim(),
         items: buildItems(qty),
+        expectedTotalCents: totalCents,
       };
       const created = await postJson<CreateOrderResponse>('/api/orders', req);
       // The order page shows the bank details, amount, and reference.
       router.replace(`/order/${created.orderId}`);
       // Keep the button disabled while the redirect happens.
     } catch (e) {
-      setMessage({ kind: 'error', text: friendlyError(e) });
+      setMessage({ kind: 'error', text: friendlyError(e, v) });
       setBusy(false);
     }
   }
@@ -361,9 +394,15 @@ export default function CheckoutClient({
     document.body.appendChild(script);
   }, [mode, paypalClientId, config.currency]);
 
-  // Render the PayPal buttons once the SDK is ready.
+  // Render the PayPal buttons once the SDK is ready — and re-render them
+  // whenever the free/paid boundary is crossed. The RSVP branch unmounts the
+  // container (destroying any buttons in it), so isFreeOrder MUST be a
+  // dependency here: without it, a buyer who lands on a preselected free tier
+  // and then adds a paid one would face a silently empty payment box, and one
+  // who toggled free→paid→free→paid would lose the buttons on the way back.
+  // The cleanup below is what makes the re-render possible.
   useEffect(() => {
-    if (mode !== 'paypal' || sdkState !== 'ready') return;
+    if (mode !== 'paypal' || sdkState !== 'ready' || isFreeOrder) return;
     if (buttonsRenderedRef.current || !paypalBoxRef.current) return;
     if (!window.paypal?.Buttons) {
       setSdkState('error');
@@ -380,7 +419,7 @@ export default function CheckoutClient({
             suppressPaypalErrorRef.current = true;
             setMessage({
               kind: 'error',
-              text: 'Please choose at least one ticket and fill in your details above.',
+              text: `Please choose at least one ${v.unit} and fill in your details above.`,
             });
             throw new Error('form incomplete');
           }
@@ -390,7 +429,15 @@ export default function CheckoutClient({
               eventId,
               buyerName: s.name.trim(),
               buyerEmail: s.email.trim(),
+              payerName: s.payerName.trim(),
               items: buildItems(s.qty),
+              // From the SNAPSHOT's quantities, not the closure's — this
+              // callback outlives renders, and the guard must state what the
+              // buyer is looking at now.
+              expectedTotalCents: config.tiers.reduce(
+                (sum, t) => sum + (s.qty[t.id] ?? 0) * t.priceCents,
+                0
+              ),
             };
             const created = await postJson<CreateOrderResponse>('/api/orders', req);
             localOrderIdRef.current = created.orderId;
@@ -400,7 +447,7 @@ export default function CheckoutClient({
             return created.paypalOrderId;
           } catch (e) {
             suppressPaypalErrorRef.current = true;
-            setMessage({ kind: 'error', text: friendlyError(e) });
+            setMessage({ kind: 'error', text: friendlyError(e, v) });
             throw e;
           }
         },
@@ -423,7 +470,7 @@ export default function CheckoutClient({
               });
               return actions.restart();
             }
-            setMessage({ kind: 'error', text: friendlyError(e) });
+            setMessage({ kind: 'error', text: friendlyError(e, v) });
           }
         },
         onCancel: () => {
@@ -444,8 +491,14 @@ export default function CheckoutClient({
         },
       })
       .render(paypalBoxRef.current);
+    return () => {
+      // The container is about to unmount (or the deps changed): forget that
+      // buttons were ever rendered, so the next mount gets fresh ones instead
+      // of an empty box guarded by a stale flag.
+      buttonsRenderedRef.current = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, sdkState]);
+  }, [mode, sdkState, isFreeOrder]);
 
   // ---------------- Render ----------------
 
@@ -464,7 +517,7 @@ export default function CheckoutClient({
       </p>
 
       <div className="card anim-fade-up anim-d1">
-        <h2 className="card-title">Your tickets</h2>
+        <h2 className="card-title">{isShop ? 'Your order' : 'Your tickets'}</h2>
         <div className={styles.qtyList}>
           {config.tiers.map((tier) => {
             const remaining = availability.tiers[tier.id]?.remaining ?? 0;
@@ -487,14 +540,14 @@ export default function CheckoutClient({
                     ) : null}
                   </div>
                   <div className="muted small">
-                    {formatMoney(tier.priceCents, config.currency)} each
+                    {tier.priceCents === 0 ? 'Free' : `${formatMoney(tier.priceCents, config.currency)} each`}
                     {tier.studentOnly ? ' · student ID required at the entrance' : ''}
                   </div>
                 </div>
                 <div className="qty-stepper">
                   <button
                     type="button"
-                    aria-label={`Remove one ${tier.name} ticket`}
+                    aria-label={`Remove one ${tier.name}`}
                     onClick={() => changeQty(tier.id, -1)}
                     disabled={working || q === 0}
                   >
@@ -503,7 +556,7 @@ export default function CheckoutClient({
                   <span className="qty-value">{q}</span>
                   <button
                     type="button"
-                    aria-label={`Add one ${tier.name} ticket`}
+                    aria-label={`Add one ${tier.name}`}
                     onClick={() => changeQty(tier.id, 1)}
                     disabled={!canAdd}
                   >
@@ -515,12 +568,12 @@ export default function CheckoutClient({
           })}
         </div>
         <p className={`muted small ${styles.hint}`}>
-          Up to {config.maxTicketsPerOrder} tickets per order.
+          Up to {config.maxTicketsPerOrder} {v.units} per order.
         </p>
 
         <div className={styles.summaryBlock}>
           {totalQty === 0 ? (
-            <p className="muted small">No tickets selected yet.</p>
+            <p className="muted small">Nothing selected yet.</p>
           ) : (
             <>
               {selectedTiers.map((tier) => (
@@ -533,7 +586,7 @@ export default function CheckoutClient({
               ))}
               <div className="summary-row total">
                 <span>Total</span>
-                <span>{formatMoney(totalCents, config.currency)}</span>
+                <span>{totalCents === 0 ? 'Free' : formatMoney(totalCents, config.currency)}</span>
               </div>
             </>
           )}
@@ -573,8 +626,53 @@ export default function CheckoutClient({
             <p className={styles.fieldError}>Please enter a valid email address.</p>
           )}
           <p className={`muted small ${styles.hint}`}>
-            Your QR-code tickets will be emailed to this address.
+            Your QR-code {v.codes} will be emailed to this address.
           </p>
+        </div>
+        {/* The seller matches your payment by its reference. A bank transfer
+            carries that reference for you; PayPal often does not — so when the
+            money turns up under a name they have never seen, there is nothing
+            left to match it to and somebody has to go hunting. One optional
+            line here saves that conversation. Hidden entirely for a free
+            order: there is no payment for anyone's name to arrive under. */}
+        <div className="field" style={isFreeOrder ? { display: 'none' } : undefined}>
+          {payerOpen ? (
+            <>
+              <label htmlFor="payer-name">Whose name will the payment come from?</label>
+              <input
+                id="payer-name"
+                className="input"
+                autoComplete="off"
+                value={payerName}
+                onChange={(e) => setPayerName(e.target.value)}
+                placeholder="Name on the account the money is sent from"
+                maxLength={120}
+                disabled={working}
+              />
+              <p className={`muted small ${styles.hint}`}>
+                Only if it is not <strong>{name.trim() || 'your own name'}</strong> — paying from a
+                partner&rsquo;s, a parent&rsquo;s or a shared account is completely fine, the seller
+                just needs to know whose name to look for.
+              </p>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="link-button small"
+              onClick={() => setPayerOpen(true)}
+              disabled={working}
+              style={{
+                background: 'none',
+                border: 0,
+                padding: 0,
+                cursor: 'pointer',
+                color: 'var(--brand-text)',
+                fontWeight: 600,
+              }}
+            >
+              Paying from someone else&rsquo;s account? Tell them whose name to look for →
+            </button>
+          )}
         </div>
         {needsStudentAck && (
           <>
@@ -607,16 +705,18 @@ export default function CheckoutClient({
             the only mode where the account is provably the organizer's own. */}
         <div className={styles.privacyNote}>
           <p style={{ margin: 0 }}>
-            <strong>Your name and email go to the organizer of this event</strong> — they are who
-            your ticket is issued by, and how you get a new copy if it goes missing.
-            {mode === 'transfer'
-              ? paypalOffered
-                ? ' Your payment goes straight to the organizer — to their own bank account or their own PayPal, so the money never passes through us, and the reference on it is how they match it to your tickets.'
-                : ' Your payment goes straight to their bank account, so the money never passes through us, and the reference on your transfer is how they match it to your tickets.'
-              : ' The reference on your order is how your payment is matched to your tickets.'}{' '}
-            We never ask for a card number or your bank details here. {retentionDays} days after the
-            event, your name and email are erased from our system for good — the organizer keeps
-            their ticket count, but not you.
+            <strong>Your name and email go to the {isShop ? 'seller' : 'organizer of this event'}</strong> —
+            they are who your {v.code} is issued by, and how you get a new copy if it goes missing.
+            {isFreeOrder
+              ? ' Nothing is charged and no payment details exist here at all.'
+              : mode === 'transfer'
+                ? paypalOffered
+                  ? ` Your payment goes straight to them — to their own bank account or their own PayPal, so the money never passes through us, and the reference on it is how they match it to your ${v.codes}.`
+                  : ` Your payment goes straight to their bank account, so the money never passes through us, and the reference on your transfer is how they match it to your ${v.codes}.`
+                : ` The reference on your order is how your payment is matched to your ${v.codes}.`}{' '}
+            We never ask for a card number or your bank details here. {retentionDays} days after
+            {isShop ? ' you collect' : ' the event'}, your name and email are erased from our system
+            for good — {isShop ? 'the seller' : 'the organizer'} keeps their sales count, but not you.
           </p>
           <p style={{ margin: '6px 0 0' }}>
             <a
@@ -628,7 +728,7 @@ export default function CheckoutClient({
             >
               Read the full privacy note →
             </a>{' '}
-            <span className="small">(opens in a new tab, so you keep your ticket selection)</span>
+            <span className="small">(opens in a new tab, so you keep your selection)</span>
           </p>
 
           {/* The consent itself. Reading the note is not agreeing to it, so the
@@ -645,9 +745,9 @@ export default function CheckoutClient({
               disabled={working}
             />
             <span>
-              <strong>I agree</strong> that my name and email may be passed to the organizer of
-              this event so my tickets can be issued, and I have read the privacy note
-              (Datenschutz).
+              <strong>I agree</strong> that my name and email may be passed to the{' '}
+              {isShop ? 'seller' : 'organizer'} of this {v.listing} so my {v.codes} can be issued, and
+              I have read the privacy note (Datenschutz).
             </span>
           </label>
           {touched.privacy && !privacyAck && (
@@ -659,7 +759,7 @@ export default function CheckoutClient({
       </div>
 
       <div className="card anim-fade-up anim-d3">
-        <h2 className="card-title">Payment</h2>
+        <h2 className="card-title">{isFreeOrder ? 'Reserve your spot' : 'Payment'}</h2>
 
         {message && (
           <div
@@ -670,7 +770,37 @@ export default function CheckoutClient({
           </div>
         )}
 
-        {mode === 'transfer' ? (
+        {isFreeOrder ? (
+          /* The RSVP flow: same endpoint, same redirect, no money. The server
+             prices the order from its tiers and finalizes a zero total on the
+             spot, so the next page already shows the QR codes. */
+          <>
+            <p className="muted small" style={{ marginTop: 0 }}>
+              {allTiersFree
+                ? `This ${v.listing} is free — no payment, just a reservation. Your QR ${v.codes} appear on the next page and are emailed to you right away.`
+                : `Everything you picked is free — no payment needed. Your QR ${v.codes} appear on the next page and are emailed to you right away.`}
+            </p>
+            <button
+              type="button"
+              className="btn btn-primary btn-lg btn-block"
+              onClick={handleTransferReserve}
+              disabled={!formReady || busy}
+            >
+              {busy ? (
+                <>
+                  <span className="spinner" aria-hidden="true" /> Reserving…
+                </>
+              ) : (
+                `Reserve ${v.units} — free`
+              )}
+            </button>
+            {!formReady && !busy && (
+              <p className={`muted small ${styles.hint}`}>
+                {blockedReason}
+              </p>
+            )}
+          </>
+        ) : mode === 'transfer' ? (
           /* Blocked ONLY when there is genuinely no way to pay. This used to
              test the bank details alone, so an organizer who had set up PayPal
              and left the IBAN half-filled got a checkout that refused every
@@ -692,15 +822,15 @@ export default function CheckoutClient({
                 <div className={styles.payPreferred}>
                   <strong>PayPal — fastest</strong>
                   <span>
-                    Arrives in seconds, so the organizer can confirm it and send your QR tickets
+                    Arrives in seconds, so they can confirm it and send your QR {v.codes}
                     straight away. Recommended.
                   </span>
                 </div>
               )}
               <p className="muted small" style={{ marginTop: paypalOffered ? 12 : 0 }}>
                 {paypalOffered
-                  ? 'Pay by PayPal for tickets today, or by bank transfer (Überweisung) if you prefer. Reserving takes one click — your seats are held for you straight away.'
-                  : 'Pay by regular bank transfer (Überweisung). Reserving takes one click — your seats are held for you straight away.'}
+                  ? `Pay by PayPal today, or by bank transfer (Überweisung) if you prefer. Reserving takes one click — your ${v.units} are held for you straight away.`
+                  : `Pay by regular bank transfer (Überweisung). Reserving takes one click — your ${v.units} are held for you straight away.`}
               </p>
               <ul className={styles.perkList}>
                 {paypalOffered && (
@@ -720,7 +850,7 @@ export default function CheckoutClient({
                   payment reference (also sent to you by email)
                 </li>
                 <li>
-                  Your QR-code tickets are emailed as soon as your transfer arrives — usually
+                  Your QR-code {v.codes} are emailed as soon as your transfer arrives — usually
                   within 1–2 business days
                 </li>
                 <li>
@@ -739,7 +869,17 @@ export default function CheckoutClient({
                     <span className="spinner" aria-hidden="true" /> Reserving…
                   </>
                 ) : (
-                  'Reserve tickets — pay by bank transfer'
+                  /* Name the routes the buyer actually has — the copy above
+                     already promised PayPal when it is offered, and a button
+                     that then says only "bank transfer" reads like PayPal was
+                     withdrawn at the last moment. */
+                  `Reserve ${v.units} — ${
+                    paypalOffered && transferConfigured
+                      ? 'pay by PayPal or bank transfer'
+                      : paypalOffered
+                        ? 'pay by PayPal'
+                        : 'pay by bank transfer'
+                  }`
                 )}
               </button>
               {!formReady && !busy && (

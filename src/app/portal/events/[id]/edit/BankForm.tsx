@@ -1,6 +1,9 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import type { EventKind } from '@/lib/types';
+import { vocabFor } from '@/lib/vocab';
+import { paypalLinkFor } from '@/lib/paypalLink';
 import { useRouter } from 'next/navigation';
 import { saveEvent, type StepUpRequest } from './save';
 
@@ -14,6 +17,8 @@ interface QueuedChange {
 
 interface Props {
   eventId: string;
+  /** Event or shop — decides the nouns in the explanatory copy. See lib/vocab. */
+  kind: EventKind;
   initial: {
     bankAccountHolder: string;
     bankIban: string;
@@ -28,8 +33,9 @@ interface Props {
 /** The exact patch that was refused, held so the confirmed save is the same one. */
 type PendingPatch = Record<string, unknown>;
 
-export default function BankForm({ eventId, initial, queued }: Props) {
+export default function BankForm({ eventId, kind, initial, queued }: Props) {
   const router = useRouter();
+  const v = vocabFor(kind);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [holder, setHolder] = useState(initial.bankAccountHolder);
@@ -242,8 +248,8 @@ export default function BankForm({ eventId, initial, queued }: Props) {
   return (
     <form onSubmit={submit}>
       <p className="muted small" style={{ marginTop: 0 }}>
-        Buyers pay <strong>directly to you</strong> — the ticket money goes straight into your own account, the
-        platform never touches it. You confirm each payment on the orders page and the tickets go out by email.
+        Buyers pay <strong>directly to you</strong> — their money goes straight into your own account, the
+        platform never touches it. You confirm each payment on the orders page and the {v.codes} go out by email.
       </p>
 
       {/* A confirmed change that has not landed yet. This is the whole payoff of
@@ -302,6 +308,17 @@ export default function BankForm({ eventId, initial, queued }: Props) {
             maxLength={120}
             placeholder="Name on the account"
           />
+          {/* Since October 2025 every EU bank checks this name against the one
+              registered to the IBAN before the payer confirms, and shows them a
+              match / no-match warning. A near-miss here does not fail quietly —
+              it puts a fraud warning in front of every single buyer at the
+              moment they are deciding whether to trust a page they have never
+              seen before. Worth a sentence to prevent. */}
+          <p className="muted small" style={{ margin: '6px 0 0' }}>
+            Type this <strong>exactly</strong> as your bank has it — buyers&rsquo; banking apps now
+            check the name against the IBAN and warn them if it does not match. Leave the event name
+            out; it goes in the reference automatically.
+          </p>
         </div>
         <div className="field">
           <label htmlFor="bank-iban">IBAN</label>
@@ -352,12 +369,43 @@ export default function BankForm({ eventId, initial, queued }: Props) {
           onChange={(e) => setPaypal(e.target.value)}
           maxLength={120}
           spellCheck={false}
-          placeholder="you@example.com or paypal.me/yourname"
+          placeholder="paypal.me/yourname"
         />
+        {/* Both forms are accepted, and they are NOT equally good — a PayPal.Me
+            link becomes a button with the amount already in it, an email becomes
+            text to copy into the PayPal app. That difference used to be
+            invisible until after publishing, so this says which one they have
+            just typed, while they can still change it. */}
+        {paypal.trim() ? (
+          paypalLinkFor(paypal) ? (
+            <p className="small" style={{ margin: '6px 0 0', color: 'var(--green)', fontWeight: 600 }}>
+              ✓ Buyers get a <strong>Pay</strong> button with the amount already filled in, plus a QR code —
+              nothing for them to type.
+            </p>
+          ) : (
+            <p className="muted small" style={{ margin: '6px 0 0' }}>
+              This works, but buyers will have to <strong>copy it into the PayPal app themselves</strong> and type
+              the amount. A <strong>paypal.me/yourname</strong> link instead gives them a button with the amount
+              already in it — it is free to set up at{' '}
+              <a href="https://paypal.me" target="_blank" rel="noopener noreferrer">
+                paypal.me
+              </a>
+              .
+            </p>
+          )
+        ) : null}
         <p className="muted small" style={{ margin: '6px 0 0' }}>
           Offer PayPal as well as the bank transfer. Buyers see this next to your IBAN with the same payment
           reference, send the money themselves, and you confirm it on the orders page exactly as you do a transfer.
           The money lands in <strong>your</strong> PayPal — we never hold it. Leave empty for bank transfer only.
+        </p>
+        {/* Said here rather than only in the confirm box, because it changes
+            what an organizer should ASK for: PayPal has no field a link can put
+            the reference in, so those payments arrive as a name and an amount. */}
+        <p className="muted small" style={{ margin: '6px 0 0' }}>
+          One thing to know: PayPal has nowhere to carry your payment reference, so those payments arrive under the
+          sender&rsquo;s <strong>name</strong> instead. Confirming a PayPal payment on the orders page lets you match
+          that name — you do not need the reference for it.
         </p>
       </div>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>

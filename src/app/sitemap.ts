@@ -25,6 +25,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const staticPages: MetadataRoute.Sitemap = [
     { url: base, changeFrequency: 'daily', priority: 1 },
     { url: `${base}/organizers`, changeFrequency: 'monthly', priority: 0.8 },
+    // The evergreen festival pages: same URL every year, so their search
+    // standing compounds. Weekly — the events listed on them change.
+    { url: `${base}/dashain`, changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${base}/tihar`, changeFrequency: 'weekly', priority: 0.8 },
     { url: `${base}/contact`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/privacy`, changeFrequency: 'yearly', priority: 0.3 },
   ];

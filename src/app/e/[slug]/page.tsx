@@ -29,6 +29,8 @@ import {
   videoEmbedUrl,
 } from '@/lib/events';
 import type { EventRow, PageDesign } from '@/lib/events';
+import type { EventKind } from '@/lib/types';
+import { vocabFor } from '@/lib/vocab';
 import { getAvailability } from '@/lib/inventory';
 import { ticketState, fromPriceCents, visibleTiers, comingSoonLabel } from '@/lib/ticketState';
 import { currentOrganizer, getOrganizer } from '@/lib/organizers';
@@ -142,16 +144,25 @@ function vibeTuning(vibe: PageDesign['vibe']): {
 }
 
 /**
- * The four steps, told for THIS event: an organizer who also takes PayPal
+ * The four steps, told for THIS listing: an organizer who also takes PayPal
  * should not have their page promising a bank transfer is the only way, and one
  * who does not must not have PayPal dangled in front of their buyers.
+ *
+ * A shop runs the identical four steps — reserve, pay, confirmed, show the code
+ * — so only the nouns and the last step's setting change.
  */
-function howItWorks(takesPaypal: boolean) {
+function howItWorks(takesPaypal: boolean, kind: EventKind) {
+  const isShop = kind === 'shop';
   return [
-    {
-      title: 'Reserve your tickets',
-      desc: 'Pick your tickets at checkout and reserve them in one click — no account needed, and your seats are held for you right away.',
-    },
+    isShop
+      ? {
+          title: 'Place your order',
+          desc: 'Pick what you want at checkout and reserve it in one click — no account needed, and your items are held for you right away.',
+        }
+      : {
+          title: 'Reserve your tickets',
+          desc: 'Pick your tickets at checkout and reserve them in one click — no account needed, and your seats are held for you right away.',
+        },
     takesPaypal
       ? {
           title: 'Pay by bank transfer or PayPal',
@@ -163,14 +174,21 @@ function howItWorks(takesPaypal: boolean) {
         },
     {
       title: 'Your payment is confirmed',
-      desc: takesPaypal
-        ? 'PayPal usually arrives within minutes and a bank transfer takes 1–2 business days. As soon as yours lands, the organizer confirms it and your QR-code tickets are emailed to you.'
-        : 'As soon as the transfer arrives (usually 1–2 business days), the organizer confirms it and your QR-code tickets land in your inbox.',
+      desc:
+        (takesPaypal
+          ? 'PayPal usually arrives within minutes and a bank transfer takes 1–2 business days. As soon as yours lands, the seller confirms it and your '
+          : 'As soon as the transfer arrives (usually 1–2 business days), the seller confirms it and your ') +
+        (isShop ? 'QR collection code is emailed to you.' : 'QR-code tickets land in your inbox.'),
     },
-    {
-      title: 'Show the QR code at the door',
-      desc: 'Bring your QR codes on your phone or on paper. One quick scan per ticket and you are in — enjoy the show!',
-    },
+    isShop
+      ? {
+          title: 'Show the code when you collect',
+          desc: 'Bring your code on your phone or on paper. One quick scan when you arrive and your order is handed over.',
+        }
+      : {
+          title: 'Show the QR code at the door',
+          desc: 'Bring your QR codes on your phone or on paper. One quick scan per ticket and you are in — enjoy the show!',
+        },
   ];
 }
 
@@ -267,10 +285,12 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const description = eventDescription(event);
   const image = socialImage(event);
   const url = absoluteUrl(`/e/${event.slug}`);
-  // What a searcher types: the event, then the city. "Dashain Night 2026 —
+  // What a searcher types: the thing, then the city. "Dashain Night 2026 —
   // Tickets, Berlin" matches "dashain night berlin tickets" far better than the
-  // name alone, and still reads like a sentence rather than keyword soup.
-  const title = `${event.name} — Tickets${event.city.trim() ? `, ${event.city.trim()}` : ''}`;
+  // name alone, and still reads like a sentence rather than keyword soup. A
+  // shop's buyers are searching for something else entirely, so it says so.
+  const searchNoun = event.kind === 'shop' ? 'Order online' : 'Tickets';
+  const title = `${event.name} — ${searchNoun}${event.city.trim() ? `, ${event.city.trim()}` : ''}`;
 
   return {
     title,
@@ -421,8 +441,22 @@ export default async function EventPage({ params }: Params) {
 
   const maps = mapsUrl(event);
   const location = [event.venueName, event.city].filter(Boolean).join(', ');
+  // The words this page speaks. A shop sells items to collect, not tickets to
+  // a night out, and every noun below comes from here rather than a literal.
+  const v = vocabFor(event.kind);
+  const isShop = event.kind === 'shop';
+  const heroCollectLine =
+    event.pickupInfo
+      .split('\n')
+      .map((l) => l.trim())
+      .find(Boolean) ?? '';
+  // A shop's collection details replace the date AND the venue in this card,
+  // and are required to publish — so a published shop always has one. An event
+  // still shows it only when it has something to put in it.
   const hasWhereCard = Boolean(
-    event.dateDisplay || event.venueName || event.address || event.city
+    isShop
+      ? event.pickupInfo.trim() || event.venueName || event.address || event.city
+      : event.dateDisplay || event.venueName || event.address || event.city
   );
   const checkoutHref = `/e/${event.slug}/checkout`;
   const headline = design.headline || event.name;
@@ -437,7 +471,7 @@ export default async function EventPage({ params }: Params) {
   // scroll nowhere. Labels are fixed and short on purpose: the About section's
   // heading is the organizer's own wording and can be a paragraph long.
   const navSections: EventSectionLink[] = [
-    { id: 'tickets', label: 'Tickets' },
+    { id: 'tickets', label: v.Units },
     event.description.trim() ? { id: 'about', label: 'About' } : null,
     legacyVideo ? { id: 'watch', label: 'Watch' } : null,
     posts.length > 0 ? { id: 'updates', label: 'Updates' } : null,
@@ -447,7 +481,7 @@ export default async function EventPage({ params }: Params) {
     // Always present now — the section holds the ask form, not just answers.
     { id: 'questions', label: 'Questions' },
   ].filter((s): s is EventSectionLink => s !== null);
-  // Tickets and "How it works" are always there, so two buttons means the event
+  // The sales section and "How it works" are always there, so two buttons means the event
   // filled in nothing else — a bar over a page that short is just chrome.
   const showSectionNav = navSections.length >= 3;
 
@@ -506,7 +540,7 @@ export default async function EventPage({ params }: Params) {
             <span className="badge badge-amber">Preview</span>
             <span className="preview-bar-text">
               This is your page as visitors will see it. <strong>Nobody else can open it</strong> —
-              it stays private until you publish, and tickets cannot be bought yet.
+              it stays private until you publish, and nothing can be bought yet.
             </span>
             <Link href={`/portal/events/${event.id}/edit`} className="btn btn-sm">
               Back to editing
@@ -539,7 +573,9 @@ export default async function EventPage({ params }: Params) {
 
         <div className="container event-hero-inner">
           {/* "Live event" is a claim, and on a draft it is a false one. */}
-          <p className="hero-kicker anim-fade-up">{preview ? 'Not published yet' : 'Live event'}</p>
+          <p className="hero-kicker anim-fade-up">
+            {preview ? 'Not published yet' : isShop ? 'Open for orders' : 'Live event'}
+          </p>
           <h1
             className="anim-fade-up anim-d1"
             style={{
@@ -560,9 +596,19 @@ export default async function EventPage({ params }: Params) {
               <strong>{event.artist}</strong>
             </p>
           ) : null}
-          {(event.dateDisplay || location) && (
+          {((isShop ? heroCollectLine : event.dateDisplay) || location) && (
             <div className="hero-chip-row anim-fade-up anim-d2">
-              {event.dateDisplay ? (
+              {/* A chip is one line, and collection details are a paragraph, so
+                  a shop puts its FIRST line here — "Collect Saturdays 4–7pm" —
+                  and leaves the rest to the card further down. */}
+              {isShop ? (
+                heroCollectLine ? (
+                  <span className="hero-chip">
+                    <CalendarIcon />
+                    {heroCollectLine}
+                  </span>
+                ) : null
+              ) : event.dateDisplay ? (
                 <span className="hero-chip">
                   <CalendarIcon />
                   {event.dateDisplay}
@@ -583,12 +629,12 @@ export default async function EventPage({ params }: Params) {
           {preview ? (
             <div className="event-hero-actions anim-fade-up anim-d3">
               <span className="btn btn-primary btn-lg" aria-disabled="true" style={{ opacity: 0.5, pointerEvents: 'none' }}>
-                Get tickets
+                {v.cta}
               </span>
               <span className="badge badge-amber">Live once you publish</span>
               {minPrice !== null ? (
                 <span className="event-hero-price">
-                  from {formatMoney(minPrice, event.currency)}
+                  {minPrice === 0 ? 'Free' : `from ${formatMoney(minPrice, event.currency)}`}
                 </span>
               ) : null}
             </div>
@@ -596,7 +642,7 @@ export default async function EventPage({ params }: Params) {
             <div className="event-hero-actions anim-fade-up anim-d3">
               {state.buyable ? (
                 <Link href={checkoutHref} className="btn btn-primary btn-lg">
-                  Get tickets
+                  {v.cta}
                 </Link>
               ) : (
                 /* Says why there is no button rather than leaving a gap. A
@@ -632,7 +678,7 @@ export default async function EventPage({ params }: Params) {
               ) : null}
               {state.buyable && minPrice !== null ? (
                 <span className="event-hero-price">
-                  from {formatMoney(minPrice, event.currency)}
+                  {minPrice === 0 ? 'Free' : `from ${formatMoney(minPrice, event.currency)}`}
                 </span>
               ) : null}
               {/* One line of context under the buttons for the states that need
@@ -640,8 +686,8 @@ export default async function EventPage({ params }: Params) {
               {state.kind === 'closed' || state.kind === 'coming-soon' ? (
                 <p className="muted small" style={{ width: '100%', margin: '8px 0 0' }}>
                   {state.kind === 'closed'
-                    ? 'Ticket sales are paused right now — check back soon.'
-                    : 'Tickets are not on sale yet. This page is where they will appear.'}
+                    ? `${v.Sales} are paused right now — check back soon.`
+                    : `${v.Units} are not on sale yet. This page is where they will appear.`}
                 </p>
               ) : null}
             </div>
@@ -676,8 +722,8 @@ export default async function EventPage({ params }: Params) {
         <div className="container">
           <div className={hasWhereCard ? 'event-split' : undefined}>
             <div>
-              <p className="section-kicker">Pick your spot</p>
-              <h2 className="page-title">Tickets</h2>
+              <p className="section-kicker">{isShop ? 'Pick what you want' : 'Pick your spot'}</p>
+              <h2 className="page-title">{v.Units}</h2>
               <div className="tier-grid">
                 {visibleTiers(tiers).map((tier) => {
                   const tierAvail = availability.tiers[tier.tierKey];
@@ -735,7 +781,7 @@ export default async function EventPage({ params }: Params) {
                       </div>
                       <div className="tier-name">{tier.name}</div>
                       <div className="tier-price">
-                        {formatMoney(tier.priceCents, event.currency)}
+                        {tier.priceCents === 0 ? 'Free' : formatMoney(tier.priceCents, event.currency)}
                       </div>
                       <p className="tier-desc">{tier.description}</p>
                       {tier.studentOnly && (
@@ -743,7 +789,7 @@ export default async function EventPage({ params }: Params) {
                           Bring a valid student ID — it&rsquo;s checked at the entrance.
                         </p>
                       )}
-                      {tierBuyable && <span className="tier-card-go">Get tickets →</span>}
+                      {tierBuyable && <span className="tier-card-go">{v.cta} →</span>}
                     </>
                   );
                   return tierBuyable ? (
@@ -754,7 +800,7 @@ export default async function EventPage({ params }: Params) {
                       // with it already at one. The server re-checks the key
                       // before honouring it.
                       href={`${checkoutHref}?tier=${encodeURIComponent(tier.tierKey)}`}
-                      aria-label={`Get ${tier.name} tickets`}
+                      aria-label={isShop ? `Order ${tier.name}` : `Get ${tier.name} tickets`}
                     >
                       {card}
                     </Link>
@@ -765,11 +811,27 @@ export default async function EventPage({ params }: Params) {
                   );
                 })}
               </div>
-              <p className="muted small">Up to {event.maxPerOrder} tickets per order.</p>
+              <p className="muted small">
+                Up to {event.maxPerOrder} {v.units} per order.
+              </p>
+              {/* Who you are buying from — said where the buying starts. The
+                  seller is the organizer, not this site: they set the prices,
+                  the money lands in their own account, and they are the ones
+                  who confirm it. The platform is only the software in between,
+                  and a buyer should not have to dig through the homepage FAQ
+                  to learn that. organizerDisplayName already falls back to
+                  "the organizer" when the account row has no name — generic,
+                  but still an honest answer to "whose event is this?". */}
+              <p className="muted small">
+                {isShop ? 'Sold by' : 'Presented by'} <strong>{organizerDisplayName}</strong>.{' '}
+                {isShop
+                  ? 'Your order is placed with them, and your payment goes straight to their own account — it never passes through us.'
+                  : 'Tickets for this event are sold by them, and your payment goes straight to their own account — it never passes through us.'}
+              </p>
               {canBuy && (
                 <p style={{ marginTop: 16 }}>
                   <Link href={checkoutHref} className="btn btn-primary btn-lg">
-                    Get your tickets
+                    {isShop ? 'Place your order' : 'Get your tickets'}
                   </Link>
                 </p>
               )}
@@ -778,9 +840,28 @@ export default async function EventPage({ params }: Params) {
             {hasWhereCard && (
               <aside className="event-aside">
                 <div className="card glow-card">
-                  <div className="card-title">When &amp; where</div>
+                  <div className="card-title">{v.logistics}</div>
                   <ul className="event-fact-list">
-                    {event.dateDisplay ? (
+                    {/* The one thing a shop's buyer came here to find, so it
+                        gets the top slot a date holds on an event — and it is
+                        shown WHOLE, line breaks and all, because "ring the bell
+                        marked Sharma" is exactly the kind of detail that gets
+                        lost when a paragraph is squeezed onto one line. */}
+                    {isShop ? (
+                      event.pickupInfo.trim() ? (
+                        <li className="event-fact">
+                          <span className="event-fact-icon" aria-hidden="true">
+                            <CalendarIcon />
+                          </span>
+                          <div>
+                            <div className="event-fact-label">Collection</div>
+                            <div className="event-fact-value" style={{ whiteSpace: 'pre-line' }}>
+                              {event.pickupInfo.trim()}
+                            </div>
+                          </div>
+                        </li>
+                      ) : null
+                    ) : event.dateDisplay ? (
                       <li className="event-fact">
                         <span className="event-fact-icon" aria-hidden="true">
                           <CalendarIcon />
@@ -797,8 +878,10 @@ export default async function EventPage({ params }: Params) {
                           <PinIcon />
                         </span>
                         <div>
-                          <div className="event-fact-label">Venue</div>
-                          <div className="event-fact-value">{event.venueName || 'Venue'}</div>
+                          <div className="event-fact-label">{isShop ? 'Where' : 'Venue'}</div>
+                          <div className="event-fact-value">
+                            {event.venueName || (isShop ? 'Collection point' : 'Venue')}
+                          </div>
                           {event.address ? (
                             <div className="muted small">{event.address}</div>
                           ) : null}
@@ -828,7 +911,9 @@ export default async function EventPage({ params }: Params) {
         <section className="section event-section" id="about">
           <div className="container">
             <p className="section-kicker">The story</p>
-            <h2 className="page-title">{design.aboutTitle || 'About the event'}</h2>
+            <h2 className="page-title">
+              {design.aboutTitle || (isShop ? 'About this shop' : 'About the event')}
+            </h2>
             <p className="muted event-prose">{event.description}</p>
           </div>
         </section>
@@ -918,10 +1003,10 @@ export default async function EventPage({ params }: Params) {
 
       <section className="section event-section" id="how-it-works">
         <div className="container">
-          <p className="section-kicker">From reserve to entry</p>
+          <p className="section-kicker">{isShop ? 'From order to collection' : 'From reserve to entry'}</p>
           <h2 className="page-title">How it works</h2>
           <ol className="step-list" style={{ maxWidth: 680 }}>
-            {howItWorks(paypalPayee(event) !== null).map((item, i) => (
+            {howItWorks(paypalPayee(event) !== null, event.kind).map((item, i) => (
               <li className="step-item" key={item.title}>
                 <span className="step-num">{i + 1}</span>
                 <div>
@@ -936,7 +1021,7 @@ export default async function EventPage({ params }: Params) {
           <div className="event-closing-actions">
             {canBuy ? (
               <Link href={checkoutHref} className="btn btn-primary btn-lg">
-                Get tickets for {event.name}
+                {isShop ? `Order from ${event.name}` : `Get tickets for ${event.name}`}
               </Link>
             ) : (
               <span className="btn btn-lg" aria-disabled="true" style={{ opacity: 0.6, pointerEvents: 'none' }}>
@@ -944,7 +1029,7 @@ export default async function EventPage({ params }: Params) {
               </span>
             )}
             <Link href="/" className="btn">
-              Browse more events
+              Browse more
             </Link>
           </div>
         </div>
@@ -1020,7 +1105,9 @@ export default async function EventPage({ params }: Params) {
           cta={state.cta}
           priceLabel={
             state.buyable && minPrice !== null
-              ? `from ${formatMoney(minPrice, event.currency)}`
+              ? minPrice === 0
+                ? 'Free'
+                : `from ${formatMoney(minPrice, event.currency)}`
               : state.badge
           }
         />

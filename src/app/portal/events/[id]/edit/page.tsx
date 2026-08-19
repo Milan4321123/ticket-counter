@@ -10,16 +10,15 @@ import {
   cropTag,
   listEventPosts,
   listEventQuestions,
+  listingDetailChecks,
+  listingDetailsComplete,
   mediaUrl,
   parseCropRect,
   parsePageDesign,
-  quoteEventFee,
 } from '@/lib/events';
 import { MAX_PHOTOS_PER_EVENT, MAX_VIDEOS_PER_EVENT } from '@/lib/media';
-import { formatMoney } from '@/lib/money';
 import { getStats } from '@/lib/orders';
 import { organizerPlanActive } from '@/lib/organizers';
-import { eventFeeBasis, eventFeeReference, platformBank } from '@/lib/platform';
 import PlanExpired from '../../../PlanExpired';
 import PortalNav from '../../../PortalNav';
 import { requirePortalOrganizer } from '../../../guard';
@@ -30,6 +29,7 @@ import BankForm from './BankForm';
 import DangerZone from './DangerZone';
 import DesignPanel from './DesignPanel';
 import EditorSection, { EditorSectionGroup } from './EditorSection';
+import { vocabFor } from '@/lib/vocab';
 import GoToTab from './GoToTab';
 import EditorTabs from './EditorTabs';
 import DetailsForm from './DetailsForm';
@@ -95,55 +95,38 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
   const soldByTierKey: Record<string, number> = {};
   for (const t of stats.perTier) soldByTierKey[t.tierId] = t.sold;
 
+  // The listing's own details come from lib/events, which is also what the
+  // publish route enforces — the two cannot say different things. Everything
+  // after them is about the account rather than the listing.
   const checklist = [
-    { ok: Boolean(event.dateDisplay.trim() || event.eventDate), label: 'Add a date' },
-    { ok: Boolean(event.venueName.trim() && event.address.trim()), label: 'Add the venue name and address' },
-    { ok: tiers.length > 0, label: 'Add at least one ticket type' },
+    ...listingDetailChecks(event),
+    { ok: tiers.length > 0, label: `Add at least one ${vocabFor(event.kind).unitType}` },
     {
       // EITHER route counts. Demanding an IBAN from an organizer who collects
       // by PayPal blocks a perfectly sellable event, and it was doing exactly
-      // that. What publishing actually needs is one working way to be paid.
-      ok: Boolean(
-        (event.bankIban.trim() && event.bankAccountHolder.trim()) || event.paypalAccount.trim()
-      ),
-      label: 'Add a way to be paid — bank account (holder and IBAN) or PayPal',
+      // that. What publishing actually needs is one working way to be paid —
+      // and a fully free listing (every tier at zero) needs none at all. Same
+      // rule as the publish gate in api/portal/events/[id]; they must agree.
+      ok:
+        tiers.every((t) => t.priceCents === 0) ||
+        Boolean(
+          (event.bankIban.trim() && event.bankAccountHolder.trim()) || event.paypalAccount.trim()
+        ),
+      label: 'Add a way to be paid — bank account (holder and IBAN) or PayPal (not needed if everything is free)',
     },
-    { ok: Boolean(event.description.trim()), label: 'Write a short description' },
     {
       ok: organizerTotpEnabled(organizer.id),
-      label: 'Set up your authenticator app (Settings) — required before you can sell tickets',
+      label: `Set up your authenticator app (Settings) — required before you can sell ${vocabFor(event.kind).units}`,
     },
   ];
 
-  // The platform fee is charged per event and follows the capacity, so the
-  // amount is quoted (and locked) here — this page is where the organizer is
-  // asked to pay. Publishing stays locked until the owner confirms the transfer.
-  const platformFeeBank = platformBank();
-  const feeCents = quoteEventFee(event);
-  const fee = {
-    paid: event.feeStatus === 'paid',
-    amount: formatMoney(feeCents, 'EUR'),
-    amountPlain: (feeCents / 100).toFixed(2),
-    basis: eventFeeBasis(event.totalCapacity),
-    reference: eventFeeReference(event.id),
-    bank: platformFeeBank
-      ? {
-          accountHolder: platformFeeBank.accountHolder,
-          iban: platformFeeBank.iban,
-          bic: platformFeeBank.bic,
-          bankName: platformFeeBank.bankName,
-        }
-      : null,
-  };
+  // The words this listing is described in, and what its kind asks for. Both
+  // come from one place each, so the editor and the publish gate cannot drift.
+  const v = vocabFor(event.kind);
+  const isShop = event.kind === 'shop';
 
   // Tab and section completion: what still needs doing, at a glance.
-  const detailsDone = Boolean(
-    event.name.trim() &&
-      (event.dateDisplay.trim() || event.eventDate) &&
-      event.venueName.trim() &&
-      event.address.trim() &&
-      event.description.trim()
-  );
+  const detailsDone = listingDetailsComplete(event);
   // What buyers are being given today, and any change still inside its waiting
   // period. The form shows the former and warns about the latter — showing the
   // queued values as if they were live would hide the very thing the delay
@@ -160,7 +143,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
 
   const tabs = [
     { key: 'basics', label: 'Basics', status: basicsDone ? ('done' as const) : ('todo' as const) },
-    { key: 'tickets', label: 'Tickets', status: ticketsDone ? ('done' as const) : ('todo' as const) },
+    { key: 'tickets', label: v.Units, status: ticketsDone ? ('done' as const) : ('todo' as const) },
     { key: 'media', label: 'Photos & videos', status: photosDone ? ('done' as const) : ('todo' as const) },
     // One tab per job, rather than four unrelated jobs stacked inside a single
     // "Page & content" page. Posting an update is a weekly errand; writing the
@@ -192,13 +175,18 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
       >
         <EditorSection
           id="details"
-          title="Event details"
-          hint="The basics buyers see first — name, date, venue, and capacity."
+          title={`${v.Listing} details`}
+          hint={
+            isShop
+              ? 'The basics buyers see first — name, what you sell, and how they collect it.'
+              : 'The basics buyers see first — name, date, venue, and capacity.'
+          }
           status={detailsDone ? 'done' : 'todo'}
         >
           <DetailsForm
             eventId={event.id}
             isDraft={event.status === 'draft'}
+            kind={event.kind}
             initial={{
               name: event.name,
               artist: event.artist,
@@ -206,6 +194,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
               dateDisplay: event.dateDisplay,
               eventDate: event.eventDate ?? '',
               venueName: event.venueName,
+              pickupInfo: event.pickupInfo,
               address: event.address,
               city: event.city,
               currency: event.currency,
@@ -232,11 +221,12 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
         <EditorSection
           id="bank"
           title="How you get paid"
-          hint="Ticket money goes straight to you — double-check the IBAN. Add PayPal too if you want to offer it."
+          hint="Your money goes straight to you — double-check the IBAN. Add PayPal too if you want to offer it."
           status={bankDone ? 'done' : 'todo'}
         >
           <BankForm
             eventId={event.id}
+            kind={event.kind}
             initial={{
               bankAccountHolder: effective.holder,
               bankIban: effective.iban,
@@ -258,7 +248,10 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
     ),
     tickets: (
       <div className="card">
-        <SectionHead title="Tickets" hint="Your ticket types and prices — you need at least one to publish." />
+        <SectionHead
+          title={v.Units}
+          hint={`Your ${v.unitTypes} and prices — you need at least one to publish.`}
+        />
         {/* Two switches produce the same words on the page — this one per ticket
             type, and the event-wide pause in Basics — and an organizer who
             unticks "Coming soon" here while the event-wide one is on sees
@@ -267,15 +260,16 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
         {!event.salesOpen && (
           <div className="notice notice-warn" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <span style={{ flex: 1, minWidth: 260 }}>
-              Ticket sales are switched <strong>off</strong> for this whole event, so your page shows{' '}
-              <strong>&ldquo;Sales closed&rdquo;</strong> and nothing here can be bought, whatever each
-              ticket type below says.
+              Sales are switched <strong>off</strong> for this whole {v.listing}, so your page shows{' '}
+              <strong>&ldquo;Sales closed&rdquo;</strong> and nothing here can be bought, whatever each{' '}
+              {v.unitType} below says.
             </span>
             <GoToTab tab="basics">Switch sales on in Basics →</GoToTab>
           </div>
         )}
         <TiersEditor
             eventId={event.id}
+            kind={event.kind}
             initialTiers={tiers.map((t) => ({
               tierKey: t.tierKey,
               name: t.name,
@@ -294,7 +288,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
       <div className="card">
         <SectionHead
           title="Photos & videos"
-          hint="A good cover sells tickets — add photos and short videos, then pick the one people see first."
+          hint={`A good cover sells ${v.units} — add photos and short videos, then pick the one people see first.`}
         />
         <MediaPanel
             eventId={event.id}
@@ -406,13 +400,11 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
         <EditorSection
           id="publish"
           className="glow-card"
-          title={event.status === 'published' ? 'Your event is live' : 'Publish'}
+          title={event.status === 'published' ? `Your ${v.listing} is live` : 'Publish'}
           hint={
             event.status === 'published'
-              ? 'Buyers can find your page and reserve tickets.'
-              : fee.paid
-                ? 'One last look — the button unlocks when everything below is done.'
-                : `One last look — and the ${fee.amount} fee for this event.`
+              ? `Buyers can find your page and reserve ${v.units}.`
+              : 'One last look — the button unlocks when everything below is done.'
           }
           status={publishDone ? 'done' : 'todo'}
         >
@@ -420,8 +412,8 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
             eventId={event.id}
             status={event.status}
             slug={event.slug}
+            kind={event.kind}
             checklist={checklist}
-            fee={fee}
           />
         </EditorSection>
 
@@ -430,12 +422,13 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
           <EditorSection
             id="delete"
             className="editor-section-danger"
-            title="Delete this event"
-            hint="Takes the event and everything on it off the platform, permanently."
+            title={`Delete this ${v.listing}`}
+            hint={`Takes the ${v.listing} and everything on it off the platform, permanently.`}
           >
             <DangerZone
               eventId={event.id}
               eventName={event.name}
+              kind={event.kind}
               paidOrders={paidOrders}
               counts={{
                 photos: media.length,
@@ -454,7 +447,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
   return (
     <>
       <PortalNav
-        event={{ id: event.id, name: event.name, slug: event.slug, published: event.status === 'published' }}
+        event={{ id: event.id, name: event.name, slug: event.slug, published: event.status === 'published', kind: event.kind }}
         tab="edit"
       />
       <div className="container section">

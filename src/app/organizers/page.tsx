@@ -1,35 +1,24 @@
 import Link from 'next/link';
-import { formatMoney } from '@/lib/money';
-import {
-  eventFeeAmount,
-  platformContactEmail,
-  platformNameFromEnv,
-  platformFeeBaseAmount,
-  platformFeePerTicketAmount,
-} from '@/lib/platform';
+import { platformContactEmail, platformNameFromEnv } from '@/lib/platform';
 import DashboardMock from '@/components/mockups/DashboardMock';
 import PlatformAssistant from '@/components/PlatformAssistant';
 import EditorMock from '@/components/mockups/EditorMock';
 import EventPageMock from '@/components/mockups/EventPageMock';
 
-// The fee comes from env vars — read them fresh on every request.
+// The brand name comes from an env var — read it fresh on every request.
 export const dynamic = 'force-dynamic';
 
 /**
- * Generated, not a static object, for two reasons that had both gone wrong.
- *
- * The brand was written out by hand, so setting PLATFORM_NAME renamed the site
- * everywhere except the title of the page whose whole job is recruiting
- * organizers. And the price was frozen in the text — it still advertised "€50
- * for a 500-person event" after the fee model changed, which is the one number
- * on this page somebody might decide to sign up on.
+ * Generated, not a static object: the brand was once written out by hand, so
+ * setting PLATFORM_NAME renamed the site everywhere except the title of the
+ * page whose whole job is recruiting organizers.
  */
 export async function generateMetadata() {
   const brand = platformNameFromEnv();
   const title = `Sell tickets on ${brand} — for organizers`;
   const description =
     `Your own beautiful event page, QR tickets, door scanning, and ticket money straight to your bank ` +
-    `account. ${eventFeeAmount(HEADLINE_CAPACITY)} for a ${HEADLINE_CAPACITY}-person event, no commission on ticket sales.`;
+    `account. Completely free — no fees, no commission on ticket sales.`;
   return {
     title,
     description,
@@ -37,12 +26,6 @@ export async function generateMetadata() {
     openGraph: { type: 'website', title, description, url: '/organizers' },
   };
 }
-
-/** The venue size the headline price is quoted for. */
-const HEADLINE_CAPACITY = 500;
-
-/** Example venue sizes for the pricing table — small room first, so the minimum shows. */
-const EXAMPLE_CAPACITIES = [100, 150, 300, 500, 1000];
 
 const INCLUDED: string[] = [
   'No commission on ticket sales',
@@ -54,7 +37,7 @@ const INCLUDED: string[] = [
   'Automatic payment reminders',
   'Student tiers with ID checks',
   'Announcements and built-in FAQ',
-  'Free account — you pay per event',
+  'Free account, free publishing',
 ];
 
 function FeatPoint({ children }: { children: React.ReactNode }) {
@@ -69,9 +52,6 @@ function FeatPoint({ children }: { children: React.ReactNode }) {
 }
 
 export default function OrganizersPage() {
-  const fee = eventFeeAmount(HEADLINE_CAPACITY);
-  const baseFee = platformFeeBaseAmount();
-  const perTicketFee = platformFeePerTicketAmount();
   const contactEmail = platformContactEmail();
 
   return (
@@ -84,9 +64,12 @@ export default function OrganizersPage() {
             Sell tickets for your event — the easy way
           </h1>
           <p className="feed-hero-sub anim-fade-up anim-d2">
-            A beautiful event page, QR tickets, door scanning — and every payment lands
-            straight in your own bank account. {fee} for a {HEADLINE_CAPACITY}-person event, no
-            commission — the account itself is free.
+            You already know the hard way: the poster forwarded through three group chats,
+            the &ldquo;how do I pay?&rdquo; messages at midnight, payment screenshots to
+            match up, a guest list living in a note on your phone. This replaces all of it —
+            a beautiful event page, QR tickets, door scanning — and every payment lands
+            straight in your own bank account. Completely free while we grow: no fees, no
+            commission, nothing.
           </p>
           <p className="feed-hero-actions anim-fade-up anim-d3">
 
@@ -156,11 +139,11 @@ export default function OrganizersPage() {
               <li className="step-item">
                 <span className="step-num step-num-brand" aria-hidden>3</span>
                 <div>
-                  <strong>Pay that event's fee and publish</strong>
+                  <strong>Publish — it&rsquo;s free</strong>
                   <p className="muted small" style={{ margin: 0 }}>
-                    The Publish tab shows the exact amount for your capacity, with the bank
-                    details and payment reference. The moment your transfer lands, publishing
-                    unlocks. One fee per event — never a cut of your sales.
+                    Finish the checklist on the Publish tab and press the button. No fee, no
+                    waiting for anything to be confirmed — your page is in the public feed the
+                    moment you publish, and we never take a cut of your sales.
                   </p>
                 </div>
               </li>
@@ -258,7 +241,7 @@ export default function OrganizersPage() {
           <div className="included-band anim-fade-up">
             <p className="feed-kicker">Everything included</p>
             <h2 className="feed-section-title" style={{ marginBottom: 8 }}>
-              One fee per event, the whole toolkit
+              Free, the whole toolkit
             </h2>
             <ul className="included-grid check-list" style={{ margin: 0 }}>
               {INCLUDED.map((item) => (
@@ -280,7 +263,8 @@ export default function OrganizersPage() {
           <p className="feed-kicker anim-fade-up">Yours, not ours</p>
           <h2 className="feed-section-title anim-fade-up">You own your own data</h2>
           <p className="muted anim-fade-up" style={{ marginTop: -6 }}>
-            We build the tools. The event, the money and the people who come to it stay yours.
+            We build the tools; the show is yours. The event, the money and the people who
+            come to it never stop being yours.
           </p>
           <div className="card anim-fade-up anim-d1">
             <ul className="check-list" style={{ margin: 0 }}>
@@ -311,9 +295,8 @@ export default function OrganizersPage() {
               <li className="check-item">
                 <span className="check-dot check-dot-done">&#10003;</span>
                 <span>
-                  <strong>One fee per event, no cut of your sales.</strong> You pay once when you
-                  publish — {baseFee} plus {perTicketFee} for every ticket your venue holds. Never a
-                  percentage. Every euro a buyer pays is yours.
+                  <strong>Free, and no cut of your sales.</strong> Publishing costs nothing, and
+                  there is never a percentage. Every euro a buyer pays is yours.
                 </span>
               </li>
             </ul>
@@ -390,42 +373,22 @@ export default function OrganizersPage() {
               Simple pricing
             </p>
             <h2 className="feed-section-title anim-fade-up" style={{ textAlign: 'center' }}>
-              {fee} for a {HEADLINE_CAPACITY}-person event.
+              Free. Really.
             </h2>
             <div className="card glow-card anim-fade-up anim-d1" style={{ textAlign: 'center' }}>
               <div className="tier-price" style={{ fontSize: '2.4rem' }}>
-                {fee}
+                €0
                 <span className="muted" style={{ fontSize: '1rem', fontWeight: 600 }}>
                   {' '}
-                  / {HEADLINE_CAPACITY}-person event
+                  / event
                 </span>
               </div>
               <p className="muted small" style={{ margin: '2px 0 0' }}>
-                You pay {baseFee} to publish, plus {perTicketFee} for every ticket your venue
-                holds. Small room, small fee. One transfer before you publish — no yearly fee, no
-                commission on ticket sales, and nothing to settle afterwards.
+                The platform is free while we grow — the account, publishing, every feature. No
+                fee, no commission on ticket sales, and nothing to settle afterwards. If pricing
+                is ever introduced later, it will be announced first, and events already published
+                stay as they are.
               </p>
-
-              <div className="table-wrap" style={{ margin: '14px 0 4px' }}>
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Your venue holds</th>
-                      <th>You pay, once</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {EXAMPLE_CAPACITIES.map((capacity) => (
-                      <tr key={capacity}>
-                        <td>{capacity} people</td>
-                        <td style={{ fontWeight: 700 }}>
-                          {eventFeeAmount(capacity)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
 
               <ul className="check-list" style={{ textAlign: 'left', margin: '14px 0 18px' }}>
                 <li className="check-item">
@@ -436,7 +399,7 @@ export default function OrganizersPage() {
                 </li>
                 <li className="check-item">
                   <span className="check-dot check-dot-done">&#10003;</span>
-                  <span>Free account, unlimited drafts — you pay per published event</span>
+                  <span>Free account, unlimited drafts, free publishing</span>
                 </li>
                 <li className="check-item">
                   <span className="check-dot check-dot-done">&#10003;</span>
@@ -493,9 +456,9 @@ export default function OrganizersPage() {
             Your next event could be live tonight
           </h2>
           <p className="muted anim-fade-up" style={{ maxWidth: 520, margin: '0 auto 22px' }}>
-            Tell us about it, build your page, send your event&rsquo;s fee when you&rsquo;re ready
-            to publish — {fee} for a {HEADLINE_CAPACITY}-person night. Most organizers are live
-            within the week.
+            Somewhere out there is the poster you have not made yet, and the crowd waiting
+            to see it. Tell us about your event, build your page, and publish when
+            you&rsquo;re ready — completely free. Most organizers are live within the week.
           </p>
           <p className="anim-fade-up anim-d1" style={{ margin: 0 }}>
             <Link href="/contact?intent=account" className="btn btn-brand btn-lg">

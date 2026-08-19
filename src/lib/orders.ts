@@ -11,7 +11,13 @@ import { generateTicketCode, normalizeTicketCode } from './tickets';
 import type { CheckinResponse } from './types';
 
 export type OrderStatus = 'pending' | 'claimed' | 'capturing' | 'paid' | 'failed' | 'cancelled';
-export type PaymentMethod = 'paypal' | 'mock' | 'transfer';
+/**
+ * 'free' is an order whose total is zero — an RSVP. It exists as its own mode
+ * (rather than riding on 'transfer') so nothing ever asks the buyer to send
+ * €0.00, no reminder chases a payment that does not exist, and the books can
+ * tell a seat that was given away from one that was sold.
+ */
+export type PaymentMethod = 'paypal' | 'mock' | 'transfer' | 'free';
 
 export interface OrderRow {
   id: string;
@@ -20,6 +26,14 @@ export interface OrderRow {
   status: OrderStatus;
   buyerName: string;
   buyerEmail: string;
+  /**
+   * Whose name the money will actually arrive under, when the buyer said it
+   * would not be their own — a partner's account, a parent's, a shared one.
+   * '' on almost every order, and on everything written before it existed.
+   */
+  payerName: string;
+  /** How the organizer matched the payment: 'reference' | 'sender' | ''. */
+  confirmedVia: string;
   totalCents: number;
   currency: string;
   paymentMode: PaymentMethod;
@@ -57,6 +71,57 @@ export interface OrderRow {
  * the bank statement and in the admin panel. Whether a tier is student-only
  * comes from the ORDER'S EVENT (event_tiers).
  */
+/**
+ * The names this order's money could plausibly arrive under: whoever bought it,
+ * and whoever they said would actually be paying.
+ */
+export function expectedSenderNames(order: Pick<OrderRow, 'buyerName' | 'payerName'>): string[] {
+  return [order.buyerName, order.payerName].map((n) => (n || '').trim()).filter(Boolean);
+}
+
+/** Lowercase word list, punctuation and accents-as-typed left behind. */
+function nameWords(name: string): string[] {
+  return (name || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean);
+}
+
+/**
+ * Does what the organizer typed name the person this money came from?
+ *
+ * Bank statements and PayPal almost never print a name the way the buyer typed
+ * it: "Ramesh Thapa" arrives as "THAPA RAMESH", "Thapa, Ramesh", or buried in
+ * "RAMESH THAPA KUMAR". Comparing strings would reject all three and send the
+ * organizer back to hunt for a reference that, on PayPal, may never have
+ * existed. So this compares WORDS: every word typed has to be one of the words
+ * on the order, in any order and any case.
+ *
+ * Deliberately forgiving, because of what this check actually is. It is a
+ * speed bump against a mis-click issuing tickets — the organizer is already
+ * signed in, already owns this event, and is reading their own bank statement.
+ * It is not authentication, and pretending otherwise would only mean rejecting
+ * honest people over a comma.
+ *
+ * What it must still refuse is an empty box, a stray keystroke, and a name that
+ * belongs to some other order — hence a real word of at least three letters.
+ */
+export function senderNameMatches(
+  typed: string,
+  order: Pick<OrderRow, 'buyerName' | 'payerName'>
+): boolean {
+  const words = nameWords(typed);
+  if (words.length === 0) return false;
+  if (!words.some((w) => w.length >= 3)) return false;
+
+  return expectedSenderNames(order).some((name) => {
+    const expected = new Set(nameWords(name));
+    return expected.size > 0 && words.every((w) => expected.has(w));
+  });
+}
+
 export function paymentReference(orderId: string): string {
   const order = getOrder(orderId);
   const hasStudent = order
@@ -108,6 +173,8 @@ const ORDER_COLS = `
   status,
   buyer_name AS buyerName,
   buyer_email AS buyerEmail,
+  payer_name AS payerName,
+  confirmed_via AS confirmedVia,
   total_cents AS totalCents,
   currency,
   payment_mode AS paymentMode,
@@ -157,6 +224,32 @@ export function heldUnpaidTicketsForEmail(eventId: string, buyerEmail: string): 
 }
 
 /**
+ * Seats this address has already RSVP'd for free on this event.
+ *
+ * The transfer ceiling above counts unpaid holds, because for a paid event
+ * the unpaid hold is the abuse surface — money settles the rest. A free order
+ * has no unpaid phase at all: it finalizes to 'paid' in the same request and
+ * there is no expiry, no reminder, and (so far) no release path. Without its
+ * own counter, one address could quietly RSVP a whole free event into
+ * "sold out" and nothing would ever claw the seats back. Counted from the
+ * database for the same reason as its sibling: a restart must not hand
+ * anyone a fresh allowance.
+ */
+export function freeTicketsForEmail(eventId: string, buyerEmail: string): number {
+  const row = getDb()
+    .prepare(
+      `SELECT COALESCE(SUM(oi.quantity), 0) AS n
+         FROM orders o JOIN order_items oi ON oi.order_id = o.id
+        WHERE o.event_id = ?
+          AND o.status = 'paid'
+          AND o.payment_mode = 'free'
+          AND LOWER(o.buyer_email) = LOWER(?)`
+    )
+    .get(eventId, buyerEmail) as { n: number };
+  return row.n;
+}
+
+/**
  * Create a local order for an event. Prices are ALWAYS looked up from the
  * event's tiers here — never trust amounts sent by the browser. The currency
  * is the event's currency.
@@ -171,6 +264,8 @@ export function createOrder(params: {
   eventId: string;
   buyerName: string;
   buyerEmail: string;
+  /** Optional: whose name the payment will show up under, if not the buyer's. */
+  payerName?: string;
   items: { tierId: string; quantity: number }[];
   paymentMode: PaymentMethod;
 }): OrderRow {
@@ -198,14 +293,15 @@ export function createOrder(params: {
 
   const tx = db.transaction(() => {
     db.prepare(
-      `INSERT INTO orders (id, event_id, status, buyer_name, buyer_email, total_cents, currency, payment_mode,
-                           payout_holder, payout_iban, payout_bic, payout_bank_name, payout_paypal)
-       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO orders (id, event_id, status, buyer_name, buyer_email, payer_name, total_cents, currency,
+                           payment_mode, payout_holder, payout_iban, payout_bic, payout_bank_name, payout_paypal)
+       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       id,
       event.id,
       params.buyerName,
       params.buyerEmail,
+      (params.payerName ?? '').trim(),
       totalCents,
       event.currency,
       params.paymentMode,
@@ -222,7 +318,10 @@ export function createOrder(params: {
   });
   tx();
 
-  if (params.paymentMode === 'transfer') {
+  // Transfer orders hold seats while the money travels; free orders hold them
+  // for the instant before finalizePaidOrder mints the codes. Either way the
+  // claim happens here, atomically, or the order dies cleanly as 'cancelled'.
+  if (params.paymentMode === 'transfer' || params.paymentMode === 'free') {
     try {
       claimInventory(id); // pending -> claimed, or throws SoldOutError
     } catch (e) {
@@ -795,7 +894,11 @@ export function expireOverdueTransferReservationsThrottled(): void {
  * while stock lasts; when the event has sold out in the meantime this throws
  * SoldOutError and the buyer must be refunded instead.
  */
-export function markTransferOrderPaid(orderId: string): TicketRow[] {
+export function markTransferOrderPaid(
+  orderId: string,
+  /** How the organizer matched it — kept so a disputed order can be asked. */
+  confirmedVia: 'reference' | 'sender' = 'reference'
+): TicketRow[] {
   const db = getDb();
   const order = getOrder(orderId);
   if (!order) throw new Error('Order not found');
@@ -803,6 +906,16 @@ export function markTransferOrderPaid(orderId: string): TicketRow[] {
     throw new Error('Only bank-transfer orders can be marked paid manually');
   }
   if (order.status === 'paid') return getTicketsForOrder(orderId);
+  // The retention sweep has already erased who this was. Minting tickets now
+  // would send them to erased@erased.invalid — the buyer who actually paid
+  // could never receive or be told anything. Refuse loudly instead: the money
+  // is real, but the resolution is a refund via the bank statement, not a
+  // ticket nobody can deliver.
+  if (order.buyerErasedAt) {
+    throw new Error(
+      'This order is too old to confirm — the buyer’s contact details have been erased under the privacy policy, so tickets could no longer be delivered. Refund the transfer instead.'
+    );
+  }
 
   // The whole revive+finalize must be atomic: if the event has sold out since
   // the reservation expired, claimInventory throws SoldOutError and the
@@ -816,6 +929,7 @@ export function markTransferOrderPaid(orderId: string): TicketRow[] {
       db.prepare(`UPDATE orders SET status = 'pending' WHERE id = ?`).run(orderId);
       claimInventory(orderId); // pending -> claimed, or throws (rolls back)
     }
+    db.prepare(`UPDATE orders SET confirmed_via = ? WHERE id = ?`).run(confirmedVia, orderId);
     finalizePaidOrder(orderId, paymentReference(orderId));
   });
   tx();

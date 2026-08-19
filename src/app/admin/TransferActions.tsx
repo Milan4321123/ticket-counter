@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 interface Props {
   orderId: string;
   buyerName: string;
+  /** Whose name the buyer said the money would arrive under, or ''. */
+  payerName?: string;
   amountDisplay: string;
   reference: string;
   /**
@@ -17,6 +19,17 @@ interface Props {
    */
   variant?: 'awaiting' | 'late';
 }
+
+/** A button that reads as a link — the two "match the other way" switches. */
+const buttonAsLink: React.CSSProperties = {
+  background: 'none',
+  border: 0,
+  padding: 0,
+  cursor: 'pointer',
+  color: 'var(--brand-text)',
+  fontWeight: 600,
+  font: 'inherit',
+};
 
 type Busy = 'confirm' | 'cancel' | null;
 type Done = 'paid' | 'cancelled' | null;
@@ -36,6 +49,7 @@ type Done = 'paid' | 'cancelled' | null;
 export default function TransferActions({
   orderId,
   buyerName,
+  payerName = '',
   amountDisplay,
   reference,
   variant = 'awaiting',
@@ -44,6 +58,20 @@ export default function TransferActions({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState('');
+  /**
+   * Which question the organizer is answering.
+   *
+   * Defaults to the reference, which is the stronger check and the one a bank
+   * transfer actually carries. The sender is there for the case the reference
+   * cannot cover: PayPal has nowhere to put one, so the money arrives as a name
+   * and an amount — and an organizer with no way to confirm that is an organizer
+   * who leaves a paying buyer waiting.
+   */
+  const [mode, setMode] = useState<'reference' | 'sender'>('reference');
+  const isReferenceMode = mode === 'reference';
+  // A reference is exactly 4 characters; a name only has to be a real word, and
+  // the server has the final say on whether it is the RIGHT one.
+  const canSubmit = isReferenceMode ? typed.length === 4 : typed.trim().length >= 3;
   const [busy, setBusy] = useState<Busy>(null);
   const [done, setDone] = useState<Done>(null);
   const [emailSent, setEmailSent] = useState(true);
@@ -55,14 +83,18 @@ export default function TransferActions({
   }, [open]);
 
   async function confirmPaid() {
-    if (busy !== null || typed.length !== 4) return;
+    if (busy !== null || !canSubmit) return;
     setBusy('confirm');
     setError(null);
     try {
       const res = await fetch(`/api/admin/orders/${orderId}/mark-paid`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ referenceConfirmation: typed }),
+        // The server accepts either and works out which one this was; sending
+        // it under the matching key keeps the request readable in a log.
+        body: JSON.stringify(
+          mode === 'reference' ? { referenceConfirmation: typed } : { senderConfirmation: typed }
+        ),
       });
       const data = (await res.json().catch(() => null)) as
         | { ok?: boolean; ticketCount?: number; emailSent?: boolean; error?: string }
@@ -171,9 +203,19 @@ export default function TransferActions({
         void confirmPaid();
       }}
     >
+      {/* Everything the organizer could possibly be looking at on a statement,
+          in one line: the amount, who it should be from, and the reference. It
+          used to name only the reference, which is exactly the thing a PayPal
+          payment does not carry. */}
       <p className="small" style={{ marginTop: 0, marginBottom: 10 }}>
-        Confirm bank transfer: <strong>{amountDisplay}</strong> from <strong>{buyerName}</strong>, reference{' '}
-        <span className="mono">{reference}</span>
+        Confirm <strong>{amountDisplay}</strong> from <strong>{buyerName}</strong>
+        {payerName.trim() ? (
+          <>
+            {' '}
+            (paying as <strong>{payerName.trim()}</strong>)
+          </>
+        ) : null}
+        , reference <span className="mono">{reference}</span>
       </p>
       {isLate && (
         <p className="muted small" style={{ marginTop: 0, marginBottom: 10 }}>
@@ -183,22 +225,68 @@ export default function TransferActions({
       )}
       <div className="field" style={{ marginBottom: 10 }}>
         <label htmlFor={`confirm-ref-${orderId}`}>
-          Type the LAST 4 characters of the reference as shown on your bank statement
+          {isReferenceMode
+            ? 'Type the LAST 4 characters of the reference as shown on your statement'
+            : 'Type the name the money came from, as shown on your statement'}
         </label>
         <input
           id={`confirm-ref-${orderId}`}
           ref={inputRef}
-          className="input input-code"
+          className={isReferenceMode ? 'input input-code' : 'input'}
           value={typed}
-          onChange={(e) => setTyped(e.target.value.toUpperCase().slice(0, 4))}
-          maxLength={4}
+          onChange={(e) =>
+            setTyped(isReferenceMode ? e.target.value.toUpperCase().slice(0, 4) : e.target.value.slice(0, 120))
+          }
+          maxLength={isReferenceMode ? 4 : 120}
           autoComplete="off"
-          autoCapitalize="characters"
+          autoCapitalize={isReferenceMode ? 'characters' : 'words'}
           spellCheck={false}
-          placeholder="····"
+          placeholder={isReferenceMode ? '····' : 'e.g. THAPA RAMESH'}
           disabled={busy !== null}
-          aria-label="Last 4 characters of the payment reference"
+          aria-label={
+            isReferenceMode ? 'Last 4 characters of the payment reference' : 'Name the payment came from'
+          }
         />
+        {/* The way out for the case the reference cannot answer. Surnames come
+            first on plenty of statements and the case is anyone's guess, so the
+            match is on WORDS — "THAPA RAMESH" is accepted for Ramesh Thapa. */}
+        <p className="muted small" style={{ margin: '8px 0 0' }}>
+          {isReferenceMode ? (
+            <>
+              No reference on it? That is normal for PayPal — it has nowhere to put one.{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('sender');
+                  setTyped('');
+                  setError(null);
+                  inputRef.current?.focus();
+                }}
+                disabled={busy !== null}
+                style={buttonAsLink}
+              >
+                Match the sender&rsquo;s name instead →
+              </button>
+            </>
+          ) : (
+            <>
+              Any order, any capitalisation — just the name, or part of it.{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('reference');
+                  setTyped('');
+                  setError(null);
+                  inputRef.current?.focus();
+                }}
+                disabled={busy !== null}
+                style={buttonAsLink}
+              >
+                ← Back to the reference
+              </button>
+            </>
+          )}
+        </p>
       </div>
       {error && (
         <div className="notice notice-error small" style={{ marginBottom: 10 }}>
@@ -206,7 +294,7 @@ export default function TransferActions({
         </div>
       )}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button type="submit" className="btn btn-danger btn-sm" disabled={typed.length !== 4 || busy !== null}>
+        <button type="submit" className="btn btn-danger btn-sm" disabled={!canSubmit || busy !== null}>
           {busy === 'confirm' ? 'Issuing tickets…' : 'Yes — money received, issue tickets'}
         </button>
         <button

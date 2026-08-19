@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   title: {
     default: `${PLATFORM_NAME} — Nepali concerts, cultural nights & events`,
     // Every page supplies its own short title and gets the brand appended, so a
-    // search result reads "Dashain Night 2026 — Tickets | NepaliConcert" without
+    // search result reads "Dashain Night 2026 — Tickets | MartNepali" without
     // each page having to remember to say so.
     template: `%s | ${PLATFORM_NAME}`,
   },
@@ -145,9 +145,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div>
               <Logo size={30} />
               <p className="footer-about">
-                The home of Nepali live music and culture abroad — concerts, cultural
-                nights and community events from organizers you know, with QR tickets
-                straight to your inbox.
+                A little corner of Nepal, wherever you have landed — concerts, cultural
+                nights, festivals and community events from organizers you know, with QR
+                tickets straight to your inbox.
               </p>
             </div>
             <nav aria-label="Footer">
@@ -179,8 +179,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="container footer-bottom">
             <p className="footer-main">{PLATFORM_NAME} — find your next night out</p>
             <p className="footer-sub">
-              Made for the Nepali community · Tickets are delivered by email as QR codes —
-              see you at the show.
+              Made with love for the Nepali community · Tickets arrive by email as QR
+              codes — see you at the show.
             </p>
           </div>
         </footer>

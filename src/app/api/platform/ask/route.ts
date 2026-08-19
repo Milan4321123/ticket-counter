@@ -19,7 +19,7 @@ function apiError(status: number, error: string) {
 }
 
 /**
- * PUBLIC: the platform help bot. Answers questions about NepaliConcert itself
+ * PUBLIC: the platform help bot. Answers questions about the platform itself
  * (how signup works, fees, how buyers pay, refunds) STRICTLY from the curated
  * knowledge base in platformAssistantContext(). Unlike the per-event Q&A,
  * nothing is stored — an unsure answer just points at the platform contact.

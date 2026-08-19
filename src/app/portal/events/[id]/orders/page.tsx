@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getEventById } from '@/lib/events';
+import { vocabFor } from '@/lib/vocab';
 import { effectivePayout } from '@/lib/payout';
 import { formatMoney } from '@/lib/money';
 import {
@@ -58,6 +59,7 @@ export default async function PortalOrdersPage({
 
   const event = getEventById(id);
   if (!event || event.organizerId !== organizer.id) redirect('/portal');
+  const v = vocabFor(event.kind);
 
   const sp = await searchParams;
   const query = typeof sp.q === 'string' ? sp.q : '';
@@ -80,7 +82,7 @@ export default async function PortalOrdersPage({
   return (
     <>
       <PortalNav
-        event={{ id: event.id, name: event.name, slug: event.slug, published: event.status === 'published' }}
+        event={{ id: event.id, name: event.name, slug: event.slug, published: event.status === 'published', kind: event.kind }}
         tab="orders"
       />
       <div className="container section">
@@ -115,7 +117,7 @@ export default async function PortalOrdersPage({
            Worded around whichever routes this event actually offers. A buyer
            given a PayPal address may well have used it, and an organizer told
            to "check your bank account" would look in one place, not find the
-           money, and leave a paid guest waiting for tickets. */}
+           money, and leave a paid buyer waiting for what they bought. */}
       {awaiting.length > 0 && (
         <div className="card action-card anim-fade-up">
           <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -124,10 +126,19 @@ export default async function PortalOrdersPage({
           </div>
           <p className="muted small" style={{ marginTop: 0 }}>
             Check {takesPaypal ? 'your bank account and your PayPal' : 'your bank account'} for these
-            references. When the money is there, click{' '}
-            <strong>Payment received</strong> and type the last 4 characters of the reference — the QR tickets are
-            emailed to the buyer automatically.
+            payments. When the money is there, click <strong>Payment received</strong> — the QR {v.codes}{' '}
+            are emailed to the buyer automatically.
           </p>
+          {/* Said once, here, rather than discovered at the moment somebody is
+              staring at a PayPal payment with no reference on it and a box
+              demanding one. */}
+          {takesPaypal && (
+            <p className="muted small" style={{ marginTop: 0 }}>
+              A bank transfer carries the reference for you. <strong>PayPal does not</strong> — it has
+              nowhere to put one — so for those, match the <strong>name</strong> the money came from
+              instead. Both work.
+            </p>
+          )}
           <div>
             {awaiting.map((o) => {
               const reference = paymentReference(o.id);
@@ -138,12 +149,22 @@ export default async function PortalOrdersPage({
                     <div className="muted small">
                       {o.itemsSummary} · reserved {o.createdAt.slice(0, 10)}
                     </div>
+                    {/* The buyer told us the money would come from someone
+                        else. Worth its own line: an organizer scanning a
+                        statement for "Ramesh Thapa" will never find the
+                        payment his mother sent. */}
+                    {o.payerName.trim() && (
+                      <div className="small" style={{ marginTop: 2 }}>
+                        Paying as <strong>{o.payerName.trim()}</strong>
+                      </div>
+                    )}
                   </div>
                   <div className="action-row-amount">{formatMoney(o.totalCents, o.currency)}</div>
                   <ReferenceTag reference={reference} />
                   <TransferActions
                     orderId={o.id}
                     buyerName={o.buyerName}
+                    payerName={o.payerName}
                     amountDisplay={formatMoney(o.totalCents, o.currency)}
                     reference={reference}
                   />
@@ -167,18 +188,18 @@ export default async function PortalOrdersPage({
           <div className="stat-value">{formatMoney(stats.awaitingTransferCents, event.currency)}</div>
           <div className="stat-sub">
             {stats.awaitingTransferOrders} order{stats.awaitingTransferOrders === 1 ? '' : 's'} ·{' '}
-            {stats.awaitingTransferTickets} ticket{stats.awaitingTransferTickets === 1 ? '' : 's'}
+            {stats.awaitingTransferTickets} {stats.awaitingTransferTickets === 1 ? v.unit : v.units}
           </div>
         </div>
         <div className="stat-card anim-fade-up anim-d3">
-          <div className="stat-label">Tickets sold</div>
+          <div className="stat-label">{v.Units} sold</div>
           <div className="stat-value">
             {stats.ticketsSold}
             <span className="muted small">/ {event.totalCapacity}</span>
           </div>
         </div>
         <div className="stat-card anim-fade-up anim-d4">
-          <div className="stat-label">Checked in</div>
+          <div className="stat-label">{v.Redeemed}</div>
           <div className="stat-value">
             {stats.checkedIn} <span className="muted small">/ {stats.ticketsSold}</span>
           </div>
@@ -269,6 +290,7 @@ export default async function PortalOrdersPage({
                           <TransferActions
                             orderId={o.id}
                             buyerName={o.buyerName}
+                            payerName={o.payerName}
                             amountDisplay={formatMoney(o.totalCents, o.currency)}
                             reference={paymentReference(o.id)}
                           />
@@ -277,6 +299,7 @@ export default async function PortalOrdersPage({
                             variant="late"
                             orderId={o.id}
                             buyerName={o.buyerName}
+                            payerName={o.payerName}
                             amountDisplay={formatMoney(o.totalCents, o.currency)}
                             reference={paymentReference(o.id)}
                           />

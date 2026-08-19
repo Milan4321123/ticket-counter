@@ -1,7 +1,14 @@
-// Server-only: platform-owner business settings — the per-event fee organizers
-// pay, and the PLATFORM's own bank details (distinct from any event's bank
-// details, which belong to organizers). Configured via environment variables.
-import { formatMoney } from './money';
+// Server-only: platform-owner business settings, configured via environment
+// variables.
+//
+// There used to be a per-event fee here — a base amount plus a per-ticket rate
+// on capacity, paid to the platform's own bank account before an event could be
+// published. All of it is gone, deliberately: the platform is free while it
+// grows. Publishing gates on nothing but the listing being complete, no money
+// ever flows to the platform, and the organizer's own payout details remain the
+// only bank account in the system. If pricing ever returns it should return as
+// a decision, not as a leftover — which is why the machinery was deleted rather
+// than zeroed.
 
 /**
  * The platform's own name, from PLATFORM_NAME.
@@ -12,102 +19,7 @@ import { formatMoney } from './money';
  * so setting PLATFORM_NAME renamed some of the product and not the rest.
  */
 export function platformNameFromEnv(): string {
-  return (process.env.PLATFORM_NAME || '').trim() || 'NepaliConcert';
-}
-
-/** The flat part, paid to publish at all (€15.00). */
-const DEFAULT_FEE_BASE_CENTS = 1500;
-
-/** The per-ticket part, charged on the capacity the organizer states (€0.15). */
-const DEFAULT_FEE_PER_TICKET_CENTS = 15;
-
-/** Positive-integer env override, or the built-in default. */
-function envCents(name: string, fallback: number): number {
-  const n = Number(process.env[name]);
-  return Number.isInteger(n) && n > 0 ? n : fallback;
-}
-
-export function platformFeeBaseCents(): number {
-  return envCents('PLATFORM_FEE_BASE_CENTS', DEFAULT_FEE_BASE_CENTS);
-}
-
-export function platformFeePerTicketCents(): number {
-  return envCents('PLATFORM_FEE_PER_TICKET_CENTS', DEFAULT_FEE_PER_TICKET_CENTS);
-}
-
-/** Whole seats, ignoring anything a bad caller passes in. */
-function seatsOf(capacity: number): number {
-  return Number.isFinite(capacity) && capacity > 0 ? Math.floor(capacity) : 0;
-}
-
-/**
- * What ONE event costs its organizer: a flat fee to publish, plus a per-ticket
- * rate on the capacity they stated. 100 seats -> €30.00, 500 -> €90.00.
- *
- * WHY THE FLAT PART STAYS UP FRONT. It is what makes a draft into a commitment.
- * Building a page costs the platform real work — the design, the review, the
- * account — and a fee that scaled only with the room would let somebody take
- * all of that for a few euros by declaring a small one. It also means the
- * platform is paid something for every event it carries, including the ones
- * that never sell a ticket.
- *
- * WHY THE PER-TICKET PART IS PRICED ON CAPACITY RATHER THAN SALES. The platform
- * never touches ticket money — buyers pay organizers directly — so there is
- * nothing to deduct a per-sale fee FROM, and collecting one afterwards would
- * mean invoicing and chasing every organizer for small sums. Charging it on the
- * stated capacity turns the whole thing into ONE transfer, known before they
- * commit, with nothing left outstanding afterwards. The organizer prices the
- * room they booked; a room they do not fill is their risk, and always was.
- *
- * This is also why an event can no longer opt out of a capacity: the number is
- * what the fee is priced from, so an event able to sell past it would be one
- * where the fee and the tickets describe different events.
- *
- * Pure: same capacity and env in, same cents out.
- */
-export function eventFeeCents(capacity: number): number {
-  return platformFeeBaseCents() + seatsOf(capacity) * platformFeePerTicketCents();
-}
-
-/** One event's fee as money, e.g. '€90.00'. */
-export function eventFeeAmount(capacity: number): string {
-  return formatMoney(eventFeeCents(capacity), 'EUR');
-}
-
-/** The flat part as money, e.g. '€15.00'. */
-export function platformFeeBaseAmount(): string {
-  return formatMoney(platformFeeBaseCents(), 'EUR');
-}
-
-/** The per-ticket part as money, e.g. '€0.15'. */
-export function platformFeePerTicketAmount(): string {
-  return formatMoney(platformFeePerTicketCents(), 'EUR');
-}
-
-/**
- * Pricing where no event — and so no capacity — is known. States the rule
- * rather than a "from" price, because with a per-ticket part nobody ever pays
- * the flat fee alone and quoting it on its own would understate every real
- * event. Wherever an event IS known, quote its own amount instead
- * (eventFeeCents / quoteEventFee).
- */
-export function platformFeeLabel(): string {
-  return `${platformFeeBaseAmount()} + ${platformFeePerTicketAmount()} per ticket`;
-}
-
-/** The whole pricing rule in one line. */
-export function platformFeeRule(): string {
-  return `${platformFeeBaseAmount()} to publish, plus ${platformFeePerTicketAmount()} for every ticket your venue holds`;
-}
-
-/** One plain line telling an organizer where their own event's amount came from. */
-export function eventFeeBasis(capacity: number): string {
-  const seats = seatsOf(capacity);
-  const perTicket = formatMoney(seats * platformFeePerTicketCents(), 'EUR');
-  return (
-    `${platformFeeBaseAmount()} to publish, plus ${platformFeePerTicketAmount()} × ${seats} tickets ` +
-    `(${perTicket}) for the room you booked.`
-  );
+  return (process.env.PLATFORM_NAME || '').trim() || 'MartNepali';
 }
 
 /**
@@ -197,38 +109,15 @@ export function platformContactEmail(): string {
   return organizerFrom || '';
 }
 
-export interface PlatformBank {
-  accountHolder: string;
-  iban: string;
-  bic: string;
-  bankName: string;
-}
-
-/** The platform owner's account for receiving fees. Null until configured. */
-export function platformBank(): PlatformBank | null {
-  const accountHolder = (process.env.PLATFORM_BANK_HOLDER || '').trim();
-  const iban = (process.env.PLATFORM_BANK_IBAN || '').trim();
-  if (!accountHolder || !iban) return null;
-  return {
-    accountHolder,
-    iban,
-    bic: (process.env.PLATFORM_BANK_BIC || '').trim(),
-    bankName: (process.env.PLATFORM_BANK_NAME || '').trim(),
-  };
-}
-
-/** Account-level reference for an organizer signup, e.g. 'NEPCON-1A2B3C4D'. */
+/**
+ * Short per-organizer reference, e.g. 'NEPCON-1A2B3C4D'.
+ *
+ * Born as the Verwendungszweck for the old account fee; it survives the fee's
+ * removal because the admin activation flow uses its last four characters as
+ * the type-to-confirm phrase, and existing pending signups already have it.
+ */
 export function signupReference(organizerId: string): string {
   return 'NEPCON-' + organizerId.slice(0, 8).toUpperCase();
-}
-
-/**
- * Verwendungszweck for ONE event's fee, e.g. 'EVENT-4BD6F584'. This is what the
- * organizer puts in the transfer's purpose line so the platform owner can match
- * the payment to the event it unlocks.
- */
-export function eventFeeReference(eventId: string): string {
-  return 'EVENT-' + eventId.slice(0, 8).toUpperCase();
 }
 
 /** Alias kept for readability at call sites that read as prose. */
@@ -245,7 +134,7 @@ export const platformName = platformNameFromEnv;
  * page still saying the old name.
  *
  * The rule now works for any name:
- *   "NepaliConcert"     -> Nepali | Concert   (split at the camelCase seam)
+ *   "MartNepali"        -> Mart | Nepali      (split at the camelCase seam)
  *   "Events Ticket Buy" -> Events Ticket | Buy (accent the last word)
  *   "Nachtkasse"        -> Nachtkasse |        (nothing to accent; stays plain)
  *
@@ -263,7 +152,7 @@ export function platformWordmark(): { head: string; accent: string } {
     return { head: words.slice(0, -1).join(' ') + ' ', accent };
   }
 
-  // One word: split at a lower-to-upper seam, e.g. NepaliConcert.
+  // One word: split at a lower-to-upper seam, e.g. MartNepali.
   const seam = /^(.*[a-z0-9])([A-Z].*)$/.exec(name);
   if (seam) return { head: seam[1], accent: seam[2] };
 

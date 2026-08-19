@@ -5,6 +5,7 @@ import { getPaymentMode } from '@/lib/config';
 import { getEventBySlug, getEventTiers, paypalPayee } from '@/lib/events';
 import { getAvailability } from '@/lib/inventory';
 import { ticketState } from '@/lib/ticketState';
+import { vocabFor } from '@/lib/vocab';
 import { expireOverdueTransferReservations } from '@/lib/orders';
 import { effectivePayout } from '@/lib/payout';
 import { BUYER_RETENTION_DAYS } from '@/lib/retention';
@@ -52,10 +53,10 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
         <h1 className="page-title anim-fade-up">Checkout</h1>
         <div className={`notice anim-fade-up anim-d1 ${state.kind === 'sold-out' ? 'notice-error' : 'notice-warn'}`}>
           {state.kind === 'coming-soon'
-            ? 'Tickets for this event are not on sale yet — nothing can be booked just now.'
+            ? `${vocabFor(event.kind).Units} are not on sale yet — nothing can be booked just now.`
             : state.kind === 'sold-out'
-              ? 'This event is completely sold out — thank you for the incredible interest!'
-              : 'Ticket sales are currently closed, so nothing can be booked right now. Check back soon!'}
+              ? `This ${vocabFor(event.kind).listing} is completely sold out — thank you for the incredible interest!`
+              : 'Sales are currently closed, so nothing can be booked right now. Check back soon!'}
         </div>
         {state.kind === 'sold-out' ? (
           <p className="muted anim-fade-up anim-d2">
@@ -65,7 +66,7 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
         ) : null}
         <p className="anim-fade-up anim-d3">
           <Link href={`/e/${event.slug}`} className="btn">
-            Back to the event page
+            Back to the {vocabFor(event.kind).listing} page
           </Link>
         </p>
       </div>
@@ -111,6 +112,7 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
         venue: [event.venueName, event.city].filter(Boolean).join(', '),
         currency: event.currency,
         maxTicketsPerOrder: event.maxPerOrder,
+        kind: event.kind,
         // Coming-soon types are not offered at checkout at all: a stepper that
         // cannot go above zero is a worse answer than not showing the row.
         tiers: getEventTiers(event.id)

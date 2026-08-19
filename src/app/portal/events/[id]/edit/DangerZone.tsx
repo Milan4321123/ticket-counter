@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import type { EventKind } from '@/lib/types';
+import { vocabFor } from '@/lib/vocab';
 import { useRouter } from 'next/navigation';
 
 /** Everything that disappears with the event, so the list is never a guess. */
@@ -15,6 +17,8 @@ export interface DeletionCounts {
 interface Props {
   eventId: string;
   eventName: string;
+  /** Event or shop — decides the nouns in the warning. See lib/vocab. */
+  kind: EventKind;
   counts: DeletionCounts;
   /** Orders already paid for — buyers holding a real ticket. */
   paidOrders: number;
@@ -30,8 +34,9 @@ function plural(n: number, one: string, many: string): string {
  * this is not undoable), and if anyone has already paid they must tick a box
  * that says so out loud first.
  */
-export default function DangerZone({ eventId, eventName, counts, paidOrders }: Props) {
+export default function DangerZone({ eventId, eventName, kind, counts, paidOrders }: Props) {
   const router = useRouter();
+  const v = vocabFor(kind);
   const [typed, setTyped] = useState('');
   const [acknowledged, setAcknowledged] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -50,7 +55,7 @@ export default function DangerZone({ eventId, eventName, counts, paidOrders }: P
     counts.videos > 0 ? plural(counts.videos, 'video', 'videos') : null,
     counts.posts > 0 ? plural(counts.posts, 'update', 'updates') : null,
     counts.faqs > 0 ? plural(counts.faqs, 'FAQ answer', 'FAQ answers') : null,
-    counts.ticketsSold > 0 ? plural(counts.ticketsSold, 'sold ticket', 'sold tickets') : null,
+    counts.ticketsSold > 0 ? plural(counts.ticketsSold, `sold ${v.unit}`, `sold ${v.units}`) : null,
   ].filter(Boolean) as string[];
 
   async function remove() {
@@ -85,18 +90,18 @@ export default function DangerZone({ eventId, eventName, counts, paidOrders }: P
       {error && <div className="notice notice-error">{error}</div>}
 
       <p className="small" style={{ marginTop: 0 }}>
-        Deleting <strong>{eventName}</strong> removes the event page and everything on it
-        {goesWithIt.length > 0 ? <> — {goesWithIt.join(', ')}</> : null}, along with its ticket types, orders and
-        anything visitors asked. It is gone from our side for good: we keep no copy, and there is no undo.
+        Deleting <strong>{eventName}</strong> removes the {v.listing} page and everything on it
+        {goesWithIt.length > 0 ? <> — {goesWithIt.join(', ')}</> : null}, along with its {v.unitTypes}, orders
+        and anything visitors asked. It is gone from our side for good: we keep no copy, and there is no undo.
       </p>
 
       {paidOrders > 0 && (
         <div className="notice notice-error" role="alert">
           <strong>
-            {plural(paidOrders, 'buyer has', 'buyers have')} already paid for this event.
+            {plural(paidOrders, 'buyer has', 'buyers have')} already paid for this {v.listing}.
           </strong>{' '}
-          Their tickets stop working the moment you delete it, and we do not email them about it. Please tell them
-          yourself — and sort out their money — before you go ahead.
+          Their {v.codes} stop working the moment you delete it, and we do not email them about it. Please tell
+          them yourself — and sort out their money — before you go ahead.
         </div>
       )}
 
@@ -111,15 +116,15 @@ export default function DangerZone({ eventId, eventName, counts, paidOrders }: P
           />
           <span>
             {paidOrders > 0
-              ? `I understand ${plural(paidOrders, 'paid order', 'paid orders')} and their tickets will be destroyed.`
-              : 'I understand the tickets people have already paid for will be destroyed.'}
+              ? `I understand ${plural(paidOrders, 'paid order', 'paid orders')} and their ${v.codes} will be destroyed.`
+              : `I understand the ${v.codes} people have already paid for will be destroyed.`}
           </span>
         </label>
       )}
 
       <div className="field" style={{ maxWidth: 420 }}>
         <label htmlFor="danger-confirm">
-          Type the event name to confirm: <strong>{eventName}</strong>
+          Type the {v.listing} name to confirm: <strong>{eventName}</strong>
         </label>
         <input
           id="danger-confirm"
@@ -144,7 +149,7 @@ export default function DangerZone({ eventId, eventName, counts, paidOrders }: P
             ? paidCleared
               ? undefined
               : 'Tick the box above first'
-            : 'Type the event name above first'
+            : `Type the ${v.listing} name above first`
         }
       >
         {busy ? <span className="spinner" aria-hidden /> : null}

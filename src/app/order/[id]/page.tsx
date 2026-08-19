@@ -4,12 +4,24 @@ import CheckPaymentButton from '@/components/CheckPaymentButton';
 import OrganizerWhatsApp from '@/components/OrganizerWhatsApp';
 import CopyButton from '@/components/CopyButton';
 import PrintButton from '@/components/PrintButton';
-import { cropTag, getEventById, getEventTiers, mediaUrl, parseCropRect, paypalPayee } from '@/lib/events';
+import {
+  cropTag,
+  getEventById,
+  getEventTiers,
+  mediaUrl,
+  parseCropRect,
+  paypalMeUrl,
+  paypalPayee,
+} from '@/lib/events';
 import { getOrganizer } from '@/lib/organizers';
+import { girocodePayload } from '@/lib/girocode';
 import { formatMoney } from '@/lib/money';
+import { getBaseUrl } from '@/lib/config';
 import { getOrder, getOrderItems, getTicketsForOrder, paymentReference } from '@/lib/orders';
 import { orderPayout } from '@/lib/payout';
+import { paymentQrDataUrl } from '@/lib/paymentQr';
 import { ticketQrDataUrl } from '@/lib/tickets';
+import { whatsappShareUrl } from '@/lib/whatsapp';
 
 export const dynamic = 'force-dynamic';
 
@@ -94,6 +106,35 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       month: 'long',
       year: 'numeric',
     });
+
+    // The whole transfer, encoded so a banking app can fill its own form: payee,
+    // IBAN, amount, and — the part people get wrong — the reference. Built from
+    // the SAME frozen payout snapshot the text below shows, never from the
+    // event's current details, so the code and the printed IBAN can never
+    // disagree about where the money goes.
+    const giroQr = await paymentQrDataUrl(
+      bank
+        ? girocodePayload({
+            accountHolder: bank.accountHolder,
+            iban: bank.iban,
+            bic: bank.bic,
+            amountCents: order.totalCents,
+            currency: order.currency,
+            reference,
+          })
+        : null,
+    );
+
+    // PayPal's equivalent, and deliberately the weaker one: a PayPal.Me link
+    // carries the amount but has nowhere to put the reference, so the buyer
+    // still types that in by hand. Only exists at all when the organizer gave a
+    // PayPal.Me link rather than a plain address.
+    // The URL itself, not only its QR. The QR is for someone reading this on a
+    // laptop with a phone in hand; most people open this page ON the phone, and
+    // cannot scan their own screen — they need something to TAP.
+    const paypalPayUrl = paypalMeUrl(paypal, order.totalCents, order.currency);
+    const paypalQr = await paymentQrDataUrl(paypalPayUrl);
+
     return (
       <div className="container container-narrow section">
         <h1 className="page-title anim-fade-up">Your reservation</h1>
@@ -133,10 +174,15 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <span className="step-num">2</span>
               <div>
                 <div className="tier-name">The organizer confirms your payment</div>
+                {/* Since October 2025 every euro-area bank must offer instant
+                    transfers, settle them in ten seconds, and charge no more
+                    than for a normal one. But it is opt-in: the buyer has to
+                    pick it, and nothing in a GiroCode can pick it for them. So
+                    the only place that choice can be prompted is here. */}
                 <p className="muted small" style={{ margin: '2px 0 0' }}>
                   {paypal
-                    ? 'PayPal usually arrives within minutes; a bank transfer takes 1–2 business days. As soon as yours lands, it is confirmed.'
-                    : 'Bank transfers usually take 1–2 business days to arrive. As soon as yours lands, it is confirmed.'}
+                    ? 'PayPal arrives within minutes. A bank transfer takes 1–2 business days — or seconds, if you choose “instant” (“Echtzeit”) in your banking app, which your bank cannot charge extra for. As soon as yours lands, it is confirmed.'
+                    : 'A transfer takes 1–2 business days — or seconds, if you choose “instant” (“Echtzeit”) in your banking app, which your bank cannot charge extra for. As soon as yours lands, it is confirmed.'}
                 </p>
               </div>
             </li>
@@ -167,6 +213,59 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               Arrives in seconds, so the organizer can confirm it and send your QR tickets straight
               away{bank ? ' — a bank transfer takes 1–2 business days' : ''}.
             </p>
+            {paypalQr ? (
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: 16,
+                  margin: '4px 0 16px',
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={paypalQr}
+                  alt={`PayPal.Me link for ${amountDisplay}`}
+                  width={160}
+                  height={160}
+                  style={{
+                    width: 160,
+                    height: 160,
+                    borderRadius: 8,
+                    background: '#fff',
+                    padding: 6,
+                    flex: '0 0 auto',
+                  }}
+                />
+                <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+                  <strong style={{ display: 'block', marginBottom: 4 }}>
+                    Open PayPal with the amount filled in
+                  </strong>
+                  {/* The tap and the scan are the same link. Which one is
+                      useful depends only on which device this page is open on,
+                      so both are offered rather than making the phone reader —
+                      who cannot scan their own screen — hunt for the address
+                      further down and type the amount in by hand. */}
+                  {paypalPayUrl ? (
+                    <a
+                      href={paypalPayUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-primary btn-sm"
+                      style={{ margin: '0 0 8px' }}
+                    >
+                      Pay {amountDisplay} with PayPal →
+                    </a>
+                  ) : null}
+                  <p className="muted small" style={{ margin: 0 }}>
+                    Or scan the code. Unlike a bank transfer, PayPal has no field a link can put the
+                    reference in — so please still type <span className="mono">{reference}</span> into
+                    the message box yourself. Without it the organizer cannot tell whose payment it is.
+                  </p>
+                </div>
+              </div>
+            ) : null}
             <div className="copy-row">
               <span className="muted small" style={rowLabelStyle}>
                 Amount
@@ -227,6 +326,54 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         {bank ? (
           <div className="bank-box anim-fade-up anim-d3" style={{ margin: '16px 0' }}>
             <div className="card-title">{paypal ? `Or transfer ${amountDisplay} to` : `Transfer ${amountDisplay} to`}</div>
+            {giroQr ? (
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: 16,
+                  margin: '4px 0 16px',
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={giroQr}
+                  alt={`GiroCode to transfer ${amountDisplay} with reference ${reference}`}
+                  width={160}
+                  height={160}
+                  style={{
+                    width: 160,
+                    height: 160,
+                    borderRadius: 8,
+                    background: '#fff',
+                    padding: 6,
+                    flex: '0 0 auto',
+                  }}
+                />
+                <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+                  <strong style={{ display: 'block', marginBottom: 4 }}>
+                    Scan this in your banking app
+                  </strong>
+                  <p className="muted small" style={{ margin: 0 }}>
+                    It fills in the account, the amount and the reference for you — nothing to type,
+                    nothing to mistype. Sparkasse, Volksbank, Deutsche Bank, Postbank, Commerzbank,
+                    comdirect, DKB and ING all read it.
+                  </p>
+                  {/* A GiroCode is plain text, not a link, so there is nothing for
+                      a phone to hand to its banking app — a buyer cannot scan a
+                      code on the screen they are holding. Several banks do accept
+                      the code as an imported image, which is the only same-device
+                      route that actually works; the copy buttons below are the
+                      other. Both beat retyping an IBAN. */}
+                  <p className="muted small" style={{ margin: '6px 0 0' }}>
+                    On the same phone as your banking app? Screenshot this and import it there (many
+                    apps offer a photo transfer), or just use the details below — they say exactly the
+                    same thing.
+                  </p>
+                </div>
+              </div>
+            ) : null}
             <div className="copy-row">
               <span className="muted small" style={rowLabelStyle}>
                 Amount
@@ -384,12 +531,34 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     getTicketsForOrder(order.id).map(async (t) => ({ ...t, qr: await ticketQrDataUrl(t.code) }))
   );
 
+  const isFreeOrder = order.paymentMode === 'free';
+  // The one moment a buyer is happiest is the moment they hold their codes —
+  // and they are standing in exactly the WhatsApp groups the next buyers are
+  // in. One pre-written tap; WhatsApp's own picker chooses who hears it.
+  const shareUrl =
+    event && event.status === 'published'
+      ? whatsappShareUrl(
+          isFreeOrder
+            ? `I'm going to ${event.name} — it's free! Reserve your spot: ${getBaseUrl()}/e/${event.slug}`
+            : `I just got my tickets for ${event.name}! Get yours: ${getBaseUrl()}/e/${event.slug}`
+        )
+      : null;
+
   return (
     <div className="container section">
       <h1 className="page-title anim-fade-up">Your tickets</h1>
       <div className="notice notice-success anim-fade-up anim-d1">
-        Payment received — you&rsquo;re all set. See you at the show!
+        {isFreeOrder
+          ? "You're on the list — reservation confirmed. See you there!"
+          : 'Payment received — you’re all set. See you at the show!'}
       </div>
+      {shareUrl && (
+        <p className="anim-fade-up anim-d1" style={{ margin: '0 0 16px' }}>
+          <a href={shareUrl} target="_blank" rel="noopener" className="btn btn-green">
+            {isFreeOrder ? "Tell your friends — I'm going →" : 'Tell your friends on WhatsApp →'}
+          </a>
+        </p>
+      )}
 
       <div className="card anim-fade-up anim-d2">
         <div className="card-title">Order summary</div>
@@ -417,7 +586,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         ))}
         <div className="summary-row total">
           <span>Total</span>
-          <span>{formatMoney(order.totalCents, order.currency)}</span>
+          <span>{order.totalCents === 0 ? 'Free' : formatMoney(order.totalCents, order.currency)}</span>
         </div>
         <p className="mono small muted" style={{ margin: '10px 0 0' }}>
           Order ID: {order.id}

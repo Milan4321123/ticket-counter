@@ -1,7 +1,7 @@
 import { listEventsForOrganizer } from '@/lib/events';
 import { organizerPlanActive } from '@/lib/organizers';
 import { organizerTotpEnabled, organizerTotpPending } from '@/lib/organizerTotp';
-import { platformFeeRule } from '@/lib/platform';
+
 import { getReminderSettings, recommendedReminderDays } from '@/lib/reminders';
 import PlanExpired from '../PlanExpired';
 import PortalNav from '../PortalNav';
@@ -62,13 +62,12 @@ export default async function PortalSettingsPage() {
         </div>
         <div className="summary-row">
           <span className="muted">Pricing</span>
-          <span>{platformFeeRule()}</span>
+          <span>Free — publishing costs nothing</span>
         </div>
         <p className="muted small" style={{ margin: '10px 0 0' }}>
-          The account costs nothing to keep — you pay per event, when you publish one, and never any
-          commission on ticket sales. The fee follows the capacity you set for that event, and the
-          exact amount is on its Publish tab. Your email address is managed by the platform team; get
-          in touch with them to change it.
+          The account costs nothing to keep, publishing costs nothing, and there is never any
+          commission on ticket sales — buyers pay you directly. Your email address is managed by the
+          platform team; get in touch with them to change it.
         </p>
       </div>
 

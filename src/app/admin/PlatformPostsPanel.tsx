@@ -61,7 +61,7 @@ export default function PlatformPostsPanel({
       <div className="card-title">Post an update to the home page</div>
       <p className="muted small" style={{ marginTop: 0 }}>
         Everyone browsing sees these, above the events. Use it for what the whole
-        platform needs to know — a new city, a change to how fees work, a festival
+        platform needs to know — a new city, a new feature, a festival
         you are running.
       </p>
 

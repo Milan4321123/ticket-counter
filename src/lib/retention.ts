@@ -74,22 +74,90 @@ function ensureRetentionInterval(): void {
 }
 
 /**
- * Orders whose event finished more than BUYER_RETENTION_DAYS ago and whose
- * buyer has not been erased yet.
+ * How long an unpaid transfer reservation stays payable past its stated
+ * window before the expiry sweep cancels it — the same two days of grace
+ * expireOverdueTransferReservations (lib/orders.ts) gives, restated here so
+ * erasure can never fire on an order that sweep still considers alive.
+ */
+const PAYMENT_WINDOW_GRACE_DAYS = 2;
+
+/**
+ * The long-stop for a PAID shop order that is never collected: whatever
+ * pickup_info promised, buyer details do not outlive this. Mirrored in the
+ * /privacy copy — change one, change both.
+ */
+export const SHOP_UNCOLLECTED_LONG_STOP_DAYS = 365;
+
+/**
+ * Orders due for erasure: the buyer has not been erased yet, and the thing
+ * their details were needed for is genuinely over.
  *
- * Two deliberate exclusions:
- *  - an order with no event (orphaned) is dropped by the JOIN;
- *  - an event with no date is never swept, because there is nothing to count
- *    the window from. date() returns NULL for an unparseable value, and
- *    `NULL <= x` is never true, so junk in event_date fails closed too.
+ * WHAT STARTS THE CLOCK depends on the kind of listing, because the two kinds
+ * end differently:
+ *
+ *  - an EVENT ends on its date, so the window counts from event_date. An event
+ *    with no date is never swept — there is nothing to count from — which is
+ *    why publishing now refuses an event without one: an unerasable buyer is
+ *    a promise /privacy cannot keep. date() returns NULL for an unparseable
+ *    value, and `NULL <= x` is never true, so junk in event_date fails closed.
+ *
+ *  - a SHOP never "happens", so each order carries its own clock — and the
+ *    clock must not start while the buyer's details still have a job to do:
+ *      · a PAID order counts from the moment its LAST code is collected, not
+ *        from payment. pickup_info is free text and nothing bounds it to the
+ *        retention window, so "paid + N days" would erase the buyer of a
+ *        six-weeks-out pre-order while their goods sat unclaimed — killing
+ *        the re-send path and the organizer's ability to check who is
+ *        collecting. Paid but never fully collected keeps the details until
+ *        the long-stop above, then erases anyway: an uncollected order from
+ *        last year is a bookkeeping row, not a live pickup.
+ *      · an UNPAID order is erased only once it can no longer become paid:
+ *        it must have left the payable states, AND its stated payment window
+ *        (pay_within_days + the expiry sweep's grace) must be over by the
+ *        retention margin. Counting bare created_at would erase a buyer whose
+ *        transfer was still legitimately in flight — and lib/orders'
+ *        markTransferOrderPaid deliberately revives late payments, which is
+ *        exactly the door this clause must not shut early.
+ *
+ * An order with no event at all (orphaned) is dropped by the JOIN.
  */
 const DUE_SQL = `
   SELECT o.id AS id
   FROM orders o
   JOIN events e ON e.id = o.event_id
   WHERE o.buyer_erased_at IS NULL
-    AND e.event_date IS NOT NULL
-    AND date(e.event_date) <= date('now', ?)
+    AND (
+      (e.kind != 'shop' AND e.event_date IS NOT NULL AND date(e.event_date) <= date('now', ?))
+      OR (
+        e.kind = 'shop'
+        AND (
+          -- Paid and every code collected: N days after the last collection.
+          (
+            o.paid_at IS NOT NULL
+            AND NOT EXISTS (
+              SELECT 1 FROM tickets t WHERE t.order_id = o.id AND t.checked_in_at IS NULL
+            )
+            AND date(COALESCE(
+              (SELECT MAX(t2.checked_in_at) FROM tickets t2 WHERE t2.order_id = o.id),
+              o.paid_at
+            )) <= date('now', ?)
+          )
+          -- Paid, never (fully) collected: the long-stop.
+          OR (
+            o.paid_at IS NOT NULL
+            AND date(o.paid_at) <= date('now', '-${SHOP_UNCOLLECTED_LONG_STOP_DAYS} days')
+          )
+          -- Never paid: only once no longer payable, N days past the window.
+          OR (
+            o.paid_at IS NULL
+            AND o.status NOT IN ('claimed', 'pending', 'capturing')
+            AND date(o.created_at,
+                     '+' || (e.pay_within_days + ${PAYMENT_WINDOW_GRACE_DAYS}) || ' days')
+                <= date('now', ?)
+          )
+        )
+      )
+    )
   ORDER BY o.created_at ASC
   LIMIT ${BATCH_SIZE}
 `;
@@ -113,6 +181,9 @@ export function runBuyerDataRetentionSweep(force = false): { erased: number } {
     const db = getDb();
     const cutoff = `-${BUYER_RETENTION_DAYS} days`;
     const findDue = db.prepare(DUE_SQL);
+    // The same cutoff three times: the event's date, a shop order's last
+    // collection, and an unpaid shop order's expired payment window — see
+    // DUE_SQL for why each clock starts where it does.
     const erase = db.prepare(
       `UPDATE orders
        SET buyer_name = ?, buyer_email = ?, buyer_erased_at = datetime('now')
@@ -126,7 +197,7 @@ export function runBuyerDataRetentionSweep(force = false): { erased: number } {
 
     let erased = 0;
     for (let batch = 0; batch < MAX_BATCHES; batch++) {
-      const due = findDue.all(cutoff) as { id: string }[];
+      const due = findDue.all(cutoff, cutoff, cutoff) as { id: string }[];
       if (due.length === 0) break;
       erased += eraseBatch(due.map((r) => r.id));
       if (due.length < BATCH_SIZE) break;
@@ -139,17 +210,25 @@ export function runBuyerDataRetentionSweep(force = false): { erased: number } {
     //
     // Measured from the event date, exactly like orders, so both halves of the
     // promise on /privacy expire together rather than on two different clocks.
+    // On a shop there is no event date, so a question's own age is the clock —
+    // its answer was needed while the asker still cared, not forever.
     const eraseAskers = db.prepare(
       `UPDATE event_questions
        SET asker_name = ?, asker_email = ?, asker_erased_at = datetime('now')
        WHERE asker_erased_at IS NULL
          AND (asker_name <> '' OR asker_email <> '')
-         AND event_id IN (
-           SELECT id FROM events
-           WHERE event_date IS NOT NULL AND date(event_date) <= date('now', ?)
+         AND (
+           event_id IN (
+             SELECT id FROM events
+             WHERE kind != 'shop' AND event_date IS NOT NULL AND date(event_date) <= date('now', ?)
+           )
+           OR (
+             date(asked_at) <= date('now', ?)
+             AND event_id IN (SELECT id FROM events WHERE kind = 'shop')
+           )
          )`
     );
-    const askersErased = eraseAskers.run(ERASED_BUYER_NAME, ERASED_BUYER_EMAIL, cutoff).changes;
+    const askersErased = eraseAskers.run(ERASED_BUYER_NAME, ERASED_BUYER_EMAIL, cutoff, cutoff).changes;
 
     if (erased > 0) console.log(`Retention sweep: erased buyer details on ${erased} order(s).`);
     if (askersErased > 0) {

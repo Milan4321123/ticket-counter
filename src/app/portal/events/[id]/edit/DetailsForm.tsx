@@ -6,10 +6,13 @@ import GoToTab from './GoToTab';
 import ContactPhotoFramer from '@/components/ContactPhotoFramer';
 import SpeechInput from '@/components/SpeechInput';
 import { saveEvent } from './save';
+import { vocabFor } from '@/lib/vocab';
+import type { EventKind } from '@/lib/types';
 
 interface Props {
   eventId: string;
   isDraft: boolean;
+  kind: EventKind;
   initial: {
     name: string;
     artist: string;
@@ -17,6 +20,7 @@ interface Props {
     dateDisplay: string;
     eventDate: string; // '' when unset
     venueName: string;
+    pickupInfo: string;
     address: string;
     city: string;
     currency: string;
@@ -38,14 +42,20 @@ interface Props {
   };
 }
 
-export default function DetailsForm({ eventId, isDraft, initial }: Props) {
+export default function DetailsForm({ eventId, isDraft, kind, initial }: Props) {
   const router = useRouter();
+  // A shop and an event fill in different halves of this form: a shop has no
+  // date and no line-up, and answers "when do I come and get it?" instead.
+  // Everything they share — money, limits, WhatsApp, photos — is untouched.
+  const isShop = kind === 'shop';
+  const v = vocabFor(kind);
   const [name, setName] = useState(initial.name);
   const [artist, setArtist] = useState(initial.artist);
   const [description, setDescription] = useState(initial.description);
   const [dateDisplay, setDateDisplay] = useState(initial.dateDisplay);
   const [eventDate, setEventDate] = useState(initial.eventDate);
   const [venueName, setVenueName] = useState(initial.venueName);
+  const [pickupInfo, setPickupInfo] = useState(initial.pickupInfo);
   const [address, setAddress] = useState(initial.address);
   const [city, setCity] = useState(initial.city);
   const [totalCapacity, setTotalCapacity] = useState(String(initial.totalCapacity));
@@ -119,6 +129,7 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
   // Description text as it was when dictation started; the live transcript
   // is appended after it, so interim words refine in place.
   const descSpeechBase = useRef('');
+  const pickupSpeechBase = useRef('');
 
   function intOf(value: string, label: string, min: number, max: number): number | null {
     const n = Number(value);
@@ -134,11 +145,11 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
     if (busy) return;
     setError(null);
     if (!name.trim()) {
-      setError('Please give your event a name.');
+      setError(`Please give your ${v.listing} a name.`);
       return;
     }
-    const capacity = intOf(totalCapacity, 'Total capacity', 1, 200000);
-    const perOrder = intOf(maxPerOrder, 'Max tickets per order', 1, 50);
+    const capacity = intOf(totalCapacity, isShop ? 'The total you can sell' : 'Total capacity', 1, 200000);
+    const perOrder = intOf(maxPerOrder, `Max ${v.units} per order`, 1, 50);
     const payDays = intOf(payWithinDays, 'The payment deadline', 1, 30);
     if (capacity === null || perOrder === null || payDays === null) return;
 
@@ -150,6 +161,7 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
       dateDisplay,
       eventDate,
       venueName,
+      pickupInfo,
       address,
       city,
       totalCapacity: capacity,
@@ -183,23 +195,23 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
       {error && <div className="notice notice-error">{error}</div>}
       <div style={grid}>
         <div className="field">
-          <label htmlFor="ev-name">Event name</label>
+          <label htmlFor="ev-name">{v.Listing} name</label>
           <input id="ev-name" className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} />
           {isDraft && (
             <p className="muted small" style={{ margin: '6px 0 0' }}>
-              While the event is a draft, renaming it also updates its web address.
+              While the {v.listing} is a draft, renaming it also updates its web address.
             </p>
           )}
         </div>
         <div className="field">
-          <label htmlFor="ev-artist">Artist / act</label>
+          <label htmlFor="ev-artist">{isShop ? 'Who is behind it (optional)' : 'Artist / act'}</label>
           <input
             id="ev-artist"
             className="input"
             value={artist}
             onChange={(e) => setArtist(e.target.value)}
             maxLength={120}
-            placeholder="Who is performing?"
+            placeholder={isShop ? 'The cook, the maker, the family name' : 'Who is performing?'}
           />
         </div>
       </div>
@@ -212,7 +224,11 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           maxLength={8000}
-          placeholder="Tell people what makes this night special — the lineup, the atmosphere, what to expect."
+          placeholder={
+            isShop
+              ? 'Tell people what you make and what makes it worth ordering — how it is cooked, where it comes from, what is in it.'
+              : 'Tell people what makes this night special — the lineup, the atmosphere, what to expect.'
+          }
           style={{ resize: 'vertical', fontFamily: 'inherit' }}
         />
         <div className="speech-row">
@@ -226,43 +242,79 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
           />
         </div>
       </div>
+      {/* A date is what an event IS, and a shop has none — it sells until it
+          stops. So a shop is asked the question a date was standing in for all
+          along: when should the buyer turn up, and what should they do when
+          they get there. Both write to fields the buyer sees in the same slot
+          on the page. */}
+      {isShop ? (
+        <div className="field" style={{ maxWidth: 640 }}>
+          <label htmlFor="ev-pickup">How to collect</label>
+          <p className="muted small" style={{ margin: '0 0 8px' }}>
+            When someone can come and get their order, and anything they need to know when they
+            arrive. This is the first thing a buyer looks for, and it is required before you can
+            publish.
+          </p>
+          <textarea
+            id="ev-pickup"
+            className="input"
+            rows={4}
+            value={pickupInfo}
+            onChange={(e) => setPickupInfo(e.target.value)}
+            maxLength={2000}
+            placeholder={'e.g. Collect Saturdays 4–7pm. Ring the bell marked Sharma, second floor. Show your collection code — I will have your order bagged and ready.'}
+            style={{ resize: 'vertical', fontFamily: 'inherit' }}
+          />
+          <div className="speech-row">
+            <SpeechInput
+              label="Dictate the collection details"
+              hint="Tap the mic and just say when people should come."
+              onStart={() => {
+                pickupSpeechBase.current = pickupInfo.trim() ? pickupInfo.trimEnd() + ' ' : '';
+              }}
+              onText={(text) => setPickupInfo(pickupSpeechBase.current + text)}
+            />
+          </div>
+        </div>
+      ) : (
+        <div style={grid}>
+          <div className="field">
+            <label htmlFor="ev-date-display">Date, as shown to buyers</label>
+            <input
+              id="ev-date-display"
+              className="input"
+              value={dateDisplay}
+              onChange={(e) => setDateDisplay(e.target.value)}
+              maxLength={120}
+              placeholder="e.g. Saturday, 24 October 2026 · Doors 19:00"
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="ev-date">Calendar date (sorts the public feed)</label>
+            <input
+              id="ev-date"
+              className="input"
+              type="date"
+              value={eventDate}
+              onChange={(e) => setEventDate(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
       <div style={grid}>
         <div className="field">
-          <label htmlFor="ev-date-display">Date, as shown to buyers</label>
-          <input
-            id="ev-date-display"
-            className="input"
-            value={dateDisplay}
-            onChange={(e) => setDateDisplay(e.target.value)}
-            maxLength={120}
-            placeholder="e.g. Saturday, 24 October 2026 · Doors 19:00"
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="ev-date">Calendar date (sorts the public feed)</label>
-          <input
-            id="ev-date"
-            className="input"
-            type="date"
-            value={eventDate}
-            onChange={(e) => setEventDate(e.target.value)}
-          />
-        </div>
-      </div>
-      <div style={grid}>
-        <div className="field">
-          <label htmlFor="ev-venue">Venue name</label>
+          <label htmlFor="ev-venue">{isShop ? 'Collection point (optional)' : 'Venue name'}</label>
           <input
             id="ev-venue"
             className="input"
             value={venueName}
             onChange={(e) => setVenueName(e.target.value)}
             maxLength={160}
-            placeholder="e.g. Stadthalle"
+            placeholder={isShop ? 'e.g. Sunita’s kitchen, Neukölln' : 'e.g. Stadthalle'}
           />
         </div>
         <div className="field">
-          <label htmlFor="ev-address">Street address</label>
+          <label htmlFor="ev-address">{isShop ? 'Street address (optional)' : 'Street address'}</label>
           <input
             id="ev-address"
             className="input"
@@ -271,6 +323,17 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
             maxLength={240}
             placeholder="Street and number — feeds the Open in Maps link"
           />
+          {/* Optional on purpose. Plenty of shops here are run out of somebody's
+              home, and publishing a home address to a public page is a decision
+              that belongs to the person who lives there — not a box they have
+              to fill to be allowed to sell. Those who leave it blank say "message
+              me for the address" in the collection details instead. */}
+          {isShop && (
+            <p className="muted small" style={{ margin: '6px 0 0' }}>
+              Leave this empty if you would rather not publish where you live — you can give the
+              address to buyers privately once they have ordered.
+            </p>
+          )}
         </div>
         <div className="field">
           <label htmlFor="ev-city">City</label>
@@ -279,7 +342,7 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
       </div>
       <div style={grid}>
         <div className="field">
-          <label htmlFor="ev-capacity">Total capacity</label>
+          <label htmlFor="ev-capacity">{isShop ? 'Total you can sell' : 'Total capacity'}</label>
           <input
             id="ev-capacity"
             className="input"
@@ -290,15 +353,14 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
             onChange={(e) => setTotalCapacity(e.target.value)}
           />
           <p className="muted small" style={{ margin: '6px 0 0' }}>
-            How many people the venue holds. Your event fee is worked out from this — the exact
-            amount is on the Publish tab.
+            {isShop
+              ? 'The most you could sell across every item together — a ceiling, not a promise. Each item has its own stock below.'
+              : 'How many people the venue holds — ticket sales stop when this many are sold.'}
           </p>
-          {/* There is no longer a way to opt out of the ceiling. The fee is
-              priced from this number, so an event that could sell past it would
-              be one where the fee and the tickets describe different events.
-              Hiding the COUNT is a different question, and it is the switch
-              below — which is what an organizer actually wanted when they
-              reached for "no limit". */}
+          {/* There is no longer a way to opt out of the ceiling: inventory
+              maths needs one real number for the room. Hiding the COUNT is a
+              different question, and it is the switch below — which is what an
+              organizer actually wanted when they reached for "no limit". */}
           <label className="checkbox-row" style={{ marginTop: 10 }}>
             <input
               type="checkbox"
@@ -306,18 +368,17 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
               onChange={(e) => setShowRemaining(e.target.checked)}
             />
             <span>
-              Show buyers how many tickets are left
+              Show buyers how many {v.units} are left
               <span className="muted small" style={{ display: 'block' }}>
-                Turn this OFF if you sell early-bird tickets. &ldquo;Only 8 left&rdquo; is read as
-                the whole event nearly selling out, when it only means the cheap tier is nearly
-                gone — and that puts people off an event with hundreds of seats free. Your limits
-                still apply either way; this only decides whether the number is shown.
+                {isShop
+                  ? '“Only 3 left” is the best reason a hesitating buyer has to order now — but it also tells everyone how small a batch you make. Your stock limits apply either way; this only decides whether the number is shown.'
+                  : 'Turn this OFF if you sell early-bird tickets. “Only 8 left” is read as the whole event nearly selling out, when it only means the cheap tier is nearly gone — and that puts people off an event with hundreds of seats free. Your limits still apply either way; this only decides whether the number is shown.'}
               </span>
             </span>
           </label>
         </div>
         <div className="field">
-          <label htmlFor="ev-max-per-order">Max tickets per order</label>
+          <label htmlFor="ev-max-per-order">Max {v.units} per order</label>
           <input
             id="ev-max-per-order"
             className="input"
@@ -344,16 +405,16 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
           <label htmlFor="ev-currency">Currency</label>
           <input id="ev-currency" className="input" value={initial.currency} disabled aria-label="Currency (fixed)" />
           <p className="muted small" style={{ margin: '6px 0 0' }}>
-            All events use EUR for now.
+            Everything on the platform uses EUR for now.
           </p>
         </div>
       </div>
       <div className="field" style={{ maxWidth: 640 }}>
         <label htmlFor="ev-whatsapp">Talk to buyers on WhatsApp (optional)</label>
         <p className="muted small" style={{ margin: '0 0 10px' }}>
-          Puts a bubble on your event page and on the payment page. Buyers tap it and reach{' '}
-          <strong style={{ color: 'var(--text)' }}>you</strong>, with your event&rsquo;s name already
-          in the message. It is the fastest way to settle the one thing people hesitate over before
+          Puts a bubble on your {v.listing} page and on the payment page. Buyers tap it and reach{' '}
+          <strong style={{ color: 'var(--text)' }}>you</strong>, with your {v.listing}&rsquo;s name
+          already in the message. It is the fastest way to settle the one thing people hesitate over before
           paying — whether the bank account is really yours. Leave the number empty and no bubble
           appears.
         </p>
@@ -518,13 +579,13 @@ export default function DetailsForm({ eventId, isDraft, initial }: Props) {
           onChange={(e) => setSalesOpen(e.target.checked)}
         />
         <span>
-          <strong style={{ color: 'var(--text)' }}>Ticket sales open</strong> — switch off to pause
-          sales on the whole event without taking the page down. Buyers see{' '}
+          <strong style={{ color: 'var(--text)' }}>{v.Sales} open</strong> — switch off to pause
+          sales on the whole {v.listing} without taking the page down. Buyers see{' '}
           <strong style={{ color: 'var(--text)' }}>Sales closed</strong>.
           <span className="muted small" style={{ display: 'block' }}>
-            To announce a ticket instead of selling it, leave this on and set that ticket to{' '}
-            <strong>Coming soon</strong> in the Tickets tab — it is a property of a ticket, not of
-            the event.
+            To announce {isShop ? 'an item' : 'a ticket'} instead of selling it, leave this on and set
+            that {v.unit} to <strong>Coming soon</strong> in the {v.Units} tab — it is a property of
+            one {v.unit}, not of the whole {v.listing}.
           </span>
         </span>
       </label>

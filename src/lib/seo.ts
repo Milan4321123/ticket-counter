@@ -31,7 +31,7 @@ export const SITE_NAME = platformNameFromEnv();
  * here because they are what the site genuinely is.
  */
 export const SITE_DESCRIPTION =
-  'Nepali concerts, cultural nights and community events across Europe. Book tickets in one click, pay by bank transfer, and get your QR tickets by email.';
+  'Nepali concerts, cultural nights, festivals and community events across Europe. Reserve tickets in one click, pay by bank transfer, and your QR tickets arrive by email.';
 
 /**
  * Country for venue addresses in structured data, as an ISO code.

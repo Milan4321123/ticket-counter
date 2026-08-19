@@ -1,18 +1,17 @@
 import Link from 'next/link';
 import PlatformAssistant from '@/components/PlatformAssistant';
 import {
-  eventFeeCentsFor,
   listEventQuestions,
   listEventsForOrganizer,
   type EventRow,
   type EventStatus,
 } from '@/lib/events';
 import { listingStillUrl } from '@/lib/listing';
+import { vocabFor } from '@/lib/vocab';
 import { formatMoney } from '@/lib/money';
 import { getStats } from '@/lib/orders';
 import { organizerPlanActive } from '@/lib/organizers';
 import { organizerTotpEnabled } from '@/lib/organizerTotp';
-import { platformFeeRule } from '@/lib/platform';
 import { runTransferReminderSweep } from '@/lib/reminders';
 import CreateEventForm from './CreateEventForm';
 import PlanExpired from './PlanExpired';
@@ -22,7 +21,7 @@ import { platformNameFromEnv } from '@/lib/platform';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Your events — Organizer portal', robots: { index: false, follow: false } };
+export const metadata = { title: 'Your events and shops — Organizer portal', robots: { index: false, follow: false } };
 
 const STATUS_LABEL: Record<EventStatus, string> = {
   published: 'Live',
@@ -42,6 +41,11 @@ function StatusBadge({ status }: { status: EventStatus }) {
  * choice for the whole site, and this simply asks it. Videos are skipped by
  * that helper too — this slot is a still.
  */
+/** The first non-empty line of a multi-line field, for a one-line summary. */
+function firstLine(text: string): string {
+  return text.split('\n').map((l) => l.trim()).find(Boolean) ?? '';
+}
+
 function dashboardThumb(event: EventRow): string | null {
   return listingStillUrl(event);
 }
@@ -73,14 +77,6 @@ export default async function PortalDashboardPage({
     openQuestions: listEventQuestions(event.id, 'open').length,
     thumb: dashboardThumb(event),
   }));
-  // Events that still owe the platform fee — they cannot be published yet. Each
-  // one costs what its own capacity says, so show the money, not just a count.
-  const unpaid = events.filter((e) => e.feeStatus !== 'paid' && e.status !== 'archived');
-  const feesDue = unpaid.length;
-  const feesDueAmount = formatMoney(
-    unpaid.reduce((sum, e) => sum + eventFeeCentsFor(e), 0),
-    'EUR'
-  );
   const firstName = organizer.name.trim().split(/\s+/)[0] || organizer.name;
 
   return (
@@ -93,34 +89,23 @@ export default async function PortalDashboardPage({
           </h1>
           <p className="muted small" style={{ margin: '4px 0 0' }}>
             {cards.length === 0
-              ? 'Welcome to your organizer portal — this is where your events live.'
-              : `Here is how your ${cards.length === 1 ? 'event is' : 'events are'} doing.`}{' '}
+              ? 'Welcome to your organizer portal — this is where your events and shops live.'
+              : `Here is how your ${cards.length === 1 ? 'listing is' : 'listings are'} doing.`}{' '}
             Signed in as {organizer.email}.
           </p>
         </div>
 
         {deletedName && (
           <div className="notice notice-success anim-fade-up" role="status">
-            <strong>{deletedName}</strong> is gone — its page, photos, ticket types, orders and tickets have all been
+            <strong>{deletedName}</strong> is gone — its page, photos, prices, orders and codes have all been
             removed. Nothing about it is left on the platform.
           </div>
         )}
 
-        {feesDue > 0 ? (
-          <div className="plan-banner anim-fade-up" role="status">
-            <strong>
-              {feesDue === 1
-                ? `1 event waiting for its ${feesDueAmount} event fee`
-                : `${feesDue} events waiting for their event fees — ${feesDueAmount} in total`}
-            </strong>{' '}
-            — open the event below and check its <strong>Publish</strong> tab for the exact amount, the
-            bank details and the payment reference. Publishing unlocks as soon as your transfer arrives.
-          </div>
-        ) : (
-          <p className="muted small anim-fade-up" style={{ marginTop: -6 }}>
-            Your account is free — you pay per event you publish: {platformFeeRule()}.
-          </p>
-        )}
+        <p className="muted small anim-fade-up" style={{ marginTop: -6 }}>
+          Your account is free, and so is publishing — no fees, and never a cut of your ticket
+          sales.
+        </p>
 
         {/* Said here, not only at the moment publishing is refused. An organizer
             who meets this as a blocked button on launch day reads it as the
@@ -145,9 +130,9 @@ export default async function PortalDashboardPage({
 
         {cards.length === 0 ? (
           <div className="card glow-card anim-fade-up anim-d1">
-            <div className="card-title">Create your first event</div>
+            <div className="card-title">Create your first listing</div>
             <p className="muted small" style={{ marginTop: 0 }}>
-              From idea to selling tickets in three steps:
+              From idea to selling in three steps:
             </p>
             <ol className="step-list">
               <li className="step-item">
@@ -157,7 +142,8 @@ export default async function PortalDashboardPage({
                 <div>
                   <strong>Name it</strong>
                   <p className="muted small" style={{ margin: 0 }}>
-                    Type a name below — your event starts as a private draft only you can see.
+                    Pick what you are setting up and name it below — it starts as a private draft
+                    only you can see.
                   </p>
                 </div>
               </li>
@@ -168,7 +154,8 @@ export default async function PortalDashboardPage({
                 <div>
                   <strong>Fill it in</strong>
                   <p className="muted small" style={{ margin: 0 }}>
-                    Date, venue, ticket types and prices, photos — and the bank account the ticket money goes to.
+                    An event wants a date and venue; a shop wants collection details. Both want
+                    prices, photos — and the bank account the money goes to.
                   </p>
                 </div>
               </li>
@@ -179,7 +166,7 @@ export default async function PortalDashboardPage({
                 <div>
                   <strong>Publish</strong>
                   <p className="muted small" style={{ margin: 0 }}>
-                    Your event page goes live and buyers can reserve tickets right away.
+                    Your page goes live and buyers can start ordering right away.
                   </p>
                 </div>
               </li>
@@ -239,9 +226,11 @@ export default async function PortalDashboardPage({
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                       <strong style={{ fontSize: '1.08rem' }}>{event.name}</strong>
                       <StatusBadge status={event.status} />
-                      {event.feeStatus !== 'paid' && event.status !== 'archived' && (
-                        <span className="badge badge-amber">Fee due</span>
-                      )}
+                      {/* Events and shops share this list, and they behave
+                          differently enough — no date, different checklist,
+                          different words on the page — that which one you are
+                          looking at should never be a guess. */}
+                      {event.kind === 'shop' && <span className="badge">Shop</span>}
                       {openQuestions > 0 && (
                         // Straight into the Questions tab, which is now its own
                         // tab rather than a section buried in Page & content.
@@ -255,8 +244,15 @@ export default async function PortalDashboardPage({
                       )}
                     </div>
                     <div className="muted small" style={{ marginTop: 4 }}>
-                      {event.dateDisplay || event.eventDate || 'Date not set'}
-                      {event.venueName ? ` · ${event.venueName}` : ''}
+                      {/* A shop has no date to show here, so it shows the line
+                          that actually tells its organizer whether it is ready:
+                          the collection details, which are what publishing asks
+                          for in place of a date and a venue. */}
+                      {event.kind === 'shop'
+                        ? firstLine(event.pickupInfo) || 'Collection details not set'
+                        : `${event.dateDisplay || event.eventDate || 'Date not set'}${
+                            event.venueName ? ` · ${event.venueName}` : ''
+                          }`}
                     </div>
                     <div className="meter" style={{ maxWidth: 320 }}>
                       <span className="meter-track">
@@ -301,7 +297,7 @@ export default async function PortalDashboardPage({
                       Orders
                     </Link>
                     <Link href={`/portal/events/${event.id}/checkin`} className="btn btn-sm">
-                      Check-in
+                      {vocabFor(event.kind).Redeem}
                     </Link>
                     {/* Draft events get the same link, named for what it does.
                         Seeing your own page is how you decide it is ready — it
@@ -315,7 +311,7 @@ export default async function PortalDashboardPage({
             })}
 
             <div className="card glow-card anim-fade-up anim-d4" style={{ marginTop: 16 }}>
-              <div className="card-title">Create a new event</div>
+              <div className="card-title">Create something new</div>
               <CreateEventForm />
             </div>
           </>

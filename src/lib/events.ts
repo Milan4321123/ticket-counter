@@ -6,24 +6,33 @@ import fs from 'fs';
 import path from 'path';
 import { getDb } from './db';
 import { deleteVariants } from './imageVariants';
-import { eventFeeCents } from './platform';
+import { paypalLinkFor } from './paypalLink';
+import { asEventKind, type EventKind } from './types';
 
 export type EventStatus = 'draft' | 'published' | 'archived';
 
-/** The per-event platform fee: 'paid' unlocks publishing. */
-export type EventFeeStatus = 'unpaid' | 'paid';
+// Re-exported so server code that already reaches for events.ts keeps one import.
+export type { EventKind } from './types';
+export { asEventKind, isShop } from './types';
 
 export interface EventRow {
   id: string;
   organizerId: string;
   slug: string;
   status: EventStatus;
+  kind: EventKind;
   name: string;
   artist: string;
   description: string;
   dateDisplay: string;
   eventDate: string | null;
   venueName: string;
+  /**
+   * Shops only: where and when to collect, free text. Stands in for both the
+   * date and the venue block, which is why a shop is never asked for those.
+   * '' on every event, and on rows written before the column existed.
+   */
+  pickupInfo: string;
   address: string;
   city: string;
   currency: string;
@@ -89,17 +98,6 @@ export interface EventRow {
    * NULL on rows that predate it; rowToEvent normalizes that away).
    */
   assistantContext: string;
-  /** Platform fee for THIS event — publishing is blocked until it is 'paid'. */
-  feeStatus: EventFeeStatus;
-  feePaidAt: string | null;
-  /** The amount quoted for this event, in cents. Null until it is first quoted. */
-  feeCents: number | null;
-  /**
-   * How many seats the PAID fee covers. Null until the fee is confirmed. The
-   * capacity can never be raised above this without the platform agreeing —
-   * see the totalCapacity branch in api/portal/events/[id].
-   */
-  feeCapacity: number | null;
   /**
    * The organizer's chosen framing for each fixed-shape slot, as raw JSON —
    * parse with parseCropRect(). NULL means "never repositioned": fall back to
@@ -188,12 +186,14 @@ const EVENT_COLS = `
   organizer_id AS organizerId,
   slug,
   status,
+  kind,
   name,
   artist,
   description,
   date_display AS dateDisplay,
   event_date AS eventDate,
   venue_name AS venueName,
+  pickup_info AS pickupInfo,
   address,
   city,
   currency,
@@ -225,10 +225,6 @@ const EVENT_COLS = `
   video_url AS videoUrl,
   page_design AS pageDesign,
   assistant_context AS assistantContext,
-  fee_status AS feeStatus,
-  fee_paid_at AS feePaidAt,
-  fee_cents AS feeCents,
-  fee_capacity AS feeCapacity,
   cover_crop AS coverCrop,
   profile_crop AS profileCrop,
   poster_crop AS posterCrop,
@@ -250,6 +246,10 @@ function rowToEvent(row: Record<string, unknown> | undefined): EventRow | null {
   return {
     ...(row as unknown as EventRow),
     salesOpen: Boolean(row.salesOpen),
+    // Added by migration and free text, so old rows read NULL. Both fall back
+    // to what those rows have always meant: an event, with nothing to collect.
+    kind: asEventKind(row.kind),
+    pickupInfo: (row.pickupInfo as string | null) ?? '',
     // Added by migration, and a free-text column, so anything unrecognised
     // falls back to the wording that is always safe to show.
     whatsapp: (row.whatsapp as string | null) ?? '',
@@ -264,6 +264,79 @@ function rowToEvent(row: Record<string, unknown> | undefined): EventRow | null {
     paypalAccount: (row.paypalAccount as string | null) ?? '',
     payoutLocked: Number(row.payoutLocked ?? 0),
   };
+}
+
+/** One line of the publish checklist: what to do, and whether it is done. */
+export interface ListingCheck {
+  ok: boolean;
+  /** Imperative and sentence-case, e.g. "Add a date". */
+  label: string;
+}
+
+/**
+ * What a listing has to say about ITSELF before it can go public.
+ *
+ * The kinds ask for different things, and each only for what its own buyers
+ * genuinely need:
+ *
+ *   event — a date and a venue. Nobody can turn up to either without both.
+ *   shop  — collection details. There is no date to turn up on, so this is the
+ *           ONLY thing telling a buyer when to come and get what they paid for;
+ *           the address stays optional because many of these shops are run out
+ *           of someone's home and that is theirs to publish or not.
+ *
+ * Money, stock and the authenticator are NOT here — they belong to other parts
+ * of the form, and the callers that show a full checklist add them around this.
+ *
+ * The editor's progress ticks, the Publish tab's checklist and the gate that
+ * actually refuses to publish all read this one function, so a green tick can
+ * never mean something different from what publishing will accept.
+ */
+export function listingDetailChecks(event: {
+  kind: EventKind;
+  name: string;
+  description: string;
+  dateDisplay: string;
+  eventDate: string | null;
+  venueName: string;
+  address: string;
+  pickupInfo: string;
+}): ListingCheck[] {
+  const checks: ListingCheck[] = [{ ok: Boolean(event.name.trim()), label: 'Give it a name' }];
+  if (event.kind === 'shop') {
+    checks.push({
+      ok: Boolean(event.pickupInfo.trim()),
+      label: 'Say how and when buyers collect their order',
+    });
+  } else {
+    checks.push(
+      // The CALENDAR date specifically, not the display text. The free-text
+      // line ("Doors 6 PM · Show 7 PM") is what humans read, but the
+      // machine-readable date is what orders the feed, drives reminders, and —
+      // above all — starts the clock on the /privacy promise to erase buyer
+      // details after the event. Accepting display text alone published events
+      // whose buyers could never be erased, which made that promise false.
+      { ok: Boolean(event.eventDate), label: 'Pick the event date in the calendar' },
+      { ok: Boolean(event.venueName.trim() && event.address.trim()), label: 'Add the venue name and address' }
+    );
+  }
+  checks.push({ ok: Boolean(event.description.trim()), label: 'Write a short description' });
+  return checks;
+}
+
+/**
+ * The unfinished checks as sentence fragments, ready to be joined into
+ * "before publishing, please add a date, write a short description."
+ */
+export function missingListingDetails(event: Parameters<typeof listingDetailChecks>[0]): string[] {
+  return listingDetailChecks(event)
+    .filter((c) => !c.ok)
+    .map((c) => c.label.charAt(0).toLowerCase() + c.label.slice(1));
+}
+
+/** True when nothing on the listing's own details is outstanding. */
+export function listingDetailsComplete(event: Parameters<typeof listingDetailChecks>[0]): boolean {
+  return listingDetailChecks(event).every((c) => c.ok);
 }
 
 export function getEventById(id: string): EventRow | null {
@@ -310,102 +383,6 @@ export function getPrimaryEvent(): EventRow | null {
   return rowToEvent(
     getDb().prepare(`SELECT ${EVENT_COLS} FROM events ORDER BY created_at ASC LIMIT 1`).get() as Record<string, unknown>
   );
-}
-
-// ---------------- Per-event platform fee ----------------
-
-/**
- * One unpaid event as the platform admin sees it: the event plus who owes the
- * fee, so the admin screen needs no second query per row.
- */
-export interface UnpaidEventRow {
-  id: string;
-  name: string;
-  slug: string;
-  status: EventStatus;
-  createdAt: string;
-  totalCapacity: number;
-  /** The amount quoted to the organizer, or null if they never opened Publish. */
-  feeCents: number | null;
-  organizerId: string;
-  organizerName: string;
-  organizerEmail: string;
-}
-
-/** Everything the fee rules need from an event — EventRow and UnpaidEventRow both fit. */
-interface EventFeeBasis {
-  id: string;
-  feeStatus: EventFeeStatus;
-  feeCents: number | null;
-  totalCapacity: number;
-}
-
-/**
- * What this event's fee is, for DISPLAY only: the amount already quoted to the
- * organizer, or today's price when nobody has been quoted yet. Never writes, so
- * screens that merely mention the fee cannot lock a number in.
- */
-export function eventFeeCentsFor(event: Pick<EventFeeBasis, 'feeCents' | 'totalCapacity'>): number {
-  return event.feeCents ?? eventFeeCents(event.totalCapacity);
-}
-
-/**
- * Quote this event's fee — the ONE place an amount becomes binding. Call it
- * wherever the organizer is asked to pay (the Publish tab, the fee email): the
- * amount is worked out from the capacity they set and written to the event, so
- * the organizer, the emails, and the admin's confirm screen all name the same
- * number.
- *
- * While the fee is unpaid the quote follows the capacity — an organizer who
- * moves to a bigger room is re-quoted, which is fair since no money has changed
- * hands. Once the owner confirms the transfer the stored amount is frozen: what
- * they paid is what the event cost, whatever they do to the capacity after.
- */
-export function quoteEventFee(event: EventFeeBasis): number {
-  if (event.feeStatus === 'paid') return eventFeeCentsFor(event);
-  const cents = eventFeeCents(event.totalCapacity);
-  if (event.feeCents !== cents) {
-    // The status guard makes a confirmation racing this write harmless.
-    getDb().prepare(`UPDATE events SET fee_cents = ? WHERE id = ? AND fee_status != 'paid'`).run(cents, event.id);
-  }
-  return cents;
-}
-
-/**
- * The platform owner saw the fee transfer arrive: unlock publishing for this
- * event. Returns false when the event is gone or was already marked paid, so
- * the caller can tell "done" from "nothing to do".
- *
- * This is also where the amount stops moving: whatever was quoted is written
- * down (or worked out now, if the organizer paid without ever opening the
- * Publish tab), so the sum on record is the sum that was actually transferred.
- */
-export function markEventFeePaid(eventId: string): boolean {
-  const event = getEventById(eventId);
-  if (!event || event.feeStatus === 'paid') return false;
-  return (
-    getDb()
-      .prepare(
-        `UPDATE events SET fee_status = 'paid', fee_paid_at = datetime('now'), fee_cents = ?, fee_capacity = ?
-         WHERE id = ? AND fee_status != 'paid'`
-      )
-      // Both frozen together: the amount paid, and the number of seats it bought.
-      .run(eventFeeCentsFor(event), event.totalCapacity, eventId).changes > 0
-  );
-}
-
-/** Events still owing their platform fee, newest first (archived ones excluded). */
-export function listUnpaidEvents(): UnpaidEventRow[] {
-  return getDb()
-    .prepare(
-      `SELECT e.id, e.name, e.slug, e.status, e.created_at AS createdAt,
-              e.total_capacity AS totalCapacity, e.fee_cents AS feeCents,
-              o.id AS organizerId, o.name AS organizerName, o.email AS organizerEmail
-       FROM events e JOIN organizers o ON o.id = e.organizer_id
-       WHERE e.fee_status != 'paid' AND e.status != 'archived'
-       ORDER BY e.created_at DESC`
-    )
-    .all() as UnpaidEventRow[];
 }
 
 // ---------------- Tiers ----------------
@@ -880,8 +857,6 @@ export interface PaypalPayee {
 
 const PAYPAL_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
 /** paypal.me/name and PayPal's own newer paypal.com/paypalme/name form. */
-const PAYPAL_LINK_RE = /^https:\/\/(?:www\.)?(?:paypal\.me|paypal\.com\/paypalme)\/[A-Za-z0-9._-]{1,64}\/?$/i;
-
 /**
  * Normalize what an organizer typed into something safe to render.
  *
@@ -890,13 +865,52 @@ const PAYPAL_LINK_RE = /^https:\/\/(?:www\.)?(?:paypal\.me|paypal\.com\/paypalme
  * nor a PayPal link comes back as a handle with no link: it is still shown for
  * the buyer to read, but it never becomes an href — an arbitrary string from an
  * organizer must not turn into a clickable destination.
+ *
+ * The link rule itself lives in lib/paypalLink, so the organizer's editor can
+ * tell them which of the two they have typed before they ever publish.
  */
 export function paypalPayee(event: Pick<EventRow, 'paypalAccount'>): PaypalPayee | null {
   const raw = (event.paypalAccount || '').trim();
   if (!raw) return null;
-  const withScheme = /^(?:www\.)?paypal\.(?:me|com)\//i.test(raw) ? `https://${raw.replace(/^www\./i, '')}` : raw;
-  if (PAYPAL_LINK_RE.test(withScheme)) return { handle: raw, link: withScheme };
-  return { handle: raw, link: null };
+  return { handle: raw, link: paypalLinkFor(raw) };
+}
+
+/**
+ * A PayPal.Me link with the amount already in it, or null.
+ *
+ * PayPal.Me accepts a trailing amount — /25.00EUR — so the buyer lands on a page
+ * that already knows what to charge. Worth having, and worth being honest about
+ * its limit: the link carries the amount and nothing else. There is no field in
+ * a PayPal.Me URL for the payment reference, so the buyer still has to type
+ * TICKETS-XXXXXXXX into PayPal's message box themselves, and the organizer
+ * still has to match it by hand afterwards.
+ *
+ * That is the opposite of what the GiroCode does, and the difference is not
+ * cosmetic: a GiroCode fills in the reference, which is the one field that
+ * actually costs somebody an evening when it goes missing.
+ *
+ * Null for a plain PayPal address, because an email is not a destination — see
+ * paypalPayee(), which deliberately refuses to turn arbitrary organizer input
+ * into a clickable link.
+ */
+export function paypalMeUrl(
+  payee: PaypalPayee | null,
+  amountCents: number,
+  currency: string,
+): string | null {
+  if (!payee?.link) return null;
+
+  const cents = Math.round(amountCents);
+  if (!Number.isFinite(cents) || cents < 1) return null;
+
+  // PayPal.Me reads the currency straight off the end of the path. Anything it
+  // does not recognise silently becomes the account's default currency, which
+  // would quietly show a buyer the wrong number — so only pass a code that
+  // looks like one.
+  const code = (currency || '').toUpperCase();
+  if (!/^[A-Z]{3}$/.test(code)) return null;
+
+  return `${payee.link.replace(/\/$/, '')}/${(cents / 100).toFixed(2)}${code}`;
 }
 
 /** True for input this platform will accept in the PayPal field. */
@@ -904,8 +918,7 @@ export function isValidPaypalAccount(raw: string): boolean {
   const value = raw.trim();
   if (!value) return true; // optional — empty simply means "no PayPal"
   if (PAYPAL_EMAIL_RE.test(value)) return true;
-  const withScheme = /^(?:www\.)?paypal\.(?:me|com)\//i.test(value) ? `https://${value.replace(/^www\./i, '')}` : value;
-  return PAYPAL_LINK_RE.test(withScheme);
+  return paypalLinkFor(value) !== null;
 }
 
 /** Universal "Open in Maps" link — opens the native maps app on phones. */

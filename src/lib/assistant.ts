@@ -15,7 +15,6 @@
 // via geminiEnabled() / ANTHROPIC_API_KEY themselves.
 import Anthropic from '@anthropic-ai/sdk';
 import { geminiEnabled, geminiJson } from './gemini';
-import { eventFeeAmount, platformFeeRule } from './platform';
 import { platformNameFromEnv } from './platform';
 
 export interface BestModelAnswer {
@@ -122,12 +121,10 @@ export async function answerWithBestModel(
  * top of it forbid the model from inventing anything beyond this text.
  */
 export function platformAssistantContext(): string {
-  const feeRule = platformFeeRule();
-  const fee500 = eventFeeAmount(500);
   return [
-    'WHAT NEPALICONCERT IS',
+    `WHAT ${platformNameFromEnv().toUpperCase()} IS`,
     `${platformNameFromEnv()} is a self-service ticketing platform for multiple independent event organizers.`,
-    `Organizer accounts are free; the platform charges a fee PER EVENT that follows the venue capacity the organizer sets — ${feeRule}, so a 500-person event costs ${fee500} — paid before that event can be published. Buyers pay organizers directly for tickets.`,
+    'Organizer accounts are free, and publishing is free — the platform charges nothing while it grows. Buyers pay organizers directly for tickets.',
     'The platform never holds, forwards, or touches ticket money — it is software access, not a payment service.',
     'Three areas: the public site for buyers, the organizer portal at /portal, and the platform admin at /admin.',
     'Door staff use time-limited scanner links at /scan — check-in only, no other access.',
@@ -135,12 +132,11 @@ export function platformAssistantContext(): string {
     'WHAT ORGANIZERS CAN DO (in their portal, always only for their own events)',
     '- Create and edit events: name, artist, description, date, venue address (buyers get an Open in Maps link).',
     '- Upload up to 12 photos and 6 short videos per event; either a photo or a video can be the cover. Visitors browse them in a swipeable gallery that opens full screen.',
-    '- Prefer a custom-designed page (festival landing page, sponsor logos, a look that is entirely their own)? The team designs it for them — organizers can send a request from the Contact page (/contact) or email the address shown there. The standard self-service page is already included in the per-event fee.',
+    '- Prefer a custom-designed page (festival landing page, sponsor logos, a look that is entirely their own)? The team designs it for them — organizers can send a request from the Contact page (/contact) or email the address shown there. The standard self-service page is free and already included.',
     '- Post organizer updates on the event page and maintain an FAQ section.',
     '- Set ticket tiers: names, prices, per-tier caps, and optional student-only tiers (student ID is checked at the door).',
     '- Design the page with a manual theme picker, or describe the vibe in plain words and let the AI page designer pick colors and write the headline, tagline, and highlights.',
     '- Enter their own payment details: an account holder and IBAN, and optionally a PayPal address as a second route. Ticket money arrives directly on whichever the buyer used — the platform never touches it.',
-    `- Pay the platform fee for that event (${feeRule}; the exact amount for their capacity is on the Publish tab, transferred to the platform with the event's own reference like EVENT-1A2B3C4D, also emailed to them); publishing stays locked until the platform confirms it arrived.`,
     '- Publish the event to the public feed; it gets its own page at /e/event-name.',
     '- Sell tickets: buyers reserve seats, then send the money to the organizer — bank transfer, or PayPal where the organizer offers it — with a personal payment reference like TICKETS-AB12CD34 (references containing S- mark student tickets).',
     '- Confirm payments: the organizer compares open reservations with their bank statement and confirms each payment with a two-step check (typing the last 4 characters of the reference), which mints QR tickets and emails them to the buyer automatically.',
@@ -150,13 +146,11 @@ export function platformAssistantContext(): string {
     '',
     'WHAT THE PLATFORM ADMIN DOES',
     '- Reads the account applications sent from /contact?intent=account and approves the genuine ones, which creates the account and emails the organizer a temporary password they must change on first sign-in.',
-    `- Confirms each event's fee, with the amount shown per event (two-step: click Fee received, then type the last 4 characters of the event's EVENT- reference), which unlocks publishing for that event and emails the organizer.`,
     '- Resets organizer passwords (a fresh one-time password is generated, and the organizer must replace it on their next sign-in) and can disable misbehaving accounts.',
     '',
     'PRICING',
     '- The organizer account is free and never expires.',
-    `- The platform fee is PER EVENT and follows that event's total capacity: ${feeRule}. A 500-capacity event costs ${fee500}, a 300-capacity event ${eventFeeAmount(300)}. It is paid by bank transfer before the event can be published.`,
-    '- The amount is quoted on the event\'s Publish tab and stays fixed once the fee is paid; while it is unpaid, changing the capacity changes the fee.',
+    '- Publishing an event is free — there is no platform fee of any kind.',
     '- Ticket prices are set freely by each organizer; the platform takes no cut of ticket sales.',
     '',
     'HOW TO GET AN ORGANIZER ACCOUNT',
@@ -164,7 +158,7 @@ export function platformAssistantContext(): string {
     '- Someone who wants to sell tickets applies at /contact?intent=account: name, email, and a few words about the event (optionally phone, what kind of event, when, where, and roughly how many people). It costs nothing to apply and no payment details are asked for.',
     '- A real person reads the application. If it looks right, the owner approves it, which creates the account and emails the applicant their sign-in email and a temporary password.',
     '- The organizer signs in at /portal/login with those details and is required to choose a new password before the portal opens — the emailed one only works once.',
-    '- The account itself is free. Money is only due per event: each event has its own reference (EVENT-…) shown on its Publish tab and emailed when they try to publish.',
+    '- The account itself is free, and so is publishing — nothing is ever due to the platform.',
     '- Anyone asking how to sign up should be pointed at /contact?intent=account, never at a signup form — none exists.',
     '',
     'HOW BUYERS PAY',

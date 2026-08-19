@@ -60,8 +60,6 @@ export default async function AdminDashboardPage() {
   const pendingOrganizers = organizers.filter((o) => o.status === 'pending').length;
   const events = listAllEvents();
   const publishedEvents = events.filter((e) => e.status === 'published').length;
-  // Events still owing the per-event platform fee — your outstanding revenue.
-  const feesDue = events.filter((e) => e.feeStatus !== 'paid' && e.status !== 'archived').length;
   // Account applications and "design my page for me" enquiries from /contact
   // still waiting for an answer.
   const newContactRequests = countNewContactRequests();
@@ -168,23 +166,12 @@ export default async function AdminDashboardPage() {
             </Link>
           </div>
         </div>
-        <div className={`stat-card anim-fade-up anim-d4${feesDue > 0 ? ' stat-card-alert' : ''}`}>
+        <div className="stat-card anim-fade-up anim-d4">
           <div className="stat-label">Events</div>
           <div className="stat-value">
             {publishedEvents} <span className="muted small">/ {events.length}</span>
           </div>
-          <div className="stat-sub">
-            published / total
-            {feesDue > 0 ? (
-              <>
-                {' '}
-                ·{' '}
-                <Link href="/admin/organizers" style={{ color: 'var(--accent)' }}>
-                  <strong>{feesDue} fee{feesDue === 1 ? '' : 's'} to confirm</strong>
-                </Link>
-              </>
-            ) : null}
-          </div>
+          <div className="stat-sub">published / total</div>
         </div>
       </div>
 

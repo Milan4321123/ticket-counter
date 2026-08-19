@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
-import { sendEventFeeInstructionsEmail, sendPayoutChangedEmail } from '@/lib/email';
+import { sendPayoutChangedEmail } from '@/lib/email';
 import {
   countPaidOrdersForEvent,
   deleteEventCompletely,
@@ -11,17 +11,16 @@ import {
   getMediaById,
   isValidPaypalAccount,
   makeUniqueSlug,
+  missingListingDetails,
   newId,
   parseCropRect,
   parsePageDesign,
-  quoteEventFee,
   videoEmbedUrl,
   type TierStatus,
   FOCUS_RE,
 } from '@/lib/events';
 import { readJsonLimited, BodyTooLargeError } from '@/lib/http';
 import { organizerTotpEnabled } from '@/lib/organizerTotp';
-import { formatMoney } from '@/lib/money';
 import {
   PAYOUT_DELAY_MS,
   effectivePayout,
@@ -36,7 +35,7 @@ import {
   summarisePayoutChange,
   verifyStepUpToken,
 } from '@/lib/payoutStepUp';
-import { eventFeeReference, platformBank } from '@/lib/platform';
+import { vocabFor } from '@/lib/vocab';
 import type { ApiErrorResponse } from '@/lib/types';
 import { planGate, requireOrganizerApi, requireOwnedEvent } from '../../auth';
 import { payoutStepUpChallenge } from '../../payout/method';
@@ -80,6 +79,8 @@ const TIER_KEY_RE = /^[a-z0-9-]{1,40}$/;
 const MAX_TIERS = 20;
 /** Keep in sync with the counter in the portal's AssistantPanel. */
 const MAX_ASSISTANT_CONTEXT = 4000;
+/** Collection details: a few lines of when and where, not an essay. */
+const MAX_PICKUP_INFO = 2000;
 
 /** Patch field -> column for the three hand-positioned photo slots. */
 const CROP_FIELDS = [
@@ -218,15 +219,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const merged = { ...event };
 
     /**
-     * The capacity this patch asks for, or null when it does not touch it.
-     *
-     * Kept so the UPDATE itself can carry the fee ceiling as a WHERE clause —
-     * the check above is the friendly error, this is the one that cannot be
-     * raced.
-     */
-    let capacityRequested: number | null = null;
-
-    /**
      * Changing WHICH photo fills a slot throws away the framing that went with
      * it: fractions measured on one picture mean something else entirely on the
      * next, so keeping them would show a slice of the new photo nobody chose.
@@ -275,6 +267,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if ('eventDate' in body) {
       const raw = body.eventDate;
       if (raw === null || raw === '') {
+        // Publishing REQUIRES this date (it starts the clock on the /privacy
+        // erasure promise), and that gate only runs on the draft->published
+        // transition — so clearing it afterwards would quietly reopen the very
+        // hole the gate closes. A published event keeps a date; unpublish first
+        // if it genuinely has to change. (merged.status is still the stored
+        // status here — the status branch runs later in this handler.)
+        need(
+          merged.kind === 'shop' || merged.status !== 'published',
+          'A published event needs its calendar date — take it offline first if the date must be cleared.'
+        );
         set('event_date', null);
         merged.eventDate = null;
       } else {
@@ -288,6 +290,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       set('venue_name', v);
       merged.venueName = v;
     }
+    // Shops only in practice — an event has a date and a venue for this job.
+    // Not gated on kind, though: the column is harmless on an event, and a
+    // silent refusal to save a field the form showed is worse than a stray one.
+    if ('pickupInfo' in body) {
+      const v = strField(body.pickupInfo, 'The collection details', MAX_PICKUP_INFO);
+      set('pickup_info', v);
+      merged.pickupInfo = v;
+    }
     if ('address' in body) {
       const v = strField(body.address, 'The address', 240);
       set('address', v);
@@ -300,32 +310,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
     if ('totalCapacity' in body) {
       const v = intField(body.totalCapacity, 'The total capacity', 1, 200000);
-      // The fee is priced per seat and freezes when the transfer is confirmed.
-      // Nothing used to stop the capacity being raised afterwards, so an event
-      // could be paid for at 100 seats and then sell 200,000 — the amount was
-      // frozen, but what it BOUGHT was not, which made the whole per-ticket
-      // model optional for anyone who noticed.
-      //
-      // Lowering it is always fine: selling fewer seats than you paid for is
-      // the organizer's own loss, and refusing it would trap someone who moved
-      // to a smaller room.
-      //
-      // Checked against a FRESH read, not the row loaded before the body was
-      // awaited. readJsonLimited drains the request with no timeout, so the
-      // organizer decides how long that snapshot stays stale: send the body one
-      // byte at a time across the moment the owner confirms the fee, and the
-      // held request would finish holding feeStatus 'unpaid' and write the
-      // raised capacity anyway. The write below is also made conditional in
-      // SQL, so even a race that slips past this line cannot land.
-      const feeNow = getEventById(event.id);
-      if (feeNow && feeNow.feeStatus === 'paid' && feeNow.feeCapacity !== null && v > feeNow.feeCapacity) {
-        need(
-          false,
-          `This event's fee covers ${feeNow.feeCapacity} tickets, which is what was paid for. ` +
-            `To sell more, get in touch and we will quote the difference — you can still lower it freely.`
-        );
-      }
-      capacityRequested = v;
       set('total_capacity', v);
       merged.totalCapacity = v;
     }
@@ -611,13 +595,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         keep.push({ tierKey, name, priceCents, cap, unlimited, status, studentOnly: r.studentOnly, description });
       }
 
+      // On a MIXED listing, a free tier must state a number. The room is one
+      // shared pool: an unlimited €0 tier beside priced ones lets free RSVPs
+      // quietly drain the seats the organizer meant to sell. All-free events
+      // keep unlimited — there is no paid inventory to protect there.
+      if (keep.some((t) => t.priceCents > 0)) {
+        const openEnded = keep.find((t) => t.priceCents === 0 && t.unlimited);
+        const units = vocabFor(merged.kind).units;
+        need(
+          !openEnded,
+          openEnded
+            ? `“${openEnded.name}” is free with no limit while other ${units} are priced — give it a fixed number, or the free spots can swallow the room the paid ${units} were meant to fill.`
+            : ''
+        );
+      }
+
       const keptKeys = new Set(keep.map((t) => t.tierKey));
       const removeKeys = existingTiers.map((t) => t.tierKey).filter((k) => !keptKeys.has(k));
       for (const key of removeKeys) {
         const gone = existingTiers.find((t) => t.tierKey === key)!;
         need(
           !tierHasOrders(event.id, key),
-          `“${gone.name}” already has orders, so it can't be removed. Set its ticket limit to 0 to stop new sales instead.`
+          `“${gone.name}” already has orders, so it can't be removed. Set its limit to 0 to stop new sales instead.`
         );
       }
       tiersPlan = { keep, removeKeys };
@@ -628,46 +627,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const status = body.status;
       need(status === 'draft' || status === 'published', 'Invalid status.');
       if (status === 'published' && event.status !== 'published') {
-        // The platform fee is charged PER EVENT and is the first gate: no
-        // transfer, no publishing. The attempt doubles as the trigger for the
-        // instructions email, so the IBAN and this event's Verwendungszweck
-        // land in the organizer's inbox exactly when they need them.
-        if (event.feeStatus !== 'paid') {
-          // Quoting here locks the amount, so the mail, the Publish tab, and the
-          // owner's confirm screen can never name three different numbers.
-          const feeAmount = formatMoney(quoteEventFee(event), 'EUR');
-          const bank = platformBank();
-          let emailed = false;
-          if (bank) {
-            const mail = await sendEventFeeInstructionsEmail(
-              { name: organizer.name, email: organizer.email },
-              { id: event.id, name: event.name },
-              { feeLabel: feeAmount, bank, reference: eventFeeReference(event.id) }
-            );
-            emailed = mail.sent;
-          }
-          throw new ValidationError(
-            `Almost there — this event still needs its ${feeAmount} platform fee. ` +
-              (emailed
-                ? `We just emailed the transfer details to ${organizer.email}, and they are on this Publish tab too. `
-                : 'The transfer details are right here on the Publish tab. ') +
-              'Once we see your transfer we unlock publishing — usually within a day.'
-          );
-        }
-
         const tierCount = tiersPlan ? tiersPlan.keep.length : existingTiers.length;
-        const missing: string[] = [];
-        if (!merged.dateDisplay.trim() && !merged.eventDate) missing.push('add a date');
-        if (!merged.venueName.trim() || !merged.address.trim()) missing.push('add the venue name and address');
-        if (tierCount < 1) missing.push('add at least one ticket type');
+        const v = vocabFor(merged.kind);
+        // Which details are compulsory depends on the kind, and that rule lives
+        // in lib/events beside the editor's progress ticks — a tick that says
+        // "done" must never disagree with what this gate accepts.
+        const missing = missingListingDetails(merged);
+        if (tierCount < 1) missing.push(`add at least one ${v.unitType}`);
         // One working payment route is the requirement, not specifically a
-        // bank one. See the same rule on the Publish tab and in the checkout.
+        // bank one — and only when there is something to pay FOR. A free
+        // event (every tier at zero) is an RSVP list; demanding an IBAN from
+        // the person running a free community evening would block exactly the
+        // organizer this platform most wants. The moment a priced tier
+        // appears, the requirement comes back.
+        const plannedTiers = tiersPlan ? tiersPlan.keep : existingTiers;
+        const hasPaidTier = plannedTiers.some((t) => t.priceCents > 0);
         const hasBank = Boolean(merged.bankIban.trim() && merged.bankAccountHolder.trim());
         const hasPaypal = Boolean((merged.paypalAccount ?? '').trim());
-        if (!hasBank && !hasPaypal) {
+        if (hasPaidTier && !hasBank && !hasPaypal) {
           missing.push('add a way to be paid — a bank account (holder and IBAN), or PayPal');
         }
-        if (!merged.description.trim()) missing.push('write a short description');
         // Publishing is the moment this account stops being a draft and starts
         // taking strangers' money, so it is where the second factor becomes
         // required rather than encouraged. Demanding it at sign-up would strand
@@ -681,7 +660,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         // enrolment BEFORE any money can be taken means a payout change on a
         // selling event always meets the strong factor instead.
         if (requireAuthenticatorToPublish() && !organizerTotpEnabled(organizer.id)) {
-          missing.push('set up your authenticator app in Settings — it is required before you can sell tickets');
+          missing.push(`set up your authenticator app in Settings — it is required before you can sell ${v.units}`);
         }
         need(missing.length === 0, `Almost there — before publishing, please ${missing.join(', ')}.`);
       }
@@ -696,6 +675,25 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }
     }
 
+    // A PUBLISHED listing with a priced tier must always have a way to be
+    // paid — checked on the merged post-patch state, not only at the moment
+    // of publishing. The publish gate alone left a hole: publish everything
+    // free (correctly needing no IBAN), then quietly add a price afterwards,
+    // and every buyer would hit "payment is not configured" while the
+    // organizer heard nothing. This runs on EVERY save that would leave the
+    // event published, so the warning lands at the moment the price is typed.
+    {
+      const plannedTiersNow = tiersPlan ? tiersPlan.keep : existingTiers;
+      const hasPaidTierNow = plannedTiersNow.some((t) => t.priceCents > 0);
+      const payable =
+        Boolean(merged.bankIban.trim() && merged.bankAccountHolder.trim()) ||
+        Boolean((merged.paypalAccount ?? '').trim());
+      need(
+        merged.status !== 'published' || !hasPaidTierNow || payable,
+        'This listing is live with a priced ticket, so it needs a way to be paid first — add a bank account (holder and IBAN) or PayPal, then set the price.'
+      );
+    }
+
     need(sets.length > 0 || tiersPlan !== null || delayPayout, 'Nothing to save.');
 
     // Fixed once, before the write, so the row, the record and the email all
@@ -704,23 +702,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const tx = db.transaction(() => {
       if (sets.length > 0) {
-        // The fee ceiling is enforced by SQLite, not by a value read earlier in
-        // this request: a paid event may only raise its capacity within what
-        // the fee bought, whatever any snapshot said. Nothing else about the
-        // patch changes, so a refusal here means the race was lost and the
-        // whole transaction is thrown away rather than half-applied.
-        const guard =
-          capacityRequested === null
-            ? ''
-            : ` AND (fee_status != 'paid' OR fee_capacity IS NULL OR ${capacityRequested} <= fee_capacity)`;
-        const changed = db
-          .prepare(`UPDATE events SET ${sets.join(', ')} WHERE id = ?${guard}`)
-          .run(...args, event.id).changes;
-        if (changed === 0 && capacityRequested !== null) {
-          throw new ValidationError(
-            'That capacity is more than this event has paid for. Reload the page and try again.'
-          );
-        }
+        db.prepare(`UPDATE events SET ${sets.join(', ')} WHERE id = ?`).run(...args, event.id);
       }
       if (tiersPlan) {
         const del = db.prepare(`DELETE FROM event_tiers WHERE event_id = ? AND tier_key = ?`);

@@ -5,6 +5,7 @@
 import nodemailer from 'nodemailer';
 import QRCode from 'qrcode';
 import { getBaseUrl } from './config';
+import { getDb } from './db';
 import {
   getEventById,
   getEventTier,
@@ -14,10 +15,10 @@ import {
   type EventRow,
 } from './events';
 import { formatMoney } from './money';
+import { vocabFor } from './vocab';
 import { getOrder, getOrderItems, getTicketsForOrder, paymentReference } from './orders';
 import { orderPayout } from './payout';
 import {
-  eventFeeAmount,
   bareAddress,
   emailFromBuyers,
   emailFromOrganizers,
@@ -26,10 +27,8 @@ import {
   platformWordmark,
   replyToBuyers,
   replyToOrganizers,
-  platformFeeLabel,
-  platformFeeRule,
-  type PlatformBank,
 } from './platform';
+import { whatsappShareUrl } from './whatsapp';
 import type { ContactRequestRow } from './contact';
 
 export function isEmailConfigured(): boolean {
@@ -78,6 +77,30 @@ function platformName(): string {
   return platformNameFromEnv();
 }
 
+/**
+ * The organizer's name, for buyer mails that need to say WHO is selling.
+ *
+ * Not decoration: buyers here wire money to a private account on this
+ * platform's word, and the mails must name the organizer as the party they are
+ * buying from — the platform is software only and never holds, sees, or
+ * confirms the money. Deliberately a direct query rather than an import from
+ * lib/organizers: that module pulls in next/headers for portal sessions, and
+ * this file also runs from background jobs outside any request (the same
+ * reason maskTail below is a local copy). Returns '' when the organizer cannot
+ * be found — and never throws — so a missing name degrades to "the organizer"
+ * instead of stopping a ticket mail.
+ */
+function organizerDisplayName(organizerId: string): string {
+  try {
+    const row = getDb().prepare(`SELECT name FROM organizers WHERE id = ?`).get(organizerId) as
+      | { name: string }
+      | undefined;
+    return row?.name?.trim() ?? '';
+  } catch {
+    return '';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Shared template pieces.
 //
@@ -119,6 +142,17 @@ const C = {
 };
 
 /** One-line venue string for emails ("Venue, City"). */
+/**
+ * The first non-empty line of a multi-line field.
+ *
+ * Collection details are a paragraph, and the slots a date used to sit in — a
+ * meta row, a stub header, a footer — hold one short line. The whole text is on
+ * the listing's page; this is the part that fits.
+ */
+function firstLineOf(text: string): string {
+  return text.split('\n').map((l) => l.trim()).find(Boolean) ?? '';
+}
+
 function venueDisplay(event: EventRow): string {
   return [event.venueName, event.city].filter(Boolean).join(', ');
 }
@@ -462,8 +496,11 @@ function ticketStubHtml(opts: {
   buyerName: string;
   eventName: string;
   when: string;
+  /** "Ticket" or "Collection code" — what this stub is, per lib/vocab. */
+  unitLabel: string;
 }): string {
-  const position = opts.total > 1 ? `Ticket ${opts.index} of ${opts.total}` : 'Your ticket';
+  const position =
+    opts.total > 1 ? `${opts.unitLabel} ${opts.index} of ${opts.total}` : `Your ${opts.unitLabel.toLowerCase()}`;
   return `
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="card stub" bgcolor="${C.card}" style="margin:0 0 16px;background-color:${C.card};border:1px solid ${C.line};border-radius:14px;">
         <tr>
@@ -511,6 +548,12 @@ export async function sendTicketEmail(
     const order = getOrder(orderId);
     if (!order) return { sent: false, reason: 'order-not-found' };
     if (order.status !== 'paid') return { sent: false, reason: 'order-not-paid' };
+    // The retention sweep replaces erased addresses with a reserved-.invalid
+    // one that can never be delivered to. Refusing here beats letting the
+    // transporter hard-bounce against a sending domain still earning trust.
+    if (order.buyerErasedAt || order.buyerEmail.trim().toLowerCase().endsWith('.invalid')) {
+      return { sent: false, reason: 'address-erased' };
+    }
 
     const tickets = getTicketsForOrder(orderId);
     if (tickets.length === 0) return { sent: false, reason: 'no-tickets' };
@@ -518,12 +561,23 @@ export async function sendTicketEmail(
     const event = getEventById(order.eventId);
     if (!event) return { sent: false, reason: 'event-not-found' };
     const venue = venueDisplay(event);
+    // A shop's buyer is being told to come and collect, not to turn up at a
+    // show — same QR, same scan, different sentence around it.
+    const v = vocabFor(event.kind);
+    const isShop = event.kind === 'shop';
+    const whenLine = isShop ? firstLineOf(event.pickupInfo) : event.dateDisplay;
     const items = getOrderItems(orderId);
     const hasStudentTickets = items.some((it) => getEventTier(event.id, it.tierId)?.studentOnly === true);
     const orderUrl = `${getBaseUrl()}/order/${orderId}`;
     const tierName = (tierId: string) => getEventTier(event.id, tierId)?.name ?? tierId;
     const total = formatMoney(order.totalCents, order.currency);
     const one = tickets.length === 1;
+    // Who confirmed the payment and issued these codes. The buyer paid the
+    // organizer's own account, and the organizer marked it received — this mail
+    // used to say only "payment received", which read as if the platform had
+    // taken the money. Falls back to "The organizer" when the account is gone.
+    const organizerName = organizerDisplayName(event.organizerId);
+    const confirmedBy = organizerName || 'The organizer';
 
     // Each QR rides along as an inline attachment: a data: URL would be
     // stripped by Gmail and Outlook, and a linked image would need the buyer to
@@ -548,23 +602,53 @@ export async function sendTicketEmail(
           tierName: tierName(t.tierId),
           buyerName: order.buyerName,
           eventName: event.name,
-          when: event.dateDisplay,
+          when: whenLine,
+          unitLabel: v.Code,
         })
       )
       .join('');
 
-    const ticketCount = one ? 'Your ticket is' : tickets.length === 2 ? 'Both tickets are' : `All ${tickets.length} tickets are`;
+    const ticketCount = one
+      ? `Your ${v.code} is`
+      : tickets.length === 2
+        ? `Both ${v.codes} are`
+        : `All ${tickets.length} ${v.codes} are`;
+    // A zero-total order was never paid for — it is a confirmed reservation,
+    // and thanking someone for a payment they did not make reads like a
+    // mistake on exactly the email they might forward around.
+    const isFreeOrder = order.totalCents === 0;
+    // The share link the order page also offers: no number, so WhatsApp's own
+    // picker chooses the group. The buyer holding fresh codes is the single
+    // best moment to ask, and an email survives to be re-found later.
+    const shareUrl =
+      event.status === 'published'
+        ? whatsappShareUrl(
+            isFreeOrder
+              ? `I'm going to ${event.name} — it's free! Reserve your spot: ${getBaseUrl()}/e/${event.slug}`
+              : `I just got my tickets for ${event.name}! Get yours: ${getBaseUrl()}/e/${event.slug}`
+          )
+        : null;
     const bodyHtml =
       pHtml(`Hi ${escapeHtml(order.buyerName)},`) +
       pHtml(
-        `Payment received — thank you! ${ticketCount} below. ` +
-          `Show the QR code at the door, we scan it, and you are in.`,
+        (isFreeOrder
+          ? `You're on the list! ${ticketCount} below. `
+          : `${escapeHtml(confirmedBy)}${organizerName ? ', the organizer,' : ''} has confirmed your payment — ` +
+            `thank you! ${ticketCount} below. `) +
+          (isShop
+            ? `Show the QR code when you collect and your order is handed over.`
+            : `Show the QR code at the door, we scan it, and you are in.`),
         20
       ) +
       stubsHtml +
-      pHtml(`Total paid: ${strong(total)}`, 20) +
-      buttonHtml(orderUrl, one ? 'Open your ticket online' : 'Open your tickets online') +
-      buttonNoteHtml('Same tickets, always up to date — handy for printing or if this email gets lost.') +
+      (isFreeOrder ? '' : pHtml(`Total paid: ${strong(total)}`, 20)) +
+      buttonHtml(orderUrl, `Open your ${one ? v.code : v.codes} online`) +
+      (shareUrl
+        ? smallHtml(
+            `Going with friends? <a href="${escapeHtml(shareUrl)}" style="color:${C.brandDeep};font-weight:700;">Share ${escapeHtml(event.name)} on WhatsApp</a> — it takes one tap.`
+          )
+        : '') +
+      buttonNoteHtml(`Same ${v.codes}, always up to date — handy for printing or if this email gets lost.`) +
       (hasStudentTickets
         ? `<div style="margin-top:20px;">${calloutHtml(
             `<strong>Student ticket${one ? '' : 's'}:</strong> bring a valid student ID for each student ticket. ` +
@@ -572,49 +656,61 @@ export async function sendTicketEmail(
           )}</div>`
         : '') +
       smallHtml(
-        `Each ticket admits one person and can be scanned once. A screenshot works just as well as paper — ` +
-          `just make sure the code is sharp. See you at the show!`
+        (isShop
+          ? `Each code covers one item and can be scanned once. A screenshot works just as well as paper — ` +
+            `just make sure the code is sharp. See you at collection!`
+          : `Each ticket admits one person and can be scanned once. A screenshot works just as well as paper — ` +
+            `just make sure the code is sharp. See you at the show!`)
       );
 
     const html = renderEmail({
-      title: `Your ticket${one ? '' : 's'} for ${event.name}`,
-      preheader: `Payment received. ${one ? 'Your QR ticket is' : `Your ${tickets.length} QR tickets are`} in this email — show ${one ? 'it' : 'them'} at the door.`,
-      kicker: 'Payment received',
+      title: `Your ${one ? v.code : v.codes} for ${event.name}`,
+      preheader:
+        `${isFreeOrder ? 'Reservation confirmed.' : 'Payment confirmed.'} ${one ? `Your QR ${v.code} is` : `Your ${tickets.length} QR ${v.codes} are`} in this email — ` +
+        `show ${one ? 'it' : 'them'} at ${v.where}.`,
+      kicker: isFreeOrder ? 'Reservation confirmed' : 'Payment confirmed',
       headline: event.name,
-      metaLines: [event.dateDisplay, venue],
+      metaLines: [whenLine, venue],
       bodyHtml,
       footerLines: [
-        `${escapeHtml(event.name)} · ${escapeHtml(event.dateDisplay)}`,
+        `${escapeHtml(event.name)}${whenLine ? ` · ${escapeHtml(whenLine)}` : ''}`,
         escapeHtml(venue),
         `Order ${escapeHtml(orderId)}`,
-        `You are getting this because you bought tickets on ${escapeHtml(platformName())}.`,
+        `You are getting this because you ordered on ${escapeHtml(platformName())}.`,
       ],
     });
 
     const text = renderText({
-      headline: `Payment received — thank you, ${order.buyerName}!`,
-      context: [event.name, event.dateDisplay, venue],
+      headline: isFreeOrder
+        ? `You're on the list, ${order.buyerName}!`
+        : `Payment confirmed — thank you, ${order.buyerName}!`,
+      context: [event.name, whenLine, venue],
       lines: [
         wrapText(
-          `${ticketCount} listed below. The QR codes are in the HTML version of this email — if you ` +
+          (isFreeOrder ? '' : `${confirmedBy}${organizerName ? ', the organizer,' : ''} has confirmed your payment. `) +
+            `${ticketCount} listed below. The QR codes are in the HTML version of this email — if you ` +
             `cannot see them, open your order page and show the code there.`
         ),
         '',
         ...tickets.flatMap((t, i) => [
-          tickets.length > 1 ? `TICKET ${i + 1} OF ${tickets.length}` : 'YOUR TICKET',
+          tickets.length > 1
+            ? `${v.Code.toUpperCase()} ${i + 1} OF ${tickets.length}`
+            : `YOUR ${v.Code.toUpperCase()}`,
           ...textRows([
             ['Code', t.code],
             ['Type', tierName(t.tierId)],
           ]),
           '',
         ]),
-        `Total paid: ${total}`,
-        '',
-        `Your tickets: ${orderUrl}`,
+        ...(isFreeOrder ? [] : [`Total paid: ${total}`, '']),
+        `Your ${v.codes}: ${orderUrl}`,
         '',
         wrapText(
-          'Each ticket admits one person and can be scanned once. A screenshot works just as ' +
-            'well as paper — just make sure the code is sharp.'
+          isShop
+            ? 'Each code covers one item and can be scanned once. A screenshot works just as ' +
+              'well as paper — just make sure the code is sharp.'
+            : 'Each ticket admits one person and can be scanned once. A screenshot works just as ' +
+              'well as paper — just make sure the code is sharp.'
         ),
         ...(hasStudentTickets
           ? [
@@ -625,14 +721,14 @@ export async function sendTicketEmail(
             ]
           : []),
       ],
-      footer: [`${event.name} · ${event.dateDisplay} · ${venue}`, `Order ${orderId}`],
+      footer: [[event.name, whenLine, venue].filter(Boolean).join(' · '), `Order ${orderId}`],
     });
 
     await createTransporter().sendMail({
       from: emailFromBuyers(),
       replyTo: replyToBuyers(),
       to: order.buyerEmail,
-      subject: `Your ${one ? 'ticket' : `${tickets.length} tickets`} for ${event.name}`,
+      subject: `Your ${one ? v.code : `${tickets.length} ${v.codes}`} for ${event.name}`,
       text,
       html,
       attachments,
@@ -683,8 +779,9 @@ function paypalNoteHtml(payee: PaypalPayee | null, reference: string, amount: st
             <span style="color:#34d399;font-weight:800;">Fastest: pay by PayPal</span><br>
             Send ${strong(escapeHtml(payee.handle))} ${strong(escapeHtml(amount))} and put
             ${strong(escapeHtml(reference))} in PayPal&#39;s message field. It arrives in seconds,
-            so your QR tickets can be sent straight away — a bank transfer takes 1&ndash;2 business
-            days. It reaches the same organizer either way: pay one way or the other, not both.
+            so the organizer can confirm your payment and your QR tickets go out straight away —
+            a bank transfer takes 1&ndash;2 business days. It reaches the same organizer either
+            way: pay one way or the other, not both.
           </td>
         </tr>
       </table>`;
@@ -698,9 +795,9 @@ function paypalNoteText(payee: PaypalPayee | null, reference: string, amount: st
     'FASTEST: PAY BY PAYPAL',
     wrapText(
       `Send ${payee.handle} ${amount} and put ${reference} in PayPal's message field. It ` +
-        `arrives in seconds, so your QR tickets can be sent straight away — a bank transfer takes ` +
-        `1-2 business days. It reaches the same organizer either way: pay one way or the other, ` +
-        `not both.`
+        `arrives in seconds, so the organizer can confirm your payment and your QR tickets go ` +
+        `out straight away — a bank transfer takes 1-2 business days. It reaches the same ` +
+        `organizer either way: pay one way or the other, not both.`
     ),
   ];
 }
@@ -738,6 +835,18 @@ export async function sendTransferInstructionsEmail(
     const payee = paypalPayee({ paypalAccount: payout.paypal });
     const offersPaypal = payee !== null;
 
+    // Whose account this is. The panel below prints an IBAN with no story
+    // around it, and the story matters: the buyer is paying the ORGANIZER's own
+    // account and buying from them — the platform never touches the money. The
+    // mail has to say so, plainly, before it asks anyone to transfer anything.
+    const organizerName = organizerDisplayName(event.organizerId);
+    const sellerIntroHtml = organizerName
+      ? `You are buying from ${strong(organizerName)}, the organizer of this event`
+      : `You are buying from the organizer of ${strong(event.name)}`;
+    const sellerIntroText = organizerName
+      ? `You are buying from ${organizerName}, the organizer of this event`
+      : `You are buying from the organizer of ${event.name}`;
+
     const venue = venueDisplay(event);
     const orderUrl = `${getBaseUrl()}/order/${orderId}`;
     const reference = paymentReference(orderId);
@@ -766,6 +875,10 @@ export async function sendTransferInstructionsEmail(
           `${strong(deadlineDisplay)} — everything you need is here.`,
         20
       ) +
+      pHtml(
+        `${sellerIntroHtml} — the payment details below are their own, and your money goes straight to them.`,
+        20
+      ) +
       paypalNoteHtml(payee, reference, amount) +
       panelHtml(amountRowHtml('Amount to transfer', amount) + detailRowsHtml(bankRows)) +
       referenceBoxHtml(
@@ -775,8 +888,8 @@ export async function sendTransferInstructionsEmail(
           `your tickets.${hasStudentTickets ? ' The <strong>S-</strong> marks an order with student tickets.' : ''}`
       ) +
       pHtml(
-        `Once the money lands — usually one or two working days — your QR tickets are emailed to you automatically. ` +
-          `Nothing else to do.`,
+        `Once the money lands — usually one or two working days — the organizer confirms your payment, and ` +
+          `your QR tickets are emailed to you the moment they do. Nothing else to do.`,
         20
       ) +
       buttonHtml(orderUrl, 'View your order') +
@@ -807,6 +920,10 @@ export async function sendTransferInstructionsEmail(
       headline: `Your tickets for ${event.name} are reserved, ${order.buyerName}!`,
       context: [event.dateDisplay, venue],
       lines: [
+        wrapText(
+          `${sellerIntroText} — the payment details below are their own, and your money goes straight to them.`
+        ),
+        '',
         wrapText(
           `To complete your order, ${offersPaypal ? 'send the money' : 'send a bank transfer'} by ${deadlineDisplay}:`
         ),
@@ -840,8 +957,9 @@ export async function sendTransferInstructionsEmail(
           : []),
         '',
         wrapText(
-          'Once the money lands — usually one or two working days — your QR tickets are ' +
-            'emailed to you automatically. Nothing else to do.'
+          'Once the money lands — usually one or two working days — the organizer confirms ' +
+            'your payment, and your QR tickets are emailed to you the moment they do. ' +
+            'Nothing else to do.'
         ),
         '',
         `Your order: ${orderUrl}`,
@@ -984,59 +1102,16 @@ export async function sendTransferReminderEmail(
 }
 
 // ---------------------------------------------------------------------------
-// Platform fee emails (organizer ← platform owner)
+// Organizer account emails (organizer ← platform owner)
 //
-// The platform's fee is charged PER EVENT: the organizer transfers it to the
-// platform's own account with the event's Verwendungszweck, and publishing
-// unlocks when the owner confirms the transfer. These three mails carry those
-// details into the organizer's inbox so they are never only on screen.
+// There used to be fee-instruction mails here too — the per-event fee, the
+// platform's own IBAN, an EVENT- Verwendungszweck. The platform is free while
+// it grows, so those mails are gone and no email names a price anywhere.
 // ---------------------------------------------------------------------------
-
-export interface FeePaymentDetails {
-  /**
-   * The headline figure: one event's own fee ('€50.00') where an event is
-   * known, or the pricing model ('from €15.00 per event') where none is.
-   */
-  feeLabel: string;
-  /** Caption above it. Defaults to 'Amount to transfer'. */
-  amountCaption?: string;
-  /** The PLATFORM's bank account (never an organizer's). */
-  bank: PlatformBank;
-  /** The Verwendungszweck to put in the transfer's purpose line. */
-  reference: string;
-}
 
 export interface OrganizerContact {
   name: string;
   email: string;
-}
-
-/**
- * Amount + the platform's bank details — the same box the organizer sees on
- * screen, so both match exactly.
- */
-function feeBankPanelHtml(details: FeePaymentDetails): string {
-  const { feeLabel, bank } = details;
-  const rows: DetailRow[] = [
-    { label: 'Account holder', value: bank.accountHolder },
-    { label: 'IBAN', value: bank.iban, mono: true },
-    ...(bank.bic ? [{ label: 'BIC', value: bank.bic, mono: true }] : []),
-    ...(bank.bankName ? [{ label: 'Bank', value: bank.bankName }] : []),
-  ];
-  return panelHtml(amountRowHtml(details.amountCaption ?? 'Amount to transfer', feeLabel) + detailRowsHtml(rows));
-}
-
-/** Plain-text twin of the bank box. */
-function feeBankBoxText(details: FeePaymentDetails): string[] {
-  const { feeLabel, bank, reference } = details;
-  return textRows([
-    ['Amount', feeLabel],
-    ['Account holder', bank.accountHolder],
-    ['IBAN', bank.iban],
-    ...(bank.bic ? ([['BIC', bank.bic]] as Array<[string, string]>) : []),
-    ...(bank.bankName ? ([['Bank', bank.bankName]] as Array<[string, string]>) : []),
-    ['Verwendungszweck', reference],
-  ]);
 }
 
 /**
@@ -1075,9 +1150,8 @@ export async function sendOrganizerCredentialsEmail(
       ) +
       buttonHtml(loginUrl, 'Sign in and set your password') +
       smallHtml(
-        `The account itself is free. You pay only when you publish an event, and the price follows the size of ` +
-          `your room: <strong>${escapeHtml(platformFeeRule())}</strong>, so a 500-person event costs ` +
-          `${escapeHtml(eventFeeAmount(500))}. No yearly fee, and we never take a cut of your ticket sales.`
+        `The account is free, and so is publishing — no fees at all, and we never take a cut of your ` +
+          `ticket sales. Buyers pay you directly.`
       ) +
       (contactEmail
         ? smallHtml(
@@ -1106,9 +1180,8 @@ export async function sendOrganizerCredentialsEmail(
         ),
         '',
         wrapText(
-          `The account itself is free. You pay only when you publish an event, and the price follows ` +
-            `the size of your room: ${platformFeeRule()}, so a 500-person event costs ${eventFeeAmount(500)}. ` +
-            `No yearly fee, and we never take a cut of your ticket sales.`
+          'The account is free, and so is publishing — no fees at all, and we never take a cut of ' +
+            'your ticket sales. Buyers pay you directly.'
         ),
         ...(contactEmail ? ['', wrapText(`Stuck? Reply to this email, or write to ${contactEmail}.`)] : []),
       ],
@@ -1141,169 +1214,6 @@ export async function sendOrganizerCredentialsEmail(
   }
 }
 
-/**
- * The fee for ONE event: sent when an organizer tries to publish an event whose
- * fee has not arrived yet, so the IBAN and that event's Verwendungszweck are in
- * their inbox while they open their banking app. Never throws.
- */
-export async function sendEventFeeInstructionsEmail(
-  organizer: OrganizerContact,
-  event: { id: string; name: string },
-  details: FeePaymentDetails
-): Promise<{ sent: boolean; reason?: string }> {
-  try {
-    if (!isEmailConfigured()) return { sent: false, reason: 'email-not-configured' };
-
-    const publishUrl = `${getBaseUrl()}/portal/events/${event.id}/edit?tab=publish`;
-    const { feeLabel, reference } = details;
-
-    const bodyHtml =
-      pHtml(`Hi ${escapeHtml(organizer.name)},`) +
-      pHtml(
-        `${strong(event.name)} is ready to go live. One thing left: the ${strong(feeLabel)} fee for it. ` +
-          `Here is everything your banking app needs.`,
-        20
-      ) +
-      feeBankPanelHtml(details) +
-      referenceBoxHtml(
-        'Verwendungszweck — required',
-        reference,
-        `Copy it into the purpose line exactly as shown. It is how your transfer finds ` +
-          `<strong>${escapeHtml(event.name)}</strong>.`
-      ) +
-      pHtml(`As soon as we see the money we unlock publishing — usually within a day — and email you.`, 20) +
-      buttonHtml(publishUrl, 'Open the Publish tab') +
-      smallHtml(
-        `Charged once for this event and based on the capacity you set (${escapeHtml(platformFeeRule())}). ` +
-          `It covers the lot: your page, QR tickets, door scanning and reminders. No commission on ticket sales.`
-      );
-
-    const text = renderText({
-      headline: `The fee for "${event.name}"`,
-      lines: [
-        `Hi ${organizer.name},`,
-        '',
-        wrapText(
-          `"${event.name}" is ready to go live. One thing left: the ${feeLabel} fee for it. ` +
-            `Here is everything your banking app needs.`
-        ),
-        '',
-        ...feeBankBoxText(details),
-        '',
-        wrapText(
-          `IMPORTANT: "${reference}" must go in the transfer's purpose line (Verwendungszweck). ` +
-            `It is how your transfer finds "${event.name}".`
-        ),
-        '',
-        wrapText('As soon as we see the money we unlock publishing — usually within a day — and email you.'),
-        '',
-        `Publish tab: ${publishUrl}`,
-      ],
-      footer: [
-        wrapText(
-          `Charged once for this event, based on the capacity you set (${platformFeeRule()}). ` +
-            `No commission on your ticket sales.`
-        ),
-      ],
-    });
-
-    await createTransporter().sendMail({
-      from: emailFromOrganizers(),
-      replyTo: replyToOrganizers(),
-      to: organizer.email,
-      subject: `Publish “${event.name}” — ${feeLabel} transfer details inside`,
-      text,
-      html: renderEmail({
-        title: `The fee for ${event.name}`,
-        preheader: `Transfer ${feeLabel} with reference ${reference} to unlock publishing for ${event.name}.`,
-        kicker: 'Almost live',
-        headline: `Your fee for ${event.name}`,
-        bodyHtml,
-        footerLines: [
-          `${escapeHtml(platformName())} · organizer portal`,
-          'You are getting this because you asked to publish this event.',
-        ],
-      }),
-    });
-    return { sent: true };
-  } catch (err) {
-    console.error('[email] Failed to send event fee instructions:', err instanceof Error ? err.message : err);
-    return { sent: false, reason: 'send-failed' };
-  }
-}
-
-/**
- * The platform owner confirmed an event's fee: publishing is unlocked.
- * Never throws — the portal shows the same state anyway.
- */
-export async function sendEventLiveEmail(
-  organizer: OrganizerContact,
-  event: { id: string; name: string }
-): Promise<{ sent: boolean; reason?: string }> {
-  try {
-    if (!isEmailConfigured()) return { sent: false, reason: 'email-not-configured' };
-
-    const publishUrl = `${getBaseUrl()}/portal/events/${event.id}/edit?tab=publish`;
-
-    const bodyHtml =
-      pHtml(`Hi ${escapeHtml(organizer.name)},`) +
-      pHtml(
-        `Your transfer arrived. The fee for ${strong(event.name)} is paid and publishing is unlocked.`,
-        20
-      ) +
-      pHtml(
-        `Open the Publish tab, give the page a last look, and press <strong>Publish event</strong>. It goes into ` +
-          `the public feed straight away and people can start reserving tickets.`,
-        20
-      ) +
-      buttonHtml(publishUrl, 'Publish your event') +
-      smallHtml(
-        `Ticket money goes straight to the bank account on your event — we never touch it. Good luck with the show!`
-      );
-
-    const text = renderText({
-      headline: `"${event.name}" can go live`,
-      lines: [
-        `Hi ${organizer.name},`,
-        '',
-        wrapText(`Your transfer arrived. The fee for "${event.name}" is paid and publishing is unlocked.`),
-        '',
-        wrapText(
-          'Open the Publish tab, give the page a last look, and press "Publish event". It goes into ' +
-            'the public feed straight away and people can start reserving tickets.'
-        ),
-        '',
-        `Publish tab: ${publishUrl}`,
-      ],
-      footer: [
-        wrapText('Ticket money goes straight to the bank account on your event — we never touch it. Good luck!'),
-      ],
-    });
-
-    await createTransporter().sendMail({
-      from: emailFromOrganizers(),
-      replyTo: replyToOrganizers(),
-      to: organizer.email,
-      subject: `“${event.name}” can go live now`,
-      text,
-      html: renderEmail({
-        title: `${event.name} can go live`,
-        preheader: `The fee for ${event.name} is confirmed — publishing is unlocked.`,
-        kicker: 'Fee confirmed',
-        headline: `${event.name} can go live`,
-        bodyHtml,
-        footerLines: [
-          `${escapeHtml(platformName())} · organizer portal`,
-          'You are getting this because you run this event.',
-        ],
-      }),
-    });
-    return { sent: true };
-  } catch (err) {
-    console.error('[email] Failed to send event-live email:', err instanceof Error ? err.message : err);
-    return { sent: false, reason: 'send-failed' };
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Buyer payment reminder — ONE friendly nudge when a transfer hasn't been
@@ -1348,8 +1258,9 @@ export async function sendBuyerPaymentReminderEmail(
     });
 
     const alreadyPaid =
-      'Bank transfers take a few days to land, and we confirm them by hand. You do not need to do anything, ' +
-      'and you certainly should not pay twice.';
+      "Bank transfers take a few days to land in the organizer's account, and the organizer confirms each " +
+      'one by hand once it shows up on their statement — we cannot see it for them. You do not need to do ' +
+      'anything, and you certainly should not pay twice.';
 
     const bankRows: DetailRow[] = [
       { label: 'Account holder', value: payout.holder },
@@ -1361,7 +1272,7 @@ export async function sendBuyerPaymentReminderEmail(
     const bodyHtml =
       pHtml(`Hi ${escapeHtml(order.buyerName)},`) +
       pHtml(
-        `Your seats are still held, but we have not seen your ${offersPaypal ? 'payment' : 'bank transfer'} yet.`,
+        `Your seats are still held, but the organizer has not confirmed your ${offersPaypal ? 'payment' : 'bank transfer'} yet.`,
         20
       ) +
       calloutHtml(`<strong>Already sent it?</strong> Then all is well. ${escapeHtml(alreadyPaid)}`) +
@@ -1378,11 +1289,11 @@ export async function sendBuyerPaymentReminderEmail(
         `Put this in the transfer&#39;s purpose line (&quot;Verwendungszweck&quot;) so your payment finds your tickets.`
       ) +
       buttonHtml(orderUrl, 'View your order') +
-      smallHtml('Your QR tickets arrive by email the moment the payment is confirmed.');
+      smallHtml('Your QR tickets arrive by email the moment the organizer confirms your payment.');
 
     const html = renderEmail({
       title: `Your tickets for ${event.name} are still reserved`,
-      preheader: `We have not seen your transfer for ${event.name} yet — the details are inside.`,
+      preheader: `The organizer has not confirmed your transfer for ${event.name} yet — the details are inside.`,
       kicker: 'Still reserved',
       headline: event.name,
       metaLines: [event.dateDisplay, venue],
@@ -1402,7 +1313,7 @@ export async function sendBuyerPaymentReminderEmail(
         `Hi ${order.buyerName},`,
         '',
         wrapText(
-          `Your seats are still held, but we have not seen your ${offersPaypal ? 'payment' : 'bank transfer'} yet.`
+          `Your seats are still held, but the organizer has not confirmed your ${offersPaypal ? 'payment' : 'bank transfer'} yet.`
         ),
         '',
         wrapText(`ALREADY SENT IT? Then all is well. ${alreadyPaid}`),
@@ -1429,7 +1340,7 @@ export async function sendBuyerPaymentReminderEmail(
         '',
         `Your order: ${orderUrl}`,
         '',
-        wrapText('Your QR tickets arrive by email the moment the payment is confirmed.'),
+        wrapText('Your QR tickets arrive by email the moment the organizer confirms your payment.'),
       ],
       footer: [`${event.name} · ${event.dateDisplay} · ${venue}`, `Order ${orderId}`],
     });
@@ -1581,7 +1492,6 @@ export async function sendContactRequestAck(
     if (!isEmailConfigured()) return { sent: false, reason: 'email-not-configured' };
 
     const name = platformName();
-    const feeLabel = platformFeeLabel();
     const contactEmail = platformContactEmail();
     const wantsAccount = request.kind === 'organizer-account';
 
@@ -1596,11 +1506,10 @@ export async function sendContactRequestAck(
       calloutHtml(
         wantsAccount
           ? `<strong>What happens next</strong><br>We read what you told us about your event. If it all looks ` +
-              `right we set your account up and email you the sign-in details. The account is free — you pay ` +
-              `only when you publish an event (${escapeHtml(feeLabel)}). Forgot to mention something? Just reply.`
+              `right we set your account up and email you the sign-in details. The account is free, and so is ` +
+              `publishing. Forgot to mention something? Just reply.`
           : `<strong>Good to know</strong><br>The standard event page — photos, video, ticket tiers, QR tickets ` +
-              `and door scanning — is already in the normal event fee (${escapeHtml(feeLabel)}). What we quote ` +
-              `you for is the design work on top.`
+              `and door scanning — is free and already included. What we quote you for is the design work on top.`
       ) +
       quoteHtml('What you sent us', multilineHtml(request.message)) +
       pHtml(
@@ -1623,11 +1532,10 @@ export async function sendContactRequestAck(
         wrapText(
           wantsAccount
             ? `WHAT HAPPENS NEXT: we read what you told us about your event. If it all looks right we set ` +
-                `your account up and email you the sign-in details. The account is free — you pay only when ` +
-                `you publish an event (${feeLabel}). Forgot to mention something? Just reply.`
+                `your account up and email you the sign-in details. The account is free, and so is publishing. ` +
+                `Forgot to mention something? Just reply.`
             : `GOOD TO KNOW: the standard event page (photos, video, ticket tiers, QR tickets and door ` +
-                `scanning) is already in the normal event fee (${feeLabel}). What we quote you for is the ` +
-                `design work on top.`
+                `scanning) is free and already included. What we quote you for is the design work on top.`
         ),
         '',
         'WHAT YOU SENT US',

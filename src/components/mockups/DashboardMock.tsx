@@ -13,9 +13,11 @@ export default function DashboardMock() {
       aria-label="Preview of the organizer dashboard: money received and awaiting payment at a glance, and an event card with a capacity meter and Edit, Orders and Check-in buttons."
     >
       <div className="mock-tilt">
-        <BrowserFrame url="nepaliconcert.com/portal">
+        <BrowserFrame url="martnepali.com/portal">
           <div className="mock-h1">Namaste, Anita</div>
-          <div className="mock-sub">Plan active &middot; 1 event live</div>
+          {/* No "Plan active": there is no plan or fee to be active — the
+              platform is free, and the mock must not imply otherwise. */}
+          <div className="mock-sub">1 event live &middot; tickets selling</div>
 
           <div className="mock-chips">
             <div className="mock-chip mock-chip-green">

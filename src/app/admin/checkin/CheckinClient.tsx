@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { CheckinResponse } from '@/lib/types';
+import type { CheckinResponse, EventKind } from '@/lib/types';
+import { vocabFor } from '@/lib/vocab';
 import styles from './checkin.module.css';
 
 type DetectedBarcode = { rawValue: string };
@@ -19,8 +20,8 @@ const RESULT_LABEL: Record<CheckinResponse['result'], string> = {
   already_checked_in: 'Already used',
   not_found: 'Not found',
   not_paid: 'Not paid',
-  mock_ticket: 'Test ticket',
-  wrong_event: 'Different event',
+  mock_ticket: 'Test code',
+  wrong_event: 'Wrong listing',
 };
 
 const RESULT_BADGE: Record<CheckinResponse['result'], string> = {
@@ -41,10 +42,20 @@ const RESULT_BADGE: Record<CheckinResponse['result'], string> = {
  */
 export default function CheckinClient({
   unauthorizedHref = '/portal/login',
+  kind = 'event',
 }: {
   /** Where to send the user when the session is no longer valid (401). */
   unauthorizedHref?: string;
+  /**
+   * What is being scanned. The scan itself is identical either way — same
+   * endpoint, same one-use rule — but "VALID — welcome!" is the wrong thing to
+   * shout at someone collecting a bag of momos. Defaults to 'event' so a caller
+   * that has not been taught about kinds behaves exactly as it always did.
+   */
+  kind?: EventKind;
 }) {
+  const v = vocabFor(kind);
+  const isShop = kind === 'shop';
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<CheckinResponse | null>(null);
@@ -196,7 +207,7 @@ export default function CheckinClient({
       <div className="card">
         <form onSubmit={onSubmit}>
           <div className="field">
-            <label htmlFor="checkin-code">Ticket code</label>
+            <label htmlFor="checkin-code">{v.Code} code</label>
             <input
               id="checkin-code"
               ref={inputRef}
@@ -208,12 +219,12 @@ export default function CheckinClient({
               autoCapitalize="characters"
               spellCheck={false}
               placeholder="XXXX-XXXX"
-              aria-label="Ticket code"
+              aria-label={`${v.Code} code`}
             />
           </div>
           <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={busy || !code.trim()}>
             {busy ? <span className="spinner" aria-hidden /> : null}
-            {busy ? 'Checking…' : 'Check in'}
+            {busy ? 'Checking…' : isShop ? 'Mark collected' : 'Check in'}
           </button>
         </form>
 
@@ -245,7 +256,7 @@ export default function CheckinClient({
         {netError && <div className="notice notice-error">{netError}</div>}
         {!netError && result?.result === 'ok' && (
           <div key={resultKey} className={`notice notice-success ${styles.result}`}>
-            <div className={styles.resultTitle}>VALID — welcome!</div>
+            <div className={styles.resultTitle}>{isShop ? 'VALID — hand it over!' : 'VALID — welcome!'}</div>
             <div className={styles.resultDetail}>
               {result.ticket?.tierName}
               {result.ticket?.buyerName ? ` · ${result.ticket.buyerName}` : ''}
@@ -257,7 +268,7 @@ export default function CheckinClient({
           <div key={resultKey} className={`notice notice-warn ${styles.result}`}>
             <div className={styles.resultTitle}>ALREADY USED</div>
             <div className={styles.resultDetail}>
-              Checked in at {result.checkedInAt} (UTC)
+              {isShop ? 'Collected' : 'Checked in'} at {result.checkedInAt} (UTC)
               {result.ticket?.buyerName ? ` · ${result.ticket.buyerName}` : ''}
             </div>
             {result.ticket?.code && <div className={`mono small ${styles.resultDetail}`}>{result.ticket.code}</div>}
@@ -265,7 +276,7 @@ export default function CheckinClient({
         )}
         {!netError && result?.result === 'not_found' && (
           <div key={resultKey} className={`notice notice-error ${styles.result}`}>
-            <div className={styles.resultTitle}>Ticket not found</div>
+            <div className={styles.resultTitle}>{v.Code} not found</div>
             <div className={styles.resultDetail}>Double-check the code and try again.</div>
           </div>
         )}
@@ -273,24 +284,26 @@ export default function CheckinClient({
           <div key={resultKey} className={`notice notice-error ${styles.result}`}>
             <div className={styles.resultTitle}>Order not paid</div>
             <div className={styles.resultDetail}>
-              This ticket belongs to an unpaid order
+              This {v.code} belongs to an unpaid order
               {result.ticket?.buyerName ? ` (${result.ticket.buyerName})` : ''}.
             </div>
           </div>
         )}
         {!netError && result?.result === 'wrong_event' && (
           <div className={`notice notice-error ${styles.result}`}>
-            <div className={styles.resultTitle}>Different event</div>
+            <div className={styles.resultTitle}>Somewhere else</div>
             <div className={styles.resultDetail}>
-              This ticket belongs to a different event — it is not valid at this door.
+              This {v.code} belongs to a different listing — it is not valid at {v.where}.
             </div>
           </div>
         )}
         {!netError && result?.result === 'mock_ticket' && (
           <div key={resultKey} className={`notice notice-error ${styles.result}`}>
-            <div className={styles.resultTitle}>TEST ticket — do not admit</div>
+            <div className={styles.resultTitle}>
+              TEST {v.code} — {isShop ? 'do not hand over' : 'do not admit'}
+            </div>
             <div className={styles.resultDetail}>
-              This ticket came from test mode; no real payment was made
+              This {v.code} came from test mode; no real payment was made
               {result.ticket?.buyerName ? ` (${result.ticket.buyerName})` : ''}.
             </div>
           </div>

@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import type { EventKind } from '@/lib/types';
+import { vocabFor } from '@/lib/vocab';
 import CopyButton from '@/components/CopyButton';
 
 interface ScanLink {
@@ -24,7 +26,16 @@ function validityLabel(hours: number): string {
  * Create time-limited door-scanner links for THIS event. Anyone with the link
  * can check tickets in for this event — and nothing else.
  */
-export default function ScanLinkCard({ eventId }: { eventId: string }) {
+export default function ScanLinkCard({
+  eventId,
+  kind = 'event',
+}: {
+  eventId: string;
+  /** Event or shop — decides who is described as doing the scanning. */
+  kind?: EventKind;
+}) {
+  const v = vocabFor(kind);
+  const isShop = kind === 'shop';
   const [busy, setBusy] = useState<number | null>(null);
   const [link, setLink] = useState<ScanLink | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +72,7 @@ export default function ScanLinkCard({ eventId }: { eventId: string }) {
     if (busy !== null || revoking) return;
     if (
       !window.confirm(
-        'Switch off every scanner link for this event?\n\nDoor staff using an old link are signed out right away. You can create a fresh link any time.'
+        `Switch off every scanner link for this ${v.listing}?\n\nAnyone using an old link is signed out right away. You can create a fresh link any time.`
       )
     ) {
       return;
@@ -92,15 +103,16 @@ export default function ScanLinkCard({ eventId }: { eventId: string }) {
   return (
     <div>
       <p className="muted small" style={{ marginTop: 0 }}>
-        Door staff scan tickets at the entrance without needing your password: create a time-limited scanner link and
-        share it with them. Anyone who opens it can check in tickets for <strong>this event only</strong> — nothing
-        else. Links switch off by themselves when the time is up.
+        {isShop ? 'Whoever hands orders over' : 'Door staff'} can scan {v.codes} without needing your
+        password: create a time-limited scanner link and share it with them. Anyone who opens it can scan{' '}
+        {v.codes} for <strong>this {v.listing} only</strong> — nothing else. Links switch off by themselves
+        when the time is up.
       </p>
 
       {error && <div className="notice notice-error">{error}</div>}
       {!error && revoked && (
         <div className="notice notice-success">
-          Done — every scanner link for this event is switched off. Create a new one whenever you need it.
+          Done — every scanner link for this {v.listing} is switched off. Create a new one whenever you need it.
         </div>
       )}
 

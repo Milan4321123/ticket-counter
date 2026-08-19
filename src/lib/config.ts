@@ -188,5 +188,18 @@ export function getPaymentMode(): PaymentMode {
 }
 
 export function getBaseUrl(): string {
-  return (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
+  const url = (process.env.NEXT_PUBLIC_BASE_URL || '').trim();
+  if (url) return url.replace(/\/$/, '');
+  // The localhost fallback is a dev convenience that must never travel: this
+  // value is baked into ticket emails, WhatsApp share links and the sitemap,
+  // and every one of those shipped with a dead localhost URL would fail in a
+  // stranger's hands, silently. Loud in production, quiet in dev — not a
+  // throw, because `next build` also runs with NODE_ENV=production and a
+  // build machine without the env set should still build.
+  if (process.env.NODE_ENV === 'production') {
+    console.error(
+      'NEXT_PUBLIC_BASE_URL is not set — outbound links (emails, WhatsApp shares, sitemap) are falling back to localhost. Set it before real buyers order.'
+    );
+  }
+  return 'http://localhost:3000';
 }

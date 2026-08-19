@@ -87,9 +87,11 @@ export default function PrivacyPage() {
           <div className="card anim-fade-up anim-d1">
             <h2 className="card-title">When your details are erased</h2>
             <p>
-              {BUYER_RETENTION_DAYS} days after the event&rsquo;s date, your name and your email
-              address are overwritten in our database automatically. It is not a flag or a hidden
-              row — the old values are gone and cannot be brought back.
+              {BUYER_RETENTION_DAYS} days after the event&rsquo;s date — or, for a shop order,{' '}
+              {BUYER_RETENTION_DAYS} days after you collect it (at the latest a year after you
+              paid, even if you never collect) — your name and your email address are overwritten
+              in our database automatically. It is not a flag or a hidden row — the old values are
+              gone and cannot be brought back.
             </p>
             <p style={{ marginBottom: 0 }}>
               What survives is arithmetic. The organizer keeps their ticket count, their takings and

@@ -52,6 +52,21 @@ export function whatsappUrl(raw: string, message?: string): string | null {
   return text ? `https://wa.me/${digits}?text=${encodeURIComponent(text)}` : `https://wa.me/${digits}`;
 }
 
+/**
+ * A share link with NO number: wa.me/?text=… opens WhatsApp's own contact
+ * picker, so the buyer chooses which group or friend hears about the event.
+ *
+ * This is the growth loop in one href. Every buyer who has just reserved is
+ * standing in exactly the WhatsApp groups the event's next buyers are in, and
+ * a pre-written message turns "I should tell people" into one tap. The text
+ * is composed server-side from the event's own name and URL — nothing user-
+ * typed rides along, so encodeURIComponent is the only escaping needed.
+ */
+export function whatsappShareUrl(text: string): string | null {
+  const t = (text ?? '').trim();
+  return t ? `https://wa.me/?text=${encodeURIComponent(t)}` : null;
+}
+
 /** `+49 170 1234567` — the number as a human reads it back, for display. */
 export function formatWhatsApp(raw: string): string {
   const digits = normalizeWhatsApp(raw);

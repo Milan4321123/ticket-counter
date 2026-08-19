@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { isAdminRequest } from '@/lib/auth';
 import { listContactRequests, type ContactRequestRow } from '@/lib/contact';
-import { platformContactEmail, platformFeeLabel } from '@/lib/platform';
+import { platformContactEmail } from '@/lib/platform';
 import ApproveAccountButton from './ApproveAccountButton';
 import MarkHandledButton from './MarkHandledButton';
 
@@ -179,9 +179,8 @@ export default async function AdminContactPage() {
         </div>
         <p className="muted small" style={{ marginTop: 0 }}>
           These are leads, not orders — nothing is charged and no account is created. A self-service
-          page is already covered by the standard event fee ({platformFeeLabel()}); what these
-          organizers are asking for is design work on top of it. Reply by email, then mark it handled
-          here.
+          page is free and already included; what these organizers are asking for is design work on
+          top of it. Reply by email, then mark it handled here.
         </p>
 
         {enquiries.length === 0 ? (

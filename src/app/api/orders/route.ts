@@ -4,9 +4,18 @@ import { getEventById, getEventTier, getEventTiers, type EventRow } from '@/lib/
 import { readsAsComingSoon } from '@/lib/ticketState';
 import { getAvailability, SoldOutError } from '@/lib/inventory';
 import { effectivePayout } from '@/lib/payout';
-import { heldUnpaidTicketsForEmail, createOrder, expireOverdueTransferReservations, markOrderFailed, setPaypalOrderId } from '@/lib/orders';
+import {
+  createOrder,
+  expireOverdueTransferReservations,
+  finalizePaidOrder,
+  freeTicketsForEmail,
+  heldUnpaidTicketsForEmail,
+  markOrderFailed,
+  setPaypalOrderId,
+  type PaymentMethod,
+} from '@/lib/orders';
 import { createPaypalOrder } from '@/lib/paypal';
-import { sendTransferInstructionsEmail } from '@/lib/email';
+import { sendTicketEmail, sendTransferInstructionsEmail } from '@/lib/email';
 import { clientIp, rateLimit } from '@/lib/ratelimit';
 import { BodyTooLargeError, readJsonLimited } from '@/lib/http';
 import type { ApiErrorResponse, CreateOrderRequest, CreateOrderResponse } from '@/lib/types';
@@ -20,6 +29,8 @@ function apiError(status: number, code: ApiErrorResponse['code'], error: string)
 interface ValidatedOrder {
   buyerName: string;
   buyerEmail: string;
+  /** Optional: whose name the payment will show up under. '' when not given. */
+  payerName: string;
   items: { tierId: string; quantity: number }[];
   totalQuantity: number;
 }
@@ -44,6 +55,16 @@ function validateBody(raw: unknown, event: EventRow): ValidatedOrder | string {
   const buyerEmail = typeof body.buyerEmail === 'string' ? body.buyerEmail.trim() : '';
   if (buyerEmail.length === 0 || buyerEmail.length > 200 || !EMAIL_RE.test(buyerEmail)) {
     return 'Please enter a valid email address — your tickets will be sent there.';
+  }
+
+  // Optional, and sanitised exactly like the buyer's own name — it lands in the
+  // same emails and the same organizer-facing lists.
+  const payerName =
+    typeof body.payerName === 'string'
+      ? body.payerName.replace(/[\u0000-\u001F\u007F]+/g, ' ').replace(/\s+/g, ' ').trim()
+      : '';
+  if (payerName.length > 120) {
+    return 'That payer name is too long (up to 120 characters).';
   }
 
   if (!Array.isArray(body.items) || body.items.length === 0) {
@@ -76,7 +97,7 @@ function validateBody(raw: unknown, event: EventRow): ValidatedOrder | string {
     return `You can buy at most ${maxTicketsPerOrder} tickets per order.`;
   }
 
-  return { buyerName, buyerEmail, items, totalQuantity };
+  return { buyerName, buyerEmail, payerName, items, totalQuantity };
 }
 
 export async function POST(req: Request) {
@@ -125,6 +146,42 @@ export async function POST(req: Request) {
       return apiError(400, 'VALIDATION', validated);
     }
 
+    // Per-ADDRESS throttle, independent of IP. The free path sends a branded
+    // email with QR attachments to whatever address is typed, instantly and
+    // unauthenticated — without this, one script rotating IPs could use the
+    // platform as a mail cannon against a single inbox. Five in fifteen
+    // minutes never touches a real buyer (even one fixing a typo twice).
+    if (!rateLimit(`orders:email:${validated.buyerEmail.toLowerCase()}`, 5, 15 * 60_000)) {
+      return apiError(
+        429,
+        'INTERNAL',
+        'Several orders were just placed with this email address — please wait a few minutes and try again.'
+      );
+    }
+
+    // Priced HERE, from the tiers, exactly as createOrder prices it again —
+    // never from the browser. A zero total is an RSVP: mode 'free', finalized
+    // in this same request, and it bypasses the payment-config checks below
+    // because an event that charges nothing has nothing to configure.
+    const orderTotalCents = validated.items.reduce((sum, it) => {
+      const tier = getEventTier(event.id, it.tierId);
+      return sum + (tier ? tier.priceCents : 0) * it.quantity;
+    }, 0);
+    const isFree = orderTotalCents === 0;
+
+    // The browser states the total it SHOWED the buyer. On mismatch, refuse
+    // before anything is claimed: an organizer repricing a tier mid-checkout
+    // must not silently turn "free" into a €50 transfer order — or the
+    // reverse — behind the buyer's back.
+    const expected = (raw as Partial<CreateOrderRequest>).expectedTotalCents;
+    if (typeof expected === 'number' && Number.isFinite(expected) && Math.round(expected) !== orderTotalCents) {
+      return apiError(
+        409,
+        'VALIDATION',
+        'Prices for this event were just updated — please review your order and try again.'
+      );
+    }
+
     // Global backstop against distributed/spoofed-IP floods. 300 valid order
     // creations per minute is far above any human peak.
     if (!rateLimit('orders:all', 300, 60_000)) {
@@ -168,8 +225,14 @@ export async function POST(req: Request) {
     // complete answer on its own — a script can vary the address — but it turns
     // "reserve the event from one script" into "keep hundreds of distinct
     // mailboxes alive", and it costs a real buyer nothing.
-    if (getPaymentMode() === 'transfer') {
-      const alreadyHeld = heldUnpaidTicketsForEmail(event.id, validated.buyerEmail);
+    if (getPaymentMode() === 'transfer' || isFree) {
+      // Both counters together: unpaid transfer holds AND already-RSVP'd free
+      // seats. A free order finalizes instantly, so without its own count one
+      // address could RSVP a free event into "sold out" with nothing ever
+      // expiring the seats back — see freeTicketsForEmail.
+      const alreadyHeld =
+        heldUnpaidTicketsForEmail(event.id, validated.buyerEmail) +
+        (isFree ? freeTicketsForEmail(event.id, validated.buyerEmail) : 0);
       const wanted = validated.totalQuantity;
       // Also bounded by the room. Derived only from maxPerOrder, the ceiling
       // could exceed a small event's whole capacity — a 12-seat event with a
@@ -181,9 +244,13 @@ export async function POST(req: Request) {
         return apiError(
           409,
           'VALIDATION',
-          `You already have ${alreadyHeld} ticket${alreadyHeld === 1 ? '' : 's'} reserved for this event that ` +
-            `the organizer has not confirmed as paid yet. A transfer can take a day or two to show up — please ` +
-            `wait for those to be confirmed, or ask the organizer to release them, before reserving more.`
+          isFree
+            ? `This email address already has ${alreadyHeld} spot${alreadyHeld === 1 ? '' : 's'} reserved for ` +
+              `this event. If you are booking for a bigger group, ask the others to reserve with their own ` +
+              `email addresses — it keeps spots from being held in one name.`
+            : `You already have ${alreadyHeld} ticket${alreadyHeld === 1 ? '' : 's'} reserved for this event that ` +
+              `the organizer has not confirmed as paid yet. A transfer can take a day or two to show up — please ` +
+              `wait for those to be confirmed, or ask the organizer to release them, before reserving more.`
         );
       }
     }
@@ -210,7 +277,7 @@ export async function POST(req: Request) {
       return apiError(409, 'SOLD_OUT', msg);
     }
 
-    const mode = getPaymentMode();
+    const mode: PaymentMethod = isFree ? 'free' : getPaymentMode();
     if (mode === 'paypal' && !hasPaypalCredentials()) {
       return apiError(500, 'INTERNAL', 'Payment is not configured yet — please try again later or contact the organizer.');
     }
@@ -233,6 +300,7 @@ export async function POST(req: Request) {
         eventId: event.id,
         buyerName: validated.buyerName,
         buyerEmail: validated.buyerEmail,
+        payerName: validated.payerName,
         items: validated.items,
         paymentMode: mode,
       });
@@ -241,6 +309,18 @@ export async function POST(req: Request) {
         return apiError(409, 'SOLD_OUT', 'Those tickets were taken just before you — please adjust your order.');
       }
       throw e;
+    }
+
+    if (mode === 'free') {
+      // Nothing to wait for: no money is coming, so the order is finalized in
+      // the same request — codes minted, status 'paid' — and the buyer lands
+      // on an order page that already shows their tickets. The email is
+      // fire-and-forget for the same reason the transfer one is: the page,
+      // not the inbox, is the delivery that must not fail.
+      finalizePaidOrder(order.id, null);
+      void sendTicketEmail(order.id)
+        .then((emailResult) => console.log(`Ticket email for free order ${order.id}:`, emailResult))
+        .catch((e) => console.error(`Ticket email for free order ${order.id} threw unexpectedly:`, e));
     }
 
     if (mode === 'transfer') {

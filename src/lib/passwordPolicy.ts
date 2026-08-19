@@ -43,6 +43,10 @@ export const MAX_PASSWORD_LENGTH = 200;
 const WEAK = [
   'password',
   'passwort',
+  'martnepali',
+  'nepalimart',
+  // Old brand names stay on the list: a password does not stop being guessable
+  // because the site renamed itself around it.
   'nepaliconcert',
   'nepalievents',
   'nepalconcert',

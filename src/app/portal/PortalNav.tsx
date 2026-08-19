@@ -1,12 +1,16 @@
 import Link from 'next/link';
 import Logo from '@/components/Logo';
 import LogoutButton from './LogoutButton';
+import type { EventKind } from '@/lib/types';
+import { vocabFor } from '@/lib/vocab';
 
 interface PortalNavEvent {
   id: string;
   name: string;
   slug: string;
   published: boolean;
+  /** Event or shop — decides what the scanning tab is called. See lib/vocab. */
+  kind: EventKind;
 }
 
 interface Props {
@@ -72,7 +76,7 @@ export default function PortalNav({ active, event, tab }: Props) {
                 href={`/portal/events/${event.id}/checkin`}
                 className={`portal-tab${tab === 'checkin' ? ' portal-tab-active' : ''}`}
               >
-                Check-in
+                {vocabFor(event.kind).Redeem}
               </Link>
               {/* Always present. On a draft it opens the private preview, which
                   is the whole point: check the page, THEN decide to publish. */}

@@ -70,7 +70,7 @@ export default function LoginForm() {
       }
       if (res.ok) {
         // Right password, but the account isn't switched on yet — show them
-        // the welcome page with the fee details instead of the portal.
+        // the welcome page that explains the activation step instead of the portal.
         if (data?.pending && data.organizerId) {
           router.push(`/organizers/pay?id=${encodeURIComponent(data.organizerId)}`);
           return;

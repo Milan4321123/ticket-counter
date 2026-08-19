@@ -1,6 +1,8 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import type { EventKind } from '@/lib/types';
+import { vocabFor } from '@/lib/vocab';
 import { useRouter } from 'next/navigation';
 import { saveEvent, type SavedTier } from './save';
 
@@ -17,6 +19,8 @@ interface Row {
 
 interface Props {
   eventId: string;
+  /** Event or shop — decides whether these rows are ticket types or items. */
+  kind: EventKind;
   initialTiers: SavedTier[];
   /** Tickets sold so far, by tier key — sold tiers can't be removed. */
   soldByTierKey: Record<string, number>;
@@ -35,8 +39,9 @@ function toRow(t: SavedTier): Row {
   };
 }
 
-export default function TiersEditor({ eventId, initialTiers, soldByTierKey }: Props) {
+export default function TiersEditor({ eventId, kind, initialTiers, soldByTierKey }: Props) {
   const router = useRouter();
+  const v = vocabFor(kind);
   const [rows, setRows] = useState<Row[]>(initialTiers.map(toRow));
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -58,7 +63,7 @@ export default function TiersEditor({ eventId, initialTiers, soldByTierKey }: Pr
     if (
       row?.tierKey &&
       !window.confirm(
-        `Remove the ticket type "${row.name.trim() || 'Untitled'}"?\n\nIt is taken off sale when you press "Save ticket types".`
+        `Remove the ${v.unitType} "${row.name.trim() || 'Untitled'}"?\n\nIt is taken off sale when you press "Save ${v.unitTypes}".`
       )
     ) {
       return;
@@ -85,7 +90,7 @@ export default function TiersEditor({ eventId, initialTiers, soldByTierKey }: Pr
     for (const row of rows) {
       const name = row.name.trim();
       if (!name) {
-        setError('Every ticket type needs a name.');
+        setError(`Every ${v.unitType} needs a name.`);
         return;
       }
       const priceNum = Number(row.price.replace(',', '.'));
@@ -138,7 +143,7 @@ export default function TiersEditor({ eventId, initialTiers, soldByTierKey }: Pr
       {error && <div className="notice notice-error">{error}</div>}
 
       {rows.length === 0 && (
-        <p className="muted">No ticket types yet — add your first one below (you need at least one to publish).</p>
+        <p className="muted">No {v.unitTypes} yet — add your first one below (you need at least one to publish).</p>
       )}
 
       {rows.map((row, i) => {
@@ -184,7 +189,7 @@ export default function TiersEditor({ eventId, initialTiers, soldByTierKey }: Pr
                 />
               </div>
               <div className="field" style={{ marginBottom: 10 }}>
-                <label htmlFor={`tier-cap-${i}`}>Ticket limit</label>
+                <label htmlFor={`tier-cap-${i}`}>{kind === 'shop' ? 'How many you have' : 'Ticket limit'}</label>
                 <input
                   id={`tier-cap-${i}`}
                   className="input"
@@ -217,7 +222,7 @@ export default function TiersEditor({ eventId, initialTiers, soldByTierKey }: Pr
                     shows on the event page — no event-wide setting overrules it. */}
                 <div className="field" style={{ marginTop: 10, marginBottom: 0 }}>
                   <label htmlFor={`tier-status-${i}`} className="small">
-                    This ticket is
+                    This {v.unit} is
                   </label>
                   <select
                     id={`tier-status-${i}`}
@@ -265,7 +270,7 @@ export default function TiersEditor({ eventId, initialTiers, soldByTierKey }: Pr
                 value={row.description}
                 onChange={(e) => patchRow(i, { description: e.target.value })}
                 maxLength={300}
-                placeholder="What does this ticket include?"
+                placeholder={kind === 'shop' ? 'What is in it?' : 'What does this ticket include?'}
               />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
@@ -300,11 +305,11 @@ export default function TiersEditor({ eventId, initialTiers, soldByTierKey }: Pr
 
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <button type="button" className="btn btn-sm" onClick={addRow} disabled={busy || rows.length >= 20}>
-          + Add ticket type
+          + Add {v.unitType}
         </button>
         <button type="submit" className="btn btn-brand" disabled={busy}>
           {busy ? <span className="spinner" aria-hidden /> : null}
-          {busy ? 'Saving…' : 'Save ticket types'}
+          {busy ? 'Saving…' : `Save ${v.unitTypes}`}
         </button>
         {saved && <span className="badge badge-green">Saved ✓</span>}
       </div>

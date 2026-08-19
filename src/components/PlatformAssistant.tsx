@@ -1,7 +1,7 @@
 import ChatWidget from './ChatWidget';
 
 /**
- * The platform-wide floating assistant: answers "how does NepaliConcert
+ * The platform-wide floating assistant: answers "how does MartNepali
  * work?" questions against POST /api/platform/ask, which replies with
  * {kind:'answered',answer} or {kind:'unsure',message} — ChatWidget renders
  * both. Mounted on the public feed and the organizer dashboard; any other

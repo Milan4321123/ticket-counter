@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS orders (
   paypal_order_id TEXT UNIQUE,
   status TEXT NOT NULL DEFAULT 'pending', -- pending | claimed | paid | failed | cancelled
   buyer_name TEXT NOT NULL,
+  payer_name TEXT NOT NULL DEFAULT '',    -- whose name the money will arrive under, when not the buyer's
+  confirmed_via TEXT NOT NULL DEFAULT '', -- reference | sender: how the organizer matched the payment
   buyer_email TEXT NOT NULL,
   total_cents INTEGER NOT NULL,
   currency TEXT NOT NULL,
@@ -106,12 +108,14 @@ CREATE TABLE IF NOT EXISTS events (
   organizer_id TEXT NOT NULL REFERENCES organizers(id),
   slug TEXT NOT NULL UNIQUE,
   status TEXT NOT NULL DEFAULT 'draft',   -- draft | published | archived
+  kind TEXT NOT NULL DEFAULT 'event',     -- event (dated, venued) | shop (pickup_info instead)
   name TEXT NOT NULL,
   artist TEXT NOT NULL DEFAULT '',
   description TEXT NOT NULL DEFAULT '',
   date_display TEXT NOT NULL DEFAULT '',
   event_date TEXT,                        -- 'YYYY-MM-DD' for feed ordering (optional)
   venue_name TEXT NOT NULL DEFAULT '',
+  pickup_info TEXT NOT NULL DEFAULT '',   -- shops only: where and when to collect
   address TEXT NOT NULL DEFAULT '',       -- full street address (feeds the Open-in-Maps link)
   city TEXT NOT NULL DEFAULT '',
   currency TEXT NOT NULL DEFAULT 'EUR',
@@ -460,6 +464,55 @@ function migrateToPlatform(db: Database.Database): void {
     db.exec(`ALTER TABLE events ADD COLUMN capacity_unlimited INTEGER NOT NULL DEFAULT 0`);
   } else {
     db.exec(`UPDATE events SET capacity_unlimited = 0 WHERE capacity_unlimited != 0`);
+  }
+
+  // Who the money will actually arrive from.
+  //
+  // A payment reference is the reliable way to match a transfer to an order,
+  // and on a bank transfer it is filled in for the buyer by the GiroCode. On
+  // PayPal it is not: a PayPal.Me link carries the amount and has nowhere to
+  // put a reference, so plenty of buyers pay with no reference at all and the
+  // organizer is left looking at a name and an amount.
+  //
+  // payer_name is the buyer's own answer to "whose name will this show up
+  // under" — for anyone paying from a partner's, a parent's or a shared
+  // account, where even the buyer's own name would not have matched. Optional
+  // and usually '': most people pay from an account in their own name, and
+  // asking is a courtesy, not a requirement.
+  const orderCols2 = (db.pragma(`table_info(orders)`) as { name: string }[]).map((c) => c.name);
+  if (!orderCols2.includes('payer_name')) {
+    db.exec(`ALTER TABLE orders ADD COLUMN payer_name TEXT NOT NULL DEFAULT ''`);
+  }
+  // Which of the two routes the organizer used to confirm — 'reference' or
+  // 'sender'. Recorded rather than inferred, so a disputed order can be asked
+  // what the person confirming it actually matched on.
+  if (!orderCols2.includes('confirmed_via')) {
+    db.exec(`ALTER TABLE orders ADD COLUMN confirmed_via TEXT NOT NULL DEFAULT ''`);
+  }
+
+  // What KIND of thing this listing is. Everything here began life as an event
+  // — a thing that happens once, at a place, on a date — and the whole model
+  // underneath (a page, priced types with a cap, an order, a QR code, someone
+  // scanning it at the door) turned out to describe a small shop just as well:
+  // a seller lists items, a buyer pays ahead, and the code is what they show
+  // when they come to collect.
+  //
+  //   event — dated and venued. Unchanged, and the default, so every row that
+  //           predates this column is exactly what it always was.
+  //   shop  — no date and no venue; pickup_info says where and when to collect
+  //           instead. Sells items rather than tickets.
+  //
+  // Deliberately ONE table rather than a parallel one: the page, gallery,
+  // posts, FAQ, assistant, orders, payouts and scanning are identical for
+  // both, and splitting them would mean maintaining each of those twice to
+  // buy nothing but a tidier-looking schema.
+  if (!eventCols.includes('kind')) {
+    db.exec(`ALTER TABLE events ADD COLUMN kind TEXT NOT NULL DEFAULT 'event'`);
+  }
+  // Free text: where to collect, and when. A shop's answer to the venue block
+  // and the date, which is why publishing a shop asks for this and not those.
+  if (!eventCols.includes('pickup_info')) {
+    db.exec(`ALTER TABLE events ADD COLUMN pickup_info TEXT NOT NULL DEFAULT ''`);
   }
 
   // Who asked a question, so the answer can be emailed back rather than only

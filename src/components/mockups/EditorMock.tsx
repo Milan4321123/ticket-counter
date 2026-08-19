@@ -15,7 +15,7 @@ export default function EditorMock() {
       aria-label="Preview of the event editor: a seven-step sidebar from Details to Publish, a form with the event name, date and venue filled in, photo thumbnails and a Save button."
     >
       <div className="mock-tilt">
-        <BrowserFrame url="nepaliconcert.com/portal/events/7/edit">
+        <BrowserFrame url="martnepali.com/portal/events/7/edit">
           <div className="mock-editor">
             <div className="mock-steps">
               {STEPS.map((label, i) => (

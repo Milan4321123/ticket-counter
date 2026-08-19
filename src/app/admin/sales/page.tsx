@@ -110,12 +110,9 @@ export default async function AdminSalesPage() {
           </span>
         </p>
         <p className="muted small" style={{ margin: '8px 0 0' }}>
-          This is your customers&rsquo; ticket money, not yours — it goes straight to their bank
-          accounts and the platform never touches it. Your own revenue is the per-event fee, under{' '}
-          <Link href="/admin/organizers" style={{ color: 'var(--accent)' }}>
-            Organizers → Event fees
-          </Link>
-          .
+          This is the organizers&rsquo; ticket money, not yours — it goes straight to their bank
+          accounts and the platform never touches it. The platform is free and takes nothing from
+          it.
         </p>
       </div>
 
@@ -146,7 +143,6 @@ export default async function AdminSalesPage() {
                   <tr>
                     <th>Event</th>
                     <th>Status</th>
-                    <th>Fee</th>
                     <th>Tickets</th>
                     <th>Revenue</th>
                     <th>Awaiting transfer</th>
@@ -171,11 +167,6 @@ export default async function AdminSalesPage() {
                           }`}
                         >
                           {event.status}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={`badge ${event.feeStatus === 'paid' ? 'badge-green' : 'badge-amber'}`}>
-                          {event.feeStatus}
                         </span>
                       </td>
                       <td>

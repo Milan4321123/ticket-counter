@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import CheckinClient from '@/app/admin/checkin/CheckinClient';
+import type { EventKind } from '@/lib/types';
 
 type Status = 'checking' | 'ready' | 'invalid';
 
@@ -10,7 +11,19 @@ type Status = 'checking' | 'ready' | 'invalid';
  * (#k=...) for a scanner cookie, or — when opened without a key — checks
  * whether a valid scanner cookie / admin session already exists.
  */
-export default function ScanClient({ eventName }: { eventName: string | null }) {
+export default function ScanClient({
+  eventName,
+  kind = 'event',
+}: {
+  eventName: string | null;
+  /**
+   * Resolved server-side from the scanner cookie's event. On a fresh link the
+   * cookie does not exist yet, so this is the default until the session
+   * exchange lands — and 'event' is the safe default to be wrong with, since it
+   * is what every listing was before shops existed.
+   */
+  kind?: EventKind;
+}) {
   const [status, setStatus] = useState<Status>('checking');
   const [message, setMessage] = useState<string | null>(null);
   // Server-known name (from the scanner cookie), possibly replaced by the
@@ -131,7 +144,7 @@ export default function ScanClient({ eventName }: { eventName: string | null }) 
         </span>
       </div>
       <div className="anim-fade-up anim-d1">
-        <CheckinClient unauthorizedHref="/scan" />
+        <CheckinClient unauthorizedHref="/scan" kind={kind} />
       </div>
     </div>
   );
