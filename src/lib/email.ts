@@ -15,6 +15,7 @@ import {
   type EventRow,
 } from './events';
 import { formatMoney } from './money';
+import { girocodePayload } from './girocode';
 import { vocabFor } from './vocab';
 import { getOrder, getOrderItems, getTicketsForOrder, paymentReference } from './orders';
 import { orderPayout } from './payout';
@@ -463,6 +464,50 @@ function textRows(rows: Array<[string, string]>): string[] {
   return rows.map(([label, value]) => `  ${(label + ':').padEnd(width)}${value}`);
 }
 
+/**
+ * A bank-payment GiroCode for email.
+ *
+ * Email clients commonly strip data: image URLs, so this deliberately returns
+ * raw PNG bytes for a cid: inline attachment, just like the ticket QR codes.
+ * Failure is non-fatal: the written IBAN, amount and reference remain the
+ * authoritative payment instructions.
+ */
+async function bankPaymentQrPng(payload: string | null): Promise<Buffer | null> {
+  if (!payload) return null;
+  try {
+    return await QRCode.toBuffer(payload, {
+      type: 'png',
+      width: 720,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#000000ff', light: '#ffffffff' },
+    });
+  } catch {
+    return null;
+  }
+}
+
+/** Email-client-safe presentation for the bank-app GiroCode. */
+function bankPaymentQrHtml(cid: string, amount: string, reference: string): string {
+  return `
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="card" bgcolor="${C.card}" style="margin:20px 0;background-color:${C.card};border:1px solid ${C.line};border-radius:14px;">
+        <tr>
+          <td align="center" style="padding:20px 18px;">
+            <p class="ink" style="margin:0 0 12px;color:${C.ink};font-size:18px;font-weight:800;line-height:1.35;">Scan with your banking app</p>
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;border:1px solid ${C.line};border-radius:10px;">
+              <tr>
+                <td bgcolor="#ffffff" style="padding:10px;background-color:#ffffff;line-height:0;">
+                  <img src="cid:${escapeHtml(cid)}" width="240" height="240" alt="Bank payment QR code for ${escapeHtml(amount)} with reference ${escapeHtml(reference)}" style="display:block;width:240px;max-width:100%;height:auto;background-color:#ffffff;">
+                </td>
+              </tr>
+            </table>
+            <p class="muted" style="margin:12px 0 0;color:${C.muted};font-size:13px;line-height:1.55;">It fills in the organizer&rsquo;s account, ${escapeHtml(amount)}, and reference <strong>${escapeHtml(reference)}</strong>. Check the details in your bank before confirming.</p>
+            <p class="muted" style="margin:6px 0 0;color:${C.muted};font-size:12px;line-height:1.5;">Reading this on the same phone? Save or screenshot the QR and import it in your banking app, if your app supports payment from a photo.</p>
+          </td>
+        </tr>
+      </table>`;
+}
+
 // ---------------------------------------------------------------------------
 // Ticket email (order is PAID — QR tickets exist)
 // ---------------------------------------------------------------------------
@@ -856,6 +901,26 @@ export async function sendTransferInstructionsEmail(
       (it) => getEventTier(event.id, it.tierId)?.studentOnly === true
     );
     const amount = formatMoney(order.totalCents, order.currency);
+    const paymentQrCid = `bank-payment-${orderId.toLowerCase()}@tickets`;
+    const paymentQrPng = await bankPaymentQrPng(
+      girocodePayload({
+        accountHolder: bank.accountHolder,
+        iban: bank.iban,
+        bic: bank.bic,
+        amountCents: order.totalCents,
+        currency: order.currency,
+        reference,
+      })
+    );
+    const paymentQrAttachment = paymentQrPng
+      ? {
+          filename: `bank-payment-${orderId}.png`,
+          content: paymentQrPng,
+          cid: paymentQrCid,
+          contentType: 'image/png',
+          contentDisposition: 'inline' as const,
+        }
+      : null;
     const deadline = new Date(Date.parse(order.createdAt.replace(' ', 'T') + 'Z') + bank.payWithinDays * 86_400_000);
     const deadlineDisplay = deadline.toLocaleDateString('en-GB', {
       day: 'numeric',
@@ -889,6 +954,7 @@ export async function sendTransferInstructionsEmail(
         `Put this in the transfer&#39;s purpose line (&quot;Verwendungszweck&quot;). It is how your payment finds ` +
           `your tickets.${hasStudentTickets ? ' The <strong>S-</strong> marks an order with student tickets.' : ''}`
       ) +
+      (paymentQrAttachment ? bankPaymentQrHtml(paymentQrCid, amount, reference) : '') +
       pHtml(
         `Once the money lands — usually one or two working days — the organizer confirms your payment, and ` +
           `your QR tickets are emailed to you the moment they do. Nothing else to do.`,
@@ -978,6 +1044,7 @@ export async function sendTransferInstructionsEmail(
       subject: `Reserved: your tickets for ${event.name} — payment details inside`,
       text,
       html,
+      ...(paymentQrAttachment ? { attachments: [paymentQrAttachment] } : {}),
     });
 
     return { sent: true };
