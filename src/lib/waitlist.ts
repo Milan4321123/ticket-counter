@@ -125,10 +125,21 @@ export async function runWaitlistNotifySweep(force = false): Promise<{ notified:
     const claim = db.prepare(
       `UPDATE waitlist SET notified_at = datetime('now') WHERE id = ? AND notified_at IS NULL`
     );
+    // Give the claim back — see the send loop below for why a failed send must
+    // not spend this address's one and only email.
+    const release = db.prepare(
+      `UPDATE waitlist SET notified_at = NULL WHERE id = ?`
+    );
 
+    // `attempted` bounds the WORK (sends tried, whatever they returned) while
+    // `notified` counts only the mails that truly left. They were one counter
+    // when a failure was indistinguishable from a success; separating them is
+    // what keeps a run of failures from re-trying the same batch forever.
+    let attempted = 0;
     let notified = 0;
+    let failed = 0;
     for (const { id } of candidates) {
-      if (notified >= MAX_EMAILS_PER_SWEEP) break;
+      if (attempted >= MAX_EMAILS_PER_SWEEP) break;
       const event = getEventById(id);
       if (!event) continue;
       // buyable, not merely "room left": a tier that is hidden, announced or
@@ -145,7 +156,7 @@ export async function runWaitlistNotifySweep(force = false): Promise<{ notified:
            ORDER BY created_at ASC
            LIMIT ?`
         )
-        .all(id, MAX_EMAILS_PER_SWEEP - notified) as { id: string; email: string }[];
+        .all(id, MAX_EMAILS_PER_SWEEP - attempted) as { id: string; email: string }[];
 
       for (const entry of entries) {
         // Stamped BEFORE the send, not after. The promise is at most one email
@@ -155,12 +166,32 @@ export async function runWaitlistNotifySweep(force = false): Promise<{ notified:
         // The quiet failure is the one the promise survives. The WHERE guard
         // also makes an overlapping run skip entries this one already claimed.
         if (claim.run(entry.id).changes !== 1) continue;
-        notified++;
-        await sendWaitlistSpotsOpenEmail(entry.email, event);
+        attempted++;
+        const result = await sendWaitlistSpotsOpenEmail(entry.email, event);
+        if (result.sent) {
+          notified++;
+          continue;
+        }
+        // The send RETURNING false is not the crash the ordering above guards
+        // against: nothing was delivered, so releasing the claim costs nobody a
+        // duplicate and keeps the entry eligible for the next sweep. Without
+        // this, one SMTP outage burns every waiting address's single email on
+        // nothing — permanently, because the candidate query only ever looks at
+        // notified_at IS NULL and retention later deletes the row. Same reasoning
+        // and same shape as the announce route's releaseAnnouncementSend().
+        release.run(entry.id);
+        failed++;
+        console.error(
+          `Waitlist notify for event ${id} to entry ${entry.id} not sent: ${result.reason ?? 'unknown'}`
+        );
       }
     }
 
-    if (notified > 0) console.log(`Waitlist sweep: notified ${notified} address(es).`);
+    // Only the mails that actually went out are reported as notified — the log
+    // is how anyone finds out mail is broken, so it must not count failures.
+    if (notified > 0 || failed > 0) {
+      console.log(`Waitlist sweep: notified ${notified} address(es), ${failed} failed.`);
+    }
     return { notified };
   } catch (e) {
     console.error('Waitlist notify sweep failed:', e);

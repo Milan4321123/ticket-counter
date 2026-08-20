@@ -201,13 +201,23 @@ async function sweepBuyerReminders(): Promise<number> {
   const stamp = db.prepare(`UPDATE orders SET buyer_reminder_sent_at = datetime('now') WHERE id = ?`);
   for (const row of due) {
     const result = await sendBuyerPaymentReminderEmail(row.orderId);
+    // Stamp ONLY on a genuine send, exactly as the organizer digest above bumps
+    // reminder_stage only when result.sent is true. buyer_reminder_sent_at means
+    // "this buyer has been reminded", and it is the record of a mail that
+    // exists — never of one that was attempted. Stamping on any other outcome
+    // spent the whole awaiting book's single reminder the moment mail was off
+    // ('email-not-configured') or an organizer was mid-IBAN-edit
+    // ('transfer-not-configured'), neither of which is permanent.
     if (result.sent) {
       stamp.run(row.orderId);
       sent++;
-    } else if (result.reason && result.reason !== 'send-failed') {
-      // Permanent skip (event gone, bank details missing, no longer awaiting):
-      // stamp it so the sweep doesn't retry this order forever.
-      stamp.run(row.orderId);
+    } else {
+      // No new state needed to stop an unsendable order looping: the query
+      // above already excludes erased buyers (buyer_erased_at IS NULL), and any
+      // other permanent case leaves the 'claimed' + 'transfer' window on its
+      // own — expireOverdueTransferReservations() cancels a reservation
+      // pay_within_days + 2 after it was made, which drops it out of `due`.
+      console.error(`Buyer payment reminder for order ${row.orderId} not sent: ${result.reason ?? 'unknown'}`);
     }
   }
   return sent;

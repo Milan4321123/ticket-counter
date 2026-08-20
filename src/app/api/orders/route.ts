@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPaymentMode, hasPaypalCredentials } from '@/lib/config';
-import { getEventById, getEventTier, getEventTiers, type EventRow } from '@/lib/events';
+import { getEventById, getEventTier, getEventTiers, paypalPayee, type EventRow } from '@/lib/events';
 import { readsAsComingSoon } from '@/lib/ticketState';
 import { getAvailability, SoldOutError } from '@/lib/inventory';
 import { effectivePayout } from '@/lib/payout';
@@ -316,7 +316,16 @@ export async function POST(req: Request) {
     // waiting period is not treated as the account yet — createOrder freezes
     // the same answer onto the order a moment later.
     const payout = effectivePayout(event);
-    if (mode === 'transfer' && (!payout.iban.trim() || !payout.holder.trim())) {
+    // SOME route has to exist — but a complete bank account is not the only one.
+    // PayPal is a full route on its own here (the organizer's own address, the
+    // same reference, the same confirm-by-hand step), and the checkout page has
+    // always offered it that way. This guard still demanded an IBAN, so a
+    // PayPal-only organizer got a working "Reserve — pay by PayPal" button and a
+    // 500 behind it: they could not sell at all. Both halves of the bank account
+    // are still required together — a holder with no IBAN is not a route.
+    const hasBankRoute = Boolean(payout.iban.trim() && payout.holder.trim());
+    const hasPaypalRoute = paypalPayee({ paypalAccount: payout.paypal }) !== null;
+    if (mode === 'transfer' && !hasBankRoute && !hasPaypalRoute) {
       return apiError(500, 'INTERNAL', 'Payment is not configured yet — please try again later or contact the organizer.');
     }
 

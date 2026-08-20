@@ -3,6 +3,7 @@
 // and payment instructions on the order page; this module just quietly
 // reports { sent: false }.
 import nodemailer from 'nodemailer';
+import type Mail from 'nodemailer/lib/mailer';
 import QRCode from 'qrcode';
 import { getBaseUrl } from './config';
 import { getDb } from './db';
@@ -44,6 +45,12 @@ export function isEmailConfigured(): boolean {
   // two new variables and clearing the old one switched email OFF completely:
   // every send returned 'email-not-configured' having never attempted anything,
   // which looks exactly like a broken mail provider and is not one.
+  //
+  // ANY is still the right answer for the question this function is asked —
+  // "is mail set up on this server at all", by callers like the announce route
+  // deciding whether to offer a button. It is NOT enough before a send, because
+  // a send uses one specific address: sendMailAs() below checks the From that
+  // this particular mail needs.
   return Boolean(
     process.env.SMTP_HOST &&
       (process.env.EMAIL_FROM || process.env.EMAIL_FROM_BUYERS || process.env.EMAIL_FROM_ORGANIZERS)
@@ -65,6 +72,41 @@ function createTransporter() {
     greetingTimeout: 10_000, // wait for server greeting
     socketTimeout: 20_000, // inactivity
   });
+}
+
+/** Which From address a mail goes out under — see lib/platform for why two. */
+type Audience = 'buyers' | 'organizers';
+
+/** Everything about a mail except who it is from; sendMailAs supplies that. */
+type MailMessage = Omit<Mail.Options, 'from'>;
+
+/**
+ * Send one mail under the From address of ITS OWN audience, refusing legibly
+ * when that address is empty.
+ *
+ * isEmailConfigured() above is satisfied by ANY of the three From variables,
+ * which is right for what it answers ("is mail set up at all") and wrong as the
+ * only check before a send: a deployment that sets EMAIL_FROM_BUYERS alone
+ * passes that gate and then hands nodemailer `from: ''` for every organizer
+ * mail. What comes back is an SMTP error about a missing sender — a broken
+ * mail server by every appearance, and a missing env var in fact.
+ *
+ * So each send asks for the address it actually needs, and an absent one is
+ * reported as the configuration problem it is, before anything touches SMTP.
+ */
+async function sendMailAs(
+  audience: Audience,
+  message: MailMessage
+): Promise<{ sent: boolean; reason?: string }> {
+  const from = (audience === 'buyers' ? emailFromBuyers() : emailFromOrganizers()).trim();
+  if (!from) {
+    console.error(
+      `[email] No From address for ${audience}: set EMAIL_FROM_${audience.toUpperCase()} (or EMAIL_FROM). Mail not sent.`
+    );
+    return { sent: false, reason: 'email-not-configured' };
+  }
+  await createTransporter().sendMail({ from, ...message });
+  return { sent: true };
 }
 
 function escapeHtml(s: string): string {
@@ -353,11 +395,17 @@ function panelHtml(innerHtml: string): string {
       </table>`;
 }
 
-/** The headline figure of a money mail. */
-function amountRowHtml(caption: string, amount: string): string {
+/**
+ * The headline figure of a money mail.
+ *
+ * The rule underneath separates it from the account rows below. Pass rule=false
+ * when there are none — a PayPal-only order prints no bank panel, and the rule
+ * would then float as a hairline across an otherwise empty card.
+ */
+function amountRowHtml(caption: string, amount: string, rule = true): string {
   return `
         <tr>
-          <td align="center" style="padding:20px 20px 16px;border-bottom:1px solid ${C.line};">
+          <td align="center" style="padding:20px 20px 16px;${rule ? `border-bottom:1px solid ${C.line};` : ''}">
             <p class="muted" style="margin:0;color:${C.muted};font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;">${escapeHtml(caption)}</p>
             <p class="ink" style="margin:6px 0 0;color:${C.ink};font-size:34px;line-height:1.15;font-weight:800;letter-spacing:-0.02em;">${escapeHtml(amount)}</p>
           </td>
@@ -545,6 +593,14 @@ function ticketStubHtml(opts: {
   when: string;
   /** "Ticket" or "Collection code" — what this stub is, per lib/vocab. */
   unitLabel: string;
+  /**
+   * What this one stub buys: "Admits one person" / "Covers one item".
+   *
+   * Passed in rather than looked up, because it is a whole sentence and not a
+   * noun — the same split sendTicketEmail already makes for its closing line,
+   * and lib/vocab deliberately holds words, not prose.
+   */
+  goodFor: string;
 }): string {
   const position =
     opts.total > 1 ? `${opts.unitLabel} ${opts.index} of ${opts.total}` : `Your ${opts.unitLabel.toLowerCase()}`;
@@ -565,7 +621,7 @@ function ticketStubHtml(opts: {
             <table role="presentation" cellpadding="0" cellspacing="0" border="0" class="qr" bgcolor="#ffffff" style="background-color:#ffffff;border:1px solid ${C.line};border-radius:10px;">
               <tr>
                 <td class="qr" bgcolor="#ffffff" style="padding:10px;background-color:#ffffff;line-height:0;">
-                  <img src="cid:${escapeHtml(opts.cid)}" width="200" height="200" alt="QR code for ticket ${escapeHtml(opts.code)}" style="display:block;width:200px;max-width:100%;height:auto;background-color:#ffffff;">
+                  <img src="cid:${escapeHtml(opts.cid)}" width="200" height="200" alt="QR code for ${escapeHtml(opts.unitLabel.toLowerCase())} ${escapeHtml(opts.code)}" style="display:block;width:200px;max-width:100%;height:auto;background-color:#ffffff;">
                 </td>
               </tr>
             </table>
@@ -576,7 +632,7 @@ function ticketStubHtml(opts: {
             <p class="ink" style="margin:0;font-family:${MONO};font-size:24px;line-height:1.2;font-weight:700;letter-spacing:0.12em;color:${C.ink};">${escapeHtml(opts.code)}</p>
             <p class="ink" style="margin:10px 0 0;color:${C.ink};font-size:15px;font-weight:700;line-height:1.45;">${escapeHtml(opts.eventName)}</p>
             <p class="muted" style="margin:2px 0 0;color:${C.muted};font-size:13px;line-height:1.5;">${escapeHtml(opts.when)}</p>
-            <p class="muted" style="margin:6px 0 0;color:${C.muted};font-size:13px;line-height:1.5;">Admits one person · ${escapeHtml(opts.buyerName)}</p>
+            <p class="muted" style="margin:6px 0 0;color:${C.muted};font-size:13px;line-height:1.5;">${escapeHtml(opts.goodFor)} · ${escapeHtml(opts.buyerName)}</p>
           </td>
         </tr>
       </table>`;
@@ -656,6 +712,7 @@ export async function sendTicketEmail(
           eventName: event.name,
           when: whenLine,
           unitLabel: v.Code,
+          goodFor: isShop ? 'Covers one item' : 'Admits one person',
         })
       )
       .join('');
@@ -800,8 +857,7 @@ export async function sendTicketEmail(
       footer: [[event.name, whenLine, venue].filter(Boolean).join(' · '), `Order ${orderId}`],
     });
 
-    await createTransporter().sendMail({
-      from: emailFromBuyers(),
+    const mailed = await sendMailAs('buyers', {
       replyTo: replyToBuyers(),
       to: order.buyerEmail,
       subject: `Your ${one ? v.code : `${tickets.length} ${v.codes}`} for ${event.name}`,
@@ -809,6 +865,7 @@ export async function sendTicketEmail(
       html,
       attachments,
     });
+    if (!mailed.sent) return mailed;
 
     return { sent: true };
   } catch (err) {
@@ -823,61 +880,88 @@ export async function sendTicketEmail(
 }
 
 // ---------------------------------------------------------------------------
-// Bank-transfer instructions email (order is CLAIMED — seats reserved)
+// Payment instructions email (order is CLAIMED — seats reserved)
+// Bank transfer, PayPal, or both — whichever routes the organizer offers.
 // ---------------------------------------------------------------------------
 
+/** What the PayPal note needs to know beyond the payee itself. */
+interface PaypalNoteOpts {
+  reference: string;
+  amount: string;
+  /** "tickets" / "collection codes" — what arrives once the money is confirmed. */
+  codes: string;
+  /** Is a bank account shown alongside? Decides whether this is A route or THE route. */
+  alsoBank: boolean;
+}
+
 /**
- * Send bank-transfer payment instructions for a freshly reserved order.
- * Never throws — the buyer sees the same instructions on the order page.
- */
-/**
- * The "you can also use PayPal" line, for buyer mails that print bank details.
+ * The "you can also use PayPal" line, for buyer mails that print payment details.
  *
  * Deliberately a note beside the bank panel rather than a second panel of its
  * own: it is the same amount, to the same person, with the same reference —
  * only the pipe differs. Returns '' when the organizer offers no PayPal, so
  * every call site can concatenate it unconditionally.
  */
-function paypalNoteHtml(payee: PaypalPayee | null, reference: string, amount: string): string {
+function paypalNoteHtml(payee: PaypalPayee | null, opts: PaypalNoteOpts): string {
   if (!payee) return '';
   // GREEN, and placed ABOVE the bank panel at every call site: PayPal clears in
   // seconds where a transfer takes 1-2 business days, so the buyer who takes
-  // this route has their QR tickets the same evening. Green marks the FAST one,
+  // this route has their QR codes the same evening. Green marks the FAST one,
   // not one anyone profits from — the money reaches the organizer either way
   // and the platform takes nothing from ticket sales.
   //
   // Its own table rather than calloutHtml(), which is amber and reads as a
   // warning. Inline styles because email clients discard stylesheets.
+  //
+  // Its own bold rather than strong(), for two reasons that both bit here.
+  // strong() escapes what it is given, so the old strong(escapeHtml(handle))
+  // escaped twice: "Ram&Sons" rendered as "Ram&amp;Sons" and buyers copied a
+  // broken handle into PayPal while the plain-text twin showed the real one.
+  // And strong() paints near-black ink, which is the file's rule for a light
+  // card and unreadable on this dark green one — the three values a buyer has
+  // to read were the three least legible words in the mail.
+  const bold = (text: string) => `<strong style="color:#ffffff;">${escapeHtml(text)}</strong>`;
   return `
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0f2a20" style="margin:0 0 18px;background-color:#0f2a20;border:1px solid #34d399;border-left:4px solid #34d399;border-radius:12px;">
         <tr>
           <td style="padding:16px 18px;color:#d1fae5;font-size:15px;line-height:1.55;">
-            <span style="color:#34d399;font-weight:800;">Fastest: pay by PayPal</span><br>
-            Send ${strong(escapeHtml(payee.handle))} ${strong(escapeHtml(amount))} and put
-            ${strong(escapeHtml(reference))} in PayPal&#39;s message field. It arrives in seconds,
-            so the organizer can confirm your payment and your QR tickets go out straight away —
-            a bank transfer takes 1&ndash;2 business days. It reaches the same organizer either
-            way: pay one way or the other, not both.
+            <span style="color:#34d399;font-weight:800;">${opts.alsoBank ? 'Fastest: pay by PayPal' : 'Pay by PayPal'}</span><br>
+            Send ${bold(payee.handle)} ${bold(opts.amount)} and put
+            ${bold(opts.reference)} in PayPal&#39;s message field. It arrives in seconds,
+            so the organizer can confirm your payment and your QR ${escapeHtml(opts.codes)} go out straight away${
+              opts.alsoBank
+                ? ` — a bank transfer takes 1&ndash;2 business days. It reaches the same organizer either
+            way: pay one way or the other, not both.`
+                : '.'
+            }
           </td>
         </tr>
       </table>`;
 }
 
 /** Plain-text twin of paypalNoteHtml. Empty array when there is no PayPal. */
-function paypalNoteText(payee: PaypalPayee | null, reference: string, amount: string): string[] {
+function paypalNoteText(payee: PaypalPayee | null, opts: PaypalNoteOpts): string[] {
   if (!payee) return [];
   return [
     '',
-    'FASTEST: PAY BY PAYPAL',
+    opts.alsoBank ? 'FASTEST: PAY BY PAYPAL' : 'PAY BY PAYPAL',
     wrapText(
-      `Send ${payee.handle} ${amount} and put ${reference} in PayPal's message field. It ` +
-        `arrives in seconds, so the organizer can confirm your payment and your QR tickets go ` +
-        `out straight away — a bank transfer takes 1-2 business days. It reaches the same ` +
-        `organizer either way: pay one way or the other, not both.`
+      `Send ${payee.handle} ${opts.amount} and put ${opts.reference} in PayPal's message ` +
+        `field. It arrives in seconds, so the organizer can confirm your payment and your QR ` +
+        `${opts.codes} go out straight away` +
+        (opts.alsoBank
+          ? ` — a bank transfer takes 1-2 business days. It reaches the same organizer either ` +
+            `way: pay one way or the other, not both.`
+          : '.')
     ),
   ];
 }
 
+/**
+ * Send payment instructions for a freshly reserved order — bank transfer, or
+ * PayPal, or both, whichever routes the organizer actually offers.
+ * Never throws — the buyer sees the same instructions on the order page.
+ */
 export async function sendTransferInstructionsEmail(
   orderId: string
 ): Promise<{ sent: boolean; reason?: string }> {
@@ -895,21 +979,29 @@ export async function sendTransferInstructionsEmail(
     // current details. A mail is a promise in writing; re-reading the event
     // would let a later edit change what an already-issued instruction says.
     const payout = orderPayout(order, event);
-    if (!payout.iban.trim() || !payout.holder.trim()) {
-      return { sent: false, reason: 'transfer-not-configured' };
-    }
-    const bank = {
-      accountHolder: payout.holder,
-      iban: payout.iban,
-      bic: payout.bic,
-      bankName: payout.bankName,
-      payWithinDays: event.payWithinDays,
-    };
     // From the order's own snapshot, exactly like the bank rows beside it — the
     // two must describe the same moment, or an organizer who later added PayPal
     // would have it offered on instructions that never mentioned it.
     const payee = paypalPayee({ paypalAccount: payout.paypal });
     const offersPaypal = payee !== null;
+    // A bank account is one route, not the only one. This used to refuse
+    // outright without an IBAN, which made a PayPal-only organizer unsellable:
+    // the checkout offered "Reserve — pay by PayPal", the order was created, and
+    // the buyer's instructions were then silently never sent. What must still be
+    // true is that SOME route exists — both halves of the account together, or
+    // PayPal — otherwise there is nothing to tell the buyer to do.
+    const bank =
+      payout.iban.trim() && payout.holder.trim()
+        ? {
+            accountHolder: payout.holder,
+            iban: payout.iban,
+            bic: payout.bic,
+            bankName: payout.bankName,
+          }
+        : null;
+    if (!bank && !offersPaypal) {
+      return { sent: false, reason: 'transfer-not-configured' };
+    }
 
     // Whose account this is. The panel below prints an IBAN with no story
     // around it, and the story matters: the buyer is paying the ORGANIZER's own
@@ -937,6 +1029,11 @@ export async function sendTransferInstructionsEmail(
     // of it — this mail is the buyer's receipt-in-waiting and must not leave
     // that number to be discovered at the door.
     const v = vocabFor(event.kind);
+    // Same pair sendTicketEmail uses: a shop's buyer is collecting from a
+    // counter, not turning up at a show on a date, and a shop need not have a
+    // date at all — so the slot a date sits in holds the collection line.
+    const isShop = event.kind === 'shop';
+    const whenLine = isShop ? firstLineOf(event.pickupInfo) : event.dateDisplay;
     const tierOf = (tierId: string) => getEventTier(event.id, tierId);
     const totalTickets = items.reduce(
       (s, it) => s + it.quantity * (tierOf(it.tierId)?.seatsPerUnit ?? 1),
@@ -946,17 +1043,20 @@ export async function sendTransferInstructionsEmail(
       .map((it) => `${it.quantity}× ${tierOf(it.tierId)?.name ?? it.tierId}`)
       .join(', ');
     const amount = formatMoney(order.totalCents, order.currency);
+    // A GiroCode is a BANK payment — nothing to encode when there is no account.
     const paymentQrCid = `bank-payment-${orderId.toLowerCase()}@tickets`;
-    const paymentQrPng = await bankPaymentQrPng(
-      girocodePayload({
-        accountHolder: bank.accountHolder,
-        iban: bank.iban,
-        bic: bank.bic,
-        amountCents: order.totalCents,
-        currency: order.currency,
-        reference,
-      })
-    );
+    const paymentQrPng = bank
+      ? await bankPaymentQrPng(
+          girocodePayload({
+            accountHolder: bank.accountHolder,
+            iban: bank.iban,
+            bic: bank.bic,
+            amountCents: order.totalCents,
+            currency: order.currency,
+            reference,
+          })
+        )
+      : null;
     const paymentQrAttachment = paymentQrPng
       ? {
           filename: `bank-payment-${orderId}.png`,
@@ -966,24 +1066,48 @@ export async function sendTransferInstructionsEmail(
           contentDisposition: 'inline' as const,
         }
       : null;
-    const deadline = new Date(Date.parse(order.createdAt.replace(' ', 'T') + 'Z') + bank.payWithinDays * 86_400_000);
+    const deadline = new Date(Date.parse(order.createdAt.replace(' ', 'T') + 'Z') + event.payWithinDays * 86_400_000);
     const deadlineDisplay = deadline.toLocaleDateString('en-GB', {
       day: 'numeric',
       month: 'long',
       year: 'numeric',
     });
 
-    const bankRows: DetailRow[] = [
-      { label: 'Account holder', value: bank.accountHolder },
-      { label: 'IBAN', value: bank.iban, mono: true },
-      ...(bank.bic ? [{ label: 'BIC', value: bank.bic, mono: true }] : []),
-      ...(bank.bankName ? [{ label: 'Bank', value: bank.bankName }] : []),
-    ];
+    const bankRows: DetailRow[] = bank
+      ? [
+          { label: 'Account holder', value: bank.accountHolder },
+          { label: 'IBAN', value: bank.iban, mono: true },
+          ...(bank.bic ? [{ label: 'BIC', value: bank.bic, mono: true }] : []),
+          ...(bank.bankName ? [{ label: 'Bank', value: bank.bankName }] : []),
+        ]
+      : [];
+
+    // The two sentences with no vocab word of their own: what is being held for
+    // this buyer, and what happens if they never pay. A shop holds stock, not
+    // seats, and nothing about a counter is "a door".
+    const heldSentence = isShop ? `Your ${v.units} are set aside` : 'Your seats are held';
+    const releasedSentence = isShop ? `the ${v.units} go back on sale` : 'the seats go back on sale';
+    // Where the reference has to be typed, which depends on the route the buyer
+    // actually has. PayPal-only instructions must not send anyone hunting for a
+    // "Verwendungszweck" field that is not in front of them.
+    const referenceWhereHtml = bank
+      ? `Put this in the transfer&#39;s purpose line (&quot;Verwendungszweck&quot;).`
+      : `Put this in PayPal&#39;s message field.`;
+    const referenceWhereText = bank
+      ? `must go in the transfer's purpose line ("Verwendungszweck")`
+      : `must go in PayPal's message field`;
+    // How long the money takes, said honestly per route: PayPal is minutes, a
+    // transfer is days, and promising the slower one to a PayPal-only buyer
+    // makes them wait for a confirmation that already happened.
+    const arrivalSentence = bank
+      ? 'Once the money lands — usually one or two working days —'
+      : 'Once the money lands — usually within minutes —';
+    const payAction = offersPaypal ? 'send the money' : 'send a bank transfer';
 
     const bodyHtml =
       pHtml(`Hi ${escapeHtml(order.buyerName)},`) +
       pHtml(
-        `Your seats are held. To turn them into tickets, ${offersPaypal ? 'send the money' : 'send a bank transfer'} by ` +
+        `${heldSentence}. To turn them into ${v.codes}, ${payAction} by ` +
           `${strong(deadlineDisplay)} — everything you need is here.`,
         20
       ) +
@@ -995,47 +1119,51 @@ export async function sendTransferInstructionsEmail(
         `Your reservation: ${escapeHtml(itemsLine)} — ${totalTickets} QR ${totalTickets === 1 ? v.code : v.codes} once the payment is confirmed.`,
         20
       ) +
-      paypalNoteHtml(payee, reference, amount) +
-      panelHtml(amountRowHtml('Amount to transfer', amount) + detailRowsHtml(bankRows)) +
+      paypalNoteHtml(payee, { reference, amount, codes: v.codes, alsoBank: bank !== null }) +
+      panelHtml(
+        amountRowHtml(bank ? 'Amount to transfer' : 'Amount to pay', amount, bank !== null) +
+          detailRowsHtml(bankRows)
+      ) +
       referenceBoxHtml(
         'Payment reference — required',
         reference,
-        `Put this in the transfer&#39;s purpose line (&quot;Verwendungszweck&quot;). It is how your payment finds ` +
-          `your tickets.${hasStudentTickets ? ' The <strong>S-</strong> marks an order with student tickets.' : ''}`
+        `${referenceWhereHtml} It is how your payment finds ` +
+          `your ${escapeHtml(v.codes)}.${hasStudentTickets ? ` The <strong>S-</strong> marks an order with student ${escapeHtml(v.units)}.` : ''}`
       ) +
       (paymentQrAttachment ? bankPaymentQrHtml(paymentQrCid, amount, reference) : '') +
       pHtml(
-        `Once the money lands — usually one or two working days — the organizer confirms your payment, and ` +
-          `your QR tickets are emailed to you the moment they do. Nothing else to do.`,
+        `${arrivalSentence} the organizer confirms your payment, and ` +
+          `your QR ${escapeHtml(v.codes)} are emailed to you the moment they do. Nothing else to do.`,
         20
       ) +
       buttonHtml(orderUrl, 'View your order') +
-      buttonNoteHtml('Worth bookmarking: your tickets appear on that page too.') +
+      buttonNoteHtml(`Worth bookmarking: your ${v.codes} appear on that page too.`) +
       (hasStudentTickets
         ? `<div style="margin-top:20px;">${calloutHtml(
-            `<strong>Student tickets:</strong> bring a valid student ID for each student ticket. It is checked at the door.`
+            `<strong>Student ${escapeHtml(v.units)}:</strong> bring a valid student ID for each student ` +
+              `${escapeHtml(v.unit)}. It is checked at ${escapeHtml(v.where)}.`
           )}</div>`
         : '') +
-      smallHtml(`If no payment arrives by ${escapeHtml(deadlineDisplay)}, the seats go back on sale.`);
+      smallHtml(`If no payment arrives by ${escapeHtml(deadlineDisplay)}, ${escapeHtml(releasedSentence)}.`);
 
     const html = renderEmail({
-      title: `Your tickets for ${event.name} are reserved`,
-      preheader: `Send ${amount} with reference ${reference} by ${deadlineDisplay} and your tickets are on their way.`,
-      kicker: 'Seats reserved',
+      title: `Your ${v.units} for ${event.name} are reserved`,
+      preheader: `Send ${amount} with reference ${reference} by ${deadlineDisplay} and your ${v.codes} are on their way.`,
+      kicker: isShop ? `${v.Units} reserved` : 'Seats reserved',
       headline: event.name,
-      metaLines: [event.dateDisplay, venue],
+      metaLines: [whenLine, venue],
       bodyHtml,
       footerLines: [
-        `${escapeHtml(event.name)} · ${escapeHtml(event.dateDisplay)}`,
+        `${escapeHtml(event.name)}${whenLine ? ` · ${escapeHtml(whenLine)}` : ''}`,
         escapeHtml(venue),
         `Order ${escapeHtml(orderId)}`,
-        `You are getting this because you reserved tickets on ${escapeHtml(platformName())}.`,
+        `You are getting this because you reserved ${escapeHtml(v.units)} on ${escapeHtml(platformName())}.`,
       ],
     });
 
     const text = renderText({
-      headline: `Your tickets for ${event.name} are reserved, ${order.buyerName}!`,
-      context: [event.dateDisplay, venue],
+      headline: `Your ${v.units} for ${event.name} are reserved, ${order.buyerName}!`,
+      context: [whenLine, venue],
       lines: [
         wrapText(
           `${sellerIntroText} — the payment details below are their own, and your money goes straight to them.`
@@ -1045,60 +1173,61 @@ export async function sendTransferInstructionsEmail(
           `Your reservation: ${itemsLine} — ${totalTickets} QR ${totalTickets === 1 ? v.code : v.codes} once the payment is confirmed.`
         ),
         '',
-        wrapText(
-          `To complete your order, ${offersPaypal ? 'send the money' : 'send a bank transfer'} by ${deadlineDisplay}:`
-        ),
+        wrapText(`To complete your order, ${payAction} by ${deadlineDisplay}:`),
         // Above the bank rows, matching the HTML. The plain-text twin used to
         // trail them, so the reader who gets text-only — which is every reader
         // whose client blocks HTML — was steered to the slower method by the
         // simple fact of it coming first.
-        ...paypalNoteText(payee, reference, amount),
+        ...paypalNoteText(payee, { reference, amount, codes: v.codes, alsoBank: bank !== null }),
         '',
         ...textRows([
           ['Amount', amount],
-          ['Account holder', bank.accountHolder],
-          ['IBAN', bank.iban],
-          ...(bank.bic ? ([['BIC', bank.bic]] as Array<[string, string]>) : []),
-          ...(bank.bankName ? ([['Bank', bank.bankName]] as Array<[string, string]>) : []),
+          ...(bank
+            ? ([
+                ['Account holder', bank.accountHolder],
+                ['IBAN', bank.iban],
+                ...(bank.bic ? [['BIC', bank.bic]] : []),
+                ...(bank.bankName ? [['Bank', bank.bankName]] : []),
+              ] as Array<[string, string]>)
+            : []),
           ['Reference', reference],
         ]),
         '',
         wrapText(
-          `IMPORTANT: the reference ${reference} must go in the transfer's purpose line ` +
-            `("Verwendungszweck"). It is how your payment finds your tickets.`
+          `IMPORTANT: the reference ${reference} ${referenceWhereText}. It is how your payment ` +
+            `finds your ${v.codes}.`
         ),
         ...(hasStudentTickets
           ? [
               '',
               wrapText(
-                'The "S-" in your reference marks an order with student tickets. Bring a valid ' +
-                  'student ID for each of them — it is checked at the door.'
+                `The "S-" in your reference marks an order with student ${v.units}. Bring a valid ` +
+                  `student ID for each of them — it is checked at ${v.where}.`
               ),
             ]
           : []),
         '',
         wrapText(
-          'Once the money lands — usually one or two working days — the organizer confirms ' +
-            'your payment, and your QR tickets are emailed to you the moment they do. ' +
-            'Nothing else to do.'
+          `${arrivalSentence} the organizer confirms your payment, and your QR ${v.codes} are ` +
+            `emailed to you the moment they do. Nothing else to do.`
         ),
         '',
         `Your order: ${orderUrl}`,
         '',
-        wrapText(`If no payment arrives by ${deadlineDisplay}, the seats go back on sale.`),
+        wrapText(`If no payment arrives by ${deadlineDisplay}, ${releasedSentence}.`),
       ],
-      footer: [`${event.name} · ${event.dateDisplay} · ${venue}`, `Order ${orderId}`],
+      footer: [[event.name, whenLine, venue].filter(Boolean).join(' · '), `Order ${orderId}`],
     });
 
-    await createTransporter().sendMail({
-      from: emailFromBuyers(),
+    const mailed = await sendMailAs('buyers', {
       replyTo: replyToBuyers(),
       to: order.buyerEmail,
-      subject: `Reserved: your tickets for ${event.name} — payment details inside`,
+      subject: `Reserved: your ${v.units} for ${event.name} — payment details inside`,
       text,
       html,
       ...(paymentQrAttachment ? { attachments: [paymentQrAttachment] } : {}),
     });
+    if (!mailed.sent) return mailed;
 
     return { sent: true };
   } catch (err) {
@@ -1208,14 +1337,14 @@ export async function sendTransferReminderEmail(
       footer: ['You can change or switch off these reminders in your portal settings.'],
     });
 
-    await createTransporter().sendMail({
-      from: emailFromOrganizers(),
+    const mailed = await sendMailAs('organizers', {
       replyTo: replyToOrganizers(),
       to: organizer.email,
       subject: `${awaiting.length} payment${one ? '' : 's'} to check — ${totals} expected`,
       text,
       html,
     });
+    if (!mailed.sent) return mailed;
     return { sent: true };
   } catch (err) {
     console.error('[email] Failed to send transfer reminder:', err instanceof Error ? err.message : err);
@@ -1310,10 +1439,15 @@ export async function sendOrganizerCredentialsEmail(
       footer: [`${name} · organizer portal`],
     });
 
-    await createTransporter().sendMail({
-      from: emailFromOrganizers(),
+    const mailed = await sendMailAs('organizers', {
       to: organizer.email,
-      ...(contactEmail ? { replyTo: contactEmail } : {}),
+      // replyToOrganizers(), like every other organizer mail — NOT
+      // platformContactEmail(). The two are usually the same address, but the
+      // whole point of EMAIL_REPLY_TO_ORGANIZERS is the window where they are
+      // not: a domain authenticated for SENDING with no mailbox yet. This mail
+      // ignored that override, so the one email that says "reply to us if
+      // something looks wrong" was the one whose replies bounced.
+      replyTo: replyToOrganizers(),
       subject: `Your ${name} organizer account is ready`,
       text,
       html: renderEmail({
@@ -1328,6 +1462,7 @@ export async function sendOrganizerCredentialsEmail(
         ],
       }),
     });
+    if (!mailed.sent) return mailed;
     return { sent: true };
   } catch (err) {
     // Deliberately terse: nothing about this failure may echo the password.
@@ -1360,11 +1495,23 @@ export async function sendBuyerPaymentReminderEmail(
     // repeat the ORIGINAL instruction — chasing a buyer with details that
     // changed after they ordered is how one edit redirects the unpaid book.
     const payout = orderPayout(order, event);
-    if (!payout.iban.trim() || !payout.holder.trim()) {
-      return { sent: false, reason: 'transfer-not-configured' };
-    }
     const payee = paypalPayee({ paypalAccount: payout.paypal });
     const offersPaypal = payee !== null;
+    // Same rule as the instructions mail this one repeats: a bank account is a
+    // route, PayPal is a route, and only having neither means there is nothing
+    // to remind anybody to do.
+    const hasBank = Boolean(payout.iban.trim() && payout.holder.trim());
+    if (!hasBank && !offersPaypal) {
+      return { sent: false, reason: 'transfer-not-configured' };
+    }
+
+    // A shop buyer is chasing items to collect, not seats at a show — and a
+    // shop need not have a date at all, so nothing here may print one blindly.
+    const v = vocabFor(event.kind);
+    const isShop = event.kind === 'shop';
+    const whenLine = isShop ? firstLineOf(event.pickupInfo) : event.dateDisplay;
+    const heldSentence = isShop ? `Your ${v.units} are still set aside` : 'Your seats are still held';
+    const releasedSentence = isShop ? `the ${v.units} go back on sale` : 'the seats go back on sale';
 
     const venue = venueDisplay(event);
     const amount = formatMoney(order.totalCents, order.currency);
@@ -1379,102 +1526,125 @@ export async function sendBuyerPaymentReminderEmail(
       year: 'numeric',
     });
 
-    const alreadyPaid =
-      "Bank transfers take a few days to land in the organizer's account, and the organizer confirms each " +
-      'one by hand once it shows up on their statement — we cannot see it for them. You do not need to do ' +
-      'anything, and you certainly should not pay twice.';
+    // Only the bank half is slow. A PayPal-only buyer who reads "transfers take
+    // a few days" is being told to keep waiting for something that arrived in
+    // seconds — the reassurance has to describe the route they were given.
+    const alreadyPaid = hasBank
+      ? "Bank transfers take a few days to land in the organizer's account, and the organizer confirms each " +
+        'one by hand once it shows up on their statement — we cannot see it for them. You do not need to do ' +
+        'anything, and you certainly should not pay twice.'
+      : 'The organizer confirms each payment by hand once it shows up in their account — we cannot see it ' +
+        'for them. You do not need to do anything, and you certainly should not pay twice.';
 
-    const bankRows: DetailRow[] = [
-      { label: 'Account holder', value: payout.holder },
-      { label: 'IBAN', value: payout.iban, mono: true },
-      ...(payout.bic ? [{ label: 'BIC', value: payout.bic, mono: true }] : []),
-      ...(payout.bankName ? [{ label: 'Bank', value: payout.bankName }] : []),
-    ];
+    const bankRows: DetailRow[] = hasBank
+      ? [
+          { label: 'Account holder', value: payout.holder },
+          { label: 'IBAN', value: payout.iban, mono: true },
+          ...(payout.bic ? [{ label: 'BIC', value: payout.bic, mono: true }] : []),
+          ...(payout.bankName ? [{ label: 'Bank', value: payout.bankName }] : []),
+        ]
+      : [];
 
     const bodyHtml =
       pHtml(`Hi ${escapeHtml(order.buyerName)},`) +
       pHtml(
-        `Your seats are still held, but the organizer has not confirmed your ${offersPaypal ? 'payment' : 'bank transfer'} yet.`,
+        `${heldSentence}, but the organizer has not confirmed your ${offersPaypal ? 'payment' : 'bank transfer'} yet.`,
         20
       ) +
       calloutHtml(`<strong>Already sent it?</strong> Then all is well. ${escapeHtml(alreadyPaid)}`) +
       pHtml(
-        `Not yet? Here are the details again. Please send it by ${strong(deadlineDisplay)}, otherwise the seats ` +
-          `go back on sale.`,
+        `Not yet? Here are the details again. Please send it by ${strong(deadlineDisplay)}, otherwise ` +
+          `${escapeHtml(releasedSentence)}.`,
         20
       ) +
-      paypalNoteHtml(payee, reference, amount) +
-      panelHtml(amountRowHtml('Amount to transfer', amount) + detailRowsHtml(bankRows)) +
+      paypalNoteHtml(payee, { reference, amount, codes: v.codes, alsoBank: hasBank }) +
+      panelHtml(
+        amountRowHtml(hasBank ? 'Amount to transfer' : 'Amount to pay', amount, hasBank) +
+          detailRowsHtml(bankRows)
+      ) +
       referenceBoxHtml(
         'Payment reference — required',
         reference,
-        `Put this in the transfer&#39;s purpose line (&quot;Verwendungszweck&quot;) so your payment finds your tickets.`
+        hasBank
+          ? `Put this in the transfer&#39;s purpose line (&quot;Verwendungszweck&quot;) so your payment finds your ${escapeHtml(v.codes)}.`
+          : `Put this in PayPal&#39;s message field so your payment finds your ${escapeHtml(v.codes)}.`
       ) +
       buttonHtml(orderUrl, 'View your order') +
-      smallHtml('Your QR tickets arrive by email the moment the organizer confirms your payment.');
+      smallHtml(
+        `Your QR ${escapeHtml(v.codes)} arrive by email the moment the organizer confirms your payment.`
+      );
 
     const html = renderEmail({
-      title: `Your tickets for ${event.name} are still reserved`,
-      preheader: `The organizer has not confirmed your transfer for ${event.name} yet — the details are inside.`,
+      title: `Your ${v.units} for ${event.name} are still reserved`,
+      preheader: `The organizer has not confirmed your payment for ${event.name} yet — the details are inside.`,
       kicker: 'Still reserved',
       headline: event.name,
-      metaLines: [event.dateDisplay, venue],
+      metaLines: [whenLine, venue],
       bodyHtml,
       footerLines: [
-        `${escapeHtml(event.name)} · ${escapeHtml(event.dateDisplay)}`,
+        `${escapeHtml(event.name)}${whenLine ? ` · ${escapeHtml(whenLine)}` : ''}`,
         escapeHtml(venue),
         `Order ${escapeHtml(orderId)}`,
-        `You are getting this because you reserved tickets on ${escapeHtml(platformName())}.`,
+        `You are getting this because you reserved ${escapeHtml(v.units)} on ${escapeHtml(platformName())}.`,
       ],
     });
 
     const text = renderText({
-      headline: `Your tickets for ${event.name} are still reserved`,
-      context: [event.dateDisplay, venue],
+      headline: `Your ${v.units} for ${event.name} are still reserved`,
+      context: [whenLine, venue],
       lines: [
         `Hi ${order.buyerName},`,
         '',
         wrapText(
-          `Your seats are still held, but the organizer has not confirmed your ${offersPaypal ? 'payment' : 'bank transfer'} yet.`
+          `${heldSentence}, but the organizer has not confirmed your ${offersPaypal ? 'payment' : 'bank transfer'} yet.`
         ),
         '',
         wrapText(`ALREADY SENT IT? Then all is well. ${alreadyPaid}`),
         '',
         wrapText(
-          `Not yet? Here are the details again. Please send it by ${deadlineDisplay}, otherwise the ` +
-            `seats go back on sale.`
+          `Not yet? Here are the details again. Please send it by ${deadlineDisplay}, otherwise ` +
+            `${releasedSentence}.`
         ),
-        ...paypalNoteText(payee, reference, amount),
+        ...paypalNoteText(payee, { reference, amount, codes: v.codes, alsoBank: hasBank }),
         '',
         ...textRows([
           ['Amount', amount],
-          ['Account holder', payout.holder],
-          ['IBAN', payout.iban],
-          ...(payout.bic ? ([['BIC', payout.bic]] as Array<[string, string]>) : []),
-          ...(payout.bankName ? ([['Bank', payout.bankName]] as Array<[string, string]>) : []),
+          ...(hasBank
+            ? ([
+                ['Account holder', payout.holder],
+                ['IBAN', payout.iban],
+                ...(payout.bic ? [['BIC', payout.bic]] : []),
+                ...(payout.bankName ? [['Bank', payout.bankName]] : []),
+              ] as Array<[string, string]>)
+            : []),
           ['Reference', reference],
         ]),
         '',
         wrapText(
-          `IMPORTANT: put the reference ${reference} in the transfer's purpose line ` +
-            `("Verwendungszweck") so your payment finds your tickets.`
+          hasBank
+            ? `IMPORTANT: put the reference ${reference} in the transfer's purpose line ` +
+              `("Verwendungszweck") so your payment finds your ${v.codes}.`
+            : `IMPORTANT: put the reference ${reference} in PayPal's message field so your ` +
+              `payment finds your ${v.codes}.`
         ),
         '',
         `Your order: ${orderUrl}`,
         '',
-        wrapText('Your QR tickets arrive by email the moment the organizer confirms your payment.'),
+        wrapText(
+          `Your QR ${v.codes} arrive by email the moment the organizer confirms your payment.`
+        ),
       ],
-      footer: [`${event.name} · ${event.dateDisplay} · ${venue}`, `Order ${orderId}`],
+      footer: [[event.name, whenLine, venue].filter(Boolean).join(' · '), `Order ${orderId}`],
     });
 
-    await createTransporter().sendMail({
-      from: emailFromBuyers(),
+    const mailed = await sendMailAs('buyers', {
       replyTo: replyToBuyers(),
       to: order.buyerEmail,
-      subject: `Reminder: your tickets for ${event.name} are still reserved`,
+      subject: `Reminder: your ${v.units} for ${event.name} are still reserved`,
       text,
       html,
     });
+    if (!mailed.sent) return mailed;
     return { sent: true };
   } catch (err) {
     console.error('[email] Failed to send buyer payment reminder:', err instanceof Error ? err.message : err);
@@ -1584,8 +1754,7 @@ export async function sendContactRequestToTeam(
       ],
     });
 
-    await createTransporter().sendMail({
-      from: emailFromOrganizers(),
+    const mailed = await sendMailAs('organizers', {
       to,
       replyTo: request.email,
       subject: `${subjectLead} — ${request.name}`,
@@ -1599,6 +1768,7 @@ export async function sendContactRequestToTeam(
         footerLines: [`${escapeHtml(platformName())} · ${escapeHtml(inboxUrl)}`],
       }),
     });
+    if (!mailed.sent) return mailed;
     return { sent: true };
   } catch (err) {
     console.error('[email] Failed to send contact request to team:', err instanceof Error ? err.message : err);
@@ -1668,8 +1838,7 @@ export async function sendContactRequestAck(
       footer: [`${name} · ${getBaseUrl()}`],
     });
 
-    await createTransporter().sendMail({
-      from: wantsAccount ? emailFromOrganizers() : emailFromBuyers(),
+    const mailed = await sendMailAs(wantsAccount ? 'organizers' : 'buyers', {
       to: request.email,
       replyTo: contactEmail,
       subject: `Thanks — we've got your request (${name})`,
@@ -1686,6 +1855,7 @@ export async function sendContactRequestAck(
         ],
       }),
     });
+    if (!mailed.sent) return mailed;
     return { sent: true };
   } catch (err) {
     console.error('[email] Failed to send contact request acknowledgement:', err instanceof Error ? err.message : err);
@@ -1768,8 +1938,7 @@ export async function sendQuestionAnsweredEmail(
       footer: [`${name} · ${getBaseUrl()}`],
     });
 
-    await createTransporter().sendMail({
-      from: emailFromBuyers(),
+    const mailed = await sendMailAs('buyers', {
       replyTo: replyToBuyers(),
       to,
       subject: `Answered: your question about ${event.name}`,
@@ -1783,6 +1952,7 @@ export async function sendQuestionAnsweredEmail(
         footerLines: [`${name} · ${getBaseUrl()}`],
       }),
     });
+    if (!mailed.sent) return mailed;
     return { sent: true };
   } catch (err) {
     console.error('[email] Failed to send question answer:', err instanceof Error ? err.message : err);
@@ -1877,8 +2047,7 @@ export async function sendSignInAlertEmail(
           `<strong>If it was not</strong>, change your password now. Somebody else knows it.`
       );
 
-    await createTransporter().sendMail({
-      from: emailFromOrganizers(),
+    const mailed = await sendMailAs('organizers', {
       replyTo: replyToOrganizers(),
       to: organizer.email,
       subject: headline,
@@ -1909,6 +2078,7 @@ export async function sendSignInAlertEmail(
         footerLines: [`${brand} · ${getBaseUrl()}`],
       }),
     });
+    if (!mailed.sent) return mailed;
     return { sent: true };
   } catch (err) {
     console.error('[email] Failed to send sign-in alert:', err instanceof Error ? err.message : err);
@@ -2091,9 +2261,7 @@ export async function sendPayoutChangedEmail(
       footer: [`${brand} · ${getBaseUrl()}`],
     });
 
-    const transporter = createTransporter();
-    await transporter.sendMail({
-      from: emailFromOrganizers(),
+    const mailed = await sendMailAs('organizers', {
       replyTo: replyToOrganizers(),
       to: organizer.email,
       subject: waiting
@@ -2113,6 +2281,7 @@ export async function sendPayoutChangedEmail(
         footerLines: [`${brand} · ${getBaseUrl()}`],
       }),
     });
+    if (!mailed.sent) return mailed;
 
     // The owner's copy: a separate message, never a CC. A CC would address the
     // owner as the organizer and put each party's address in the other's inbox.
@@ -2131,8 +2300,7 @@ export async function sendPayoutChangedEmail(
           (waiting ? 'and cancel the change before it takes effect.' : 'and switch the account off if in doubt.')
         : '';
       try {
-        await transporter.sendMail({
-          from: emailFromOrganizers(),
+        const ownerCopy = await sendMailAs('organizers', {
           replyTo: replyToOrganizers(),
           to: ownerInbox,
           subject: change.nameMismatch
@@ -2187,6 +2355,11 @@ export async function sendPayoutChangedEmail(
             footerLines: [`${brand} · ${getBaseUrl()}`],
           }),
         });
+        // Logged, never returned: the organizer's alarm above already went out,
+        // and this copy failing must not report the whole notice as unsent.
+        if (!ownerCopy.sent) {
+          console.error(`[email] Payout-change owner copy not sent: ${ownerCopy.reason}`);
+        }
       } catch (err) {
         console.error('[email] Payout-change owner copy failed:', err instanceof Error ? err.message : err);
       }
@@ -2277,8 +2450,7 @@ export async function sendWaitlistSpotsOpenEmail(
       footer: [[event.name, whenLine, venue].filter(Boolean).join(' · ')],
     });
 
-    await createTransporter().sendMail({
-      from: emailFromBuyers(),
+    const mailed = await sendMailAs('buyers', {
       replyTo: replyToBuyers(),
       to,
       subject: headline,
@@ -2297,6 +2469,7 @@ export async function sendWaitlistSpotsOpenEmail(
         ],
       }),
     });
+    if (!mailed.sent) return mailed;
     return { sent: true };
   } catch (err) {
     console.error('[email] Failed to send waitlist notification:', err instanceof Error ? err.message : err);
@@ -2380,8 +2553,7 @@ export async function sendOrganizerAnnouncementEmail(
       footer: [[event.name, whenLine, venue].filter(Boolean).join(' · ')],
     });
 
-    await createTransporter().sendMail({
-      from: emailFromBuyers(),
+    const mailed = await sendMailAs('buyers', {
       replyTo: replyToBuyers(),
       to,
       subject: headline,
@@ -2412,6 +2584,7 @@ export async function sendOrganizerAnnouncementEmail(
         ],
       }),
     });
+    if (!mailed.sent) return mailed;
     return { sent: true };
   } catch (err) {
     console.error('[email] Failed to send announcement:', err instanceof Error ? err.message : err);
@@ -2476,8 +2649,7 @@ export async function sendMarketingConfirmationEmail(
       ],
     });
 
-    await createTransporter().sendMail({
-      from: emailFromBuyers(),
+    const mailed = await sendMailAs('buyers', {
       replyTo: replyToBuyers(),
       to,
       subject: headline,
@@ -2494,6 +2666,7 @@ export async function sendMarketingConfirmationEmail(
         ],
       }),
     });
+    if (!mailed.sent) return mailed;
     return { sent: true };
   } catch (err) {
     console.error('[email] Failed to send marketing confirmation:', err instanceof Error ? err.message : err);
@@ -2582,8 +2755,7 @@ export async function sendStallRequestEmail(
       footer: [`${platformName()} · organizer portal`],
     });
 
-    await createTransporter().sendMail({
-      from: emailFromOrganizers(),
+    const mailed = await sendMailAs('organizers', {
       replyTo: replyToOrganizers(),
       to: hostOrganizer.email,
       subject: `Stall request for ${hostEvent.name}: ${shop.name}`,
@@ -2601,6 +2773,7 @@ export async function sendStallRequestEmail(
         ],
       }),
     });
+    if (!mailed.sent) return mailed;
     return { sent: true };
   } catch (err) {
     console.error('[email] Failed to send stall request:', err instanceof Error ? err.message : err);
@@ -2681,8 +2854,7 @@ export async function sendStallDecisionEmail(
       footer: [`${platformName()} · organizer portal`],
     });
 
-    await createTransporter().sendMail({
-      from: emailFromOrganizers(),
+    const mailed = await sendMailAs('organizers', {
       replyTo: replyToOrganizers(),
       to: shopOrganizer.email,
       subject: approved
@@ -2704,6 +2876,7 @@ export async function sendStallDecisionEmail(
         ],
       }),
     });
+    if (!mailed.sent) return mailed;
     return { sent: true };
   } catch (err) {
     console.error('[email] Failed to send stall decision:', err instanceof Error ? err.message : err);
@@ -2779,8 +2952,7 @@ export async function sendStallRevokedEmail(
       footer: [`${platformName()} · organizer portal`],
     });
 
-    await createTransporter().sendMail({
-      from: emailFromOrganizers(),
+    const mailed = await sendMailAs('organizers', {
       replyTo: replyToOrganizers(),
       to: shopOrganizer.email,
       subject: `Removed: your stall at ${hostEvent.name}`,
@@ -2797,6 +2969,7 @@ export async function sendStallRevokedEmail(
         ],
       }),
     });
+    if (!mailed.sent) return mailed;
     return { sent: true };
   } catch (err) {
     console.error('[email] Failed to send stall revocation:', err instanceof Error ? err.message : err);
