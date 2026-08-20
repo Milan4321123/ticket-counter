@@ -11,7 +11,12 @@ export interface SavedTier {
   /** on-sale | coming-soon | hidden — see lib/events.ts TierStatus. */
   status: 'on-sale' | 'coming-soon' | 'hidden';
   studentOnly: boolean;
+  /** The one line on the card. */
   description: string;
+  /** The long "about this item" write-up behind its own page, or ''. */
+  details: string;
+  /** Its picture: one of the listing's own photo ids, or null for none. */
+  mediaId: string | null;
   /** Seats one booking covers (1..20). 1 on every ordinary tier. */
   seatsPerUnit: number;
 }

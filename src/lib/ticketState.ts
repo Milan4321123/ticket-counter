@@ -207,6 +207,52 @@ export function ticketState(
   };
 }
 
+/** What one tier's own pill says, and the classes that colour it. */
+export interface TierBadge {
+  label: string;
+  /**
+   * The COMPLETE class list for the pill, base included — 'badge' on its own is
+   * the plain grey one. Complete rather than just the modifier so no caller can
+   * render `class="badge "` with a dangling space, or forget the base class.
+   */
+  className: string;
+}
+
+/**
+ * The badge for ONE ticket type, given the listing's overall state.
+ *
+ * Lifted out of the listing page the day the item page appeared, because the
+ * two now show the same row in two places and a chain this order-dependent
+ * copied into a second file WILL drift. The order is the whole thing, and it
+ * is: finished, then this row's own status, then its own stock, then the
+ * listing's pause, then the countdown.
+ *
+ *  - Own-status-before-listing is what lets an early bird read "Sold out"
+ *    beside a standard reading "Coming soon". A paused listing used to
+ *    relabel every row at once, which is what made the two controls
+ *    impossible to tell apart.
+ *  - The countdown comes LAST because hiding the count must hide the NUMBER,
+ *    never the fact: this chain once began with "countdown hidden → Available",
+ *    so a tier with it switched off said Available after selling out.
+ */
+export function tierBadge(
+  state: TicketState,
+  tier: EventTierRow,
+  remaining: number,
+  showRemaining: boolean
+): TierBadge {
+  if (state.kind === 'past') return { label: state.badge, className: 'badge' };
+  if (tier.status === 'coming-soon') return { label: 'Coming soon', className: 'badge badge-green' };
+  if (remaining === 0) return { label: 'Sold out', className: 'badge badge-red' };
+  // On sale, but the listing as a whole is paused — so the honest word for THIS
+  // row is the listing's, in the amber the hero uses for it.
+  if (state.kind === 'closed') return { label: state.badge, className: 'badge badge-amber' };
+  if (showRemaining && remaining <= 25) {
+    return { label: `Only ${remaining} left`, className: 'badge badge-amber' };
+  }
+  return { label: 'Available', className: 'badge badge-green' };
+}
+
 /**
  * The "from €x" headline price — the cheapest price the badge beside it is
  * actually talking about.

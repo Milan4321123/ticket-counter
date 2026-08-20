@@ -79,3 +79,33 @@ export function listingStillUrl(event: EventRow): string | null {
   const still = listingStill(event, getEventMedia(event.id));
   return still ? mediaUrl(still.id, 'card', still.crop) : null;
 }
+
+/**
+ * The picture that represents this listing everywhere OFF-site: Google,
+ * WhatsApp, Facebook, Viber. Uses the SAME cover the page itself opens with,
+ * including the organizer's own crop, so the link preview and the page agree.
+ *
+ * 1200x630 is the size every social platform crops to; the 'cover' variant is
+ * 1600x740, close enough in shape that nothing important is lost and far better
+ * than shipping a 7 MB original that Facebook would reject for size.
+ *
+ * Videos are skipped: a link preview must be a still. A listing whose cover is a
+ * video falls through to its poster or first photo, and if it has no picture at
+ * all it gets no og:image rather than a broken one.
+ *
+ * Lives here rather than on the event page because the item page needs the same
+ * fallback: an item with no photo of its own shares its shop's picture, and two
+ * copies of this preference order would eventually disagree about which one.
+ */
+export function socialImageUrl(event: EventRow): string | null {
+  const photos = getEventMedia(event.id); // photos only — videos are excluded here
+  const isPhoto = (id: string | null): id is string => !!id && photos.some((p) => p.id === id);
+
+  if (isPhoto(event.coverMediaId)) {
+    return mediaUrl(event.coverMediaId, 'cover', cropTag(parseCropRect(event.coverCrop)));
+  }
+  if (isPhoto(event.posterMediaId)) {
+    return mediaUrl(event.posterMediaId, 'cover', cropTag(parseCropRect(event.posterCrop)));
+  }
+  return photos[0] ? mediaUrl(photos[0].id, 'cover', null) : null;
+}

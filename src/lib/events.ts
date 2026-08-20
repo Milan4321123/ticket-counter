@@ -166,7 +166,22 @@ export interface EventTierRow {
    */
   status: TierStatus;
   studentOnly: boolean;
+  /** The ONE line on the card. Stays short — the grid has room for a sentence. */
   description: string;
+  /**
+   * The long "about this item" prose behind the item page, or ''. Separate from
+   * `description` on purpose: the card needs a line, the item page needs a
+   * write-up, and collapsing the two would either bury the write-up in a grid
+   * or shrink the card's line to nothing.
+   */
+  details: string;
+  /**
+   * This item's photo: the id of one of the SAME listing's event_media rows,
+   * or null. Never trust it raw — a photo can be deleted after a tier points at
+   * it, and a hand-written row could name another listing's photo. tierPhoto()
+   * is the only sanctioned way to turn it into something to render.
+   */
+  mediaId: string | null;
   sort: number;
 }
 
@@ -407,18 +422,26 @@ export function getEventTiers(eventId: string): EventTierRow[] {
   const rows = getDb()
     .prepare(
       `SELECT id, event_id AS eventId, tier_key AS tierKey, name, price_cents AS priceCents,
-              cap, unlimited, status, student_only AS studentOnly, description, sort,
-              seats_per_unit AS seatsPerUnit
+              cap, unlimited, status, student_only AS studentOnly, description, details,
+              media_id AS mediaId, sort, seats_per_unit AS seatsPerUnit
        FROM event_tiers WHERE event_id = ? ORDER BY sort, tier_key`
     )
-    .all(eventId) as (Omit<EventTierRow, 'studentOnly' | 'unlimited'> & {
+    .all(eventId) as (Omit<EventTierRow, 'studentOnly' | 'unlimited' | 'details'> & {
       studentOnly: number;
       unlimited: number;
+      // NOT NULL with a default, but rows can predate the ALTER on a database
+      // restored from an older dump — typed as it really arrives.
+      details: string | null;
     })[];
   return rows.map((r) => ({
     ...r,
     studentOnly: Boolean(r.studentOnly),
     unlimited: Boolean(r.unlimited),
+    // NULL on every row written before the column existed, and on every tier
+    // whose organizer has not written one — normalized here so no caller has
+    // to spell `?? ''` before measuring or rendering it.
+    details: r.details ?? '',
+    mediaId: r.mediaId ?? null,
     // Whitelisted on the way out as well as in: an unrecognised value must not
     // silently hide a ticket type an organizer is trying to sell.
     status: r.status === 'coming-soon' || r.status === 'hidden' ? r.status : 'on-sale',
@@ -431,6 +454,71 @@ export function getEventTiers(eventId: string): EventTierRow[] {
 
 export function getEventTier(eventId: string, tierKey: string): EventTierRow | null {
   return getEventTiers(eventId).find((t) => t.tierKey === tierKey) ?? null;
+}
+
+/**
+ * The photo this tier may actually show, or null.
+ *
+ * `photos` is THIS listing's own photo list (getEventMedia), and an id that is
+ * not in it — deleted since it was picked, or belonging to another listing —
+ * comes back as null. Degrading to no picture rather than throwing is the same
+ * posture the cover/poster/profile slots already take on the event page: a
+ * dangling pointer costs a thumbnail, never a page.
+ *
+ * The same check runs on save (see the tiers block in the portal's update
+ * route), so this is the second of two locks, not the only one. It is still
+ * required: the photo can be deleted long after the tier was saved.
+ */
+export function tierPhoto(tier: EventTierRow, photos: EventMediaRow[]): EventMediaRow | null {
+  if (!tier.mediaId) return null;
+  return photos.find((p) => p.id === tier.mediaId) ?? null;
+}
+
+/**
+ * This listing's photos MINUS every picture a tier has claimed as its own.
+ *
+ * An item photo is an ordinary row in the listing's shared media pool — that is
+ * what lets a tier point at one without a second upload path or a second place
+ * to delete from. The cost is that any gallery built from the raw pool shows
+ * the product art too: a shop with five items advertised eight "photos of the
+ * shop", five of which were jars, and the item page's own rail offered the 500 g
+ * jar and the gift box as more views of the 100 g jar somebody was deciding on.
+ * A picture that belongs to one product belongs on that product's page and
+ * nowhere else, so the generic rails are built from what is left here.
+ *
+ * Pass ALL tiers (getEventTiers), not just the visible ones: a hidden row is off
+ * the page entirely, and its picture should not be the way back onto it.
+ */
+export function unclaimedPhotos(tiers: EventTierRow[], photos: EventMediaRow[]): EventMediaRow[] {
+  const claimed = new Set(tiers.map((t) => t.mediaId).filter((id): id is string => !!id));
+  return photos.filter((p) => !claimed.has(p.id));
+}
+
+/**
+ * Is this row worth a page of its own — linked from the card, and offered to
+ * Google in the sitemap?
+ *
+ * /e/[slug]/item/[tierKey] RENDERS for any visible tier regardless (a link
+ * that was shared or indexed must not start 404ing the day a seller clears the
+ * prose). This is the narrower question of whether anything should point at it.
+ *
+ *  - A SHOP: always. A shop sells goods, goods have product pages, and the
+ *    item page carries things the grid cannot — the disclosed seller, the
+ *    collection details, the picture at a size you can actually judge. "Read
+ *    more" that is sometimes there and sometimes not is worse than plain.
+ *  - An EVENT: only when the ticket has a picture or a write-up. A ticket tier
+ *    is a line in a picker, not a product; with no photo and no details the
+ *    page would repeat the card word for word, which costs a tap on the way to
+ *    checkout and asks Google to index a page that duplicates the listing. So
+ *    an ordinary event regresses to precisely today's card, and an organizer
+ *    who writes a real description of their VIP table gets the page for it.
+ */
+export function tierHasItemPage(
+  kind: EventKind,
+  tier: EventTierRow,
+  photo: EventMediaRow | null
+): boolean {
+  return kind === 'shop' || photo !== null || tier.details.trim().length > 0;
 }
 
 // ---------------- Media ----------------

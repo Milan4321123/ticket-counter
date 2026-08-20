@@ -1,7 +1,14 @@
 import type { MetadataRoute } from 'next';
 import { getBaseUrl } from '@/lib/config';
-import { listPublishedEvents } from '@/lib/events';
+import {
+  getEventMedia,
+  getEventTiers,
+  listPublishedEvents,
+  tierHasItemPage,
+  tierPhoto,
+} from '@/lib/events';
 import { machineDate } from '@/lib/seo';
+import { visibleTiers } from '@/lib/ticketState';
 
 /**
  * /sitemap.xml — the list of pages we are asking Google to index.
@@ -60,5 +67,35 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.9,
   }));
 
-  return [...staticPages, ...eventPages];
+  /**
+   * One entry per thing a published listing sells that has a page worth
+   * indexing — a shop's items always, an event's ticket types only when the
+   * organizer gave them a picture or a write-up (see tierHasItemPage).
+   *
+   * That gate is the whole point of listing them separately. A shop item page
+   * is the page a searcher for "black cardamom berlin" actually wants, and
+   * without this it is invisible to Google — nothing links to it from outside
+   * the shop. An event ticket page with no photo and no prose is a copy of one
+   * card on the listing page, and asking Google to index thirty of those per
+   * event is how a domain teaches a crawler that most of its pages are
+   * duplicates.
+   *
+   * Hidden types are excluded by visibleTiers, exactly as the item page itself
+   * excludes them — a sitemap must never advertise a URL that 404s.
+   */
+  const itemPages: MetadataRoute.Sitemap = events.flatMap((event) => {
+    const photos = getEventMedia(event.id);
+    return visibleTiers(getEventTiers(event.id))
+      .filter((tier) => tierHasItemPage(event.kind, tier, tierPhoto(tier, photos)))
+      .map((tier) => ({
+        url: `${base}/e/${event.slug}/item/${encodeURIComponent(tier.tierKey)}`,
+        lastModified: machineDate(event) ?? undefined,
+        // Below the listing page itself, which is what should rank for the
+        // shop's own name — these compete for the product's name instead.
+        changeFrequency: 'daily' as const,
+        priority: 0.7,
+      }));
+  });
+
+  return [...staticPages, ...eventPages, ...itemPages];
 }

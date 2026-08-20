@@ -417,6 +417,33 @@ function migrateToPlatform(db: Database.Database): void {
   if (!tierCols.includes('seats_per_unit')) {
     db.exec(`ALTER TABLE event_tiers ADD COLUMN seats_per_unit INTEGER NOT NULL DEFAULT 1`);
   }
+  // A picture and a proper write-up per thing sold, so a shop's products look
+  // like goods instead of ticket tiers.
+  //
+  // media_id POINTS AT ONE OF THE LISTING'S OWN event_media ROWS rather than
+  // holding an upload of its own. Photos are already uploaded, quota-counted,
+  // variant-rendered and deleted per listing; a second pipeline hanging off
+  // event_tiers would have to repeat every one of those and would be the only
+  // place on the site where deleting a photo left a file nobody swept. NULL —
+  // no picture — is the state every existing row starts in and most event
+  // tiers will stay in. Deliberately NOT a REFERENCES constraint: the column
+  // is added by ALTER on live tables, SQLite cannot add a foreign key that
+  // way, and the id is re-checked against THIS listing's photos on every save
+  // and every render anyway (see tierPhoto() in lib/events.ts), which a
+  // foreign key alone would not do — it would happily accept another
+  // listing's photo.
+  //
+  // `details` is the long "about this item" prose the item page is built
+  // around. `description` stays exactly what it was, the one-liner on the
+  // card, because that is what every existing row holds and what the grid has
+  // room for. 4000 characters matches assistant_context — a page of prose, not
+  // a book — and is enforced on write.
+  if (!tierCols.includes('media_id')) {
+    db.exec(`ALTER TABLE event_tiers ADD COLUMN media_id TEXT`);
+  }
+  if (!tierCols.includes('details')) {
+    db.exec(`ALTER TABLE event_tiers ADD COLUMN details TEXT NOT NULL DEFAULT ''`);
+  }
   // RETIRED. It let an organizer choose whether a PAUSE read "Sales closed" or
   // "Tickets coming soon" — a second way to say what the per-ticket status
   // below already says, and it overrode every ticket type at once. An organizer

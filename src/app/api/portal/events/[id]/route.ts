@@ -81,6 +81,36 @@ const MAX_TIERS = 20;
 const MAX_ASSISTANT_CONTEXT = 4000;
 /** Collection details: a few lines of when and where, not an essay. */
 const MAX_PICKUP_INFO = 2000;
+/**
+ * The long "about this item" prose behind one item's page. Same ceiling as the
+ * assistant notes — a page of writing about one product, not a book — and kept
+ * in sync with the counter in the portal's TiersEditor.
+ */
+const MAX_TIER_DETAILS = 4000;
+/** The row's short name and its one-line blurb on the listing card. */
+const MAX_TIER_NAME = 80;
+const MAX_TIER_DESCRIPTION = 300;
+
+/**
+ * How big a patch this route will read — DERIVED from the ceilings above
+ * rather than picked as a round number.
+ *
+ * The Tiers tab posts every row in one body, so the cap has to hold what that
+ * form itself invites a seller to type: MAX_TIERS rows each carrying a full
+ * MAX_TIER_DETAILS write-up. A flat 64 KB did not — twenty full rows measure
+ * about 90 KB — so a seller with a twenty-item shop got "That request was too
+ * large" on every save of the tab, including a save that only moved one price,
+ * while the counter under each box still said characters remained. Deriving it
+ * is what stops raising either ceiling from quietly bringing that back.
+ *
+ * Four bytes per character is the worst an ordinary typed character costs once
+ * UTF-8 encoded and JSON escaped, so a seller writing their product pages in
+ * Devanagari (three bytes) sits comfortably inside this rather than near the
+ * edge. The flat tail covers the rest of the patch — description, collection
+ * details, the page design — which no tier count changes.
+ */
+const MAX_EVENT_BODY_BYTES =
+  MAX_TIERS * (MAX_TIER_DETAILS + MAX_TIER_DESCRIPTION + MAX_TIER_NAME) * 4 + 64 * 1024;
 
 /** Patch field -> column for the three hand-positioned photo slots. */
 const CROP_FIELDS = [
@@ -100,6 +130,10 @@ interface TierPayload {
   status: TierStatus;
   studentOnly: boolean;
   description: string;
+  /** The long write-up behind this row's item page, or ''. */
+  details: string;
+  /** One of THIS listing's photo ids, or null. Never another listing's. */
+  mediaId: string | null;
   /**
    * Seats one booking of this tier covers (a "Table of 8" is one booking,
    * eight seats, eight QR tickets). 1..20; 1 on every ordinary tier.
@@ -166,7 +200,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     let body: Record<string, unknown>;
     try {
-      const parsed = await readJsonLimited(req, 64 * 1024);
+      const parsed = await readJsonLimited(req, MAX_EVENT_BODY_BYTES);
       need(Boolean(parsed) && typeof parsed === 'object' && !Array.isArray(parsed), 'Nothing to save.');
       body = parsed as Record<string, unknown>;
     } catch (e) {
@@ -578,11 +612,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const existingKeys = new Set(existingTiers.map((t) => t.tierKey));
       const taken = new Set<string>();
       const keep: (TierPayload & { tierKey: string })[] = [];
+      // The ONLY photos a tier of this listing may point at: its own listing's,
+      // and photos rather than videos. Read once, outside the loop. This is the
+      // scoping guard — without it a body naming another organizer's media id
+      // would render that photo on this page, which is both a leak and a
+      // picture whose owner can delete it out from under a live listing.
+      const ownPhotoIds = new Set(getEventMedia(event.id).map((m) => m.id));
 
       for (const raw of rows) {
         need(Boolean(raw) && typeof raw === 'object', 'Invalid ticket type.');
         const r = raw as Record<string, unknown>;
-        const name = strField(r.name, 'Each ticket type name', 80);
+        const name = strField(r.name, 'Each ticket type name', MAX_TIER_NAME);
         need(name.length > 0, 'Every ticket type needs a name.');
         const priceCents = intField(r.priceCents, `The price of "${name}"`, 0, 5_000_000);
         const cap = intField(r.cap, `The ticket limit of "${name}"`, 0, 200000);
@@ -595,7 +635,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const status: TierStatus =
           rawStatus === 'coming-soon' || rawStatus === 'hidden' ? rawStatus : 'on-sale';
         need(typeof r.studentOnly === 'boolean', 'Student-only must be on or off.');
-        const description = strField(r.description ?? '', `The description of "${name}"`, 300);
+        const description = strField(r.description ?? '', `The description of "${name}"`, MAX_TIER_DESCRIPTION);
+        const details = strField(r.details ?? '', `The details of "${name}"`, MAX_TIER_DETAILS);
+        // A photo id that is not one of THIS listing's photos becomes no photo,
+        // rather than a 400. Both halves are deliberate:
+        //  - it is COERCED, not trusted, so the scoping rule is enforced here
+        //    and not only where it is rendered;
+        //  - it does not refuse the save, because the id most likely to be
+        //    stale is one whose photo the organizer deleted in the Photos tab
+        //    in another window, and refusing the whole tiers form over a
+        //    thumbnail would block a price change behind a picture. Silently
+        //    losing the picture is the smaller surprise, and the editor reloads
+        //    from the server after every save so they see it immediately.
+        const rawMediaId = (r as { mediaId?: unknown }).mediaId;
+        const mediaId =
+          typeof rawMediaId === 'string' && ownPhotoIds.has(rawMediaId) ? rawMediaId : null;
 
         // Existing rows keep their key so past orders stay linked; new rows
         // (or rows with a stale/unknown key) get a fresh key from the name.
@@ -629,7 +683,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             `“${name}” already has orders, so its ${merged.kind === 'shop' ? 'items' : 'seats'} per booking can't change from ${prior.seatsPerUnit}. Hide it and add a new ${vocabFor(merged.kind).unitType} instead.`
           );
         }
-        keep.push({ tierKey, name, priceCents, cap, unlimited, status, studentOnly: r.studentOnly, description, seatsPerUnit });
+        keep.push({ tierKey, name, priceCents, cap, unlimited, status, studentOnly: r.studentOnly, description, details, mediaId, seatsPerUnit });
       }
 
       // On a MIXED listing, a free tier must state a number. The room is one
@@ -745,19 +799,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const del = db.prepare(`DELETE FROM event_tiers WHERE event_id = ? AND tier_key = ?`);
         for (const key of tiersPlan.removeKeys) del.run(event.id, key);
         const upd = db.prepare(
-          `UPDATE event_tiers SET name = ?, price_cents = ?, cap = ?, unlimited = ?, status = ?, student_only = ?, description = ?, sort = ?, seats_per_unit = ?
+          `UPDATE event_tiers SET name = ?, price_cents = ?, cap = ?, unlimited = ?, status = ?, student_only = ?, description = ?, details = ?, media_id = ?, sort = ?, seats_per_unit = ?
            WHERE event_id = ? AND tier_key = ?`
         );
         const ins = db.prepare(
-          `INSERT INTO event_tiers (id, event_id, tier_key, name, price_cents, cap, unlimited, status, student_only, description, sort, seats_per_unit)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO event_tiers (id, event_id, tier_key, name, price_cents, cap, unlimited, status, student_only, description, details, media_id, sort, seats_per_unit)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         );
         const existingKeys = new Set(existingTiers.map((t) => t.tierKey));
         tiersPlan.keep.forEach((t, sort) => {
           if (existingKeys.has(t.tierKey)) {
-            upd.run(t.name, t.priceCents, t.cap, t.unlimited ? 1 : 0, t.status, t.studentOnly ? 1 : 0, t.description, sort, t.seatsPerUnit, event.id, t.tierKey);
+            upd.run(t.name, t.priceCents, t.cap, t.unlimited ? 1 : 0, t.status, t.studentOnly ? 1 : 0, t.description, t.details, t.mediaId, sort, t.seatsPerUnit, event.id, t.tierKey);
           } else {
-            ins.run(newId(), event.id, t.tierKey, t.name, t.priceCents, t.cap, t.unlimited ? 1 : 0, t.status, t.studentOnly ? 1 : 0, t.description, sort, t.seatsPerUnit);
+            ins.run(newId(), event.id, t.tierKey, t.name, t.priceCents, t.cap, t.unlimited ? 1 : 0, t.status, t.studentOnly ? 1 : 0, t.description, t.details, t.mediaId, sort, t.seatsPerUnit);
           }
         });
       }
@@ -831,6 +885,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
               status: t.status,
               studentOnly: t.studentOnly,
               description: t.description,
+              details: t.details,
+              mediaId: t.mediaId,
               seatsPerUnit: t.seatsPerUnit,
             })),
           }

@@ -4,7 +4,15 @@ import { useRef, useState } from 'react';
 import type { EventKind } from '@/lib/types';
 import { vocabFor } from '@/lib/vocab';
 import { useRouter } from 'next/navigation';
+import GoToTab from './GoToTab';
 import { saveEvent, type SavedTier } from './save';
+
+/**
+ * Long "about this item" prose. Kept in sync with MAX_TIER_DETAILS in the
+ * portal's update route — the counter under the box has to promise what the
+ * server will actually accept.
+ */
+const MAX_DETAILS = 4000;
 
 interface Row {
   tierKey: string | null; // null = new row, key assigned by the server on save
@@ -15,7 +23,17 @@ interface Row {
   status: 'on-sale' | 'coming-soon' | 'hidden';
   studentOnly: boolean;
   description: string;
+  details: string;
+  /** One of the listing's photo ids, or null for "no picture". */
+  mediaId: string | null;
   seatsPerUnit: string; // as typed; blank means 1 (an ordinary single ticket)
+}
+
+/** One of the listing's uploaded photos, as the picker shows it. */
+export interface TierPhotoOption {
+  id: string;
+  url: string;
+  label: string;
 }
 
 interface Props {
@@ -23,6 +41,14 @@ interface Props {
   /** Event or shop — decides whether these rows are ticket types or items. */
   kind: EventKind;
   initialTiers: SavedTier[];
+  /**
+   * The listing's own photos, in gallery order. An item's picture is CHOSEN
+   * from these rather than uploaded here: the photos are already uploaded,
+   * quota-counted and cleaned up per listing, and a second upload path hanging
+   * off this form would be the one place on the site where deleting a photo
+   * left a file nobody swept.
+   */
+  photos: TierPhotoOption[];
   /** Tickets sold so far, by tier key — sold tiers can't be removed. */
   soldByTierKey: Record<string, number>;
 }
@@ -37,11 +63,13 @@ function toRow(t: SavedTier): Row {
     status: t.status ?? 'on-sale',
     studentOnly: t.studentOnly,
     description: t.description,
+    details: t.details ?? '',
+    mediaId: t.mediaId ?? null,
     seatsPerUnit: String(t.seatsPerUnit ?? 1),
   };
 }
 
-export default function TiersEditor({ eventId, kind, initialTiers, soldByTierKey }: Props) {
+export default function TiersEditor({ eventId, kind, initialTiers, photos, soldByTierKey }: Props) {
   const router = useRouter();
   const v = vocabFor(kind);
   const [rows, setRows] = useState<Row[]>(initialTiers.map(toRow));
@@ -55,7 +83,7 @@ export default function TiersEditor({ eventId, kind, initialTiers, soldByTierKey
   }
 
   function addRow() {
-    setRows((prev) => [...prev, { tierKey: null, name: '', price: '', cap: '', unlimited: false, status: 'on-sale', studentOnly: false, description: '', seatsPerUnit: '1' }]);
+    setRows((prev) => [...prev, { tierKey: null, name: '', price: '', cap: '', unlimited: false, status: 'on-sale', studentOnly: false, description: '', details: '', mediaId: null, seatsPerUnit: '1' }]);
   }
 
   function removeRow(index: number) {
@@ -87,6 +115,8 @@ export default function TiersEditor({ eventId, kind, initialTiers, soldByTierKey
       status: 'on-sale' | 'coming-soon' | 'hidden';
       studentOnly: boolean;
       description: string;
+      details: string;
+      mediaId: string | null;
       seatsPerUnit: number;
     }[] =
       [];
@@ -125,6 +155,12 @@ export default function TiersEditor({ eventId, kind, initialTiers, soldByTierKey
         studentOnly: row.studentOnly,
         status: row.status,
         description: row.description.trim(),
+        details: row.details.trim(),
+        // A photo the organizer deleted in the Photos tab since this form was
+        // opened is dropped here rather than sent: the server would coerce it
+        // to null anyway, and sending it would make the "Saved" that comes back
+        // disagree with the thumbnail still showing in this row.
+        mediaId: row.mediaId && photos.some((p) => p.id === row.mediaId) ? row.mediaId : null,
         seatsPerUnit,
       });
     }
@@ -312,6 +348,97 @@ export default function TiersEditor({ eventId, kind, initialTiers, soldByTierKey
                 maxLength={300}
                 placeholder={kind === 'shop' ? 'What is in it?' : 'What does this ticket include?'}
               />
+              <p className="muted small" style={{ margin: '6px 0 0' }}>
+                The one line on the card. Everything longer goes in the write-up below.
+              </p>
+            </div>
+
+            {/* Picture and write-up together, because they are the two things
+                that give this row a page of its own — a shop item always gets
+                one, an event ticket gets one as soon as either of these is
+                filled in. */}
+            <div className="field" style={{ marginBottom: 10 }}>
+              {/* Not a <label>: this labels a grid of buttons, not one form
+                  control, and a label pointing at nothing is worse for a
+                  screen reader than a heading. The buttons carry their own
+                  names. */}
+              <p className="tier-photo-label">Photo</p>
+              {photos.length === 0 ? (
+                /* No empty picker: a grid of nothing looks broken and, worse,
+                   looks like the feature is unavailable. Say where the photos
+                   come from and send them there. */
+                <>
+                  <p className="muted small" style={{ margin: '0 0 8px' }}>
+                    You have not uploaded any photos yet — an item&rsquo;s picture is picked from
+                    them, so add some first and then come back and choose one for each{' '}
+                    {v.unitType}.
+                  </p>
+                  <GoToTab tab="media">Go to Photos &amp; videos →</GoToTab>
+                </>
+              ) : (
+                <>
+                  <div className="tier-photo-picker">
+                    {/* "None" is a real option and it is FIRST: most rows will
+                        never have a picture, and taking one off has to be as
+                        easy as putting one on. */}
+                    <button
+                      type="button"
+                      className={`tier-photo-option tier-photo-none${row.mediaId === null ? ' is-selected' : ''}`}
+                      onClick={() => patchRow(i, { mediaId: null })}
+                      aria-pressed={row.mediaId === null}
+                    >
+                      No photo
+                    </button>
+                    {photos.map((photo) => (
+                      <button
+                        type="button"
+                        key={photo.id}
+                        className={`tier-photo-option${row.mediaId === photo.id ? ' is-selected' : ''}`}
+                        onClick={() => patchRow(i, { mediaId: photo.id })}
+                        aria-pressed={row.mediaId === photo.id}
+                        title={photo.label}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={photo.url} alt={photo.label} loading="lazy" />
+                      </button>
+                    ))}
+                  </div>
+                  <p className="muted small" style={{ margin: '6px 0 0' }}>
+                    Pick one of your own photos. It shows on the card and at the top of this{' '}
+                    {v.unitType}&rsquo;s own page.
+                  </p>
+                </>
+              )}
+            </div>
+
+            <div className="field" style={{ marginBottom: 10 }}>
+              <label htmlFor={`tier-details-${i}`}>About this {v.unit}</label>
+              <textarea
+                id={`tier-details-${i}`}
+                className="input"
+                rows={6}
+                value={row.details}
+                onChange={(e) => patchRow(i, { details: e.target.value.slice(0, MAX_DETAILS) })}
+                maxLength={MAX_DETAILS}
+                placeholder={
+                  kind === 'shop'
+                    ? 'What it is, how it was made, how to use it, how much is in it, how long it keeps…'
+                    : 'What this ticket gets you, who it is for, anything a buyer should know before choosing it…'
+                }
+                style={{ resize: 'vertical', fontFamily: 'inherit' }}
+              />
+              <p
+                className="muted small"
+                style={{
+                  margin: '6px 0 0',
+                  ...(MAX_DETAILS - row.details.length < 200 ? { color: 'var(--red)' } : {}),
+                }}
+              >
+                {MAX_DETAILS - row.details.length} characters left.{' '}
+                {kind === 'shop'
+                  ? 'This is the page a buyer reads before deciding — write it like you would tell somebody at your stall.'
+                  : 'Optional. Fill it in and this ticket gets a page of its own; leave it empty and it stays a card.'}
+              </p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
               <label className="checkbox-row" style={{ marginBottom: 0 }} htmlFor={`tier-student-${i}`}>

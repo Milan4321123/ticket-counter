@@ -27,19 +27,23 @@ import {
   parseCropRect,
   parsePageDesign,
   paypalPayee,
+  tierHasItemPage,
+  tierPhoto,
+  unclaimedPhotos,
   videoEmbedUrl,
 } from '@/lib/events';
 import type { EventRow, PageDesign } from '@/lib/events';
+import { ACCENT_THEMES } from '@/lib/accents';
 import type { EventKind } from '@/lib/types';
 import { listStallLinksForShop, listVisibleStallsForEvent, stallBannerVisibleOnShopPage } from '@/lib/stalls';
 import type { StallLinkRow } from '@/lib/stalls';
-import { listingStillUrl } from '@/lib/listing';
+import { listingStillUrl, socialImageUrl } from '@/lib/listing';
 import { BADGE_TONE, PLACEHOLDER_GRADIENTS } from '@/components/EventCard';
 import { vocabFor } from '@/lib/vocab';
 import { getAvailability } from '@/lib/inventory';
 import { runWaitlistNotifySweep } from '@/lib/waitlist';
 import WaitlistForm from '@/components/WaitlistForm';
-import { ticketState, fromPriceCents, visibleTiers, comingSoonLabel } from '@/lib/ticketState';
+import { ticketState, fromPriceCents, tierBadge, visibleTiers, comingSoonLabel } from '@/lib/ticketState';
 import { platformName } from '@/lib/platform';
 import { currentOrganizer, getOrganizer } from '@/lib/organizers';
 import {
@@ -59,77 +63,6 @@ import {
 
 // Availability comes from the database — always render fresh.
 export const dynamic = 'force-dynamic';
-
-type AccentName = NonNullable<PageDesign['accent']>;
-
-/**
- * The six organizer-selectable accents, mapped onto the design system's CSS
- * tokens. Applied as inline CSS variables on a wrapper div, so every existing
- * class (buttons, badges, steps, glows) recolors itself — no raw CSS from
- * organizers ever reaches the page.
- */
-const ACCENT_THEMES = {
-  violet: {
-    '--accent': '#8b5cf6',
-    '--accent-strong': '#7c3aed',
-    '--accent-soft': 'rgba(139, 92, 246, 0.14)',
-    '--accent-glow': 'rgba(139, 92, 246, 0.45)',
-    '--accent-text': '#c4b5fd',
-    '--pink': '#ec4899',
-    '--pink-soft': 'rgba(236, 72, 153, 0.14)',
-    '--pink-text': '#f9a8d4',
-  },
-  sunset: {
-    '--accent': '#f97316',
-    '--accent-strong': '#ea580c',
-    '--accent-soft': 'rgba(249, 115, 22, 0.14)',
-    '--accent-glow': 'rgba(249, 115, 22, 0.45)',
-    '--accent-text': '#fdba74',
-    '--pink': '#ec4899',
-    '--pink-soft': 'rgba(236, 72, 153, 0.14)',
-    '--pink-text': '#f9a8d4',
-  },
-  ocean: {
-    '--accent': '#0ea5e9',
-    '--accent-strong': '#0284c7',
-    '--accent-soft': 'rgba(14, 165, 233, 0.14)',
-    '--accent-glow': 'rgba(14, 165, 233, 0.45)',
-    '--accent-text': '#7dd3fc',
-    '--pink': '#22d3ee',
-    '--pink-soft': 'rgba(34, 211, 238, 0.14)',
-    '--pink-text': '#a5f3fc',
-  },
-  emerald: {
-    '--accent': '#10b981',
-    '--accent-strong': '#059669',
-    '--accent-soft': 'rgba(16, 185, 129, 0.14)',
-    '--accent-glow': 'rgba(16, 185, 129, 0.45)',
-    '--accent-text': '#6ee7b7',
-    '--pink': '#2dd4bf',
-    '--pink-soft': 'rgba(45, 212, 191, 0.14)',
-    '--pink-text': '#99f6e4',
-  },
-  gold: {
-    '--accent': '#f59e0b',
-    '--accent-strong': '#d97706',
-    '--accent-soft': 'rgba(245, 158, 11, 0.14)',
-    '--accent-glow': 'rgba(245, 158, 11, 0.45)',
-    '--accent-text': '#fcd34d',
-    '--pink': '#f97316',
-    '--pink-soft': 'rgba(249, 115, 22, 0.14)',
-    '--pink-text': '#fdba74',
-  },
-  crimson: {
-    '--accent': '#ef4444',
-    '--accent-strong': '#dc2626',
-    '--accent-soft': 'rgba(239, 68, 68, 0.14)',
-    '--accent-glow': 'rgba(239, 68, 68, 0.45)',
-    '--accent-text': '#fca5a5',
-    '--pink': '#f43f5e',
-    '--pink-soft': 'rgba(244, 63, 94, 0.14)',
-    '--pink-text': '#fda4af',
-  },
-} satisfies Record<AccentName, Record<string, string>>;
 
 /** Subtle hero adjustments per vibe — sizing and spacing only. */
 function vibeTuning(vibe: PageDesign['vibe']): {
@@ -252,32 +185,6 @@ interface Params {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-/**
- * The picture that represents this event everywhere off-site: Google, WhatsApp,
- * Facebook, Viber. Uses the SAME cover the page itself opens with, including
- * the organizer's own crop, so the link preview and the page agree.
- *
- * 1200x630 is the size every social platform crops to; the 'cover' variant is
- * 1600x740, close enough in shape that nothing important is lost and far better
- * than shipping a 7 MB original that Facebook would reject for size.
- *
- * Videos are skipped: a link preview must be a still. An event whose cover is a
- * video falls through to its poster or first photo, and if it has no picture at
- * all it gets no og:image rather than a broken one.
- */
-function socialImage(event: EventRow): string | null {
-  const photos = getEventMedia(event.id); // photos only — videos are excluded here
-  const isPhoto = (id: string | null): id is string => !!id && photos.some((p) => p.id === id);
-
-  if (isPhoto(event.coverMediaId)) {
-    return mediaUrl(event.coverMediaId, 'cover', cropTag(parseCropRect(event.coverCrop)));
-  }
-  if (isPhoto(event.posterMediaId)) {
-    return mediaUrl(event.posterMediaId, 'cover', cropTag(parseCropRect(event.posterCrop)));
-  }
-  return photos[0] ? mediaUrl(photos[0].id, 'cover', null) : null;
-}
-
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
   const event = getEventBySlug(slug);
@@ -297,7 +204,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   }
 
   const description = eventDescription(event);
-  const image = socialImage(event);
+  const image = socialImageUrl(event);
   const url = absoluteUrl(`/e/${event.slug}`);
   // What a searcher types: the thing, then the city. "Dashain Night 2026 —
   // Tickets, Berlin" matches "dashain night berlin tickets" far better than the
@@ -444,7 +351,12 @@ export default async function EventPage({ params, searchParams }: Params) {
     galleryItems.push({ id, kind, src: mediaUrl(id), alt });
   };
   addMedia(coverId, coverIsVideo ? 'video' : 'photo');
-  photos.forEach((m) => addMedia(m.id, 'photo'));
+  // NOT every photo: the ones a tier claimed as its item picture belong to that
+  // item's page, not to a rail captioned as photos of the whole listing. Left
+  // in, a five-product shop advertised eight "photos" of itself, five of them
+  // jars. The cover above is added before this and so survives the filter — an
+  // organizer who deliberately made a product shot the cover keeps it.
+  unclaimedPhotos(tiers, photos).forEach((m) => addMedia(m.id, 'photo'));
   videos.forEach((v) => addMedia(v.id, 'video'));
   // A lone item is already the hero cover — no point repeating it below.
   const showGallery = galleryItems.length >= 2;
@@ -582,7 +494,7 @@ export default async function EventPage({ params, searchParams }: Params) {
       ? { settings: referralRewards, currency: organizerCurrency(event.organizerId) }
       : null;
 
-  const socialImageUrl = socialImage(event);
+  const ogImage = socialImageUrl(event);
   const eventLd = eventJsonLd({
     event,
     tiers,
@@ -590,7 +502,7 @@ export default async function EventPage({ params, searchParams }: Params) {
       Object.entries(availability.tiers).map(([key, t]) => [key, t.remaining])
     ),
     totalRemaining: availability.totalRemaining,
-    images: socialImageUrl ? [absoluteUrl(socialImageUrl)] : [],
+    images: ogImage ? [absoluteUrl(ogImage)] : [],
     organizerName: organizer?.name?.trim() || SITE_NAME,
   });
 
@@ -821,46 +733,58 @@ export default async function EventPage({ params, searchParams }: Params) {
                   // into a dead end — off the biggest tap target on the page.
                   const tierBuyable =
                     state.buyable && !preview && tier.status === 'on-sale' && remaining > 0;
+                  // The picture the seller picked for this one, degrading to
+                  // none when the photo behind it has since been deleted.
+                  const tierPic = tierPhoto(tier, photos);
+                  // Whether this row is worth a page of its own — always for a
+                  // shop, only when there is something extra to read for an
+                  // event. See tierHasItemPage() for why. In preview the item
+                  // page 404s on an unpublished listing, exactly like the
+                  // checkout, so it is not offered there either.
+                  const itemHref =
+                    !preview && tierHasItemPage(event.kind, tier, tierPic)
+                      ? `/e/${event.slug}/item/${encodeURIComponent(tier.tierKey)}${refCode ? `?ref=${refCode}` : ''}`
+                      : null;
+                  const buyHref = `${checkoutBase}?tier=${encodeURIComponent(tier.tierKey)}${refCode ? `&ref=${refCode}` : ''}`;
+                  // One badge function, shared with the item page — the chain
+                  // it encodes is order-dependent enough that two copies of it
+                  // would eventually disagree about the same row.
+                  const badge = tierBadge(state, tier, remaining, availability.showRemaining);
                   const card = (
                     <>
+                      {/* The photo, when there is one. Cards without one keep
+                          exactly today's shape rather than reserving an empty
+                          frame: most events will never set one, and a row of
+                          grey placeholders would make a perfectly finished
+                          event page look half-built. */}
+                      {tierPic && (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          className="tier-card-photo"
+                          src={mediaUrl(tierPic.id, 'card', null)}
+                          alt={tier.name}
+                          loading="lazy"
+                        />
+                      )}
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        {/* Order matters, and it is: finished, then this row's
-                            own status, then its own stock, then the event's
-                            pause, then the countdown.
-                            Own-status-before-event is what lets an early bird
-                            read "Sold out" beside a standard reading "Coming
-                            soon" — for a while a paused event relabelled every
-                            row at once, which is what made the two controls
-                            impossible to tell apart. Countdown LAST because
-                            hiding the count must hide the NUMBER, never the
-                            fact: this chain once began with "countdown hidden ->
-                            Available", so a tier with it switched off said
-                            Available after selling out completely. */}
-                        {state.kind === 'past' ? (
-                          <span className="badge">{state.badge}</span>
-                        ) : tier.status === 'coming-soon' ? (
-                          /* Its OWN status first, ahead of the event's. A paused
-                             event used to relabel every row, so an organizer who
-                             set one type to coming-soon and another on sale saw
-                             both go the same colour and could not tell which
-                             control had won. "Coming soon" is true of this
-                             ticket whether or not sales are paused. */
-                          <span className="badge badge-green">Coming soon</span>
-                        ) : remaining === 0 ? (
-                          <span className="badge badge-red">Sold out</span>
-                        ) : state.kind === 'closed' ? (
-                          /* On sale, but the event as a whole is paused — so the
-                             honest word for THIS row is the event's, in the
-                             amber the hero uses for it. */
-                          <span className="badge badge-amber">{state.badge}</span>
-                        ) : availability.showRemaining && remaining <= 25 ? (
-                          <span className="badge badge-amber">Only {remaining} left</span>
-                        ) : (
-                          <span className="badge badge-green">Available</span>
-                        )}
+                        <span className={badge.className}>{badge.label}</span>
                         {tier.studentOnly && <span className="badge badge-student">Student</span>}
                       </div>
-                      <div className="tier-name">{tier.name}</div>
+                      <div className="tier-name">
+                        {/* The name is the link to the item page, and its
+                            ::after covers the whole card — so the card is
+                            clickable while the buy button inside stays its own
+                            control. An <a> inside an <a> is invalid HTML and
+                            browsers split it, which is why this is an overlay
+                            and not a nested link. */}
+                        {itemHref ? (
+                          <Link className="tier-card-title-link" href={itemHref}>
+                            {tier.name}
+                          </Link>
+                        ) : (
+                          tier.name
+                        )}
+                      </div>
                       <div className="tier-price">
                         {tier.priceCents === 0 ? 'Free' : formatMoney(tier.priceCents, event.currency)}
                       </div>
@@ -880,9 +804,34 @@ export default async function EventPage({ params, searchParams }: Params) {
                           Bring a valid student ID — it&rsquo;s checked at the entrance.
                         </p>
                       )}
-                      {tierBuyable && <span className="tier-card-go">{v.cta} →</span>}
+                      {/* Two ways out of a card that has both: read about it,
+                          or buy it now. A shopper who already knows what they
+                          want must not be made to open a page to get at the
+                          button that was there before this existed. */}
+                      {itemHref && <span className="tier-card-go">See this {v.unit} →</span>}
+                      {itemHref && tierBuyable && (
+                        <Link
+                          className="btn btn-primary btn-sm tier-card-buy"
+                          href={buyHref}
+                          aria-label={isShop ? `Order ${tier.name}` : `Get ${tier.name} tickets`}
+                        >
+                          {v.cta}
+                        </Link>
+                      )}
+                      {!itemHref && tierBuyable && <span className="tier-card-go">{v.cta} →</span>}
                     </>
                   );
+                  // With an item page the card is a plain box holding two links
+                  // (see tier-card-title-link above). Without one it behaves
+                  // exactly as it always has: the whole card is the checkout
+                  // link when buyable, and a dead box when it is not.
+                  if (itemHref) {
+                    return (
+                      <div className="tier-card glow-card tier-card-has-link" key={tier.tierKey}>
+                        {card}
+                      </div>
+                    );
+                  }
                   return tierBuyable ? (
                     <Link
                       className="tier-card glow-card tier-card-link"
@@ -890,7 +839,7 @@ export default async function EventPage({ params, searchParams }: Params) {
                       // Carries WHICH ticket was tapped, so the checkout opens
                       // with it already at one. The server re-checks the key
                       // before honouring it.
-                      href={`${checkoutBase}?tier=${encodeURIComponent(tier.tierKey)}${refCode ? `&ref=${refCode}` : ''}`}
+                      href={buyHref}
                       aria-label={isShop ? `Order ${tier.name}` : `Get ${tier.name} tickets`}
                     >
                       {card}

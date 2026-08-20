@@ -149,10 +149,17 @@ export function mediaFilePath(media: EventMediaRow): string {
  * Let go of every reference to a media row so it can be deleted. Poster,
  * profile, and cover pointers are cleared when they pointed at it; the legacy
  * single-video pointer moves on to the next remaining video (or NULL); and any
- * update post that attached it keeps its text but loses the attachment.
+ * update post that attached it keeps its text but loses the attachment; and any
+ * ticket type or shop item that used it as its picture goes back to no picture.
  *
  * That last step is not optional: event_posts.media_id is a real foreign key,
  * so deleting an attached photo/video without it fails outright.
+ *
+ * event_tiers.media_id is NOT a foreign key (it was added by ALTER, which
+ * SQLite cannot attach one to), so nothing forces this — but leaving the
+ * pointer would put a deleted photo back in front of the organizer as the
+ * selected thumbnail in the item picker, and tierPhoto()'s render-time guard
+ * only fixes what buyers see. Clear it here so the two agree.
  *
  * Call inside the deleting transaction, BEFORE the row is removed.
  */
@@ -163,6 +170,7 @@ function releaseMediaReferences(eventId: string, mediaId: string): void {
     db.prepare(`UPDATE events SET ${col} = NULL WHERE id = ? AND ${col} = ?`).run(eventId, mediaId);
   }
   db.prepare(`UPDATE event_posts SET media_id = NULL WHERE event_id = ? AND media_id = ?`).run(eventId, mediaId);
+  db.prepare(`UPDATE event_tiers SET media_id = NULL WHERE event_id = ? AND media_id = ?`).run(eventId, mediaId);
 
   const pointer =
     (db.prepare(`SELECT video_media_id AS id FROM events WHERE id = ?`).get(eventId) as

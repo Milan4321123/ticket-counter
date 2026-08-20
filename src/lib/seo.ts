@@ -121,12 +121,41 @@ export function machineDate(event: EventRow): string | null {
  * seller simply has no way to be paid afterwards. That is a different problem
  * and not one structured data should be lying about in either direction.
  */
-function canTakePaidOrders(event: EventRow): boolean {
+export function canTakePaidOrders(event: EventRow): boolean {
   if (getPaymentMode() !== 'transfer') return true;
   const payout = effectivePayout(event);
   const hasBankRoute = Boolean(payout.iban.trim() && payout.holder.trim());
   const hasPaypalRoute = paypalPayee({ paypalAccount: payout.paypal }) !== null;
   return hasBankRoute || hasPaypalRoute;
+}
+
+/**
+ * The Schema.org availability of ONE ticket type, in one place.
+ *
+ * Shared by the event's Offer list and the item page's Product offer, because
+ * the two describe the same row: an item page that said InStock while the
+ * listing said SoldOut would be exactly the mismatch the note at the top of
+ * this file warns about, and would be found by the crawler that fetches both
+ * within a second of each other.
+ */
+function offerAvailability(
+  event: EventRow,
+  tiers: EventTierRow[],
+  tier: EventTierRow,
+  remaining: number,
+  totalRemaining: number
+): string {
+  // An event that has not opened yet is not sold out, and marking it so tells
+  // Google to stop advertising tickets that were never offered. PreOrder is the
+  // state Google documents for "announced, not yet purchasable" — it keeps the
+  // listing alive without promising a checkout.
+  if (tier.status === 'coming-soon' || (!event.salesOpen && readsAsComingSoon(tiers))) {
+    return 'https://schema.org/PreOrder';
+  }
+  if (!event.salesOpen || totalRemaining === 0 || remaining === 0) {
+    return 'https://schema.org/SoldOut';
+  }
+  return 'https://schema.org/InStock';
 }
 
 export interface EventJsonLdInput {
@@ -223,16 +252,13 @@ export function eventJsonLd({
       price: (tier.priceCents / 100).toFixed(2),
       priceCurrency: event.currency,
       url,
-      // An event that has not opened yet is not sold out, and marking it so
-      // tells Google to stop advertising tickets that were never offered.
-      // PreOrder is the state Google documents for "announced, not yet
-      // purchasable" — it keeps the listing alive without promising a checkout.
-      availability:
-        tier.status === 'coming-soon' || (!event.salesOpen && readsAsComingSoon(tiers))
-          ? 'https://schema.org/PreOrder'
-          : !event.salesOpen || totalRemaining === 0 || (remainingByTier[tier.tierKey] ?? 0) === 0
-            ? 'https://schema.org/SoldOut'
-            : 'https://schema.org/InStock',
+      availability: offerAvailability(
+        event,
+        tiers,
+        tier,
+        remainingByTier[tier.tierKey] ?? 0,
+        totalRemaining
+      ),
     }));
   }
 
@@ -247,6 +273,118 @@ export function eventBreadcrumbJsonLd(event: EventRow): Record<string, unknown> 
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Events', item: getBaseUrl() },
       { '@type': 'ListItem', position: 2, name: event.name, item: absoluteUrl(`/e/${event.slug}`) },
+    ],
+  };
+}
+
+export interface ItemJsonLdInput {
+  event: EventRow;
+  /** Every visible tier — the pause/coming-soon rule reads the whole set. */
+  tiers: EventTierRow[];
+  /** The one this page is about. */
+  tier: EventTierRow;
+  /** Remaining units of THIS tier, from getAvailability(). */
+  remaining: number;
+  totalRemaining: number;
+  /** Absolute image URLs, best first. */
+  images: string[];
+  /** The person selling it — the disclosed seller, never the platform. */
+  sellerName: string;
+  /** This item page's own canonical URL. */
+  url: string;
+}
+
+/**
+ * Schema.org Product for one item's page.
+ *
+ * Product, not Event: this page is about a THING with a price and a picture,
+ * and on a shop it genuinely is a product. On an event it is a ticket, which
+ * Schema.org also models as a Product with an Offer — the parent MusicEvent
+ * with its date and venue stays on the listing page, where it belongs, so the
+ * two pages describe different entities instead of competing for the same one.
+ *
+ * seller is the ORGANIZER. That is the same disclosed-seller posture the page
+ * body takes ("Sold by …"): the money goes to their account, they hand the
+ * goods over, and structured data naming this platform as the seller would
+ * contradict the sentence printed beside the button.
+ *
+ * The Offer is CONDITIONAL, exactly as it is in eventJsonLd — see the long
+ * note there. A priced item on a listing with no payout route cannot be
+ * ordered at all (POST /api/orders refuses it), and there is no availability
+ * value that says "priced, but unpayable" honestly, so it gets no Offer. A
+ * free item survives, because a €0 booking never reaches the payout guard.
+ * A Product with no offers is still valid and still earns the picture and the
+ * name in a result; a Product with a fictional offer costs the rich result on
+ * every listing on the domain.
+ */
+export function itemJsonLd({
+  event,
+  tiers,
+  tier,
+  remaining,
+  totalRemaining,
+  images,
+  sellerName,
+  url,
+}: ItemJsonLdInput): Record<string, unknown> {
+  const data: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: tier.name,
+    description: itemDescription(event, tier),
+    url,
+  };
+  if (images.length) data.image = images;
+
+  const offerable = canTakePaidOrders(event) || tier.priceCents === 0;
+  if (offerable) {
+    data.offers = {
+      '@type': 'Offer',
+      price: (tier.priceCents / 100).toFixed(2),
+      priceCurrency: event.currency,
+      url,
+      availability: offerAvailability(event, tiers, tier, remaining, totalRemaining),
+      seller: { '@type': 'Organization', name: sellerName },
+    };
+  }
+  return data;
+}
+
+/**
+ * The sentence that describes ONE item in a search result.
+ *
+ * The seller's OWN words win, and the long write-up wins over the one-liner:
+ * on an item page both are about this exact thing, which is what a searcher is
+ * matching on, and metaText cuts them to a length Google will not rewrite.
+ * Unlike eventDescription() nothing is prepended to them — an event needs its
+ * date and city stitched in because those are the fields people search events
+ * by, and a product does not.
+ *
+ * The fallback is for an item nobody has written a word about: the name, the
+ * listing it belongs to and the city, so it still reads like a real listing
+ * rather than a bare product name.
+ */
+export function itemDescription(event: EventRow, tier: EventTierRow): string {
+  const own = (tier.details || tier.description).replace(/\s+/g, ' ').trim();
+  if (own) return metaText(own);
+  const where = event.city.trim() ? ` — ${event.city.trim()}` : '';
+  return metaText(`${tier.name}, from ${event.name}${where}.`);
+}
+
+/** Home > Listing > Item, so an item page shows its shop in the trail. */
+export function itemBreadcrumbJsonLd(event: EventRow, tier: EventTierRow): Record<string, unknown> {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Events', item: getBaseUrl() },
+      { '@type': 'ListItem', position: 2, name: event.name, item: absoluteUrl(`/e/${event.slug}`) },
+      {
+        '@type': 'ListItem',
+        position: 3,
+        name: tier.name,
+        item: absoluteUrl(`/e/${event.slug}/item/${encodeURIComponent(tier.tierKey)}`),
+      },
     ],
   };
 }

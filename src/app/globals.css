@@ -6493,3 +6493,213 @@ html:has(.event-page.has-section-nav) {
     font-size: 0.84rem;
   }
 }
+
+/* ---------- Item cards & the item page ---------- */
+
+/* The picture on a tier card. 4:3 rather than the feed's portrait 4:5: these
+   sit three or four across inside a grid whose minimum column is 260px, and a
+   tall crop there pushes the price below the fold of the card. The 'card'
+   variant is what is served into it — an 800x1000 render scaled into a 4:3 box
+   is still sharp, and reusing an existing variant means an item photo costs no
+   new derivative on disk. Bleeds to the card's edges by cancelling the card's
+   own padding, so the photo looks like part of the card and not a picture
+   pasted into it. */
+.tier-card-photo {
+  display: block;
+  width: calc(100% + 44px);
+  margin: -22px -22px 4px;
+  /* Shown SQUARE although the file behind it is the 4:5 'card' render: these
+     sit three or four across in a grid whose minimum column is 260px, and a
+     full portrait there pushes the price below the fold of the card. Square
+     rather than landscape because it throws away far less of the picture — the
+     browser keeps the middle 4:5 of it, which on a phone photo is the subject —
+     and because a square product thumbnail is what every shop grid on the web
+     already looks like. Reusing the feed's variant instead of adding a fourth
+     rendered shape means an item photo costs no new derivative on disk, and the
+     item page serves the identical URL. */
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--bg-elevated);
+}
+
+/* The tier NAME is the link to the item page, and its ::after covers the whole
+   card so the card is clickable — while the buy button inside stays a separate
+   control. Nesting one <a> inside another is invalid HTML and browsers repair
+   it by splitting the markup, so this overlay is the way a card can have both
+   a "read more" target and a "buy now" target.
+
+   position: relative is stated here rather than leaned on from .glow-card,
+   which happens to set it today: the overlay's whole correctness depends on
+   which box it is measured against, and that must not be a side effect of a
+   decorative class somebody could remove. */
+.tier-card-has-link {
+  position: relative;
+}
+
+.tier-card-title-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.tier-card-title-link:hover,
+.tier-card-title-link:focus-visible {
+  text-decoration: underline;
+}
+
+.tier-card-title-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+}
+
+/* Anything the shopper is meant to press directly has to sit above that
+   overlay, or the card's own link would swallow every click on it. */
+.tier-card-buy {
+  position: relative;
+  z-index: 1;
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+.item-page {
+  padding-top: 18px;
+}
+
+.item-back {
+  margin: 0 0 16px;
+  font-size: 0.92rem;
+}
+
+.item-layout {
+  display: grid;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .item-layout {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    gap: 40px;
+  }
+}
+
+/* Portrait 4:5 — the shape the file is actually rendered at, so the item page
+   shows the whole picture rather than a slice of it. Capped in width because a
+   full-column 4:5 on a wide desktop is a photo the height of the screen. */
+.item-media {
+  max-width: 520px;
+}
+
+.item-photo {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+
+/* Most event tickets will never have a photo, so "no photo" has to look like a
+   decision. An initial on the listing's accent wash reads as a mark, not as a
+   picture that failed to load. */
+.item-photo-blank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse 70% 70% at 30% 10%, var(--accent-soft), transparent),
+    var(--bg-elevated);
+}
+
+.item-photo-blank span {
+  font-family: var(--font-display, var(--font));
+  font-size: clamp(3rem, 12vw, 6rem);
+  font-weight: 800;
+  color: var(--accent-text);
+  opacity: 0.7;
+}
+
+.item-gallery {
+  margin-top: 16px;
+}
+
+.item-lede {
+  margin: 14px 0 0;
+  font-size: 1.02rem;
+  color: var(--text-dim);
+}
+
+.item-about {
+  max-width: 68ch;
+}
+
+.item-prose {
+  white-space: pre-wrap;
+  line-height: 1.75;
+  margin: 0 0 14px;
+}
+
+/* ---------- The item picture picker (portal, Tiers editor) ---------- */
+
+.tier-photo-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: var(--text-dim);
+}
+
+/* A wrapping strip of thumbnails rather than a scroller: a listing is capped at
+   a handful of photos, and a horizontal scroller hides the very option the
+   organizer is looking for behind a gesture nobody discovers. */
+.tier-photo-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tier-photo-option {
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    border-color 0.18s ease,
+    transform 0.18s var(--ease-out);
+}
+
+.tier-photo-option img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.tier-photo-none {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.tier-photo-option:hover {
+  border-color: var(--accent);
+}
+
+/* The selection has to survive a colour-blind reading, so it is a thick accent
+   ring AND a lift, not a tint. */
+.tier-photo-option.is-selected {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}

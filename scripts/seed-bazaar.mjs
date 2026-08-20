@@ -564,7 +564,9 @@ function announceProductionRun(paymentMode) {
   line(`  · ${SHOPS.length} published example shops, in the feed, on /market, on their`);
   line("    own /e/<slug> pages and in the sitemap, beside real sellers'");
   line('    listings;');
-  line(`  · ${SHOPS.length * 3} generated images served from /api/media;`);
+  line(`  · ${IMAGE_COUNT} generated images served from /api/media — a cover, a tile`);
+  line(`    and a round mark per shop, plus one per product;`);
+  line(`  · ${PRODUCT_COUNT} products, each with its own picture and its own page;`);
   line(`  · ${SELLERS.length} seller accounts, named as the Veranstalter on those pages.`);
   line();
   line('Each one carries "(example shop)" in its name, says what it is in the');
@@ -763,6 +765,11 @@ Bring the QR code on your order — on your phone is fine, I scan it and that's 
         price: 1050,
         cap: 60,
         description: 'About 30–35 pods. The size to start with if you have never cooked with alaichi.',
+        details: `The starter size, and the one I push at people who have only ever met the small green elaichi in a sweet shop. Badi alaichi is a different plant and a different job: savoury, smoky, resinous, and it goes into the pot whole rather than into a batter.
+
+About 30 to 35 pods, which at one pod per pot of dal is a couple of months of ordinary cooking. They come from the same September–October picking as everything else on this page — cut in Taplejung when the base of the pod has gone deep red-brown, then two or three days on a bamboo rack over a slow wood fire.
+
+Crack a pod with the flat of a knife before it goes in, so the fire can get at the seeds, and fish the husk out before you serve. Keep the rest whole in a closed jar out of the sun and they will still be worth cooking with in a year.`,
       },
       {
         key: 'pods-250g',
@@ -770,6 +777,11 @@ Bring the QR code on your order — on your phone is fine, I scan it and that's 
         price: 2350,
         cap: 40,
         description: 'The jar most families come back for. Works out cheaper per gram than the 100g.',
+        details: `The jar most families come back for, and the reason is arithmetic: it is noticeably cheaper per gram than the 100g and it lasts a household that cooks dal most nights about half a year.
+
+Same sack, same fire, same picking. Buy this one if you already know you like it, or if you cook for more than two people — a pod goes into dal, two or three into a buff or mutton curry with the onions, one into the whole-spice bloom for a biryani.
+
+Store it whole and closed. Ground cardamom is convenient and it fades; whole pods are the reason this is worth carrying from Taplejung at all.`,
       },
       {
         key: 'pods-500g',
@@ -777,6 +789,11 @@ Bring the QR code on your order — on your phone is fine, I scan it and that's 
         price: 4300,
         cap: 24,
         description: 'Half a kilo, for a big kitchen or for splitting between two or three households.',
+        details: `Half a kilo. This is the size for a kitchen that cooks in quantity — a family that feeds people at Dashain, a caterer, or two or three households splitting a sack between them, which is how most of it actually leaves here.
+
+Nothing about the spice differs from the smaller jars: one picking, one fire, one grower. Only the quantity and the price per gram change.
+
+A word on keeping it, since half a kilo takes a while to work through: whole pods hold their smoke for a year and more in a sealed jar away from light and heat. Do not decant it into something clear and leave it on a sunny shelf, and do not grind it all at once.`,
       },
       {
         key: 'ground-60g',
@@ -784,6 +801,11 @@ Bring the QR code on your order — on your phone is fine, I scan it and that's 
         price: 950,
         cap: 30,
         description: 'Pods from the same sack, ground the week you collect. Small on purpose — ground fades fast.',
+        details: `Pods from the same sack, ground the week you come and collect it. Deliberately a small tin.
+
+Ground badi alaichi is wonderful for the things whole pods are clumsy in — a rub, a masala mix, a marinade, anything where you do not want to be fishing husks out at the table. What it will not do is keep. The smoke sits in volatile oils, and once the pod is broken open they leave: at full strength for about three months, then steadily less interesting.
+
+So this is 60g and not 200g, and it is ground close to the day you pick it up rather than sitting pre-ground in a box since spring. Use it as if it were fresh, because it is.`,
       },
       {
         key: 'gift-box',
@@ -791,6 +813,11 @@ Bring the QR code on your order — on your phone is fine, I scan it and that's 
         price: 2800,
         cap: 18,
         description: '100g whole pods, the 60g ground tin and a small chiya masala, in a lokta paper box.',
+        details: `What people take to somebody's house at Dashain, or send to a cousin who has been complaining that nothing here tastes right.
+
+Inside: 100g of whole pods, the 60g tin of alaichi ground that week, and a small jar of chiya masala I grind at home — cardamom, clove, cinnamon and a little black pepper. All of it packs into a lokta paper box, which is handmade in Nepal from Himalayan Daphne bark and is worth keeping afterwards.
+
+One thing to say plainly, because a gift should never be a surprise of the wrong kind: everything here is packed by hand in a home kitchen that also handles tea and other whole spices, and the chiya masala contains clove, cinnamon and pepper as well as cardamom. If the person you are giving it to avoids anything, ask me before you order.`,
       },
     ],
   },
@@ -833,6 +860,11 @@ If you want to taste before you buy a whole pouch, come in the first hour — th
         price: 1200,
         cap: 36,
         description: 'Spring picking, light and floral. No milk — it would bury it.',
+        details: `The spring picking, taken from the Ilam gardens around Fikkal when the bushes wake up after winter. Light, floral, a little green at the edges, and the most delicate thing on this page.
+
+Orthodox processing is what makes it possible: the leaf is rolled whole and gently rather than chopped, so a brewed cup unfurls into recognisable leaves instead of dust. It also means a small harvest and a short season, which is why first flush costs more than the summer leaf and runs out first.
+
+Brew it as if you were afraid of it — water off the boil, three minutes, no milk and no sugar. Milk would bury the whole reason to buy it. It will take a second brew from the same leaf, usually a rounder one.`,
       },
       {
         key: 'second-flush-100g',
@@ -840,6 +872,11 @@ If you want to taste before you buy a whole pouch, come in the first hour — th
         price: 1050,
         cap: 42,
         description: 'Summer leaf, darker and rounder. The one most people end up buying twice.',
+        details: `The summer picking, and the one most people end up buying twice. Darker in the cup than the first flush, rounder, with the muscatel note that the Ilam and Darjeeling gardens on either side of that ridge are known for — a sort of ripe grape sweetness behind the tea.
+
+More forgiving than the spring leaf, too. It survives four minutes, it survives being made slightly too strong, and it will take a splash of milk if that is how you drink tea, without falling apart.
+
+Whole orthodox leaf, so give it room in the pot rather than cramming it into a small infuser. 100g is roughly forty cups.`,
       },
       {
         key: 'ilam-green-100g',
@@ -847,6 +884,11 @@ If you want to taste before you buy a whole pouch, come in the first hour — th
         price: 850,
         cap: 64,
         description: 'Pan-dried and grassy. Cooler water, two minutes — it will take a second brew.',
+        details: `Pan-dried green from the same gardens: grassy, clean, no smoke and no roast. If your experience of green tea is a bitter cup from a supermarket bag, this is a different drink.
+
+Bitterness in green tea is almost always the water. Let the kettle sit for a few minutes after it boils — somewhere around 75 to 80 degrees — and give it two minutes, not five. Do that and it is sweet and vegetal; boil it hard and it will turn astringent and you will blame the leaf.
+
+Good for a second and even a third brew, each a little lighter. Keep it away from air and light, and drink this one within the year rather than saving it.`,
       },
       {
         key: 'ctc-500g',
@@ -854,6 +896,11 @@ If you want to taste before you buy a whole pouch, come in the first hour — th
         price: 750,
         cap: 80,
         description: 'For real chiya: boiled hard with milk and ginger. Not fancy, and not trying to be.',
+        details: `This is the one for real chiya, and it is not trying to be anything else.
+
+CTC — crush, tear, curl — is the machine-processed leaf that stands up to being boiled hard with milk, ginger, cardamom and sugar for five minutes. The whole-leaf orthodox teas above would be destroyed by that treatment, and would waste your money in the process. This is built for it: strong, malty, reliable, and it takes milk without disappearing.
+
+Half a kilo, because nobody makes chiya once. A rounded spoon per cup of water, in with the ginger from cold, milk in when it comes up, and let it rise twice.`,
       },
       {
         key: 'chiya-masala-50g',
@@ -861,6 +908,11 @@ If you want to taste before you buy a whole pouch, come in the first hour — th
         price: 550,
         cap: 45,
         description: 'Ground at home — cardamom, clove, cinnamon, a little black pepper. A pinch per pot.',
+        details: `Ground at home in small batches: cardamom, clove, cinnamon, a little black pepper. That is the whole list, and there is nothing else in it — no filler, no sugar, no colour.
+
+A pinch per pot, added with the ginger while the water is still cold so the spice has time to get out of its own way. Start with less than you think. Masala is meant to sit behind the tea and the ginger, not in front of them, and it is easy to make a cup that tastes like a candle.
+
+50g and no more, for the same reason as the ground cardamom tin: ground spice fades. Use it within a few months and grind is not a compromise — it is just convenient.`,
       },
     ],
   },
@@ -904,6 +956,11 @@ Bring your QR code and a bag — the jars are heavier than people expect.`,
         price: 650,
         cap: 24,
         description: 'Nepali hog plum with timur and mustard oil. Sour first, hot afterwards.',
+        details: `Lapsi is the Nepali hog plum, and there is no European fruit that stands in for it. Sour in a way that is almost sharp, then sweet underneath, and it holds the mustard oil and the timur without going soft.
+
+Made the way it is made at home: fruit, mustard oil, timur, chilli, salt, a little sugar to round it. Sour arrives first and the heat comes afterwards, which is the point of the thing.
+
+Eat it as an achar on the side of dal bhat, a teaspoon at a time — it is a condiment, not a chutney to spread. Keep the jar in the fridge once it is open and use a dry spoon; the oil is what preserves it, so do not pour it off.`,
       },
       {
         key: 'timur-golbheda-200g',
@@ -911,6 +968,11 @@ Bring your QR code and a bag — the jars are heavier than people expect.`,
         price: 600,
         cap: 30,
         description: 'The tomato achar for dal bhat. The tingle is the timur — it is supposed to do that.',
+        details: `The tomato achar that goes on the side of dal bhat, and the one visitors ask about afterwards.
+
+Cooked tomato, timur, dried chilli, garlic, mustard oil. Timur is Nepali Sichuan pepper, and the tingling numbness it leaves on your lips is not a fault, not chilli heat, and not a sign that anything is wrong — it is the whole reason the spice exists, and it is why this achar tastes like home to anybody who grew up with it.
+
+If you have never had timur, start with a small amount and eat it with rice rather than on its own. Fridge once opened, dry spoon, and it is happiest within a month.`,
       },
       {
         key: 'gundruk-100g',
@@ -918,6 +980,11 @@ Bring your QR code and a bag — the jars are heavier than people expect.`,
         price: 500,
         cap: 66,
         description: 'Fermented and dried at home. Soak 15 minutes for jhol, or fry into sadeko.',
+        details: `Fermented and dried by me, in the way that has kept green vegetables edible through a Himalayan winter for a very long time: mustard and radish leaves wilted, pressed into a jar, left to sour for days, then dried out completely.
+
+It arrives looking like nothing much — dark, dry, crumpled. Soak it for fifteen minutes and it comes back to life. Then either gundruk ko jhol, the thin sour soup with tomato and potato, or gundruk sadeko, fried with tomato, dried chilli and mustard oil and eaten as a side.
+
+100g is a lot, because it weighs almost nothing dry. Keep it dry and airtight and it will outlast everything else on this page.`,
       },
       {
         key: 'sinki-150g',
@@ -925,6 +992,11 @@ Bring your QR code and a bag — the jars are heavier than people expect.`,
         price: 550,
         cap: 20,
         description: 'Radish-root sinki, sharper than gundruk. Wonderful in a winter soup.',
+        details: `The same idea as gundruk, done with radish ROOT instead of leaves, and sharper for it.
+
+The root is shredded, packed tight and left to ferment before it is dried, and what comes out is more sour and more assertive than gundruk. In a winter soup with a little tomato and timur it is one of the best things I know how to make, and it will absolutely wake up a plate of plain rice.
+
+Soak it, squeeze it out, and use it as you would gundruk — but taste as you go, because it is stronger. Keep it dry and closed.`,
       },
       {
         key: 'sukuti-150g',
@@ -932,6 +1004,11 @@ Bring your QR code and a bag — the jars are heavier than people expect.`,
         price: 1200,
         cap: 18,
         description: 'Thin-cut buffalo, spiced and air-dried hard. Eat as it is, or pan-fry into sadeko.',
+        details: `Buffalo, cut thin, spiced and air-dried until it is genuinely hard. This is not jerky as a supermarket sells it: it is drier, saltier, and it is meant to be a snack with drinks or the base of a dish, not a soft chew.
+
+Eat it as it is, torn into small pieces. Or do what most people do with it — a hot dry pan for a minute, then sukuti sadeko with red onion, tomato, coriander, timur, chilli and mustard oil, which turns 150g into something four people pick at all evening.
+
+It contains buffalo meat, salt, chilli, timur and mustard oil. Keep it sealed and dry; it does not need the fridge until it is opened.`,
       },
     ],
   },
@@ -975,6 +1052,13 @@ Big festival orders (Dashain, Tihar, Yomari Punhi) — message me a week ahead a
         price: 600,
         cap: 72,
         description: 'Fried Saturday morning. Crisp edge, soft middle — eat it the same day if you can.',
+        details: `Fried on the Saturday morning you collect it, and that is not a slogan — sel roti has a window of a few hours where the outside is crisp and the inside is still soft, and after a day it is a different and much sadder food.
+
+Rice flour batter, ground and rested overnight, sweetened lightly, poured in a ring into hot oil by hand. No baking powder, no shortcut: the lift comes from the fermentation and the pouring.
+
+Six pieces. Eat them the same day if you possibly can, with tea in the morning or with aloo achar. If you cannot, they freeze better than they keep — freeze the same day and warm them in a dry pan, never a microwave.
+
+Contains rice flour, sugar, ghee and milk, and it is fried in oil that is also used for other sweets.`,
       },
       {
         key: 'juju-dhau-400',
@@ -982,6 +1066,13 @@ Big festival orders (Dashain, Tihar, Yomari Punhi) — message me a week ahead a
         price: 550,
         cap: 24,
         description: 'Set in the pot, Bhaktapur style. Bring the pot back for a euro off the next one.',
+        details: `Juju dhau means king of yoghurts, and Bhaktapur has been making it in clay for long enough that the pot is part of the recipe rather than packaging.
+
+Buffalo milk, boiled down with a little sugar, set warm in an unglazed clay pot and left alone. The clay draws moisture out through its own walls, which is why the result is thick enough to hold a spoon upright and slightly sweet without anything being stirred in. It cannot be done properly in plastic, which is why nobody does.
+
+400ml. Eat it cold and plain, or with sel roti. Bring the pot back next time and take a euro off — the pots are made by hand and it is a waste to throw one away.
+
+Contains milk. Set fresh, so eat it within three or four days.`,
       },
       {
         key: 'lakhamari-250g',
@@ -989,6 +1080,13 @@ Big festival orders (Dashain, Tihar, Yomari Punhi) — message me a week ahead a
         price: 800,
         cap: 30,
         description: 'Hard, glazed, barely sweet. Break it into hot tea — that is how it is meant to be eaten.',
+        details: `A Newar sweet that surprises people, because it is barely sweet and it is hard.
+
+Wheat flour, ghee and a light glaze, shaped and baked into something between a biscuit and a bread. On its own it is dry and quiet. Broken into hot milk tea it goes soft at the edges and turns into the thing it was designed to be — which is how it is eaten at weddings and at Newar feasts, and how you should try it first.
+
+250g keeps for a couple of weeks in a tin, which for anything on this page is a long time.
+
+Contains wheat, ghee (milk) and sugar. Made in a kitchen that also handles sesame and nuts.`,
       },
       {
         key: 'yomari-4',
@@ -996,6 +1094,13 @@ Big festival orders (Dashain, Tihar, Yomari Punhi) — message me a week ahead a
         price: 750,
         cap: 16,
         description: 'Steamed parcels of chaku and sesame. Shaped by hand, so never very many.',
+        details: `Steamed parcels of rice-flour dough with chaku — hardened sugarcane molasses — and sesame inside, pinched into a fig shape by hand. Newar, and traditionally made at Yomari Punhi in the winter.
+
+There are never very many, because each one is shaped individually and the shaping is the slow part. Four to a portion.
+
+Eat them warm. If you are collecting them for later, steam them again for five minutes rather than microwaving, which turns the dough to rubber. The filling holds heat far longer than the outside does, so give the first one a moment.
+
+Contains rice flour, sesame and sugarcane molasses.`,
       },
       {
         key: 'barfi-500g',
@@ -1003,6 +1108,13 @@ Big festival orders (Dashain, Tihar, Yomari Punhi) — message me a week ahead a
         price: 1300,
         cap: 20,
         description: 'Milk barfi, coconut and pista, cut small. The box people take to somebody’s house.',
+        details: `The box people take to somebody's house — milk barfi, coconut and pista, cut small so it can be handed round rather than sliced at the table.
+
+Milk barfi is reduced milk and sugar, cooked down and set: dense, fudgy, not too sweet. The coconut is lighter, the pista is the one that disappears first. Roughly equal thirds unless you ask for more of one, which is fine if you tell me when you order.
+
+500g is about 25 to 30 pieces depending on how I cut them. They are at their best within three or four days and want a cool room rather than the fridge, which dries them.
+
+Contains milk, sugar, coconut and pistachio, from a kitchen that also handles other nuts and sesame.`,
       },
     ],
   },
@@ -1046,6 +1158,13 @@ I take a table at the Nepali cultural evenings in Munich and at Dashain in Stutt
         price: 2600,
         cap: 30,
         description: 'Handwoven and properly stiffened. Give me your head size in cm when you order.',
+        details: `Palpali dhaka, handwoven, and stiffened properly so it holds its shape rather than collapsing into a fabric hat after a month.
+
+Dhaka is a supplementary-weft cotton weave — the geometric pattern is woven in on the loom, thread by thread, not printed on afterwards. That is why no two lengths are identical, why the reverse side shows the working, and why one topi takes a weaver a serious part of a day.
+
+Tell me your head circumference in centimetres when you order. Measure round, just above the ears, with a soft tape — a topi that is a size out looks wrong immediately and cannot really be adjusted.
+
+Spot clean only. Never a washing machine, and never wring it.`,
       },
       {
         key: 'dhaka-shawl',
@@ -1053,6 +1172,13 @@ I take a table at the Nepali cultural evenings in Munich and at Dashain in Stutt
         price: 4800,
         cap: 12,
         description: 'Soft cotton, wide enough to actually wear. Each one a different colourway.',
+        details: `Handwoven dhaka in soft cotton, and wide enough that you can actually wear it rather than draping it over the back of a chair.
+
+Every one is a different colourway, because they come from different warps — I photograph what I have and what you collect is the piece you picked, not one like it. The patterning is woven in, so it is the same cloth on both faces with the working visible on the reverse, which is the honest sign of real dhaka.
+
+Cotton, so it is a three-season shawl rather than a winter one: it takes the edge off an evening without being hot.
+
+Hand wash cold, separately for the first two washes, and dry flat in the shade. The colours are strong and they will run a little at first.`,
       },
       {
         key: 'dhaka-cholo-fabric',
@@ -1060,6 +1186,11 @@ I take a table at the Nepali cultural evenings in Munich and at Dashain in Stutt
         price: 3400,
         cap: 15,
         description: 'Unstitched length for your own tailor. Enough for a cholo with sleeves.',
+        details: `An unstitched 1.5 metre length for your own tailor — enough for a cholo with sleeves for most sizes, and the way most people who know what they want buy dhaka.
+
+Handwoven cotton dhaka, full width. Take it to whoever makes your blouses and they will know exactly what to do with it; if they have not sewn dhaka before, tell them it behaves like a medium-weight cotton and that the pattern runs along the warp, so it needs laying out with an eye to where the motifs land.
+
+Wash the length before it is cut and sewn, not after. It will shrink a little and the colour will settle, and it is far better that happens on a flat piece of cloth than on a finished garment.`,
       },
       {
         key: 'dhaka-muffler',
@@ -1067,6 +1198,11 @@ I take a table at the Nepali cultural evenings in Munich and at Dashain in Stutt
         price: 2200,
         cap: 20,
         description: 'Narrow scarf, dhaka border at both ends. Wears well with a plain coat.',
+        details: `A narrow scarf with a dhaka border woven at both ends and a plain body between them — the piece for somebody who likes the weave but does not want to wear a pattern from throat to waist.
+
+It sits well over a plain coat, which is most coats here, and it is the one I sell most of to people buying a present for somebody who is not Nepali.
+
+Handwoven cotton. Hand wash cold, dry flat in the shade, and do not iron directly over the patterned ends — a cloth between the iron and the weave, or not at all.`,
       },
       {
         key: 'pashmina-70-30',
@@ -1074,6 +1210,13 @@ I take a table at the Nepali cultural evenings in Munich and at Dashain in Stutt
         price: 6500,
         cap: 8,
         description: '70% cashmere, 30% silk, from Kathmandu. The blend that keeps its shine.',
+        details: `A 70% cashmere, 30% silk shawl from Kathmandu — the blend, and the reason to buy this one rather than a cheaper thing with the same word on the label.
+
+Pure cashmere is warmer and softer and it pills; pure silk has the shine and none of the warmth. The 70/30 blend keeps the sheen, drapes properly instead of hanging like a blanket, and survives being worn every day of a winter. It is the standard the Kathmandu weavers settled on for a reason.
+
+What it is not: pashmina in the strict sense of hand-spun mountain-goat undercoat, which costs several times this and which I do not stock. I would rather tell you that than let the word do work it should not.
+
+Dry clean, or a careful cold hand wash with hair shampoo and absolutely no wringing. Dry flat.`,
       },
     ],
   },
@@ -1119,6 +1262,11 @@ I'm also at the Teej and Dashain programmes with a table — say so when you ord
         price: 1400,
         cap: 35,
         description: 'The everyday strand, with a screw clasp. Free restringing to your length.',
+        details: `Seven strands of green glass pote with a screw clasp — the everyday strand, worn daily rather than kept for occasions.
+
+Glass, not plastic. You can tell by the weight and by how cold the beads are for the first second against your neck, and it is the difference between something that still looks right in five years and something that goes cloudy.
+
+Restringing is free, and I mean that as a standing offer rather than a warranty: bring it back whenever you want it shortened, lengthened, or re-threaded after a knock, and I will do it while you wait if I am not busy. Tell me the length you want in centimetres when you order and I will string it to that.`,
       },
       {
         key: 'pote-red-7',
@@ -1126,6 +1274,11 @@ I'm also at the Teej and Dashain programmes with a table — say so when you ord
         price: 1200,
         cap: 75,
         description: 'For Teej and for wedding photographs. Deep red glass, not plastic.',
+        details: `Deep red glass pote, seven strands. This is the Teej strand, and it is the one that shows up in wedding photographs.
+
+Same glass and the same screw clasp as the green. The red is a fuller, darker red than the bright scarlet plastic strands sold cheaply — it reads properly against a red sari instead of fighting it, which is the entire job.
+
+Say what length you want when you order. Free restringing whenever you want it changed, same as the green.`,
       },
       {
         key: 'tilhari',
@@ -1133,6 +1286,13 @@ I'm also at the Teej and Dashain programmes with a table — say so when you ord
         price: 4800,
         cap: 10,
         description: 'Gold-plated cylinder on a green strand. Plated brass — said plainly, not gold.',
+        details: `A gold-plated cylindrical tilhari on a green pote strand — the piece a married woman wears, and traditionally the one given at the wedding.
+
+Said plainly, because this matters more than a sale: the tilhari is PLATED BRASS, not gold. It has the weight and the look and it will hold its finish for years with reasonable care, and it costs a small fraction of the real thing. Anyone telling you a tilhari at this price is gold is not telling you the truth.
+
+Keep it away from perfume, hairspray and sweat, which are what take plating off. Wipe it with a dry soft cloth, never a jewellery dip.
+
+The strand it comes on can be restrung to your length, free, like any other pote here.`,
       },
       {
         key: 'jhumka',
@@ -1140,6 +1300,13 @@ I'm also at the Teej and Dashain programmes with a table — say so when you ord
         price: 1900,
         cap: 22,
         description: 'Silver-plated, hook fitting, light enough to wear all evening.',
+        details: `Silver-plated jhumka on a hook fitting — the bell-shaped drop earring, light enough to wear through a whole evening without your ears complaining by the end of it.
+
+Weight is the thing nobody checks before buying jhumka and everybody regrets afterwards. These are made hollow, so they hang and swing properly while weighing very little.
+
+Silver-plated brass with a hook fitting. If you react to nickel, tell me before you order — I can usually source a sterling hook and swap it, which takes a few days and costs a little more.
+
+Take them off before you sleep and before you swim, and keep them in the pouch they come in.`,
       },
       {
         key: 'rudraksha-mala',
@@ -1147,6 +1314,13 @@ I'm also at the Teej and Dashain programmes with a table — say so when you ord
         price: 2400,
         cap: 14,
         description: 'Five-mukhi beads, 108 plus the guru bead, strung on cotton.',
+        details: `A 108-bead mala of five-mukhi rudraksha, plus the guru bead, strung on cotton.
+
+Five-mukhi — five faces, meaning five natural clefts running down each bead — is the common and traditional bead for a japa mala, and the one actually used for counting. Each bead is a seed, so they vary slightly in size and colour, and that variation is what tells you they were not moulded.
+
+Strung on cotton rather than elastic, with a knot between beads, so it can be counted properly and so a break loses one bead instead of a hundred and eight.
+
+Keep it dry, and oil it occasionally with a drop of almond or sandalwood oil if it starts to look chalky. Restringing free whenever it needs it.`,
       },
     ],
   },
@@ -1190,6 +1364,13 @@ Also at the Munich Nepali cultural evenings; pre-paid orders can be picked up th
         price: 1600,
         cap: 25,
         description: 'Hand-stitched, unlined, deckle edges. Takes fountain pen ink without bleeding.',
+        details: `A5, unlined, hand-stitched, with the deckle edges left on.
+
+Lokta paper is made from the bark of the Himalayan Daphne, which regrows from the stump — the plant is not killed to make it, and a stand can be cut again every few years. The bark is boiled, beaten and poured onto a frame by hand, which is why sheets vary in thickness and why the edges are ragged. That is the paper, not a defect.
+
+It takes fountain pen ink without bleeding through, which surprises people who expect handmade paper to behave like blotting paper. Pencil and rollerball are fine too. Very wet brush work is not.
+
+Hand-stitched binding, so it opens flat and stays open.`,
       },
       {
         key: 'lokta-sheets-3',
@@ -1197,6 +1378,13 @@ Also at the Munich Nepali cultural evenings; pre-paid orders can be picked up th
         price: 900,
         cap: 70,
         description: 'Large block-printed sheets. Wrap a book, or frame one as it is.',
+        details: `Three large block-printed sheets of handmade lokta paper.
+
+Block printing means a carved wooden block, inked and pressed by hand, one impression at a time — so the ink sits slightly unevenly, the registration is a fraction off here and there, and no two sheets are the same. Printed paper that is perfectly uniform came off a machine.
+
+They wrap a book beautifully, which is what most people buy them for. They also frame straight as they are, deckle edges and all, and cost rather less than a print.
+
+Store them flat. Rolled lokta keeps a memory of the curl for a long time.`,
       },
       {
         key: 'felt-coasters-6',
@@ -1204,6 +1392,13 @@ Also at the Munich Nepali cultural evenings; pre-paid orders can be picked up th
         price: 1400,
         cap: 30,
         description: 'Hand-felted and dyed in Kathmandu, from imported merino. Survives a hot cup, unlike most nice things.',
+        details: `Six coasters made of hand-rolled felt balls, wet-felted and dyed in Kathmandu and then stitched together into a disc.
+
+They survive a hot cup, which is more than most attractive coasters manage, and wool has the useful property of absorbing the ring of condensation rather than letting it run onto the table.
+
+The wool is imported New Zealand merino, not Nepali sheep wool — said plainly because people ask, and because merino is what makes them soft rather than scratchy. The making is entirely Nepali; the fibre is not.
+
+Spot clean only. Wool felt in a washing machine becomes a smaller, harder object.`,
       },
       {
         key: 'bowl-9cm',
@@ -1211,6 +1406,13 @@ Also at the Munich Nepali cultural evenings; pre-paid orders can be picked up th
         price: 4800,
         cap: 9,
         description: 'Bright and easy to play. Comes with cushion and wooden striker.',
+        details: `A 9cm hand-hammered bowl, bright and quick to speak, and the easiest one here to actually play. Comes with a cushion and a wooden striker.
+
+Hammered, not cast. A cast bowl is poured into a mould and every one sounds the same; a hammered bowl is beaten out by hand over days, which is why the wall thickness varies slightly, why you can see the hammer marks, and why each one has its own pitch. I cannot tell you what note yours will be until you have heard it.
+
+To play it: rest it on the cushion, hold the striker like a pen, and run it slowly round the outside rim with gentle, even pressure. It will take a few laps before it sings. Pressing harder makes it rattle, not louder.
+
+Small enough to hold in your palm if you prefer that, which changes the sound completely.`,
       },
       {
         key: 'bowl-12cm',
@@ -1218,10 +1420,29 @@ Also at the Munich Nepali cultural evenings; pre-paid orders can be picked up th
         price: 7200,
         cap: 6,
         description: 'Hand-hammered, low and long-sustaining. Come and play it before you choose.',
+        details: `The 12cm bowl: low, deep, and it sustains for a very long time after you stop.
+
+Hand-hammered like the smaller one, so the pitch is its own — and at this size the difference between one bowl and the next is obvious enough that you should choose by ear rather than by description. Come and play the ones I have before you decide. That is not a sales line; it is the only sensible way to buy a bowl this size, and it costs you nothing but the trip.
+
+Struck once on the side it gives a single long note; run round the rim slowly and it builds into a tone you can feel in your chest. It needs a heavier hand and a slower circle than the 9cm.
+
+Cushion and striker are not included at this size — most people at this point want to choose their own, and I have both to hand if you do not.`,
       },
     ],
   },
 ];
+
+/**
+ * How many products the bazaar sells, and how many pictures it generates.
+ *
+ * Three per shop (cover, tile, avatar) plus one per product. Counted rather
+ * than hard-coded because every notice below quotes it — the production banner
+ * before anything is written, and the "take it all down" instructions after —
+ * and a number that drifts from the truth in a warning about a live site is
+ * worse than no number.
+ */
+const PRODUCT_COUNT = SHOPS.reduce((n, shop) => n + shop.tiers.length, 0);
+const IMAGE_COUNT = SHOPS.length * 3 + PRODUCT_COUNT;
 
 // ---------------------------------------------------------------------------
 // The production banner is printed HERE, and not up with the refusals, only
@@ -1241,9 +1462,17 @@ if (!cleanOnly && isProduction) announceProductionRun(resolvedPaymentMode);
 // aspect of its variant, so the automatic crop has nothing to throw away and
 // the composition survives intact:
 //
-//   cover  1600x740  (2.16:1)  -> the wide band across the top of the shop page
-//   tile   1600x2000 (4:5)     -> the portrait card on /market and in the feed
-//   avatar 512x512   (1:1)     -> the round profile mark over the cover
+//   cover   1600x740  (2.16:1)  -> the wide band across the top of the shop page
+//   tile    1600x2000 (4:5)     -> the portrait card on /market and in the feed
+//   avatar  512x512   (1:1)     -> the round profile mark over the cover
+//   product 1600x2000 (4:5)     -> one per item: its own page, and its card in
+//                                  the shop's item grid. Same shape as the tile
+//                                  because both are served through the same
+//                                  'card' variant.
+//
+// The product picture is the one that is also shown CROPPED — the item card in
+// the shop's grid puts it in a SQUARE box, so its composition stays inside the
+// middle 1600x1600 of the frame. See productSvg().
 //
 // That is also why no *_crop columns are written: a crop rectangle exists to
 // rescue a photo that is the wrong shape, and these are the right shape.
@@ -1425,6 +1654,145 @@ function avatarSvg(shop) {
 }
 
 /**
+ * Nudge a hex colour round the colour wheel, keeping its lightness.
+ *
+ * Used to give every PRODUCT its own palette without inventing 35 of them by
+ * hand: an item's art is its shop's art with the accent (and the ground it sits
+ * on) rotated by a fixed step per position, so a shop's five products read as
+ * five variations of one shelf rather than five unrelated pictures. Small
+ * rotations only — a 34-degree step keeps a warm shop warm.
+ */
+function shiftHue(hex, degrees) {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex; // not a colour we can rotate — leave it exactly as given
+  const n = parseInt(m[1], 16);
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const d = max - min;
+  const sat = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  let h = 0;
+  if (d !== 0) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+  }
+  h = (((h * 60 + degrees) % 360) + 360) % 360;
+
+  const c = (1 - Math.abs(2 * l - 1)) * sat;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const mm = l - c / 2;
+  const [rr, gg, bb] =
+    h < 60 ? [c, x, 0]
+    : h < 120 ? [x, c, 0]
+    : h < 180 ? [0, c, x]
+    : h < 240 ? [0, x, c]
+    : h < 300 ? [x, 0, c]
+    : [c, 0, x];
+  const hex2 = (v) => Math.round((v + mm) * 255).toString(16).padStart(2, '0');
+  return `#${hex2(rr)}${hex2(gg)}${hex2(bb)}`;
+}
+
+/**
+ * One product's palette: the shop's, rotated by its position on the shelf.
+ *
+ * bg2 is left alone deliberately. It is the dark bottom of every gradient on
+ * this shop's art, and rotating it too would break the family resemblance that
+ * makes five product pictures obviously belong to one seller.
+ */
+function itemPalette(shop, index) {
+  const p = shop.palette;
+  // Centred on the shop's own hue and small: five products come out at -30,
+  // -15, 0, +15 and +30 degrees, which is enough to tell them apart on a shelf
+  // and not enough to turn a warm brown cardamom shop olive. Rotating in one
+  // direction from zero, which is what this did first, sent the last item on
+  // every shelf a third of the way round the wheel.
+  const deg = (index - (shop.tiers.length - 1) / 2) * 15;
+  return {
+    ...p,
+    bg1: shiftHue(p.bg1, deg),
+    accent: shiftHue(p.accent, deg),
+    sub: shiftHue(p.sub, deg),
+  };
+}
+
+/**
+ * The picture for ONE product, at the shape the app's 'card' variant renders
+ * (1600x2000, 4:5) — the same source shape as the shop tile, because the item
+ * page and the item card on the listing page both serve that variant. Produced
+ * at exactly its aspect so the automatic crop has nothing to throw away.
+ *
+ * Composition is CENTRED and vertically middle-weighted on purpose: the listing
+ * card shows this file inside a SQUARE box with object-fit: cover, so the
+ * browser takes the middle band of it. Anything important pushed to the top or
+ * the bottom would survive on the item page and vanish from the card — and the
+ * "THIS COULD BE YOUR SHOP" stamp is exactly the thing that must not.
+ *
+ * The stamp is here for the same reason it is on the shop art: these pictures
+ * travel further than the page does. A product photo lifted into a search
+ * result or a shared link has to say what it is on its own.
+ */
+function productSvg(shop, tier, index) {
+  const w = 1600;
+  const h = 2000;
+  const p = itemPalette(shop, index);
+  const cx = w / 2;
+  // Product names carry a middle dot ("Whole pods · 250g"). Splitting on it
+  // gives a title and a qualifier, which stack far better than one long line
+  // wrapped at an arbitrary word.
+  const [head, ...restParts] = tier.name.split('·').map((part) => part.trim());
+  const qualifier = restParts.join(' · ');
+  const lines = wrap(head, 15, 2);
+  const longest = lines.reduce((a, b) => (a.length > b.length ? a : b), '');
+  const titleSize = fitSize(longest, w - 300, 130);
+
+  // Everything that MUST survive lives between y=200 and y=1800 — the middle
+  // band a SQUARE box keeps out of a 4:5 picture, which is how the item card in
+  // the shop's grid shows this file. The stamp is inside that band for exactly
+  // that reason: the tile and cover art can stamp their top edge because they
+  // are shown whole, and this one cannot. Only the shop's name along the bottom
+  // is allowed outside it, because the card sits on that shop's own page.
+  let y = 1330; // first title baseline, low enough to sit under the mark
+  const titleY = lines.map((_, i) => y + i * Math.round(titleSize * 1.16));
+  y = titleY[titleY.length - 1];
+  const qualifierY = y + 108;
+  const ruleY = qualifierY + (qualifier ? 66 : 10);
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+  ${ground(w, h, p)}
+  ${exampleStamp({ x: cx, y: 430, size: 32, text: 'THIS COULD BE YOUR SHOP', p, centred: true })}
+  <g opacity="0.55">
+    <circle cx="${cx}" cy="850" r="140" fill="none" stroke="${p.accent}" stroke-opacity="0.4" stroke-width="3"/>
+    <circle cx="${cx}" cy="850" r="220" fill="none" stroke="${p.accent}" stroke-opacity="0.2" stroke-width="3"/>
+    <circle cx="${cx}" cy="850" r="300" fill="none" stroke="${p.accent}" stroke-opacity="0.09" stroke-width="3"/>
+  </g>
+  <text x="${cx}" y="902" text-anchor="middle" font-family="${DEVA}" font-size="150"
+        fill="${p.ink}" opacity="0.92">${esc(shop.mono)}</text>
+  <text x="${cx}" y="1210" text-anchor="middle" font-family="${SANS}" font-size="30" font-weight="600"
+        letter-spacing="9" fill="${p.accent}">${esc(shop.kickerShort.toUpperCase())}</text>
+  ${lines
+    .map(
+      (line, i) =>
+        `<text x="${cx}" y="${titleY[i]}" text-anchor="middle" font-family="${SANS}" ` +
+        `font-size="${titleSize}" font-weight="700" fill="${p.ink}">${esc(line)}</text>`
+    )
+    .join('\n  ')}
+  ${
+    qualifier
+      ? `<text x="${cx}" y="${qualifierY}" text-anchor="middle" font-family="${SANS}" font-size="64" ` +
+        `font-weight="600" fill="${p.sub}">${esc(qualifier)}</text>`
+      : ''
+  }
+  <rect x="${cx - 70}" y="${ruleY}" width="140" height="5" fill="${p.accent}"/>
+  <text x="${cx}" y="1830" text-anchor="middle" font-family="${SANS}" font-size="34" letter-spacing="4"
+        fill="${p.sub}" opacity="0.85">${esc(shop.name.toUpperCase())}</text>
+</svg>`;
+}
+
+/**
  * Render one SVG to JPEG bytes IN MEMORY.
  *
  * Deliberately not straight to disk: see the render loop below, where every
@@ -1494,7 +1862,7 @@ requireColumns('events', [
   'fee_status',
   'fee_capacity',
 ]);
-requireColumns('event_tiers', ['status', 'unlimited', 'seats_per_unit']);
+requireColumns('event_tiers', ['status', 'unlimited', 'seats_per_unit', 'details', 'media_id']);
 
 /**
  * Does this table exist in the file in front of us?
@@ -1831,8 +2199,8 @@ const insertEvent = db.prepare(`
 `);
 
 const insertTier = db.prepare(`
-  INSERT INTO event_tiers (id, event_id, tier_key, name, price_cents, cap, unlimited, status, student_only, description, sort, seats_per_unit)
-  VALUES (?, ?, ?, ?, ?, ?, 0, 'on-sale', 0, ?, ?, 1)
+  INSERT INTO event_tiers (id, event_id, tier_key, name, price_cents, cap, unlimited, status, student_only, description, details, media_id, sort, seats_per_unit)
+  VALUES (?, ?, ?, ?, ?, ?, 0, 'on-sale', 0, ?, ?, ?, ?, 1)
 `);
 
 const insertMedia = db.prepare(
@@ -1877,7 +2245,22 @@ for (const shop of SHOPS) {
     tile: await renderImage(tileSvg(shop)),
     avatar: await renderImage(avatarSvg(shop)),
   };
-  rendered.push({ shop, ids, images });
+  // One picture per PRODUCT as well, because a shop whose items have no
+  // photographs is exactly the ticket-picker look this feature exists to
+  // replace — the example bazaar has to demonstrate the thing, not describe
+  // it. Rendered here with everything else, BEFORE anything is deleted, so a
+  // failure in any one of them still leaves the existing bazaar standing.
+  // Same id convention as the shop art: deterministic, marker-prefixed, so a
+  // re-seed overwrites its own file and --clean finds it by directory.
+  const items = [];
+  for (const [index, tier] of shop.tiers.entries()) {
+    items.push({
+      tier,
+      id: `${shop.id}-item-${tier.key}`,
+      image: await renderImage(productSvg(shop, tier, index)),
+    });
+  }
+  rendered.push({ shop, ids, images, items });
 }
 
 // ---------------------------------------------------------------------------
@@ -1910,17 +2293,21 @@ const previousSeed = collectSeed();
 const seedAll = db.transaction(() => {
   deleteSeedRows(previousSeed);
 
-  for (const { shop, ids, images } of rendered) {
+  for (const { shop, ids, images, items } of rendered) {
     writeImage(shop.id, ids.cover, images.cover);
     writeImage(shop.id, ids.tile, images.tile);
     writeImage(shop.id, ids.avatar, images.avatar);
+    // Into the SAME uploads/<shop id>/ directory as the shop's own art, which
+    // is what makes --clean and the orphan sweep cover these with no new code:
+    // both work on marker-named directories, not on a list of file names.
+    for (const item of items) writeImage(shop.id, item.id, item.image);
   }
 
   for (const s of SELLERS) {
     insertOrganizer.run(s.id, s.email, s.name, ACCOUNT.hash, SELLER_STATUS, PLAN_NEVER_EXPIRES, s.notes);
   }
 
-  for (const { shop, ids } of rendered) {
+  for (const { shop, ids, items } of rendered) {
     const totalCapacity = shop.tiers.reduce((sum, t) => sum + t.cap, 0);
     insertEvent.run({
       id: shop.id,
@@ -1941,16 +2328,38 @@ const seedAll = db.transaction(() => {
       assistantContext: `${EXAMPLE_ASSISTANT_NOTE}\n\n${shop.assistantContext}`,
     });
 
-    shop.tiers.forEach((t, i) => {
-      insertTier.run(`${shop.id}-tier-${t.key}`, shop.id, t.key, t.name, t.price, t.cap, t.description, i);
-    });
-
     // sort 0 is the wide cover, 1 the portrait tile, 2 the round mark — the
-    // order they appear in the shop's photo strip.
+    // order they appear in the shop's photo strip — then the products in shelf
+    // order after them. The media rows go in BEFORE the tiers that point at
+    // them: there is no foreign key to enforce it (event_tiers.media_id was
+    // added by ALTER, which SQLite cannot attach one to), but a reader between
+    // the two statements inside this transaction would otherwise see a tier
+    // naming a photo that does not exist yet.
     insertMedia.run(ids.cover, shop.id, `${ids.cover}.jpg`, 0);
     insertMedia.run(ids.tile, shop.id, `${ids.tile}.jpg`, 1);
     insertMedia.run(ids.avatar, shop.id, `${ids.avatar}.jpg`, 2);
+    items.forEach((item, i) => {
+      insertMedia.run(item.id, shop.id, `${item.id}.jpg`, 3 + i);
+    });
     setMediaPointers.run(ids.cover, ids.tile, ids.avatar, shop.id);
+
+    items.forEach((item, i) => {
+      insertTier.run(
+        `${shop.id}-tier-${item.tier.key}`,
+        shop.id,
+        item.tier.key,
+        item.tier.name,
+        item.tier.price,
+        item.tier.cap,
+        item.tier.description,
+        item.tier.details,
+        // Every seeded product carries its own picture, so the example bazaar
+        // shows what an item page looks like with one rather than what it
+        // looks like empty.
+        item.id,
+        i
+      );
+    });
   }
 });
 
@@ -2040,7 +2449,8 @@ console.log(`  assistant — so a buyer cannot arrange a collection with somebod
 console.log(`  exist. And each of those places says what to do about it: a seller who likes what`);
 console.log(`  they see is sent to ${ORGANIZERS_LINK} to open their own, free.`);
 
-console.log(`\n${SHOPS.length * 3} cover images generated with sharp (wide cover, portrait tile, round mark),`);
+console.log(`\n${IMAGE_COUNT} images generated with sharp — per shop a wide cover, a portrait tile and a`);
+console.log(`  round mark, plus one picture for each of the ${PRODUCT_COUNT} products, all of them`);
 console.log(`  stamped "THIS COULD BE YOUR SHOP", under ${path.join(dataDir, 'uploads', `${MARKER}<shop>`)}/`);
 if (orphanDirs) {
   console.log(`  Also removed ${orphanDirs} leftover "${MARKER}*" image folder(s) no listing points at.`);
@@ -2103,7 +2513,7 @@ console.log(`  #  Run it from this directory with the same environment (so DATA_
 console.log(`  #  still points at ${dbPath}).`);
 console.log(`  #  It needs no flag and works on production exactly as it does here.`);
 console.log(`  #`);
-console.log(`  #  It removes the ${SHOPS.length} listings, their products, their ${SHOPS.length * 3} images, the`);
+console.log(`  #  It removes the ${SHOPS.length} listings, their ${PRODUCT_COUNT} products, their ${IMAGE_COUNT} images, the`);
 console.log(`  #  ${SELLERS.length} accounts, and everything that hangs off them — visitor`);
 console.log(`  #  questions, FAQs, posts, waitlist entries, stall links, promo`);
 console.log(`  #  codes, payout records — because with foreign keys on, one child`);

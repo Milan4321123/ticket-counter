@@ -395,8 +395,14 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
               status: t.status,
               studentOnly: t.studentOnly,
               description: t.description,
+              details: t.details,
+              mediaId: t.mediaId,
               seatsPerUnit: t.seatsPerUnit,
             }))}
+            // The listing's own photos are the ONLY pool an item picture can
+            // come from — there is no second upload path, and the picker says
+            // so by pointing at the Photos tab when this is empty.
+            photos={media.map((m, i) => ({ id: m.id, url: mediaUrl(m.id), label: `Photo ${i + 1}` }))}
           soldByTierKey={soldByTierKey}
         />
       </div>
