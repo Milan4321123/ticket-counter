@@ -190,7 +190,11 @@ export function getPaymentMode(): PaymentMode {
 export function getBaseUrl(): string {
   const url = (process.env.NEXT_PUBLIC_BASE_URL || '').trim();
   if (url) {
-    const normalized = url.replace(/\/$/, '');
+    // A stray comma in the deployment setting previously produced links like
+    // `https://martnepali.com,/order/...`; browsers then look up the invalid
+    // hostname `martnepali.com,` and report a DNS failure. Be forgiving of
+    // punctuation accidentally copied after the origin.
+    const normalized = url.replace(/[\s,;]+$/, '').replace(/\/$/, '');
 
     // The apex currently redirects to www. Email clients and link scanners can
     // be stricter about redirects than browsers, so send buyers straight to

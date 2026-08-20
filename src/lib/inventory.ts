@@ -9,6 +9,7 @@
 //   failed / cancelled -> terminal, seats released
 import { getDb } from './db';
 import { getEventById, getEventTiers, getPrimaryEvent } from './events';
+import { releaseVoucherForOrder } from './referrals';
 
 export interface TierAvailability {
   tierId: string;
@@ -225,8 +226,12 @@ export function beginCapture(orderId: string): boolean {
 /** Release a claim/capture hold so the seats go back on sale. */
 export function releaseClaim(orderId: string, toStatus: 'pending' | 'failed' | 'cancelled' = 'failed'): void {
   const db = getDb();
-  db.prepare(`UPDATE orders SET status = ? WHERE id = ? AND status IN ('claimed', 'capturing')`).run(
-    toStatus,
-    orderId
-  );
+  const changes = db
+    .prepare(`UPDATE orders SET status = ? WHERE id = ? AND status IN ('claimed', 'capturing')`)
+    .run(toStatus, orderId).changes;
+  // A reservation that ends for good gives back any referral voucher it was
+  // holding, so a buyer who never paid does not lose a reward they earned.
+  // NOT for 'pending': that order is still alive and about to try again — the
+  // voucher belongs to it until it either becomes a sale or dies.
+  if (changes > 0 && toStatus !== 'pending') releaseVoucherForOrder(orderId);
 }

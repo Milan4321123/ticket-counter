@@ -7,6 +7,7 @@ import { getPaymentMode } from './config';
 import { getEventById, getEventTier, getEventTiers } from './events';
 import { claimInventory } from './inventory';
 import { effectivePayout } from './payout';
+import { claimVoucherForOrder, releaseVoucherForOrder } from './referrals';
 import { generateTicketCode, normalizeTicketCode } from './tickets';
 import type { CheckinResponse } from './types';
 
@@ -72,6 +73,17 @@ export interface OrderRow {
    * referralCode below for why).
    */
   shareCode: string;
+  /**
+   * The referral voucher the buyer redeemed here, or '' — by far the usual
+   * case. The organizer's own discount on the organizer's own price; see
+   * lib/referrals.ts.
+   */
+  voucherCode: string;
+  /**
+   * What that voucher took off. A RECORD, not a second subtraction:
+   * totalCents below is already the final amount owed.
+   */
+  discountCents: number;
 }
 
 /**
@@ -251,7 +263,9 @@ const ORDER_COLS = `
   payout_bank_name AS payoutBankName,
   payout_paypal AS payoutPaypal,
   referred_by AS referredBy,
-  share_code AS shareCode
+  share_code AS shareCode,
+  voucher_code AS voucherCode,
+  discount_cents AS discountCents
 `;
 
 const TICKET_COLS = `
@@ -346,6 +360,13 @@ export function createOrder(params: {
    * that is not the buyer's own). '' or absent means unreferred.
    */
   referredBy?: string;
+  /**
+   * Optional: a referral voucher code the buyer typed at checkout. UNLIKE
+   * referredBy this is NOT trusted from the caller — it is validated and
+   * claimed inside this function's transaction, because it moves money and a
+   * check made anywhere else could go stale between there and here.
+   */
+  voucherCode?: string;
   items: { tierId: string; quantity: number }[];
   paymentMode: PaymentMethod;
 }): OrderRow {
@@ -363,7 +384,8 @@ export function createOrder(params: {
     }
     return { tierId: it.tierId, quantity: it.quantity, unitPriceCents: tier.priceCents };
   });
-  const totalCents = resolved.reduce((sum, it) => sum + it.quantity * it.unitPriceCents, 0);
+  const itemsTotalCents = resolved.reduce((sum, it) => sum + it.quantity * it.unitPriceCents, 0);
+  const wantsVoucher = Boolean((params.voucherCode ?? '').trim());
 
   // Freeze where this buyer is being sent, now, before anything can move it.
   // effectivePayout() rather than the raw columns: a payout change whose waiting
@@ -372,11 +394,35 @@ export function createOrder(params: {
   const payout = effectivePayout(event);
 
   const tx = db.transaction(() => {
+    // The voucher is checked and SPENT in the same transaction that writes the
+    // order it discounts. Two checkouts racing for one code therefore cannot
+    // both win: the loser's claim touches no row, claimVoucherForOrder throws,
+    // and this whole insert rolls back — no order exists holding a discount it
+    // never actually took. A VoucherError propagates to the caller, which
+    // turns it into a message the buyer reads BEFORE they have committed to
+    // anything.
+    let voucherCode = '';
+    let discountCents = 0;
+    if (wantsVoucher) {
+      const claimed = claimVoucherForOrder(
+        event.organizerId,
+        params.voucherCode ?? '',
+        id,
+        itemsTotalCents
+      );
+      voucherCode = claimed.code;
+      discountCents = claimed.discountCents;
+    }
+    // What the buyer OWES. Never negative, and no change is given for a
+    // voucher worth more than the basket — claimVoucherForOrder already capped
+    // the discount at the items total.
+    const totalCents = Math.max(0, itemsTotalCents - discountCents);
+
     db.prepare(
       `INSERT INTO orders (id, event_id, status, buyer_name, buyer_email, payer_name, total_cents, currency,
                            payment_mode, payout_holder, payout_iban, payout_bic, payout_bank_name, payout_paypal,
-                           referred_by, share_code)
-       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                           referred_by, share_code, voucher_code, discount_cents)
+       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       id,
       event.id,
@@ -394,7 +440,9 @@ export function createOrder(params: {
       (params.referredBy ?? '').trim(),
       // Minted here, once, so the code the buyer will broadcast never has to
       // be derived from anything a payment or support flow also relies on.
-      generateShareCode()
+      generateShareCode(),
+      voucherCode,
+      discountCents
     );
     const ins = db.prepare(
       `INSERT INTO order_items (order_id, tier_id, quantity, unit_price_cents) VALUES (?, ?, ?, ?)`
@@ -450,9 +498,13 @@ export function getTicketsForOrder(orderId: string): TicketRow[] {
 }
 
 export function markOrderFailed(orderId: string, status: 'failed' | 'cancelled' = 'failed'): void {
-  getDb()
+  const changes = getDb()
     .prepare(`UPDATE orders SET status = ? WHERE id = ? AND status IN ('pending', 'claimed')`)
-    .run(status, orderId);
+    .run(status, orderId).changes;
+  // An order that dies gives back whatever voucher it was holding: the reward
+  // was earned by bringing friends, not by finishing this particular booking,
+  // and losing it here would punish somebody for a sale that never happened.
+  if (changes > 0) releaseVoucherForOrder(orderId);
 }
 
 /**
@@ -963,16 +1015,29 @@ export function listAwaitingTransferOrders(eventId?: string): OrderListRow[] {
  * Returns the number of reservations expired.
  */
 export function expireOverdueTransferReservations(eventId?: string): number {
+  const db = getDb();
   const scope = eventId ? `AND event_id = ?` : '';
   const args: string[] = eventId ? [eventId] : [];
-  return getDb()
-    .prepare(
-      `UPDATE orders SET status = 'cancelled'
-       WHERE status = 'claimed' AND payment_mode = 'transfer' ${scope}
+  const OVERDUE = `status = 'claimed' AND payment_mode = 'transfer' ${scope}
          AND created_at < datetime('now',
-           '-' || (COALESCE((SELECT e.pay_within_days FROM events e WHERE e.id = orders.event_id), 5) + 2) || ' days')`
-    )
-    .run(...args).changes;
+           '-' || (COALESCE((SELECT e.pay_within_days FROM events e WHERE e.id = orders.event_id), 5) + 2) || ' days')`;
+  // The ids are read first so the vouchers those reservations were holding can
+  // be handed back in the same transaction — a buyer whose transfer never
+  // arrived loses their seats, which is the point, but must not also lose a
+  // reward they earned by bringing friends. One transaction, so a crash
+  // between the two cannot strand a voucher on a cancelled order. The release
+  // also puts the cancelled order back to its full price (see
+  // releaseVoucherForOrder), so a transfer that turns up late is confirmed
+  // against what the order is really worth and the voucher — now the buyer's
+  // again — is never honoured twice.
+  const tx = db.transaction(() => {
+    const ids = db.prepare(`SELECT id FROM orders WHERE ${OVERDUE}`).all(...args) as { id: string }[];
+    if (ids.length === 0) return 0;
+    const expired = db.prepare(`UPDATE orders SET status = 'cancelled' WHERE ${OVERDUE}`).run(...args).changes;
+    for (const { id } of ids) releaseVoucherForOrder(id);
+    return expired;
+  });
+  return tx();
 }
 
 // Reservations expire on a multi-DAY timescale, so there is no reason to run
@@ -1036,6 +1101,51 @@ export function markTransferOrderPaid(
       // seats back. claimInventory re-checks caps and throws SoldOutError.
       db.prepare(`UPDATE orders SET status = 'pending' WHERE id = ?`).run(orderId);
       claimInventory(orderId); // pending -> claimed, or throws (rolls back)
+      // The seats came back; the voucher has to as well.
+      //
+      // Normally there is nothing to do here: releaseVoucherForOrder hands the
+      // voucher back AND takes the discount off this order at the same moment,
+      // so an expired reservation is already back at its full list price and
+      // carries no voucher. This runs for the orders that still hold one — and
+      // it must, because a discounted total whose voucher belongs to somebody
+      // else again is exactly how one voucher comes to pay for two orders.
+      //
+      // Re-claiming its own voucher is a no-op that must still count as
+      // success (redeemed_order_id is already this order), hence the second
+      // arm of the WHERE. If it cannot be re-claimed the voucher has provably
+      // been spent on another order, so it cannot be spent on this one either:
+      // the discount comes off, the order goes back to what it is worth, and
+      // the confirmation goes ahead — the money that arrived is real and
+      // withholding tickets would punish a buyer who paid. What the organizer
+      // then sees on the order is a total larger than the transfer, which is
+      // the ordinary underpayment they already know how to handle, instead of
+      // a discount silently granted twice and a line in a log nobody reads.
+      if (order.voucherCode) {
+        const reclaimed = db
+          .prepare(
+            `UPDATE referral_vouchers
+             SET redeemed_at = datetime('now'), redeemed_order_id = ?
+             WHERE code = ? AND (redeemed_at IS NULL OR redeemed_order_id = ?)`
+          )
+          .run(orderId, order.voucherCode, orderId).changes;
+        if (reclaimed !== 1) {
+          const items = db
+            .prepare(
+              `SELECT COALESCE(SUM(quantity * unit_price_cents), 0) AS n
+               FROM order_items WHERE order_id = ?`
+            )
+            .get(orderId) as { n: number };
+          db.prepare(
+            `UPDATE orders SET voucher_code = '', discount_cents = 0, total_cents = ? WHERE id = ?`
+          ).run(items.n, orderId);
+          console.error(
+            `Order ${orderId} was confirmed paid with voucher ${order.voucherCode}, but that voucher ` +
+              `had already been redeemed on another order — the discount has been removed and this ` +
+              `order is back at its full price of ${items.n} cents. If the buyer transferred the ` +
+              `discounted amount, the difference is still outstanding.`
+          );
+        }
+      }
     }
     db.prepare(`UPDATE orders SET confirmed_via = ? WHERE id = ?`).run(confirmedVia, orderId);
     finalizePaidOrder(orderId, paymentReference(orderId));
@@ -1068,6 +1178,10 @@ export function cleanupOldPendingOrders(olderThanHours = 24): number {
     const delItems = db.prepare(`DELETE FROM order_items WHERE order_id = ?`);
     const delOrder = db.prepare(`DELETE FROM orders WHERE id = ?`);
     for (const { id } of ids) {
+      // Hand back any voucher first: deleting the order would otherwise leave
+      // the voucher redeemed against a row that no longer exists — burnt for
+      // good, on an order that never became a sale.
+      releaseVoucherForOrder(id);
       delItems.run(id);
       delOrder.run(id);
     }
@@ -1089,6 +1203,9 @@ export function purgeMockOrders(): { orders: number; tickets: number } {
     const delItems = db.prepare(`DELETE FROM order_items WHERE order_id = ?`);
     const delOrder = db.prepare(`DELETE FROM orders WHERE id = ?`);
     for (const { id } of ids) {
+      // Same reason as the cleanup above — a purged test order must not take a
+      // real voucher with it.
+      releaseVoucherForOrder(id);
       tickets += delTickets.run(id).changes;
       delItems.run(id);
       delOrder.run(id);

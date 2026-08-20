@@ -19,6 +19,7 @@ import { formatMoney } from '@/lib/money';
 import { getBaseUrl } from '@/lib/config';
 import { getOrder, getOrderItems, getTicketsForOrder, paymentReference, referralCode } from '@/lib/orders';
 import { orderPayout } from '@/lib/payout';
+import { referralProgressFor } from '@/lib/referrals';
 import { paymentQrDataUrl } from '@/lib/paymentQr';
 import { machineDate } from '@/lib/seo';
 import { ticketQrDataUrl } from '@/lib/tickets';
@@ -310,6 +311,16 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <strong>{amountDisplay}</strong>
               <CopyButton value={amountPlain} />
             </div>
+            {/* The amount above is already the discounted one — total_cents IS
+                what is owed — so this only explains why it is lower, and must
+                never read as something still to subtract. */}
+            {order.discountCents > 0 ? (
+              <p className="muted small" style={{ margin: '0 0 10px' }}>
+                Voucher <span className="mono">{order.voucherCode}</span> applied —{' '}
+                {formatMoney(order.discountCents, order.currency)} off the organizer&rsquo;s own price.
+                Transfer the amount above and nothing else.
+              </p>
+            ) : null}
             <div className="copy-row">
               <span className="muted small" style={rowLabelStyle}>
                 PayPal
@@ -418,6 +429,16 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <strong>{amountDisplay}</strong>
               <CopyButton value={amountPlain} />
             </div>
+            {/* The amount above is already the discounted one — total_cents IS
+                what is owed — so this only explains why it is lower, and must
+                never read as something still to subtract. */}
+            {order.discountCents > 0 ? (
+              <p className="muted small" style={{ margin: '0 0 10px' }}>
+                Voucher <span className="mono">{order.voucherCode}</span> applied —{' '}
+                {formatMoney(order.discountCents, order.currency)} off the organizer&rsquo;s own price.
+                Transfer the amount above and nothing else.
+              </p>
+            ) : null}
             <div className="copy-row">
               <span className="muted small" style={rowLabelStyle}>
                 Account holder
@@ -598,6 +619,29 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         )
       : null;
 
+  // What the link above has actually earned this buyer, when the organizer has
+  // switched referral rewards on. Nothing new appears on the page when they
+  // have not — an unasked-for promise is worse than silence.
+  //
+  // Only while the buyer's details still exist: once lib/retention has erased
+  // them, this order's address is a shared placeholder, and counting against
+  // it would credit one imaginary, very busy person. Vouchers already earned
+  // are unaffected — a voucher stands on its own code.
+  //
+  // And only where the promise can actually come true. This buyer's share link
+  // points at THIS listing, and a referral is counted on the order it brings
+  // here — so on a listing where nothing costs money, no booking it brings can
+  // ever be "actually paid for" and the counter would sit at zero for good.
+  // Rewards are an ACCOUNT setting, so an organizer with one paid listing and
+  // one free one would otherwise promise every RSVP guest something the rules
+  // can never give them.
+  const rewardsReachable = orderTiers.some((t) => t.priceCents > 0);
+  const rewards =
+    event && !order.buyerErasedAt && rewardsReachable
+      ? referralProgressFor(event.organizerId, order.buyerEmail)
+      : null;
+  const sellerName = organizer?.name?.trim() || 'The organizer';
+
   return (
     <div className="container section">
       <h1 className="page-title anim-fade-up">Your tickets</h1>
@@ -616,6 +660,63 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           </a>
         </p>
       )}
+
+      {/* The other half of that share button: what it has actually brought,
+          and what it has earned. Shown ONLY when the organizer rewards
+          referrals — and stated as their thank-you on their own prices, never
+          as anything the platform hands out. */}
+      {rewards?.settings.enabled ? (
+        <div className="card anim-fade-up anim-d1">
+          <div className="card-title">Bring a friend, get a thank-you</div>
+          <p className="muted small" style={{ marginTop: 0 }}>
+            {sellerName} gives a{' '}
+            {formatMoney(rewards.settings.rewardCents, rewards.currency)} voucher for every{' '}
+            {rewards.settings.threshold}{' '}
+            {rewards.settings.threshold === 1 ? 'friend who books' : 'friends who book'} through your
+            link above and actually pays. It is their own discount on their own {v.units} — you
+            simply pay them less next time, and nothing about it passes through us.
+          </p>
+          <div className="summary-row">
+            {/* Counted from the day this seller made the promise, which is the
+                same window the vouchers below are issued from — a lifetime
+                number here would tell somebody they had earned four vouchers
+                they do not hold. */}
+            <span className="muted">Friends who booked and paid since this started</span>
+            <span>{rewards.paidReferrals}</span>
+          </div>
+          <div className="summary-row">
+            <span className="muted">Until your next voucher</span>
+            <span>
+              {rewards.toNextReward} more {rewards.toNextReward === 1 ? 'booking' : 'bookings'}
+            </span>
+          </div>
+          {rewards.vouchers.length > 0 ? (
+            <>
+              <p style={{ margin: '14px 0 4px' }}>
+                <strong>
+                  {rewards.vouchers.length === 1 ? 'Your voucher' : 'Your vouchers'}
+                </strong>
+              </p>
+              {rewards.vouchers.map((voucher) => (
+                <div className="summary-row" key={voucher.code}>
+                  <span className="mono">{voucher.code}</span>
+                  <span>{formatMoney(voucher.amountCents, rewards.currency)} off</span>
+                </div>
+              ))}
+              <p className="muted small" style={{ margin: '10px 0 0' }}>
+                Type it into the &ldquo;Have a voucher code?&rdquo; box at checkout on any{' '}
+                {v.listing} from {sellerName}. Each one is yours to use once, and there is no expiry
+                date on it.
+              </p>
+            </>
+          ) : (
+            <p className="muted small" style={{ margin: '10px 0 0' }}>
+              Only bookings {sellerName} has confirmed as paid count — nothing is owed to you until
+              then, and we will email you the moment a voucher is yours.
+            </p>
+          )}
+        </div>
+      ) : null}
 
       <div className="card anim-fade-up anim-d2">
         <div className="card-title">Order summary</div>
@@ -653,6 +754,14 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             </div>
           );
         })}
+        {order.discountCents > 0 ? (
+          <div className="summary-row">
+            <span>
+              Voucher <span className="mono small">{order.voucherCode}</span>
+            </span>
+            <span>&minus;{formatMoney(order.discountCents, order.currency)}</span>
+          </div>
+        ) : null}
         <div className="summary-row total">
           <span>Total</span>
           <span>{order.totalCents === 0 ? 'Free' : formatMoney(order.totalCents, order.currency)}</span>

@@ -10,6 +10,7 @@ import {
   paymentReference,
   senderNameMatches,
 } from '@/lib/orders';
+import { awardReferralVouchers } from '@/lib/referrals';
 import type { ApiErrorResponse } from '@/lib/types';
 
 /**
@@ -93,6 +94,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     const tickets = markTransferOrderPaid(id, byReference ? 'reference' : 'sender');
+    // The money has arrived, so a referral that brought this buyer has now
+    // genuinely been paid for. Fail-soft inside: whatever happens to a
+    // thank-you, the organizer's confirmation must still succeed.
+    awardReferralVouchers(id);
     const email = await sendTicketEmail(id);
     return NextResponse.json({ ok: true, ticketCount: tickets.length, emailSent: email.sent });
   } catch (e) {

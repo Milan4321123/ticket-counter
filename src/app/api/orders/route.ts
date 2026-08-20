@@ -16,6 +16,12 @@ import {
   type PaymentMethod,
 } from '@/lib/orders';
 import { requestMarketingConsent } from '@/lib/marketing';
+import {
+  normalizeVoucherCode,
+  requireRedeemableVoucher,
+  VOUCHER_NOTHING_TO_DISCOUNT,
+  VoucherError,
+} from '@/lib/referrals';
 import { createPaypalOrder } from '@/lib/paypal';
 import { sendMarketingConfirmationEmail, sendTicketEmail, sendTransferInstructionsEmail } from '@/lib/email';
 import { clientIp, rateLimit } from '@/lib/ratelimit';
@@ -169,7 +175,40 @@ export async function POST(req: Request) {
       const tier = getEventTier(event.id, it.tierId);
       return sum + (tier ? tier.priceCents : 0) * it.quantity;
     }, 0);
-    const isFree = orderTotalCents === 0;
+
+    // A voucher the buyer typed at checkout: the SELLER'S own discount on the
+    // seller's own price. Previewed here for ONE reason — to know which flow
+    // this order takes, because a total that a voucher brings to zero is an
+    // RSVP and nobody may be asked to transfer 0.00. The authoritative check
+    // and the claim happen inside createOrder's transaction; a refusal there
+    // reaches the buyer as the same message, before anything is committed.
+    const rawVoucher = (raw as Partial<CreateOrderRequest>).voucherCode;
+    const voucherCode = normalizeVoucherCode(typeof rawVoucher === 'string' ? rawVoucher : '');
+    let discountCents = 0;
+    if (voucherCode) {
+      try {
+        const voucher = requireRedeemableVoucher(event.organizerId, voucherCode);
+        // A basket worth nothing has nothing to discount. Refused here, in the
+        // same words createOrder would refuse it in, because spending a
+        // voucher for 0.00 destroys the whole reward on an order that
+        // finalizes as paid in this very request and can never hand it back —
+        // and anybody who came across a code could do that to its owner in one
+        // request. A mixed listing (a free tier beside paid ones) makes this a
+        // basket the buyer can genuinely arrive at by changing their mind.
+        if (orderTotalCents <= 0) {
+          return apiError(400, 'VALIDATION', VOUCHER_NOTHING_TO_DISCOUNT);
+        }
+        // Never more than the basket is worth, and never negative. No change
+        // and no credit is given for the remainder — it is a discount.
+        discountCents = Math.min(voucher.amountCents, orderTotalCents);
+      } catch (e) {
+        if (e instanceof VoucherError) return apiError(400, 'VALIDATION', e.message);
+        throw e;
+      }
+    }
+    // What the buyer will actually owe once the discount is off.
+    const payableCents = Math.max(0, orderTotalCents - discountCents);
+    const isFree = payableCents === 0;
     // Seats this order occupies — quantities count BOOKINGS, and a bundled
     // tier ("Table of 8") puts several people in the room per booking. Every
     // comparison against the room or the per-address ceiling uses this.
@@ -181,6 +220,9 @@ export async function POST(req: Request) {
     // before anything is claimed: an organizer repricing a tier mid-checkout
     // must not silently turn "free" into a €50 transfer order — or the
     // reverse — behind the buyer's back.
+    // Deliberately compared against the ITEMS total, before any voucher: this
+    // guard is about PRICES changing under the buyer, and a voucher is not a
+    // price. The checkout sends the same subtotal for the same reason.
     const expected = (raw as Partial<CreateOrderRequest>).expectedTotalCents;
     if (typeof expected === 'number' && Number.isFinite(expected) && Math.round(expected) !== orderTotalCents) {
       return apiError(
@@ -362,6 +404,7 @@ export async function POST(req: Request) {
         buyerEmail: validated.buyerEmail,
         payerName: validated.payerName,
         referredBy,
+        voucherCode,
         items: validated.items,
         paymentMode: mode,
       });
@@ -369,6 +412,10 @@ export async function POST(req: Request) {
       if (e instanceof SoldOutError) {
         return apiError(409, 'SOLD_OUT', 'Those tickets were taken just before you — please adjust your order.');
       }
+      // Somebody else spent the voucher in the seconds since the preview above
+      // — the order rolled back rather than existing without the discount it
+      // was shown. Say so plainly instead of silently charging full price.
+      if (e instanceof VoucherError) return apiError(409, 'VALIDATION', e.message);
       throw e;
     }
 
@@ -447,6 +494,7 @@ export async function POST(req: Request) {
       mode,
       paypalOrderId,
       totalCents: order.totalCents,
+      discountCents: order.discountCents,
       currency: order.currency,
     };
     return NextResponse.json(response);

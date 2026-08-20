@@ -874,6 +874,88 @@ function migrateToPlatform(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_event_stalls_shop ON event_stalls(shop_event_id, status);
   `);
 
+  // ---- Referral REWARDS: the organizer's own thank-you, on their own prices --
+  //
+  // referred_by above only ever MEASURED who brought friends. These two
+  // columns let an organizer reward it: every `referral_threshold` genuinely
+  // paid referrals earn that referrer one voucher worth
+  // `referral_reward_cents`.
+  //
+  // Both default to 0 — rewards OFF — because a reward must never switch
+  // itself on for an account that never asked for one. What a voucher IS: a
+  // discount the ORGANIZER grants on their OWN prices. The buyer simply
+  // transfers less money to the organizer; the platform is free, never touches
+  // the money, and neither funds nor takes any part of this. The pair is
+  // meaningless apart (a threshold worth nothing, a reward nobody can reach),
+  // so the portal refuses one without the other.
+  if (!orgCols.includes('referral_threshold')) {
+    db.exec(`ALTER TABLE organizers ADD COLUMN referral_threshold INTEGER NOT NULL DEFAULT 0`);
+  }
+  if (!orgCols.includes('referral_reward_cents')) {
+    db.exec(`ALTER TABLE organizers ADD COLUMN referral_reward_cents INTEGER NOT NULL DEFAULT 0`);
+  }
+  // WHEN the current promise started. How many vouchers somebody should hold
+  // is DERIVED from their referral count, so without a start date, switching
+  // rewards on would owe every referral the account ever had — an organizer of
+  // a year's standing could turn on "5 referrals = 10.00" and find themselves
+  // granting hundreds of euros of discounts for bookings that happened before
+  // they promised anything. Nullable because an account that never switched
+  // rewards on has no promise to date; lib/referrals stamps it when rewards go
+  // on (and when the threshold is lowered, which is the same burst in
+  // miniature), and counts referrals and vouchers from it in the same breath.
+  if (!orgCols.includes('referral_rewards_since')) {
+    db.exec(`ALTER TABLE organizers ADD COLUMN referral_rewards_since TEXT`);
+    // Anybody already rewarding referrals when this column arrived starts
+    // their clock now rather than retroactively: the same reasoning, applied
+    // to the one moment the rule itself changed.
+    db.exec(
+      `UPDATE organizers SET referral_rewards_since = datetime('now')
+       WHERE referral_threshold > 0 AND referral_reward_cents > 0`
+    );
+  }
+
+  // What the buyer redeemed at checkout, and what it took off.
+  //
+  // total_cents keeps meaning THE FINAL AMOUNT THE BUYER OWES (items minus
+  // discount), so every money surface already built on it — the order page,
+  // the GiroCode, the PayPal amount, the emails, the statements, analytics
+  // revenue — stays correct without knowing vouchers exist. discount_cents is
+  // the RECORD of what was taken off, never a second thing to subtract.
+  if (!orderCols.includes('voucher_code')) {
+    db.exec(`ALTER TABLE orders ADD COLUMN voucher_code TEXT NOT NULL DEFAULT ''`);
+  }
+  if (!orderCols.includes('discount_cents')) {
+    db.exec(`ALTER TABLE orders ADD COLUMN discount_cents INTEGER NOT NULL DEFAULT 0`);
+  }
+
+  // One earned voucher: who earned it, from whom, what it is worth, and
+  // whether it has been spent.
+  //
+  // amount_cents is FROZEN at the moment it was earned — the organizer may
+  // change what future referrals are worth, but never what somebody was
+  // already promised. referrer_email is how it is found again (the referrer
+  // has no account here); it is kept even after lib/retention erases that
+  // buyer's ORDER details, because a voucher stands on its own code and a
+  // reward already given must not evaporate — an erased referrer simply stops
+  // ACCRUING (see lib/referrals.ts). code is UNIQUE, which is also the
+  // redemption lock's backstop.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS referral_vouchers (
+      id TEXT PRIMARY KEY,
+      organizer_id TEXT REFERENCES organizers(id),
+      referrer_email TEXT,
+      code TEXT NOT NULL UNIQUE,
+      amount_cents INTEGER NOT NULL,
+      earned_at TEXT NOT NULL DEFAULT (datetime('now')),
+      redeemed_at TEXT,
+      redeemed_order_id TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_referral_vouchers_owner
+      ON referral_vouchers(organizer_id, referrer_email);
+    CREATE INDEX IF NOT EXISTS idx_referral_vouchers_order
+      ON referral_vouchers(redeemed_order_id);
+  `);
+
   const haveEvents = (db.prepare(`SELECT COUNT(*) AS n FROM events`).get() as { n: number }).n > 0;
   if (!haveEvents) {
     const configPath = path.join(process.cwd(), 'event.config.json');

@@ -10,6 +10,7 @@ import {
   type PaypalCaptureResponse,
 } from '@/lib/paypal';
 import { reconcileStuckOrder } from '@/lib/reconcile';
+import { awardReferralVouchers } from '@/lib/referrals';
 import { sendTicketEmail } from '@/lib/email';
 import type { ApiErrorResponse, CaptureOrderResponse } from '@/lib/types';
 
@@ -32,6 +33,12 @@ const UNCLEAR_PAYMENT_MSG =
 
 async function finalizeAndRespond(orderId: string, captureId: string): Promise<NextResponse> {
   const tickets = finalizePaidOrder(orderId, captureId);
+
+  // The money is in and the codes are minted — so if this order came through
+  // somebody's share link, that referrer may just have earned their reward.
+  // Fail-soft inside: a voucher problem must never turn a completed payment
+  // into an error the buyer sees.
+  awardReferralVouchers(orderId);
 
   // Email is best-effort; the buyer always sees tickets on the site.
   try {

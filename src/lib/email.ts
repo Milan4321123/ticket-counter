@@ -20,6 +20,7 @@ import { girocodePayload } from './girocode';
 import { vocabFor } from './vocab';
 import { getOrder, getOrderItems, getTicketsForOrder, paymentReference, referralCode } from './orders';
 import { orderPayout } from './payout';
+import { getVoucher, organizerCurrency } from './referrals';
 import {
   bareAddress,
   emailFromBuyers,
@@ -2670,6 +2671,119 @@ export async function sendMarketingConfirmationEmail(
     return { sent: true };
   } catch (err) {
     console.error('[email] Failed to send marketing confirmation:', err instanceof Error ? err.message : err);
+    return { sent: false, reason: 'send-failed' };
+  }
+}
+
+/**
+ * Tell somebody their friends' bookings just earned them a voucher.
+ *
+ * Says plainly WHOSE thank-you this is: the ORGANIZER grants the discount, on
+ * their own prices, and the buyer will simply transfer less money to them. The
+ * platform never holds or funds any part of it and takes nothing — so this
+ * mail must never read as the platform handing out money.
+ *
+ * Best-effort like every send here: the voucher exists in the database whether
+ * or not this arrives, and it is also shown on the referrer's own order page.
+ */
+export async function sendReferralRewardEmail(
+  voucherId: string,
+  eventId: string
+): Promise<{ sent: boolean; reason?: string }> {
+  try {
+    if (!isEmailConfigured()) return { sent: false, reason: 'email-not-configured' };
+
+    const voucher = getVoucher(voucherId);
+    if (!voucher) return { sent: false, reason: 'voucher-not-found' };
+    const to = (voucher.referrerEmail || '').trim();
+    if (!to) return { sent: false, reason: 'no-recipient' };
+
+    const event = getEventById(eventId);
+    const v = vocabFor(event?.kind ?? 'event');
+    const organizerName = organizerDisplayName(voucher.organizerId) || 'the organizer';
+    const amount = formatMoney(voucher.amountCents, event?.currency ?? organizerCurrency(voucher.organizerId));
+    const eventUrl = event ? `${getBaseUrl()}/e/${event.slug}` : getBaseUrl();
+    const headline = `${organizerName} has a ${amount} thank-you for you`;
+
+    const bodyHtml =
+      pHtml(`Hi,`) +
+      pHtml(
+        `Friends of yours booked through your share link${event ? ` for ${strong(event.name)}` : ''} — enough ` +
+          `of them that ${strong(organizerName)} would like to say thank you with ${strong(amount)} off your ` +
+          `next booking with them.`,
+        20
+      ) +
+      referenceBoxHtml(
+        'Your voucher code',
+        voucher.code,
+        `Type it into the &ldquo;Have a voucher code?&rdquo; box at checkout and ${escapeHtml(amount)} comes ` +
+          `straight off your total.`
+      ) +
+      pHtml(
+        `It works on any ${escapeHtml(v.listing)} from ${strong(organizerName)}, it is yours to use once, and ` +
+          `there is no expiry date on it.`,
+        20
+      ) +
+      buttonHtml(eventUrl, event ? `See what ${organizerName} has on` : 'Have a look') +
+      smallHtml(
+        `${escapeHtml(organizerName)} is giving this discount on their own ${escapeHtml(v.units)}, at their own ` +
+          `prices — you simply pay them less. ${escapeHtml(platformName())} is free, never handles the money, ` +
+          `and takes nothing from it.`
+      );
+
+    const text = renderText({
+      headline,
+      context: event ? [event.name] : [],
+      lines: [
+        'Hi,',
+        '',
+        wrapText(
+          `Friends of yours booked through your share link${event ? ` for ${event.name}` : ''} — enough of ` +
+            `them that ${organizerName} would like to say thank you with ${amount} off your next booking ` +
+            `with them.`
+        ),
+        '',
+        `Your voucher code: ${voucher.code}`,
+        '',
+        wrapText(
+          `Type it into the "Have a voucher code?" box at checkout and ${amount} comes straight off your ` +
+            `total. It works on any ${v.listing} from ${organizerName}, it is yours to use once, and there ` +
+            `is no expiry date on it.`
+        ),
+        '',
+        `${event ? `See what ${organizerName} has on` : 'Have a look'}: ${eventUrl}`,
+        '',
+        wrapText(
+          `${organizerName} is giving this discount on their own ${v.units}, at their own prices — you ` +
+            `simply pay them less. ${platformName()} is free, never handles the money, and takes nothing ` +
+            `from it.`
+        ),
+      ],
+    });
+
+    const mailed = await sendMailAs('buyers', {
+      replyTo: replyToBuyers(),
+      to,
+      subject: headline,
+      text,
+      html: renderEmail({
+        title: headline,
+        preheader: `Your share link brought friends in — ${amount} off your next booking with ${organizerName}.`,
+        kicker: 'Thank you',
+        headline: `${amount} off, from ${organizerName}`,
+        metaLines: event ? [event.name] : [],
+        bodyHtml,
+        footerLines: [
+          `Sent because a ${escapeHtml(v.listing)} you booked was shared by you and friends booked through ` +
+            `your link. ${escapeHtml(organizerName)} sets and grants this reward themselves on ` +
+            `${escapeHtml(platformName())}.`,
+        ],
+      }),
+    });
+    if (!mailed.sent) return mailed;
+    return { sent: true };
+  } catch (err) {
+    console.error('[email] Failed to send referral reward:', err instanceof Error ? err.message : err);
     return { sent: false, reason: 'send-failed' };
   }
 }

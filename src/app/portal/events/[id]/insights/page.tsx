@@ -6,6 +6,7 @@ import { activeConsentCount } from '@/lib/marketing';
 import { formatMoney } from '@/lib/money';
 import { getStats } from '@/lib/orders';
 import { organizerPlanActive } from '@/lib/organizers';
+import { getReferralRewardSettings, voucherTotalsForOrganizer } from '@/lib/referrals';
 import { BUYER_RETENTION_DAYS } from '@/lib/retention';
 import { vocabFor } from '@/lib/vocab';
 import PlanExpired from '../../../PlanExpired';
@@ -51,6 +52,11 @@ export default async function PortalInsightsPage({ params }: { params: Promise<{
   // request is not a subscriber.
   const subscribers = activeConsentCount(organizer.id);
   const referrers = topReferrers(event.id);
+  // Rewards are an ACCOUNT setting and vouchers are earned across all of this
+  // organizer's listings, so both are read per organizer — the table above is
+  // this listing only, and the copy says so.
+  const rewards = getReferralRewardSettings(organizer.id);
+  const vouchers = voucherTotalsForOrganizer(organizer.id);
 
   const hasSales = stats.ordersPaid > 0 || stats.awaitingTransferOrders > 0;
   const checkinPct = stats.ticketsSold > 0 ? Math.round((stats.checkedIn / stats.ticketsSold) * 100) : 0;
@@ -201,34 +207,81 @@ export default async function PortalInsightsPage({ params }: { params: Promise<{
         {/* ---- Top referrers ---- */}
         {/* Only when at least one referred paid order exists: an empty "nobody
             shared your event" table is a worse message than no table. */}
-        {referrers.length > 0 && (
+        {(referrers.length > 0 || vouchers.earned > 0) && (
           <div className="card anim-fade-up anim-d3">
             <div className="card-title">Top referrers</div>
             <p className="muted small" style={{ marginTop: 0 }}>
-              Buyers whose shared link brought in a confirmed order. Just for you to see who spreads
-              the word — nothing is owed to anyone, and buyers erased by the privacy sweep show as
+              Buyers whose shared link brought in a booking you have{' '}
+              <strong>confirmed</strong> — test orders are never counted, and free reservations are
+              counted here as the bookings they are. Buyers erased by the privacy sweep show as
               &ldquo;a past guest&rdquo;.
+              {rewards.enabled ? (
+                <>
+                  {' '}
+                  Rewards are on: every {rewards.threshold} booking
+                  {rewards.threshold === 1 ? '' : 's'} someone brings that is{' '}
+                  <strong>actually paid for</strong> earns them a{' '}
+                  {formatMoney(rewards.rewardCents, event.currency)} voucher — your discount, on
+                  your prices. That is the stricter count: a free reservation, and a booking one of
+                  your vouchers already paid part of, appear in the table below but never earn the
+                  next voucher.
+                </>
+              ) : (
+                <>
+                  {' '}
+                  Nothing is owed to anyone — you can change that under{' '}
+                  <Link href="/portal/settings">Settings</Link>, where you decide how many referrals
+                  earn a voucher and what it is worth.
+                </>
+              )}
             </p>
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Referrer</th>
-                    <th>Orders brought</th>
-                    <th>{v.Units} brought</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {referrers.map((r, i) => (
-                    <tr key={`${r.name}-${i}`}>
-                      <td>{r.name}</td>
-                      <td>{r.referredOrders}</td>
-                      <td>{r.referredSeats}</td>
+            {rewards.enabled && (
+              <>
+                <div className="summary-row">
+                  <span className="muted">Vouchers earned (all your listings)</span>
+                  <span>
+                    {vouchers.earned} · {formatMoney(vouchers.earnedCents, event.currency)}
+                  </span>
+                </div>
+                <div className="summary-row">
+                  <span className="muted">Of those, redeemed</span>
+                  <span>
+                    {vouchers.redeemed} · {formatMoney(vouchers.redeemedCents, event.currency)}
+                  </span>
+                </div>
+                <p className="muted small" style={{ margin: '8px 0 16px' }}>
+                  A redeemed voucher means a buyer transferred you that much less — your own
+                  discount on your own prices. Nothing is charged or deducted by the platform, and
+                  the counts above run across all your listings, while the table below is this{' '}
+                  {v.listing} only.
+                </p>
+              </>
+            )}
+            {/* Only when somebody has actually referred a paid booking on THIS
+                listing: an empty table under a filled-in voucher summary would
+                read as a bug rather than as "not yet". */}
+            {referrers.length > 0 && (
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Referrer</th>
+                      <th>Orders brought</th>
+                      <th>{v.Units} brought</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {referrers.map((r, i) => (
+                      <tr key={`${r.name}-${i}`}>
+                        <td>{r.name}</td>
+                        <td>{r.referredOrders}</td>
+                        <td>{r.referredSeats}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 

@@ -45,6 +45,13 @@ export interface CreateOrderRequest {
    * order of the same event by somebody else.
    */
   ref?: string;
+  /**
+   * Optional: a referral voucher code the buyer typed at checkout — the
+   * SELLER'S own discount on the seller's own price (lib/referrals.ts). The
+   * server re-validates and claims it while the order is written, and refuses
+   * the order with a readable message rather than quietly charging full price.
+   */
+  voucherCode?: string;
   items: { tierId: string; quantity: number }[];
   /**
    * The total the checkout DISPLAYED, in cents. Purely a guard: the server
@@ -60,14 +67,44 @@ export interface CreateOrderResponse {
   /** 'free' = a zero-total RSVP: already paid, tickets already minted. */
   mode: 'paypal' | 'mock' | 'transfer' | 'free';
   paypalOrderId: string | null; // set when mode === 'paypal'; return this from createOrder() in the PayPal JS SDK
+  /** The FINAL amount owed — items minus any voucher discount. */
   totalCents: number;
+  /** What a redeemed voucher took off, 0 on almost every order. */
+  discountCents: number;
   currency: string;
+}
+
+/** POST /api/orders/voucher — "does this code work here, and for how much?" */
+export interface VoucherCheckRequest {
+  eventId: string;
+  code: string;
+}
+
+export interface VoucherCheckResponse {
+  ok: true;
+  /** The normalised code to send back with the order. */
+  code: string;
+  amountCents: number;
+  currency: string;
+  /** Who is giving the discount — the buyer copy has to name them. */
+  sellerName: string;
 }
 
 export interface CaptureOrderResponse {
   orderId: string;
   status: 'paid';
   ticketCodes: string[];
+}
+
+/**
+ * The answer to "the buyer closed the payment window". `released` says whether
+ * the order was actually ended — false is a perfectly normal answer (it was
+ * already finished, or PayPal says money may still be moving), and the
+ * checkout treats both the same way.
+ */
+export interface AbandonOrderResponse {
+  ok: true;
+  released: boolean;
 }
 
 export interface ApiErrorResponse {

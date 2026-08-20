@@ -14,6 +14,7 @@
 // in the stats, but it no longer identifies anyone, and grouping the shared
 // placeholder address would invent a single very busy "buyer".
 import { getDb } from './db';
+import { confirmedReferralSql } from './referrals';
 
 /** One calendar day of confirmed money — real payments only, like getStats. */
 export interface DailySales {
@@ -169,20 +170,28 @@ export function returningBuyerCount(eventId: string, organizerId: string): numbe
   return row.n;
 }
 
-/** One referring buyer: how many paid orders their shared link brought in. */
+/** One referring buyer: how many confirmed bookings their shared link brought in. */
 export interface ReferrerRow {
   /** The referrer's display name, or 'a past guest' once retention erased them. */
   name: string;
-  /** PAID orders that arrived through their link. */
+  /** CONFIRMED bookings that arrived through their link. */
   referredOrders: number;
   /** Seats/items those orders brought — QR codes minted, one scan each. */
   referredSeats: number;
 }
 
 /**
- * Who brought friends: paid orders grouped by the referral code they arrived
- * with, resolved back to the referring buyer's name. Analysis only — no reward
- * rides on this, which is also why it is honest to show at all.
+ * Who brought friends: confirmed bookings grouped by the referral code they
+ * arrived with, resolved back to the referring buyer's name.
+ *
+ * Counts what REALLY HAPPENED — confirmed, not test-mode — using the shared
+ * fragment in lib/referrals.ts rather than a rule invented here. Deliberately
+ * the wider of the two rules that file exports: the narrower one decides who
+ * has EARNED a voucher and additionally throws out free reservations and
+ * bookings a voucher paid part of, which is right for money and wrong for
+ * this table. A free RSVP listing's referrals are real referrals, and an
+ * organizer running one must not open Insights to an empty card because
+ * nobody paid anything.
  *
  * The referring order is looked up the same way the orders API validated the
  * code (the share_code of a paid order of THIS event — a random code of its
@@ -202,7 +211,7 @@ export function topReferrers(eventId: string): ReferrerRow[] {
               COUNT(t.code) AS referredSeats
        FROM orders o
        LEFT JOIN tickets t ON t.order_id = o.id
-       WHERE o.event_id = ? AND o.status = 'paid' AND o.payment_mode != 'mock'
+       WHERE o.event_id = ? AND ${confirmedReferralSql('o')}
          AND o.referred_by != ''
        GROUP BY o.referred_by
        ORDER BY referredOrders DESC, referredSeats DESC`

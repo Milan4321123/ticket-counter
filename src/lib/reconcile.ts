@@ -27,6 +27,7 @@ import {
   getOrder,
   getStalePendingPaypalOrders,
   getStuckOrders,
+  markOrderFailed,
   type OrderRow,
 } from './orders';
 import { beginCapture, claimInventory, releaseClaim, SoldOutError } from './inventory';
@@ -39,6 +40,11 @@ import {
   type CaptureDetails,
 } from './paypal';
 import { sendTicketEmail } from './email';
+// Recovery paths mint tickets exactly like a live capture does, so they must
+// also settle what the sale earned the person who brought this buyer in. The
+// issuing side derives how many vouchers should exist from the referral count,
+// so a recovery crossing a capture cannot double-issue.
+import { awardReferralVouchers } from './referrals';
 
 export interface ReconcileResult {
   finalized: string[]; // confirmed paid at PayPal; tickets minted
@@ -140,6 +146,7 @@ async function reconcileStuckOrderLocked(orderId: string): Promise<Bucket> {
   if (paypalOrder.status === 'COMPLETED') {
     if (captureLooksPaid(fresh, capture)) {
       finalizePaidOrder(fresh.id, capture.captureId);
+      awardReferralVouchers(fresh.id);
       await emailBestEffort(fresh.id);
       return 'finalized';
     }
@@ -160,6 +167,7 @@ async function reconcileStuckOrderLocked(orderId: string): Promise<Bucket> {
       const details = extractCaptureDetails(captureResponse);
       if (captureLooksPaid(fresh, details)) {
         finalizePaidOrder(fresh.id, details.captureId);
+        awardReferralVouchers(fresh.id);
         await emailBestEffort(fresh.id);
         return 'recovered';
       }
@@ -205,7 +213,22 @@ async function reconcilePendingOrderLocked(orderId: string): Promise<Bucket | nu
   }
 
   if (paypalOrder.status !== 'APPROVED' && paypalOrder.status !== 'COMPLETED') {
-    return null; // buyer never approved — nothing to recover
+    // The buyer never approved — nothing to recover, and the row is normally
+    // left exactly where it is. An order still HOLDING a referral voucher is
+    // the exception: the reward is stuck on a payment that never started, and
+    // its owner is told their code has already been used for a booking they
+    // never made. The checkout asks us to end such an order the moment the
+    // buyer closes the PayPal window; this is the net for the ones that die
+    // with the browser tab instead.
+    //
+    // Only when PayPal PROVES no capture can exist or ever land, and only by
+    // ending the order — releasing the voucher while the order could still be
+    // captured is exactly how one voucher comes to pay for two orders.
+    if (order.voucherCode && NO_MONEY_ORDER_STATUSES.has(paypalOrder.status ?? '')) {
+      markOrderFailed(order.id, 'cancelled');
+      return 'released';
+    }
+    return null;
   }
 
   try {
@@ -225,6 +248,7 @@ async function reconcilePendingOrderLocked(orderId: string): Promise<Bucket | nu
     const capture = extractCaptureDetails(paypalOrder);
     if (captureLooksPaid(order, capture)) {
       finalizePaidOrder(order.id, capture.captureId);
+      awardReferralVouchers(order.id);
       await emailBestEffort(order.id);
       return 'finalized';
     }
@@ -238,6 +262,7 @@ async function reconcilePendingOrderLocked(orderId: string): Promise<Bucket | nu
     const details = extractCaptureDetails(captureResponse);
     if (captureLooksPaid(order, details)) {
       finalizePaidOrder(order.id, details.captureId);
+      awardReferralVouchers(order.id);
       await emailBestEffort(order.id);
       return 'recovered';
     }

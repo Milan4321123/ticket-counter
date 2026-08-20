@@ -3,7 +3,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatMoney } from '@/lib/money';
-import type { ApiErrorResponse, CaptureOrderResponse, CreateOrderResponse, EventKind } from '@/lib/types';
+import type {
+  ApiErrorResponse,
+  CaptureOrderResponse,
+  CreateOrderResponse,
+  EventKind,
+  VoucherCheckResponse,
+} from '@/lib/types';
 import { vocabFor, type Vocab } from '@/lib/vocab';
 import styles from './checkout.module.css';
 
@@ -111,6 +117,8 @@ interface CreateOrderBody {
   marketingOptIn: boolean;
   /** The ?ref= referral code the buyer arrived with, '' when there was none. */
   ref: string;
+  /** A voucher code the buyer applied, '' when they did not. */
+  voucherCode: string;
 }
 
 type ApiCode = NonNullable<ApiErrorResponse['code']>;
@@ -194,6 +202,19 @@ interface Touched {
   privacy?: boolean;
 }
 
+/**
+ * A voucher the server has confirmed for THIS seller: the seller's own
+ * discount on the seller's own price. Held in state only so the summary can
+ * show what it takes off before the buyer commits — the order route re-checks
+ * and claims it, so nothing here decides anything about money.
+ */
+interface AppliedVoucher {
+  code: string;
+  amountCents: number;
+  /** Who is giving it — the copy has to name them, never "us". */
+  sellerName: string;
+}
+
 interface InlineMessage {
   kind: 'error' | 'warn';
   text: string;
@@ -256,6 +277,39 @@ export default function CheckoutClient({
   const totalCents = config.tiers.reduce((sum, t) => sum + (qty[t.id] ?? 0) * t.priceCents, 0);
 
   /**
+   * A referral voucher, if the buyer applied one. Collapsed behind a link
+   * exactly like the payer-name field above: almost nobody holds one, and a
+   * box everyone has to read past is a worse checkout for all of them.
+   *
+   * Applying it asks the server, so the discount and the new total are on
+   * screen BEFORE anything is committed — and so a code that does not work
+   * says so here, out loud, instead of quietly costing the buyer full price.
+   * The server checks it again while it writes the order; this is a preview.
+   */
+  const [voucherOpen, setVoucherOpen] = useState(false);
+  const [voucherInput, setVoucherInput] = useState('');
+  const [voucher, setVoucher] = useState<AppliedVoucher | null>(null);
+  const [voucherBusy, setVoucherBusy] = useState(false);
+  const [voucherError, setVoucherError] = useState<string | null>(null);
+
+  /**
+   * A voucher only applies to a basket that COSTS something. On a mixed
+   * listing the buyer can apply one and then select nothing but free tiers —
+   * and sending it anyway would spend the whole reward for 0.00 off, on an
+   * order that finalizes as paid the same second and can never hand it back.
+   * So it stays applied on screen (they can see it and remove it), but it is
+   * not counted here and not sent with the order; the server refuses the same
+   * case in the same words if anything sends it regardless.
+   */
+  const voucherApplies = Boolean(voucher) && totalCents > 0;
+  // Never more than the basket is worth: a voucher bigger than the order
+  // simply covers it, and no change or credit is given for the rest.
+  const discountCents = voucherApplies ? Math.min(voucher!.amountCents, totalCents) : 0;
+  const payableCents = Math.max(0, totalCents - discountCents);
+  /** What actually goes to the server with this order — '' when it does not apply. */
+  const sentVoucherCode = voucherApplies ? voucher!.code : '';
+
+  /**
    * A zero-total order is an RSVP: the server finalizes it in the same request
    * and the buyer lands on their codes, so no payment UI should ever appear.
    *
@@ -265,7 +319,10 @@ export default function CheckoutClient({
    * selection, because "which flow" genuinely depends on what is in the cart.
    */
   const allTiersFree = config.tiers.every((t) => t.priceCents === 0);
-  const isFreeOrder = allTiersFree || (totalQty > 0 && totalCents === 0);
+  // A voucher that covers the whole basket lands here too: there is nothing
+  // left to pay, so the order finalizes as an RSVP rather than asking anybody
+  // to transfer 0.00 — the server reaches the same conclusion the same way.
+  const isFreeOrder = allTiersFree || (totalQty > 0 && payableCents === 0);
 
   const needsStudentAck = config.tiers.some((t) => t.studentOnly && (qty[t.id] ?? 0) > 0);
   const nameOk = name.trim().length >= 2;
@@ -294,8 +351,8 @@ export default function CheckoutClient({
 
   // Latest state snapshot for PayPal callbacks (they are registered once and
   // would otherwise close over stale state).
-  const latestRef = useRef({ qty, name, email, payerName, marketingOptIn, formReady, totalQty });
-  latestRef.current = { qty, name, email, payerName, marketingOptIn, formReady, totalQty };
+  const latestRef = useRef({ qty, name, email, payerName, marketingOptIn, formReady, totalQty, voucher });
+  latestRef.current = { qty, name, email, payerName, marketingOptIn, formReady, totalQty, voucher };
 
   const localOrderIdRef = useRef<string | null>(null);
   const suppressPaypalErrorRef = useRef(false);
@@ -335,6 +392,44 @@ export default function CheckoutClient({
     setTouched({ name: true, email: true, student: true, privacy: true });
   }
 
+  // ---------------- Voucher ----------------
+
+  async function applyVoucher() {
+    const typed = voucherInput.trim();
+    if (voucherBusy || working) return;
+    if (!typed) {
+      setVoucherError('Please type the voucher code first.');
+      return;
+    }
+    setVoucherBusy(true);
+    setVoucherError(null);
+    try {
+      const checked = await postJson<VoucherCheckResponse>('/api/orders/voucher', {
+        eventId,
+        code: typed,
+      });
+      setVoucher({
+        code: checked.code,
+        amountCents: checked.amountCents,
+        sellerName: checked.sellerName,
+      });
+      setVoucherInput(checked.code);
+    } catch (e) {
+      // Never a silent ignore: a code that did not apply has to say so here,
+      // while the buyer can still decide what to do about it.
+      setVoucher(null);
+      setVoucherError(e instanceof ApiError ? e.message : GENERIC_ERROR);
+    } finally {
+      setVoucherBusy(false);
+    }
+  }
+
+  function removeVoucher() {
+    setVoucher(null);
+    setVoucherError(null);
+    setVoucherInput('');
+  }
+
   // ---------------- Mock payment flow ----------------
 
   async function handleMockPay() {
@@ -358,6 +453,7 @@ export default function CheckoutClient({
         expectedTotalCents: totalCents,
         marketingOptIn,
         ref: refCode ?? '',
+        voucherCode: sentVoucherCode,
       };
       const created = await postJson<CreateOrderResponse>('/api/orders', req);
       await postJson<CaptureOrderResponse>(`/api/orders/${created.orderId}/capture`, {});
@@ -392,6 +488,7 @@ export default function CheckoutClient({
         expectedTotalCents: totalCents,
         marketingOptIn,
         ref: refCode ?? '',
+        voucherCode: sentVoucherCode,
       };
       const created = await postJson<CreateOrderResponse>('/api/orders', req);
       // The order page shows the bank details, amount, and reference.
@@ -470,21 +567,25 @@ export default function CheckoutClient({
           }
           setMessage(null);
           try {
+            // From the SNAPSHOT's quantities, not the closure's — this callback
+            // outlives renders, and the guard must state what the buyer is
+            // looking at now.
+            const snapshotTotalCents = config.tiers.reduce(
+              (sum, t) => sum + (s.qty[t.id] ?? 0) * t.priceCents,
+              0
+            );
             const req: CreateOrderBody = {
               eventId,
               buyerName: s.name.trim(),
               buyerEmail: s.email.trim(),
               payerName: s.payerName.trim(),
               items: buildItems(s.qty),
-              // From the SNAPSHOT's quantities, not the closure's — this
-              // callback outlives renders, and the guard must state what the
-              // buyer is looking at now.
-              expectedTotalCents: config.tiers.reduce(
-                (sum, t) => sum + (s.qty[t.id] ?? 0) * t.priceCents,
-                0
-              ),
+              expectedTotalCents: snapshotTotalCents,
               marketingOptIn: s.marketingOptIn,
               ref: refCode ?? '',
+              // Same rule as the rest of the page, read off the snapshot: a
+              // voucher is never spent on a basket that costs nothing.
+              voucherCode: snapshotTotalCents > 0 ? (s.voucher?.code ?? '') : '',
             };
             const created = await postJson<CreateOrderResponse>('/api/orders', req);
             localOrderIdRef.current = created.orderId;
@@ -520,10 +621,29 @@ export default function CheckoutClient({
             setMessage({ kind: 'error', text: friendlyError(e, v) });
           }
         },
-        onCancel: () => {
+        onCancel: async () => {
+          // The local order was written before PayPal ever opened, and if a
+          // voucher was applied it is claimed on that order. Nothing else in
+          // the system will ever touch it — so say so here, and wait for the
+          // answer before inviting a retry: the next attempt writes a NEW
+          // order, and it can only re-apply the voucher once this one has let
+          // go of it. The server refuses to release anything PayPal says may
+          // still take money, so this is safe to call unconditionally.
+          const orderId = localOrderIdRef.current;
+          localOrderIdRef.current = null;
+          if (orderId) {
+            try {
+              await postJson<{ ok: true }>(`/api/orders/${orderId}/abandon`, {});
+            } catch {
+              // Best effort: reconciliation releases it later. Never turn a
+              // cancelled payment into an error the buyer has to read.
+            }
+          }
           setMessage({
             kind: 'warn',
-            text: 'Payment cancelled — you have not been charged. You can try again whenever you are ready.',
+            text: latestRef.current.voucher
+              ? 'Payment cancelled — you have not been charged, and your voucher has not been used. You can try again whenever you are ready.'
+              : 'Payment cancelled — you have not been charged. You can try again whenever you are ready.',
           });
         },
         onError: () => {
@@ -649,10 +769,31 @@ export default function CheckoutClient({
                   <span>{formatMoney((qty[tier.id] ?? 0) * tier.priceCents, config.currency)}</span>
                 </div>
               ))}
+              {/* The discount and the new total, shown BEFORE the buyer
+                  commits — nobody should discover what a voucher was worth
+                  after they have already agreed to pay. */}
+              {discountCents > 0 && (
+                <div className="summary-row">
+                  <span>
+                    Voucher <span className="mono small">{voucher?.code}</span>
+                  </span>
+                  <span>−{formatMoney(discountCents, config.currency)}</span>
+                </div>
+              )}
               <div className="summary-row total">
                 <span>Total</span>
-                <span>{totalCents === 0 ? 'Free' : formatMoney(totalCents, config.currency)}</span>
+                <span>{payableCents === 0 ? 'Free' : formatMoney(payableCents, config.currency)}</span>
               </div>
+              {discountCents > 0 && (
+                <p className="muted small" style={{ margin: '8px 0 0' }}>
+                  {voucher?.sellerName || 'The seller'} is taking{' '}
+                  {formatMoney(discountCents, config.currency)} off their own price — you simply pay
+                  them less.
+                  {voucher && voucher.amountCents > discountCents
+                    ? ' This order is worth less than the voucher, and the difference is not carried over.'
+                    : ''}
+                </p>
+              )}
               {/* Only when a bundle is in the cart — for ordinary tickets the
                   quantities above already ARE the ticket count, and repeating
                   it would read as a second, mysterious number. */}
@@ -662,6 +803,97 @@ export default function CheckoutClient({
                 </p>
               )}
             </>
+          )}
+
+          {/* "Have a voucher code?" — collapsed behind a link like the payer
+              name above, and hidden entirely when nothing here costs money.
+              Almost nobody holds one; those who do go looking for it. */}
+          {!allTiersFree && (
+            <div style={{ marginTop: 12 }}>
+              {voucherError && (
+                <p className={styles.fieldError} role="alert">
+                  {voucherError}
+                </p>
+              )}
+              {voucher ? (
+                <p className="muted small" style={{ margin: 0 }}>
+                  Voucher <span className="mono">{voucher.code}</span>{' '}
+                  {voucherApplies ? 'applied' : 'saved for later'} —{' '}
+                  {formatMoney(voucher.amountCents, config.currency)} off, from{' '}
+                  {voucher.sellerName || 'the seller'}.{' '}
+                  {/* Nothing selected costs anything, so there is nothing to
+                      take off. Said out loud rather than spent for 0.00: the
+                      code stays theirs for an order that costs money. */}
+                  {!voucherApplies && (
+                    <>
+                      Nothing you have picked costs anything yet, so it stays unused.{' '}
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={removeVoucher}
+                    disabled={working}
+                    style={{
+                      background: 'none',
+                      border: 0,
+                      padding: 0,
+                      cursor: 'pointer',
+                      color: 'var(--brand-text)',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Remove
+                  </button>
+                </p>
+              ) : voucherOpen ? (
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label htmlFor="voucher-code">Voucher code</label>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <input
+                      id="voucher-code"
+                      className="input"
+                      autoComplete="off"
+                      value={voucherInput}
+                      onChange={(e) => setVoucherInput(e.target.value)}
+                      placeholder="THANKS-XXXXXXXX"
+                      maxLength={20}
+                      disabled={voucherBusy || working}
+                      style={{ flex: '1 1 180px' }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={applyVoucher}
+                      disabled={voucherBusy || working}
+                    >
+                      {voucherBusy ? <span className="spinner" aria-hidden /> : null}
+                      {voucherBusy ? 'Checking…' : 'Apply'}
+                    </button>
+                  </div>
+                  <p className={`muted small ${styles.hint}`}>
+                    A thank-you code the seller sent you for bringing friends. It is their discount
+                    on their own price — it comes straight off what you transfer to them.
+                  </p>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="link-button small"
+                  onClick={() => setVoucherOpen(true)}
+                  disabled={working}
+                  style={{
+                    background: 'none',
+                    border: 0,
+                    padding: 0,
+                    cursor: 'pointer',
+                    color: 'var(--brand-text)',
+                    fontWeight: 600,
+                  }}
+                >
+                  Have a voucher code? →
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -878,7 +1110,9 @@ export default function CheckoutClient({
             <p className="muted small" style={{ marginTop: 0 }}>
               {allTiersFree
                 ? `This ${v.listing} is free — no payment, just a reservation. Your QR ${v.codes} appear on the next page and are emailed to you right away.`
-                : `Everything you picked is free — no payment needed. Your QR ${v.codes} appear on the next page and are emailed to you right away.`}
+                : discountCents > 0
+                  ? `Your voucher covers the whole order — there is nothing to pay and nothing to transfer. Your QR ${v.codes} appear on the next page and are emailed to you right away.`
+                  : `Everything you picked is free — no payment needed. Your QR ${v.codes} appear on the next page and are emailed to you right away.`}
             </p>
             <button
               type="button"
@@ -891,7 +1125,9 @@ export default function CheckoutClient({
                   <span className="spinner" aria-hidden="true" /> Reserving…
                 </>
               ) : (
-                `Reserve ${v.units} — free`
+                discountCents > 0 && !allTiersFree
+                  ? `Reserve ${v.units} — nothing to pay`
+                  : `Reserve ${v.units} — free`
               )}
             </button>
             {!formReady && !busy && (

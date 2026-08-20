@@ -2,6 +2,7 @@ import { listEventsForOrganizer } from '@/lib/events';
 import { organizerPlanActive } from '@/lib/organizers';
 import { organizerTotpEnabled, organizerTotpPending } from '@/lib/organizerTotp';
 
+import { getReferralRewardSettings, organizerCurrency } from '@/lib/referrals';
 import { getReminderSettings, recommendedReminderDays } from '@/lib/reminders';
 import PlanExpired from '../PlanExpired';
 import PortalNav from '../PortalNav';
@@ -9,6 +10,7 @@ import { requirePortalOrganizer } from '../guard';
 import ChangePasswordForm from './ChangePasswordForm';
 import TotpPanel from './TotpPanel';
 import RemindersCard from './RemindersCard';
+import ReferralRewardsCard from './ReferralRewardsCard';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +25,7 @@ export default async function PortalSettingsPage() {
   const maxPayWithin =
     listEventsForOrganizer(organizer.id).reduce((max, e) => Math.max(max, e.payWithinDays), 0) || 5;
   const recommended = recommendedReminderDays(maxPayWithin);
+  const referral = getReferralRewardSettings(organizer.id);
 
   return (
     <>
@@ -33,7 +36,7 @@ export default async function PortalSettingsPage() {
             Settings
           </h1>
           <p className="muted small" style={{ margin: '4px 0 0' }}>
-            Your account, payment reminders, and password.
+            Your account, payment reminders, referral rewards, and password.
           </p>
         </div>
 
@@ -89,6 +92,15 @@ export default async function PortalSettingsPage() {
           initialEnabled={reminders.enabled}
           initialDays={reminders.days}
           recommended={recommended}
+        />
+      </div>
+
+      <div className="card anim-fade-up anim-d2">
+        <div className="card-title">Thank people who bring friends</div>
+        <ReferralRewardsCard
+          initialThreshold={referral.threshold}
+          initialRewardCents={referral.rewardCents}
+          currency={organizerCurrency(organizer.id)}
         />
       </div>
 
