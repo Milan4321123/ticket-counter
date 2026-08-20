@@ -2716,7 +2716,7 @@ export async function sendReferralRewardEmail(
       referenceBoxHtml(
         'Your voucher code',
         voucher.code,
-        `Type it into the &ldquo;Have a voucher code?&rdquo; box at checkout and ${escapeHtml(amount)} comes ` +
+        `Type it into the &ldquo;Have a discount code?&rdquo; box at checkout and ${escapeHtml(amount)} comes ` +
           `straight off your total.`
       ) +
       pHtml(
@@ -2746,7 +2746,7 @@ export async function sendReferralRewardEmail(
         `Your voucher code: ${voucher.code}`,
         '',
         wrapText(
-          `Type it into the "Have a voucher code?" box at checkout and ${amount} comes straight off your ` +
+          `Type it into the "Have a discount code?" box at checkout and ${amount} comes straight off your ` +
             `total. It works on any ${v.listing} from ${organizerName}, it is yours to use once, and there ` +
             `is no expiry date on it.`
         ),

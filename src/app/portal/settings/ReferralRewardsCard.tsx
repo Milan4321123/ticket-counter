@@ -140,6 +140,14 @@ export default function ReferralRewardsCard({ initialThreshold, initialRewardCen
         change here, and can be spent at any of your checkouts, once each.
       </p>
 
+      {/* The other half of the same idea, one click away: vouchers are earned
+          automatically, codes are handed out on purpose. */}
+      <p className="muted small" style={{ marginTop: 0 }}>
+        Want a code you hand out yourself — an early-bird code, one for a sponsor, one for a
+        WhatsApp group? Make one under <a href="/portal/promos">Discount codes</a>. Buyers type
+        either kind into the same box, and only one applies per order.
+      </p>
+
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <button type="submit" className="btn btn-primary" disabled={busy}>
           {busy ? <span className="spinner" aria-hidden /> : null}

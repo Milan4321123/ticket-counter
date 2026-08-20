@@ -60,8 +60,20 @@ export default async function PortalCheckinPage({ params }: { params: Promise<{ 
             : 'For student tickets, ask to see a student ID at the door.'}
         </p>
 
+        {/* The same box reads CUSTOMER CARDS too — the codes your regulars
+            chose to hold with you. Scanning one admits nobody and spends
+            nothing; it tells you who is in front of you and what codes they
+            are carrying. Deliberately NOT on the scanner links below: door
+            staff are handed a scanner to verify {v.codes}, not to read a
+            customer's history with you, and /api/admin/checkin enforces that
+            rather than trusting this page. */}
+        <p className="muted small anim-fade-up" style={{ marginTop: -4 }}>
+          A card code (<span className="mono">card-…</span>) works in the same box: it shows you who
+          the holder is instead of checking anything in.
+        </p>
+
         <div className="anim-fade-up anim-d1">
-          <CheckinClient unauthorizedHref="/portal/login" kind={event.kind} />
+          <CheckinClient unauthorizedHref="/portal/login" kind={event.kind} cards />
         </div>
 
         {/* Handing the scanning to someone else is a check-in job, so the links

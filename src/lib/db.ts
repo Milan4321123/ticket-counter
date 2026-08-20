@@ -914,12 +914,16 @@ function migrateToPlatform(db: Database.Database): void {
     );
   }
 
-  // What the buyer redeemed at checkout, and what it took off.
+  // What the buyer redeemed at checkout, and what it took off — a referral
+  // voucher (lib/referrals.ts) or one of the organizer's own promo codes
+  // (lib/promos.ts). ONE code per order, so one pair of columns records
+  // either: the column keeps the older name, and stays the single answer to
+  // "what part-paid this order".
   //
   // total_cents keeps meaning THE FINAL AMOUNT THE BUYER OWES (items minus
   // discount), so every money surface already built on it — the order page,
   // the GiroCode, the PayPal amount, the emails, the statements, analytics
-  // revenue — stays correct without knowing vouchers exist. discount_cents is
+  // revenue — stays correct without knowing codes exist. discount_cents is
   // the RECORD of what was taken off, never a second thing to subtract.
   if (!orderCols.includes('voucher_code')) {
     db.exec(`ALTER TABLE orders ADD COLUMN voucher_code TEXT NOT NULL DEFAULT ''`);
@@ -954,6 +958,80 @@ function migrateToPlatform(db: Database.Database): void {
       ON referral_vouchers(organizer_id, referrer_email);
     CREATE INDEX IF NOT EXISTS idx_referral_vouchers_order
       ON referral_vouchers(redeemed_order_id);
+  `);
+
+  // Codes the ORGANIZER mints themselves — an early-bird code, a code for a
+  // sponsor, a code for a WhatsApp group — as opposed to the vouchers above,
+  // which the system issues automatically for referrals. Same thing to a
+  // buyer: the seller's own reduction of the seller's own price, redeemed
+  // through the same checkout field.
+  //
+  // The code is UNIQUE PER ORGANIZER, not globally: two sellers may both hand
+  // out "DASHAIN10" and neither may spend the other's. event_id NULL means
+  // "all of my listings"; max_redemptions 0 means unlimited; expires_on NULL
+  // means never. redeemed_count is the live tally the cap is checked against —
+  // incremented inside the order's own transaction and decremented again on
+  // every path that releases a voucher, so a cap is never eaten by an order
+  // nobody paid (see lib/promos.ts).
+  //
+  // There is no delete: deactivating is enough, and keeps the history of what
+  // was handed out and redeemed honest.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS promo_codes (
+      id TEXT PRIMARY KEY,
+      organizer_id TEXT REFERENCES organizers(id),
+      code TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      amount_cents INTEGER NOT NULL DEFAULT 0,
+      percent INTEGER NOT NULL DEFAULT 0,
+      event_id TEXT,
+      max_redemptions INTEGER NOT NULL DEFAULT 0,
+      redeemed_count INTEGER NOT NULL DEFAULT 0,
+      expires_on TEXT,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(organizer_id, code)
+    );
+    CREATE INDEX IF NOT EXISTS idx_promo_codes_organizer
+      ON promo_codes(organizer_id, active);
+  `);
+
+  // ---- The customer card: a seller's regulars, held by the buyer ----------
+  //
+  // OPT-IN, per (organizer, email), and nothing else. Nobody gets a row here
+  // by buying something — the row exists only because a buyer pressed a button
+  // asking for it, which is the same lawful basis (and the same promise on
+  // /privacy) that lets a marketing_consents row outlive the after-event
+  // erasure. Same shape as that table on purpose: UNIQUE per organizer and
+  // address, email COLLATE NOCASE because it names a mailbox rather than a
+  // string, and no name column — the person's name is read from their own
+  // orders when it is needed, never copied in here.
+  //
+  // It NEVER spans sellers. One card is one buyer's standing with one
+  // organizer; there is no query in the codebase that joins two of these, and
+  // there must never be one, because a card that recognised somebody across
+  // sellers would be exactly the behind-your-back profile /privacy says this
+  // platform does not build.
+  //
+  // card_code is the whole security model: it is the QR payload AND the entire
+  // private URL (/c/<code>), so it is minted long and random in lib/cards.ts —
+  // see the note there for why it is much longer than an order's share code.
+  // closed_at exists so a card can be switched off without vanishing, but the
+  // holder's own "close this card" button DELETES the row instead: unlike an
+  // unsubscribe there is nothing to suppress, since nothing can hand somebody
+  // a new card except that person asking for one again.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS customer_cards (
+      id TEXT PRIMARY KEY,
+      organizer_id TEXT REFERENCES organizers(id),
+      email TEXT NOT NULL COLLATE NOCASE,
+      card_code TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      last_seen_at TEXT,
+      closed_at TEXT,
+      UNIQUE (organizer_id, email)
+    );
+    CREATE INDEX IF NOT EXISTS idx_customer_cards_org ON customer_cards(organizer_id);
   `);
 
   const haveEvents = (db.prepare(`SELECT COUNT(*) AS n FROM events`).get() as { n: number }).n > 0;

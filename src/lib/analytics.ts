@@ -194,10 +194,13 @@ export interface ReferrerRow {
  * nobody paid anything.
  *
  * The referring order is looked up the same way the orders API validated the
- * code (the share_code of a paid order of THIS event — a random code of its
- * own, never the payment reference's short id, which support treats as weak
- * proof of ownership), so the two can never disagree about who a code belongs
- * to. A referrer whose buyer details the
+ * code (the share_code of a paid order of ANY listing belonging to the SAME
+ * SELLER — a random code of its own, never the payment reference's short id,
+ * which support treats as weak proof of ownership), so the two can never
+ * disagree about who a code belongs to. Per seller and not per event because
+ * that is where a code is spendable: somebody who bought at last month's
+ * listing and brought a friend to this one is the same referrer, and matching
+ * per event would print them as 'a past guest'. A referrer whose buyer details the
  * retention sweep has erased still shows their COUNT — the seats they brought
  * are the organizer's arithmetic — but as 'a past guest', because the person
  * is no longer identifiable and must stay that way.
@@ -220,7 +223,13 @@ export function topReferrers(eventId: string): ReferrerRow[] {
 
   const nameOf = db.prepare(
     `SELECT buyer_name AS name, buyer_erased_at AS erasedAt
-     FROM orders WHERE share_code = ? AND event_id = ? AND status = 'paid' LIMIT 2`
+     FROM orders
+     WHERE share_code = ? AND share_code != '' AND status = 'paid'
+       AND event_id IN (
+         SELECT id FROM events
+         WHERE organizer_id = (SELECT organizer_id FROM events WHERE id = ?)
+       )
+     LIMIT 2`
   );
   return rows.map((r) => {
     const referrers = nameOf.all(r.code, eventId) as {

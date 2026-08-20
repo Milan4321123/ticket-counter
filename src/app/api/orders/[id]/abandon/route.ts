@@ -78,8 +78,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }
     }
 
-    // Ends the order and, with it, hands back any voucher and any discount it
-    // was holding (see markOrderFailed -> releaseVoucherForOrder).
+    // Ends the order and, with it, hands back any code and any discount it was
+    // holding (see markOrderFailed -> releaseDiscountCodeForOrder).
     markOrderFailed(id, 'cancelled');
     return done(true);
   } catch (e) {

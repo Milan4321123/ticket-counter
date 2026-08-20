@@ -350,6 +350,11 @@ export function markUnsubscribed(organizerId: string, email: string): void {
  * Spans every organizer because the person is asking the PLATFORM to forget
  * them, not one mailing list. Returns how many consent rows were erased so
  * the caller can tell "forgotten" from "was never on file".
+ *
+ * This is the consent book only. The OTHER record that outlives the buyer
+ * erasure — a customer card (lib/cards.ts eraseCustomerCards) — is erased in
+ * the same breath by /api/admin/erase-consent, which is the one place that
+ * knows the full list. Add anything new that survives retention there too.
  */
 export function eraseMarketingConsent(email: string): number {
   const db = getDb();

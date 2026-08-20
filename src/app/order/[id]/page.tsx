@@ -1,9 +1,10 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import CheckPaymentButton from '@/components/CheckPaymentButton';
 import OrganizerWhatsApp from '@/components/OrganizerWhatsApp';
 import CopyButton from '@/components/CopyButton';
 import PrintButton from '@/components/PrintButton';
+import { getCustomerCard, issueCustomerCard } from '@/lib/cards';
 import {
   cropTag,
   getEventById,
@@ -316,7 +317,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 never read as something still to subtract. */}
             {order.discountCents > 0 ? (
               <p className="muted small" style={{ margin: '0 0 10px' }}>
-                Voucher <span className="mono">{order.voucherCode}</span> applied —{' '}
+                Code <span className="mono">{order.voucherCode}</span> applied —{' '}
                 {formatMoney(order.discountCents, order.currency)} off the organizer&rsquo;s own price.
                 Transfer the amount above and nothing else.
               </p>
@@ -434,7 +435,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 never read as something still to subtract. */}
             {order.discountCents > 0 ? (
               <p className="muted small" style={{ margin: '0 0 10px' }}>
-                Voucher <span className="mono">{order.voucherCode}</span> applied —{' '}
+                Code <span className="mono">{order.voucherCode}</span> applied —{' '}
                 {formatMoney(order.discountCents, order.currency)} off the organizer&rsquo;s own price.
                 Transfer the amount above and nothing else.
               </p>
@@ -642,6 +643,42 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       : null;
   const sellerName = organizer?.name?.trim() || 'The organizer';
 
+  // ---- The customer card: offered here, never assumed ---------------------
+  //
+  // Offered only where it can honestly work: this buyer's details still exist
+  // (an erased order's address is a shared placeholder, so a card issued
+  // against it would be a card for nobody), and the listing still has an
+  // organizer to hold it with.
+  //
+  // Quiet on purpose. It is one paragraph and one button, it is never
+  // pre-ticked because there is nothing to tick, and once somebody holds a
+  // card the offer is replaced by a link to it — asking again next month is
+  // how a kindness turns into nagging.
+  const cardOfferable = Boolean(event && organizer && !order.buyerErasedAt && order.buyerEmail);
+  const existingCard =
+    cardOfferable && event ? getCustomerCard(event.organizerId, order.buyerEmail) : null;
+
+  /**
+   * Create the card, because the buyer pressed the button asking for one.
+   *
+   * The order id in the form is transport, not authority: everything the card
+   * is made from is re-read here from the order itself, so a hand-made POST
+   * can only ever issue a card to the address that really owns the order it
+   * names — and only while that order is paid and its buyer not yet erased.
+   */
+  async function keepCard(formData: FormData) {
+    'use server';
+    const orderId = String(formData.get('orderId') ?? '');
+    const fresh = getOrder(orderId);
+    if (!fresh || fresh.status !== 'paid' || fresh.buyerErasedAt || !fresh.buyerEmail) return;
+    const freshEvent = getEventById(fresh.eventId);
+    if (!freshEvent) return;
+    issueCustomerCard({ organizerId: freshEvent.organizerId, email: fresh.buyerEmail });
+    // Straight back to this page, which now shows the link to the card rather
+    // than the offer — one POST, one visible result.
+    redirect(`/order/${encodeURIComponent(orderId)}`);
+  }
+
   return (
     <div className="container section">
       <h1 className="page-title anim-fade-up">Your tickets</h1>
@@ -704,7 +741,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 </div>
               ))}
               <p className="muted small" style={{ margin: '10px 0 0' }}>
-                Type it into the &ldquo;Have a voucher code?&rdquo; box at checkout on any{' '}
+                Type it into the &ldquo;Have a discount code?&rdquo; box at checkout on any{' '}
                 {v.listing} from {sellerName}. Each one is yours to use once, and there is no expiry
                 date on it.
               </p>
@@ -716,6 +753,41 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             </p>
           )}
         </div>
+      ) : null}
+
+      {/* The card offer. Nobody gets one by buying something — this button is
+          the only way a card comes into existence, which is exactly what lets
+          it outlive the after-event erasure (see /privacy and lib/cards.ts). */}
+      {cardOfferable ? (
+        existingCard ? (
+          <p className="muted small anim-fade-up anim-d1" style={{ margin: '0 0 16px' }}>
+            You keep a card with {sellerName} —{' '}
+            <Link
+              href={`/c/${encodeURIComponent(existingCard.cardCode)}`}
+              style={{ color: 'var(--brand-text)', fontWeight: 600 }}
+            >
+              open it
+            </Link>{' '}
+            for your QR, your codes and everything you have bought from them.
+          </p>
+        ) : (
+          <div className="card anim-fade-up anim-d1">
+            <div className="card-title">Keep a card with {sellerName}?</div>
+            <p className="muted small" style={{ marginTop: 0 }}>
+              One page of your own with {sellerName}: a QR that lets them recognise you at{' '}
+              {v.where}, your referral code, any discount codes you are holding, and what you have
+              bought from them. It stores your email address and nothing more, it works only with{' '}
+              {sellerName} and nowhere else on this site, and you can close it yourself from the
+              card in one press.
+            </p>
+            <form action={keepCard}>
+              <input type="hidden" name="orderId" value={order.id} />
+              <button type="submit" className="btn btn-brand">
+                Yes, keep a card for me
+              </button>
+            </form>
+          </div>
+        )
       ) : null}
 
       <div className="card anim-fade-up anim-d2">
@@ -757,7 +829,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         {order.discountCents > 0 ? (
           <div className="summary-row">
             <span>
-              Voucher <span className="mono small">{order.voucherCode}</span>
+              Code <span className="mono small">{order.voucherCode}</span>
             </span>
             <span>&minus;{formatMoney(order.discountCents, order.currency)}</span>
           </div>

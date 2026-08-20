@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { formatMoney } from '@/lib/money';
+import { discountCentsFor, formatMoney } from '@/lib/money';
 import type {
   ApiErrorResponse,
   CaptureOrderResponse,
   CreateOrderResponse,
   EventKind,
+  ReferralCheckResponse,
   VoucherCheckResponse,
 } from '@/lib/types';
 import { vocabFor, type Vocab } from '@/lib/vocab';
@@ -115,9 +116,13 @@ interface CreateOrderBody {
   expectedTotalCents: number;
   /** True ONLY when the buyer ticked the optional "keep me posted" box. */
   marketingOptIn: boolean;
-  /** The ?ref= referral code the buyer arrived with, '' when there was none. */
+  /**
+   * The referral code crediting whoever sent this buyer — the one they arrived
+   * with in ?ref=, or the one they typed in by hand. '' when there is none.
+   * Takes nothing off this order; it credits the person who shared it.
+   */
   ref: string;
-  /** A voucher code the buyer applied, '' when they did not. */
+  /** A discount code the buyer applied, '' when they did not. */
   voucherCode: string;
 }
 
@@ -203,15 +208,33 @@ interface Touched {
 }
 
 /**
- * A voucher the server has confirmed for THIS seller: the seller's own
- * discount on the seller's own price. Held in state only so the summary can
- * show what it takes off before the buyer commits — the order route re-checks
- * and claims it, so nothing here decides anything about money.
+ * A discount code the server has confirmed for THIS seller: the seller's own
+ * discount on the seller's own price, whether it is a thank-you voucher their
+ * referral rewards issued or a code they minted and handed out themselves.
+ * Held in state only so the summary can show what it takes off before the
+ * buyer commits — the order route re-checks and claims it, so nothing here
+ * decides anything about money.
  */
-interface AppliedVoucher {
+interface AppliedCode {
   code: string;
+  /** Which kind it turned out to be — for the wording, never the arithmetic. */
+  source: 'voucher' | 'promo';
+  kind: 'fixed' | 'percent';
   amountCents: number;
+  percent: number;
   /** Who is giving it — the copy has to name them, never "us". */
+  sellerName: string;
+}
+
+/**
+ * A referral code the server has confirmed names somebody who can be credited.
+ *
+ * A COMPLETELY DIFFERENT THING from the discount code above, and the checkout
+ * keeps the two apart on purpose: this one credits the person who sent the
+ * buyer here and takes nothing off the buyer's own price.
+ */
+interface CheckedReferral {
+  code: string;
   sellerName: string;
 }
 
@@ -277,37 +300,63 @@ export default function CheckoutClient({
   const totalCents = config.tiers.reduce((sum, t) => sum + (qty[t.id] ?? 0) * t.priceCents, 0);
 
   /**
-   * A referral voucher, if the buyer applied one. Collapsed behind a link
-   * exactly like the payer-name field above: almost nobody holds one, and a
-   * box everyone has to read past is a worse checkout for all of them.
+   * A discount code, if the buyer applied one — a thank-you voucher they
+   * earned or one of the seller's own codes; they do not have to know which,
+   * so there is ONE box for both. Collapsed behind a link exactly like the
+   * payer-name field above: most buyers hold no code at all, and a box
+   * everyone has to read past is a worse checkout for all of them.
    *
    * Applying it asks the server, so the discount and the new total are on
    * screen BEFORE anything is committed — and so a code that does not work
    * says so here, out loud, instead of quietly costing the buyer full price.
    * The server checks it again while it writes the order; this is a preview.
    */
-  const [voucherOpen, setVoucherOpen] = useState(false);
-  const [voucherInput, setVoucherInput] = useState('');
-  const [voucher, setVoucher] = useState<AppliedVoucher | null>(null);
-  const [voucherBusy, setVoucherBusy] = useState(false);
-  const [voucherError, setVoucherError] = useState<string | null>(null);
+  const [codeOpen, setCodeOpen] = useState(false);
+  const [codeInput, setCodeInput] = useState('');
+  const [applied, setApplied] = useState<AppliedCode | null>(null);
+  const [codeBusy, setCodeBusy] = useState(false);
+  const [codeError, setCodeError] = useState<string | null>(null);
+  /** Said out loud when a second code replaced the first — see applyCode. */
+  const [codeNotice, setCodeNotice] = useState<string | null>(null);
 
   /**
-   * A voucher only applies to a basket that COSTS something. On a mixed
-   * listing the buyer can apply one and then select nothing but free tiers —
-   * and sending it anyway would spend the whole reward for 0.00 off, on an
-   * order that finalizes as paid the same second and can never hand it back.
-   * So it stays applied on screen (they can see it and remove it), but it is
-   * not counted here and not sent with the order; the server refuses the same
-   * case in the same words if anything sends it regardless.
+   * The referral code crediting whoever sent this buyer here.
+   *
+   * Pre-filled when they arrived through somebody's share link (?ref=), and
+   * editable, because in real life a code travels by word of mouth, a
+   * screenshot or a WhatsApp message and has to be typeable. Checked against
+   * the server so a mistyped one is refused while it can still be fixed —
+   * the refusal is deliberately harmless, because a code that matches nobody
+   * costs this buyer nothing at all.
    */
-  const voucherApplies = Boolean(voucher) && totalCents > 0;
-  // Never more than the basket is worth: a voucher bigger than the order
-  // simply covers it, and no change or credit is given for the rest.
-  const discountCents = voucherApplies ? Math.min(voucher!.amountCents, totalCents) : 0;
+  const [referralOpen, setReferralOpen] = useState(Boolean(refCode));
+  const [referralInput, setReferralInput] = useState(refCode ?? '');
+  const [referral, setReferral] = useState<CheckedReferral | null>(null);
+  const [referralBusy, setReferralBusy] = useState(false);
+  const [referralError, setReferralError] = useState<string | null>(null);
+  /** The last value asked about, so blurring an unchanged box asks nothing. */
+  const referralCheckedRef = useRef('');
+
+  /**
+   * A discount code only applies to a basket that COSTS something. On a mixed
+   * listing the buyer can apply one and then select nothing but free tiers —
+   * and sending it anyway would spend a whole reward for 0.00 off (on an order
+   * that finalizes as paid the same second and can never hand it back), or
+   * burn one of a limited code's redemptions for nothing. So it stays applied
+   * on screen (they can see it and remove it), but it is not counted here and
+   * not sent with the order; the server refuses the same case in the same
+   * words if anything sends it regardless.
+   */
+  const codeApplies = Boolean(applied) && totalCents > 0;
+  // The SAME function the server discounts with: never more than the basket is
+  // worth, and a percentage rounded in the buyer's favour. One implementation,
+  // so this page can never promise a number the order then contradicts.
+  const discountCents = codeApplies ? discountCentsFor(applied!, totalCents) : 0;
   const payableCents = Math.max(0, totalCents - discountCents);
   /** What actually goes to the server with this order — '' when it does not apply. */
-  const sentVoucherCode = voucherApplies ? voucher!.code : '';
+  const sentCode = codeApplies ? applied!.code : '';
+  /** The referral code that goes with the order; the server validates it again. */
+  const sentRefCode = referralInput.trim().toUpperCase();
 
   /**
    * A zero-total order is an RSVP: the server finalizes it in the same request
@@ -319,7 +368,7 @@ export default function CheckoutClient({
    * selection, because "which flow" genuinely depends on what is in the cart.
    */
   const allTiersFree = config.tiers.every((t) => t.priceCents === 0);
-  // A voucher that covers the whole basket lands here too: there is nothing
+  // A code that covers the whole basket lands here too: there is nothing
   // left to pay, so the order finalizes as an RSVP rather than asking anybody
   // to transfer 0.00 — the server reaches the same conclusion the same way.
   const isFreeOrder = allTiersFree || (totalQty > 0 && payableCents === 0);
@@ -351,8 +400,8 @@ export default function CheckoutClient({
 
   // Latest state snapshot for PayPal callbacks (they are registered once and
   // would otherwise close over stale state).
-  const latestRef = useRef({ qty, name, email, payerName, marketingOptIn, formReady, totalQty, voucher });
-  latestRef.current = { qty, name, email, payerName, marketingOptIn, formReady, totalQty, voucher };
+  const latestRef = useRef({ qty, name, email, payerName, marketingOptIn, formReady, totalQty, applied, sentRefCode });
+  latestRef.current = { qty, name, email, payerName, marketingOptIn, formReady, totalQty, applied, sentRefCode };
 
   const localOrderIdRef = useRef<string | null>(null);
   const suppressPaypalErrorRef = useRef(false);
@@ -392,43 +441,119 @@ export default function CheckoutClient({
     setTouched({ name: true, email: true, student: true, privacy: true });
   }
 
-  // ---------------- Voucher ----------------
+  // ---------------- Discount code (voucher or the seller's own) ----------------
 
-  async function applyVoucher() {
-    const typed = voucherInput.trim();
-    if (voucherBusy || working) return;
+  async function applyCode() {
+    const typed = codeInput.trim();
+    if (codeBusy || working) return;
     if (!typed) {
-      setVoucherError('Please type the voucher code first.');
+      setCodeError('Please type the code first.');
       return;
     }
-    setVoucherBusy(true);
-    setVoucherError(null);
+    setCodeBusy(true);
+    setCodeError(null);
+    setCodeNotice(null);
     try {
       const checked = await postJson<VoucherCheckResponse>('/api/orders/voucher', {
         eventId,
         code: typed,
       });
-      setVoucher({
+      // ONE CODE PER ORDER. The new one takes the place of the old one rather
+      // than being added to it, and the swap is said out loud: a buyer who
+      // typed a second code and saw the first quietly vanish would reasonably
+      // believe both were counted, and only find out at the total.
+      const previous = applied;
+      if (previous && previous.code !== checked.code) {
+        setCodeNotice(
+          `${checked.code} replaced ${previous.code} — only one code counts per order. ` +
+            `${previous.source === 'voucher' ? 'Your voucher has not been used and is still yours.' : ''}`.trim()
+        );
+      }
+      setApplied({
         code: checked.code,
+        source: checked.source,
+        kind: checked.kind,
         amountCents: checked.amountCents,
+        percent: checked.percent,
         sellerName: checked.sellerName,
       });
-      setVoucherInput(checked.code);
+      setCodeInput(checked.code);
     } catch (e) {
       // Never a silent ignore: a code that did not apply has to say so here,
-      // while the buyer can still decide what to do about it.
-      setVoucher(null);
-      setVoucherError(e instanceof ApiError ? e.message : GENERIC_ERROR);
+      // while the buyer can still decide what to do about it. The code that
+      // was already applied stays applied — a typo must not cost somebody the
+      // discount they had a moment ago.
+      setCodeError(e instanceof ApiError ? e.message : GENERIC_ERROR);
     } finally {
-      setVoucherBusy(false);
+      setCodeBusy(false);
     }
   }
 
-  function removeVoucher() {
-    setVoucher(null);
-    setVoucherError(null);
-    setVoucherInput('');
+  function removeCode() {
+    setApplied(null);
+    setCodeError(null);
+    setCodeNotice(null);
+    setCodeInput('');
   }
+
+  // ---------------- Referral code (credits somebody else) ----------------
+
+  /**
+   * Ask whether this code names somebody who can be credited.
+   *
+   * Nothing about the order depends on the answer — the code is sent either
+   * way and the server has the last word — so this exists purely so a typo is
+   * refused while the buyer can still fix it, in wording that makes clear
+   * nothing of theirs is at stake.
+   */
+  async function checkReferral(raw: string, { unprompted = false }: { unprompted?: boolean } = {}) {
+    const typed = raw.trim().toUpperCase();
+    if (referralBusy) return;
+    referralCheckedRef.current = typed;
+    if (!typed) {
+      setReferral(null);
+      setReferralError(null);
+      return;
+    }
+    setReferralBusy(true);
+    setReferralError(null);
+    try {
+      const checked = await postJson<ReferralCheckResponse>('/api/orders/referral', {
+        eventId,
+        code: typed,
+      });
+      setReferral({ code: checked.code, sellerName: checked.sellerName });
+    } catch (e) {
+      setReferral(null);
+      // A check NOBODY ASKED FOR may only ever report the one thing the buyer
+      // could act on: that this particular code credits nobody (a 400, the
+      // deliberately harmless NOT_CREDITABLE wording). "Too many code
+      // attempts", a server error or a dropped connection are about the site,
+      // not about them — and thirteen buyers behind one office address in a
+      // minute would otherwise leave the thirteenth staring at a rate-limit
+      // refusal in a box they never touched. So those are swallowed, and the
+      // box is left as if it had not been asked yet: referralCheckedRef is
+      // rolled back so blurring the same value later really does re-ask.
+      const actionable = e instanceof ApiError && e.status === 400;
+      if (unprompted && !actionable) {
+        referralCheckedRef.current = '';
+      } else {
+        setReferralError(e instanceof ApiError ? e.message : GENERIC_ERROR);
+      }
+    } finally {
+      setReferralBusy(false);
+    }
+  }
+
+  // A code the buyer ARRIVED with is checked once, unprompted: they did not
+  // type it, so the first thing they should learn about it is that it works
+  // (or harmlessly does not), not nothing at all. It costs one request per
+  // checkout view carrying ?ref=, which is why the failure half above refuses
+  // to spend the buyer's attention on anything they did not cause.
+  useEffect(() => {
+    if (refCode) void checkReferral(refCode, { unprompted: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refCode]);
 
   // ---------------- Mock payment flow ----------------
 
@@ -452,8 +577,8 @@ export default function CheckoutClient({
         items: buildItems(qty),
         expectedTotalCents: totalCents,
         marketingOptIn,
-        ref: refCode ?? '',
-        voucherCode: sentVoucherCode,
+        ref: sentRefCode,
+        voucherCode: sentCode,
       };
       const created = await postJson<CreateOrderResponse>('/api/orders', req);
       await postJson<CaptureOrderResponse>(`/api/orders/${created.orderId}/capture`, {});
@@ -487,8 +612,8 @@ export default function CheckoutClient({
         items: buildItems(qty),
         expectedTotalCents: totalCents,
         marketingOptIn,
-        ref: refCode ?? '',
-        voucherCode: sentVoucherCode,
+        ref: sentRefCode,
+        voucherCode: sentCode,
       };
       const created = await postJson<CreateOrderResponse>('/api/orders', req);
       // The order page shows the bank details, amount, and reference.
@@ -582,10 +707,10 @@ export default function CheckoutClient({
               items: buildItems(s.qty),
               expectedTotalCents: snapshotTotalCents,
               marketingOptIn: s.marketingOptIn,
-              ref: refCode ?? '',
+              ref: s.sentRefCode,
               // Same rule as the rest of the page, read off the snapshot: a
-              // voucher is never spent on a basket that costs nothing.
-              voucherCode: snapshotTotalCents > 0 ? (s.voucher?.code ?? '') : '',
+              // code is never spent on a basket that costs nothing.
+              voucherCode: snapshotTotalCents > 0 ? (s.applied?.code ?? '') : '',
             };
             const created = await postJson<CreateOrderResponse>('/api/orders', req);
             localOrderIdRef.current = created.orderId;
@@ -623,11 +748,11 @@ export default function CheckoutClient({
         },
         onCancel: async () => {
           // The local order was written before PayPal ever opened, and if a
-          // voucher was applied it is claimed on that order. Nothing else in
-          // the system will ever touch it — so say so here, and wait for the
+          // code was applied it is claimed on that order. Nothing else in the
+          // system will ever touch it — so say so here, and wait for the
           // answer before inviting a retry: the next attempt writes a NEW
-          // order, and it can only re-apply the voucher once this one has let
-          // go of it. The server refuses to release anything PayPal says may
+          // order, and it can only re-apply the code once this one has let go
+          // of it. The server refuses to release anything PayPal says may
           // still take money, so this is safe to call unconditionally.
           const orderId = localOrderIdRef.current;
           localOrderIdRef.current = null;
@@ -641,8 +766,8 @@ export default function CheckoutClient({
           }
           setMessage({
             kind: 'warn',
-            text: latestRef.current.voucher
-              ? 'Payment cancelled — you have not been charged, and your voucher has not been used. You can try again whenever you are ready.'
+            text: latestRef.current.applied
+              ? 'Payment cancelled — you have not been charged, and your code has not been used. You can try again whenever you are ready.'
               : 'Payment cancelled — you have not been charged. You can try again whenever you are ready.',
           });
         },
@@ -770,12 +895,14 @@ export default function CheckoutClient({
                 </div>
               ))}
               {/* The discount and the new total, shown BEFORE the buyer
-                  commits — nobody should discover what a voucher was worth
-                  after they have already agreed to pay. */}
+                  commits — nobody should discover what a code was worth after
+                  they have already agreed to pay. */}
               {discountCents > 0 && (
                 <div className="summary-row">
                   <span>
-                    Voucher <span className="mono small">{voucher?.code}</span>
+                    {applied?.source === 'promo' ? 'Code' : 'Voucher'}{' '}
+                    <span className="mono small">{applied?.code}</span>
+                    {applied?.kind === 'percent' ? ` (${applied.percent}%)` : ''}
                   </span>
                   <span>−{formatMoney(discountCents, config.currency)}</span>
                 </div>
@@ -786,11 +913,11 @@ export default function CheckoutClient({
               </div>
               {discountCents > 0 && (
                 <p className="muted small" style={{ margin: '8px 0 0' }}>
-                  {voucher?.sellerName || 'The seller'} is taking{' '}
+                  {applied?.sellerName || 'The seller'} is taking{' '}
                   {formatMoney(discountCents, config.currency)} off their own price — you simply pay
                   them less.
-                  {voucher && voucher.amountCents > discountCents
-                    ? ' This order is worth less than the voucher, and the difference is not carried over.'
+                  {applied && applied.kind === 'fixed' && applied.amountCents > discountCents
+                    ? ' This order is worth less than the code, and the difference is not carried over.'
                     : ''}
                 </p>
               )}
@@ -805,33 +932,63 @@ export default function CheckoutClient({
             </>
           )}
 
-          {/* "Have a voucher code?" — collapsed behind a link like the payer
+          {/* "Have a discount code?" — collapsed behind a link like the payer
               name above, and hidden entirely when nothing here costs money.
-              Almost nobody holds one; those who do go looking for it. */}
+              Most buyers hold no code; those who do go looking for it. ONE
+              box for both kinds: a buyer holds a code, not a taxonomy. */}
           {!allTiersFree && (
             <div style={{ marginTop: 12 }}>
-              {voucherError && (
+              {codeError && (
                 <p className={styles.fieldError} role="alert">
-                  {voucherError}
+                  {codeError}
                 </p>
               )}
-              {voucher ? (
+              {codeNotice && (
+                <p className="muted small" role="status" style={{ margin: '0 0 6px' }}>
+                  {codeNotice}
+                </p>
+              )}
+              {applied ? (
                 <p className="muted small" style={{ margin: 0 }}>
-                  Voucher <span className="mono">{voucher.code}</span>{' '}
-                  {voucherApplies ? 'applied' : 'saved for later'} —{' '}
-                  {formatMoney(voucher.amountCents, config.currency)} off, from{' '}
-                  {voucher.sellerName || 'the seller'}.{' '}
+                  {applied.source === 'promo' ? 'Code' : 'Voucher'}{' '}
+                  <span className="mono">{applied.code}</span> {codeApplies ? 'applied' : 'saved for later'} —{' '}
+                  {applied.kind === 'percent'
+                    ? `${applied.percent}% off`
+                    : `${formatMoney(applied.amountCents, config.currency)} off`}
+                  , from {applied.sellerName || 'the seller'}.{' '}
                   {/* Nothing selected costs anything, so there is nothing to
                       take off. Said out loud rather than spent for 0.00: the
                       code stays theirs for an order that costs money. */}
-                  {!voucherApplies && (
+                  {!codeApplies && (
                     <>
                       Nothing you have picked costs anything yet, so it stays unused.{' '}
                     </>
                   )}
+                  {/* One code per order, said before they go looking for a
+                      second box that does not exist. */}
+                  Only one code counts per order.{' '}
                   <button
                     type="button"
-                    onClick={removeVoucher}
+                    onClick={() => {
+                      removeCode();
+                      setCodeOpen(true);
+                    }}
+                    disabled={working}
+                    style={{
+                      background: 'none',
+                      border: 0,
+                      padding: 0,
+                      cursor: 'pointer',
+                      color: 'var(--brand-text)',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Use a different code
+                  </button>{' '}
+                  ·{' '}
+                  <button
+                    type="button"
+                    onClick={removeCode}
                     disabled={working}
                     style={{
                       background: 'none',
@@ -845,41 +1002,42 @@ export default function CheckoutClient({
                     Remove
                   </button>
                 </p>
-              ) : voucherOpen ? (
+              ) : codeOpen ? (
                 <div className="field" style={{ marginBottom: 0 }}>
-                  <label htmlFor="voucher-code">Voucher code</label>
+                  <label htmlFor="discount-code">Discount code</label>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <input
-                      id="voucher-code"
+                      id="discount-code"
                       className="input"
                       autoComplete="off"
-                      value={voucherInput}
-                      onChange={(e) => setVoucherInput(e.target.value)}
-                      placeholder="THANKS-XXXXXXXX"
-                      maxLength={20}
-                      disabled={voucherBusy || working}
+                      value={codeInput}
+                      onChange={(e) => setCodeInput(e.target.value)}
+                      placeholder="e.g. DASHAIN10"
+                      maxLength={24}
+                      disabled={codeBusy || working}
                       style={{ flex: '1 1 180px' }}
                     />
                     <button
                       type="button"
                       className="btn btn-sm"
-                      onClick={applyVoucher}
-                      disabled={voucherBusy || working}
+                      onClick={applyCode}
+                      disabled={codeBusy || working}
                     >
-                      {voucherBusy ? <span className="spinner" aria-hidden /> : null}
-                      {voucherBusy ? 'Checking…' : 'Apply'}
+                      {codeBusy ? <span className="spinner" aria-hidden /> : null}
+                      {codeBusy ? 'Checking…' : 'Apply'}
                     </button>
                   </div>
                   <p className={`muted small ${styles.hint}`}>
-                    A thank-you code the seller sent you for bringing friends. It is their discount
-                    on their own price — it comes straight off what you transfer to them.
+                    A code the seller handed out, or a thank-you code they sent you for bringing
+                    friends. Either way it is their discount on their own price — it comes straight
+                    off what you transfer to them. One code per order.
                   </p>
                 </div>
               ) : (
                 <button
                   type="button"
                   className="link-button small"
-                  onClick={() => setVoucherOpen(true)}
+                  onClick={() => setCodeOpen(true)}
                   disabled={working}
                   style={{
                     background: 'none',
@@ -890,11 +1048,76 @@ export default function CheckoutClient({
                     fontWeight: 600,
                   }}
                 >
-                  Have a voucher code? →
+                  Have a discount code? →
                 </button>
               )}
             </div>
           )}
+
+          {/* A SEPARATE field, and separate on purpose: this one credits the
+              person who sent the buyer here and takes nothing off the buyer's
+              own price. Sharing a box with the discount code would promise
+              money that is not coming.
+              Shown even on a listing where everything is free, unlike the
+              discount box above: a free reservation somebody's link brought in
+              is a real referral, and the person who brought it should be
+              credited for it. */}
+          <div style={{ marginTop: 12 }}>
+            {referralOpen ? (
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label htmlFor="referral-code">Referral code</label>
+                <input
+                  id="referral-code"
+                  className="input"
+                  autoComplete="off"
+                  value={referralInput}
+                  onChange={(e) => setReferralInput(e.target.value.toUpperCase())}
+                  onBlur={(e) => {
+                    const typed = e.target.value.trim().toUpperCase();
+                    if (typed !== referralCheckedRef.current) void checkReferral(typed);
+                  }}
+                  placeholder="XXXXXXXX"
+                  maxLength={8}
+                  disabled={referralBusy || working}
+                />
+                {referralError ? (
+                  // Harmless by construction, and worded that way: nobody
+                  // is credited, and that is the whole of the loss.
+                  <p className="muted small" role="status" style={{ margin: '6px 0 0' }}>
+                    {referralError}
+                  </p>
+                ) : referral ? (
+                  <p className="muted small" style={{ margin: '6px 0 0' }}>
+                    Thanks — {referral.sellerName || 'the seller'} will see that{' '}
+                    <span className="mono">{referral.code}</span> sent you. Your price is exactly
+                    the same either way.
+                  </p>
+                ) : (
+                  <p className={`muted small ${styles.hint}`}>
+                    The code a friend shared with you. It credits <em>them</em> with the seller —
+                    it takes nothing off your own total, and it is never needed to buy.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="link-button small"
+                onClick={() => setReferralOpen(true)}
+                disabled={working}
+                style={{
+                  background: 'none',
+                  border: 0,
+                  padding: 0,
+                  cursor: 'pointer',
+                  color: 'var(--brand-text)',
+                  fontWeight: 600,
+                }}
+              >
+                Someone referred you? Enter their code →
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1111,7 +1334,7 @@ export default function CheckoutClient({
               {allTiersFree
                 ? `This ${v.listing} is free — no payment, just a reservation. Your QR ${v.codes} appear on the next page and are emailed to you right away.`
                 : discountCents > 0
-                  ? `Your voucher covers the whole order — there is nothing to pay and nothing to transfer. Your QR ${v.codes} appear on the next page and are emailed to you right away.`
+                  ? `Your code covers the whole order — there is nothing to pay and nothing to transfer. Your QR ${v.codes} appear on the next page and are emailed to you right away.`
                   : `Everything you picked is free — no payment needed. Your QR ${v.codes} appear on the next page and are emailed to you right away.`}
             </p>
             <button

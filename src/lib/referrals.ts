@@ -42,14 +42,20 @@ export function confirmedReferralSql(alias = 'o'): string {
  * "this booking really happened" it demands two things somebody could
  * otherwise mint rewards out of:
  *   - total_cents > 0        — a free RSVP was never "actually paid";
- *   - voucher_code = ''      — a booking a voucher paid part of never funds
+ *   - voucher_code = ''      — a booking that a CODE paid part of never funds
  *                              the next voucher.
  *
  * That second condition is the whole of "a voucher cannot breed the next one",
- * and it has to be about the VOUCHER, not the leftover total: two addresses
- * with a 40.00 voucher against a 50.00 ticket would otherwise pay 10.00, count
- * the order as a referral, earn the next 40.00 voucher, and run that loop for
- * as long as the organizer let them.
+ * and it has to be about the CODE, not the leftover total: two addresses with
+ * a 40.00 voucher against a 50.00 ticket would otherwise pay 10.00, count the
+ * order as a referral, earn the next 40.00 voucher, and run that loop for as
+ * long as the organizer let them.
+ *
+ * It covers an ORGANIZER'S OWN PROMO CODE too, and by construction rather than
+ * by luck: a promo is recorded in the same orders.voucher_code column as a
+ * voucher (one code per order — see lib/promos.ts), so "part-paid by a code"
+ * is one test here, not two that could drift apart. An organizer who hands out
+ * a 90%-off code has not thereby created a machine for minting vouchers.
  *
  * Every reward counter — the progress a referrer reads on their order page and
  * the count that decides when a voucher is issued — goes through this one
@@ -205,7 +211,15 @@ export function organizerCurrency(organizerId: string): string {
 
 /**
  * The person who owns a referral code: lowercased email of the buyer whose
- * paid order minted that share_code on this event, or null.
+ * paid order minted that share_code on ANY of this organizer's listings, or
+ * null.
+ *
+ * Scoped to the ORGANIZER, not to one event, because that is the scope the
+ * accrual below already runs at — and the scope the orders API resolves a
+ * typed-in code at (getPaidOrderByReferralCode). A code earned at last
+ * month's listing has to name its owner at this month's one, or the reward
+ * would silently stop at the calendar. Never crosses an organizer boundary:
+ * somebody else's referrals are somebody else's business.
  *
  * Null — nobody accrues — in three cases, all of them on purpose:
  *   - no such code, or it names an unpaid order (same rule the orders API
@@ -218,15 +232,16 @@ export function organizerCurrency(organizerId: string): string {
  *     accruing; vouchers they already hold keep working, because a voucher
  *     stands on its own code and nothing about it needs to know who they were.
  */
-export function referrerEmailForCode(eventId: string, code: string): string | null {
+export function referrerEmailForCode(organizerId: string, code: string): string | null {
   const key = (code || '').trim().toUpperCase();
   if (!/^[A-Z0-9]{8}$/.test(key)) return null;
   const rows = getDb()
     .prepare(
-      `SELECT buyer_email AS email, buyer_erased_at AS erasedAt
-       FROM orders WHERE share_code = ? AND event_id = ? AND status = 'paid' LIMIT 2`
+      `SELECT o.buyer_email AS email, o.buyer_erased_at AS erasedAt
+       FROM orders o JOIN events e ON e.id = o.event_id
+       WHERE o.share_code = ? AND e.organizer_id = ? AND o.status = 'paid' LIMIT 2`
     )
-    .all(key, eventId) as { email: string; erasedAt: string | null }[];
+    .all(key, organizerId) as { email: string; erasedAt: string | null }[];
   if (rows.length !== 1 || rows[0].erasedAt) return null;
   const email = (rows[0].email || '').trim().toLowerCase();
   return email || null;
@@ -244,6 +259,12 @@ export function referrerEmailForCode(eventId: string, code: string): string | nu
  *
  * EXISTS rather than a JOIN because share_code has no uniqueness constraint —
  * a join would count a referred order twice if two rows ever shared a code.
+ *
+ * The referring order is matched across the SAME ORGANIZER's listings, not
+ * within one event: a code is spendable at any of their checkouts (see
+ * getPaidOrderByReferralCode), so it has to be countable there too — matching
+ * per event would credit nobody for exactly the bookings the wider rule was
+ * added to allow.
  *
  * `since` is the organizer's reward clock (see setReferralRewardSettings):
  * only bookings confirmed on or after the day the current promise started
@@ -270,9 +291,9 @@ export function countPaidReferrals(
          AND ${paidReferralSql('o')}
          ${window}
          AND EXISTS (
-           SELECT 1 FROM orders r
+           SELECT 1 FROM orders r JOIN events re ON re.id = r.event_id
            WHERE r.share_code = o.referred_by
-             AND r.event_id = o.event_id
+             AND re.organizer_id = e.organizer_id
              AND r.status = 'paid'
              AND r.buyer_erased_at IS NULL
              AND lower(r.buyer_email) = ?
@@ -351,8 +372,12 @@ export class VoucherError extends Error {
  * "never existed" from "exists here and is spent" would confirm both that the
  * code is real and which seller it belongs to. It names every reason at once
  * so a buyer with a genuine problem still knows what to check.
+ *
+ * Exported so lib/promos can RECOGNISE it: one checkout box takes either kind
+ * of code, and a refusal that reads differently for a spent voucher than for
+ * anything else is the very oracle this constant exists to avoid.
  */
-const VOUCHER_NOT_USABLE =
+export const VOUCHER_NOT_USABLE =
   'We could not use that voucher here. Vouchers only work on listings from the seller who gave them to you, and each one works once.';
 
 /**
@@ -452,14 +477,17 @@ export function claimVoucherForOrder(
 export function releaseVoucherForOrder(orderId: string): void {
   const db = getDb();
   const tx = db.transaction(() => {
-    const changes = db
-      .prepare(
-        `UPDATE referral_vouchers
-         SET redeemed_at = NULL, redeemed_order_id = NULL
-         WHERE redeemed_order_id = ?`
-      )
-      .run(orderId).changes;
-    if (changes === 0) return;
+    db.prepare(
+      `UPDATE referral_vouchers
+       SET redeemed_at = NULL, redeemed_order_id = NULL
+       WHERE redeemed_order_id = ?`
+    ).run(orderId);
+    // The order's own columns are reset WHATEVER the voucher UPDATE did. An
+    // early return on "no rows changed" left a cancelled order carrying a
+    // discounted total and the name of a code it no longer holds — which is
+    // both a lie on the order page and the precondition the reclaim path
+    // reads as "this redemption was already counted". Whatever the counter
+    // says, this order is back at its full list price.
     // Back to the items total — the same sum createOrder priced from the
     // tiers, re-read from the order's own lines so a later price change cannot
     // rewrite what this buyer was quoted. Never on a paid order: that money
@@ -560,7 +588,9 @@ function issueVouchersForPaidOrder(orderId: string): { vouchers: VoucherRow[]; e
   const settings = getReferralRewardSettings(order.organizerId);
   if (!settings.enabled) return { vouchers: [], eventId: order.eventId };
 
-  const referrerEmail = referrerEmailForCode(order.eventId, order.referredBy);
+  // By ORGANIZER: the code may have been minted at any of their listings, and
+  // the accrual below counts across all of them anyway.
+  const referrerEmail = referrerEmailForCode(order.organizerId, order.referredBy);
   if (!referrerEmail) return { vouchers: [], eventId: order.eventId };
 
   const tx = db.transaction(() => {

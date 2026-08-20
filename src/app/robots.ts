@@ -39,6 +39,7 @@ export default function robots(): MetadataRoute.Robots {
           '/scan', // door scanner, reachable only by a signed link
           '/ticket/', // a real person's QR ticket
           '/order/', // a real person's order and payment reference
+          '/c/', // a real person's customer card with one seller
           '/checkout', // mid-purchase state, useless and personal
         ],
       },

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isAdminRequest } from '@/lib/auth';
+import { eraseCustomerCards } from '@/lib/cards';
 import { eraseMarketingConsent } from '@/lib/marketing';
 import { clientIp, rateLimit } from '@/lib/ratelimit';
 import type { ApiErrorResponse } from '@/lib/types';
@@ -7,7 +8,14 @@ import type { ApiErrorResponse } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 
 /**
- * Erase an address from the marketing consent book entirely, on request.
+ * Erase an address from everything that outlives the after-event buyer
+ * erasure, on request — the marketing consent book AND any customer cards.
+ *
+ * Those two are the whole of it, and that is not a coincidence: they are the
+ * only records that survive lib/retention.ts, and each survives for the same
+ * reason, that the person ASKED for it. So "delete everything about me" has to
+ * take both, or the promise is only half kept. Anything added later that
+ * outlives retention belongs in this handler on the day it is written.
  *
  * This is the button behind a legal promise: /privacy and the unsubscribe page
  * both say the do-not-email record is erased entirely when its owner asks, and
@@ -48,7 +56,10 @@ export async function POST(req: Request) {
     }
 
     const erased = eraseMarketingConsent(email);
-    return NextResponse.json({ ok: true, erased });
+    // Cards go in the same request, across every seller: somebody asking to be
+    // forgotten is asking the platform, not one organizer (lib/cards.ts).
+    const cardsErased = eraseCustomerCards(email);
+    return NextResponse.json({ ok: true, erased, cardsErased });
   } catch (e) {
     console.error('POST /api/admin/erase-consent failed:', e);
     return NextResponse.json(

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { formatMoney } from '@/lib/money';
 import type { CheckinResponse, EventKind } from '@/lib/types';
 import { vocabFor } from '@/lib/vocab';
 import styles from './checkin.module.css';
@@ -22,6 +23,7 @@ const RESULT_LABEL: Record<CheckinResponse['result'], string> = {
   not_paid: 'Not paid',
   mock_ticket: 'Test code',
   wrong_event: 'Wrong listing',
+  customer_card: 'Customer card',
 };
 
 const RESULT_BADGE: Record<CheckinResponse['result'], string> = {
@@ -31,6 +33,9 @@ const RESULT_BADGE: Record<CheckinResponse['result'], string> = {
   not_paid: 'badge-red',
   mock_ticket: 'badge-red',
   wrong_event: 'badge-red',
+  // Neither good nor bad news — nothing was admitted or refused, somebody was
+  // simply recognised.
+  customer_card: 'badge-accent',
 };
 
 /**
@@ -39,10 +44,18 @@ const RESULT_BADGE: Record<CheckinResponse['result'], string> = {
  * check-in screen: this component is rendered only by the organizer's own
  * portal page and by /scan, both of which are scoped to a single event. The
  * folder is historical — there is no /admin/checkin route any more.
+ *
+ * It reads TWO kinds of code, not two scanners: a ticket, which is checked in,
+ * and a customer card (lib/cards.ts), which is not — a card admits nobody and
+ * is spent on nothing, it only says who is standing there. One box, because at
+ * a counter there is one thing to do with whatever is held up: scan it. Which
+ * kind arrived is decided server-side, and so is who may see a card at all —
+ * see the `cards` prop and /api/admin/checkin.
  */
 export default function CheckinClient({
   unauthorizedHref = '/portal/login',
   kind = 'event',
+  cards = false,
 }: {
   /** Where to send the user when the session is no longer valid (401). */
   unauthorizedHref?: string;
@@ -53,6 +66,18 @@ export default function CheckinClient({
    * that has not been taught about kinds behaves exactly as it always did.
    */
   kind?: EventKind;
+  /**
+   * Whether this scanner also reads CUSTOMER CARDS (lib/cards.ts). Purely
+   * presentational — it changes the label and the hint, nothing else. The real
+   * gate is in /api/admin/checkin, which answers a card lookup only to an
+   * organizer's own session and never to a door-staff scanner cookie; passing
+   * true from the wrong page would therefore reveal nothing, and passing
+   * false from the right one only hides the invitation.
+   *
+   * Default false, so /scan — the tokenized link an organizer hands to door
+   * staff — behaves exactly as it always did.
+   */
+  cards?: boolean;
 }) {
   const v = vocabFor(kind);
   const isShop = kind === 'shop';
@@ -118,7 +143,9 @@ export default function CheckinClient({
         setLog((prev) =>
           [
             {
-              code: data.ticket?.code ?? value.toUpperCase(),
+              // A card code is lowercase by design — uppercasing it in the log
+              // would print something that is not the code anybody holds.
+              code: data.card?.cardCode ?? data.ticket?.code ?? value.toUpperCase(),
               result: data.result,
               at: new Date().toLocaleTimeString(),
             },
@@ -207,7 +234,7 @@ export default function CheckinClient({
       <div className="card">
         <form onSubmit={onSubmit}>
           <div className="field">
-            <label htmlFor="checkin-code">{v.Code} code</label>
+            <label htmlFor="checkin-code">{cards ? `${v.Code} or card code` : `${v.Code} code`}</label>
             <input
               id="checkin-code"
               ref={inputRef}
@@ -216,10 +243,12 @@ export default function CheckinClient({
               onChange={(e) => setCode(e.target.value)}
               autoFocus
               autoComplete="off"
-              autoCapitalize="characters"
+              // A card code is lowercase; forcing capitals on the phone
+              // keyboard would fight whoever is typing one in by hand.
+              autoCapitalize={cards ? 'none' : 'characters'}
               spellCheck={false}
-              placeholder="XXXX-XXXX"
-              aria-label={`${v.Code} code`}
+              placeholder={cards ? 'XXXX-XXXX or card-…' : 'XXXX-XXXX'}
+              aria-label={cards ? `${v.Code} or customer card code` : `${v.Code} code`}
             />
           </div>
           <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={busy || !code.trim()}>
@@ -272,6 +301,37 @@ export default function CheckinClient({
               {result.ticket?.buyerName ? ` · ${result.ticket.buyerName}` : ''}
             </div>
             {result.ticket?.code && <div className={`mono small ${styles.resultDetail}`}>{result.ticket.code}</div>}
+          </div>
+        )}
+        {/* A customer card, not a ticket: nothing was admitted and nothing was
+            spent. It answers one question — who is this? — so the counter can
+            greet a regular by name and honour a code they are holding. */}
+        {!netError && result?.result === 'customer_card' && result.card && (
+          <div key={resultKey} className={`notice ${styles.result}`}>
+            <div className={styles.resultTitle}>
+              CUSTOMER CARD{result.card.holderName ? ` — ${result.card.holderName}` : ''}
+            </div>
+            <div className={styles.resultDetail}>
+              {result.card.confirmedOrders}{' '}
+              {result.card.confirmedOrders === 1 ? 'order' : 'orders'} with you · card held for{' '}
+              {result.card.heldForDays} {result.card.heldForDays === 1 ? 'day' : 'days'}
+              {result.card.lastSeenAt ? ` · last seen ${result.card.lastSeenAt} (UTC)` : ''}
+            </div>
+            <div className={`small ${styles.resultDetail}`}>{result.card.email}</div>
+            {result.card.vouchers.length > 0 ? (
+              <div className={styles.resultDetail}>
+                Unspent codes:{' '}
+                {result.card.vouchers
+                  .map((voucher) => `${voucher.code} (${formatMoney(voucher.amountCents, result.card!.currency)} off)`)
+                  .join(', ')}
+              </div>
+            ) : (
+              <div className={`small ${styles.resultDetail}`}>No unspent codes.</div>
+            )}
+            <div className={`mono small ${styles.resultDetail}`}>{result.card.cardCode}</div>
+            <div className={`small ${styles.resultDetail}`}>
+              A card is not a {v.code} — nothing has been {v.redeemed} here.
+            </div>
           </div>
         )}
         {!netError && result?.result === 'not_found' && (

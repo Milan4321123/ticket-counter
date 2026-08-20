@@ -9,7 +9,7 @@
 //   failed / cancelled -> terminal, seats released
 import { getDb } from './db';
 import { getEventById, getEventTiers, getPrimaryEvent } from './events';
-import { releaseVoucherForOrder } from './referrals';
+import { releaseDiscountCodeForOrder } from './promos';
 
 export interface TierAvailability {
   tierId: string;
@@ -229,9 +229,11 @@ export function releaseClaim(orderId: string, toStatus: 'pending' | 'failed' | '
   const changes = db
     .prepare(`UPDATE orders SET status = ? WHERE id = ? AND status IN ('claimed', 'capturing')`)
     .run(toStatus, orderId).changes;
-  // A reservation that ends for good gives back any referral voucher it was
-  // holding, so a buyer who never paid does not lose a reward they earned.
-  // NOT for 'pending': that order is still alive and about to try again — the
-  // voucher belongs to it until it either becomes a sale or dies.
-  if (changes > 0 && toStatus !== 'pending') releaseVoucherForOrder(orderId);
+  // A reservation that ends for good gives back any code it was holding — a
+  // referral voucher, or a redemption of one of the seller's promo codes — so
+  // a buyer who never paid does not lose a reward they earned, and a cap is
+  // not eaten by a booking that never happened. NOT for 'pending': that order
+  // is still alive and about to try again — the code belongs to it until it
+  // either becomes a sale or dies.
+  if (changes > 0 && toStatus !== 'pending') releaseDiscountCodeForOrder(orderId);
 }

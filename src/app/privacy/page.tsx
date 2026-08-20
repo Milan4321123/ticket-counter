@@ -116,8 +116,9 @@ export default function PrivacyPage() {
                 <strong>Nobody else.</strong> We do not sell or share any of it, and booking a ticket
                 does not put you on a mailing list. The only emails we send a buyer are your ticket,
                 your transfer instructions, and — if your transfer has not arrived after a few days —
-                one reminder. The single exception is one you create yourself: the optional
-                &ldquo;keep me posted&rdquo; box at checkout, explained below.
+                one reminder. The only exceptions are ones you create yourself: the optional
+                &ldquo;keep me posted&rdquo; box at checkout and the customer card you can ask a
+                seller to keep — both explained below.
               </li>
             </ul>
           </div>
@@ -148,6 +149,41 @@ export default function PrivacyPage() {
               nothing can quietly add you back; only ticking the box yourself again, and confirming
               it again from your own inbox, would. Want even that record erased entirely? Ask, and
               we will.
+            </p>
+          </div>
+
+          <div className="card anim-fade-up anim-d2">
+            <h2 className="card-title">The customer card, if you ask for one</h2>
+            <p>
+              After you have paid, the order page offers you a card with that one seller. It is an
+              offer and nothing more: buying something does not give you a card, and if you never
+              press the button, no card exists. Nothing about your order changes either way.
+            </p>
+            <p>
+              Press it and we store one thing — your email address, filed against that one seller —
+              and give you a private page of your own with a QR code on it. The page shows your
+              referral code, any discount codes you are holding, and what you have bought{' '}
+              <em>from that seller</em>. The QR carries the card&rsquo;s random code and nothing
+              else: no name, no email, nothing about you.
+            </p>
+            <p>
+              The card belongs to one seller and stops there. It cannot recognise you at another
+              seller&rsquo;s counter, it does not follow you around this site, and there is no
+              screen anywhere in {PLATFORM_NAME} that puts your cards side by side — that would be
+              a profile built behind your back, which is precisely what this is not. Only the seller
+              whose card it is can look the code up, and when they do they see your name, how many
+              orders you have placed with them, how long you have held the card and which discount
+              codes you have not spent. The door staff scanning tickets cannot: the scanner link a
+              seller hands out reads tickets and nothing else.
+            </p>
+            <p style={{ marginBottom: 0 }}>
+              Because you asked for it, this address is — like the &ldquo;keep me posted&rdquo; box
+              above — one of the only things that survives the after-event erasure. It survives for
+              exactly as long as you want it to: there is a{' '}
+              <strong>Close this card</strong> button on the card page itself, no sign-in needed,
+              and pressing it deletes the card outright. The QR stops working that second and
+              nothing is kept behind, because nothing but you asking again can ever create another.
+              Lost the link, or would rather every card you hold went at once? Ask, and we will.
             </p>
           </div>
 

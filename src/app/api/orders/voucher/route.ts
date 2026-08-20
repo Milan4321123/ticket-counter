@@ -3,7 +3,8 @@ import { getEventById } from '@/lib/events';
 import { BodyTooLargeError, readJsonLimited } from '@/lib/http';
 import { getOrganizer } from '@/lib/organizers';
 import { clientIp, rateLimit } from '@/lib/ratelimit';
-import { requireRedeemableVoucher, VoucherError } from '@/lib/referrals';
+import { previewDiscountCode } from '@/lib/promos';
+import { VoucherError } from '@/lib/referrals';
 import { vocabFor } from '@/lib/vocab';
 import type { ApiErrorResponse, VoucherCheckRequest, VoucherCheckResponse } from '@/lib/types';
 
@@ -12,11 +13,16 @@ function apiError(status: number, code: ApiErrorResponse['code'], error: string)
 }
 
 /**
- * "Does this voucher work here, and how much does it take off?" — so the
- * checkout can show the discount and the new total BEFORE the buyer commits to
+ * "Does this code work here, and how much does it take off?" — so the checkout
+ * can show the discount and the new total BEFORE the buyer commits to
  * anything. Somebody who types a code has to be told there and then whether it
  * applied; finding out on the payment page, or not at all, is worse than not
  * offering the box.
+ *
+ * Takes EITHER kind of discount code: a referral voucher the seller's rewards
+ * issued, or a promo code the seller minted themselves. The buyer holds a
+ * code, not a taxonomy, so there is one box and one endpoint (lib/promos.ts
+ * resolves which it is).
  *
  * This is a PREVIEW ONLY and decides nothing. The order route re-checks and
  * CLAIMS the voucher inside the same transaction that writes the order, so
@@ -31,7 +37,7 @@ function apiError(status: number, code: ApiErrorResponse['code'], error: string)
 export async function POST(req: Request) {
   try {
     if (!rateLimit(`voucher:${clientIp(req)}`, 12, 60_000)) {
-      return apiError(429, 'INTERNAL', 'Too many voucher attempts — please wait a minute and try again.');
+      return apiError(429, 'INTERNAL', 'Too many code attempts — please wait a minute and try again.');
     }
 
     let raw: unknown;
@@ -39,7 +45,7 @@ export async function POST(req: Request) {
       raw = await readJsonLimited(req);
     } catch (e) {
       if (e instanceof BodyTooLargeError) return apiError(413, 'VALIDATION', 'That request was too large.');
-      return apiError(400, 'VALIDATION', 'Please enter a voucher code and try again.');
+      return apiError(400, 'VALIDATION', 'Please enter a code and try again.');
     }
 
     const body = (raw && typeof raw === 'object' ? raw : {}) as Partial<VoucherCheckRequest>;
@@ -58,21 +64,36 @@ export async function POST(req: Request) {
       return apiError(403, 'SALES_CLOSED', `${v.Sales} are currently closed for this ${v.listing}.`);
     }
 
-    // Scoped to the SELLER of this listing: a voucher is one seller's discount
-    // on one seller's prices, and it is never spendable at anyone else's till.
-    const voucher = requireRedeemableVoucher(event.organizerId, code);
+    // Global backstop against a distributed or spoofed-IP grind, beside the
+    // per-IP limit above and in the same style as the orders route's
+    // 'orders:all'. clientIp() is only as trustworthy as the proxy in front of
+    // it, so the per-IP bucket alone is not a ceiling on guessing — this is.
+    // Consumed only AFTER the listing checks, so garbage requests cannot
+    // exhaust it for real buyers. 300 a minute is far above any human peak
+    // (a buyer types one code, maybe two).
+    if (!rateLimit('voucher:all', 300, 60_000)) {
+      return apiError(429, 'INTERNAL', 'The site is very busy right now — please try again in a minute.');
+    }
+
+    // Scoped to the SELLER of this listing: a code is one seller's discount on
+    // one seller's prices, and it is never spendable at anyone else's till.
+    const preview = previewDiscountCode({ id: event.id, organizerId: event.organizerId }, code);
     const response: VoucherCheckResponse = {
       ok: true,
-      code: voucher.code,
-      amountCents: voucher.amountCents,
+      code: preview.code,
+      source: preview.source,
+      kind: preview.kind,
+      amountCents: preview.amountCents,
+      percent: preview.percent,
       currency: event.currency,
       sellerName: getOrganizer(event.organizerId)?.name?.trim() || '',
     };
     return NextResponse.json(response);
   } catch (e) {
-    // A VoucherError is the buyer's answer, written for them to read.
+    // A VoucherError is the buyer's answer, written for them to read — both
+    // kinds of code refuse through it.
     if (e instanceof VoucherError) return apiError(400, 'VALIDATION', e.message);
     console.error('POST /api/orders/voucher failed:', e);
-    return apiError(500, 'INTERNAL', 'We could not check that voucher just now — please try again.');
+    return apiError(500, 'INTERNAL', 'We could not check that code just now — please try again.');
   }
 }

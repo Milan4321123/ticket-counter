@@ -315,6 +315,21 @@ export default async function PortalDashboardPage({
               <CreateEventForm />
             </div>
 
+            {/* Alongside statements, and shown on the same condition: a code
+                is something you hand out for a listing, so it means nothing on
+                an account that has none yet. */}
+            <div className="card anim-fade-up anim-d4" style={{ marginTop: 16 }}>
+              <div className="card-title">Discount codes</div>
+              <p className="muted small" style={{ marginTop: 0 }}>
+                Make a code to hand out — an early-bird code, one for a sponsor, one for a WhatsApp
+                group. It is your own discount on your own prices: the buyer simply transfers you
+                less.
+              </p>
+              <Link href="/portal/promos" className="btn btn-sm">
+                Open discount codes
+              </Link>
+            </div>
+
             {/* Only shown once there are listings: a statements card on an
                 account that has never sold anything is a promise with nothing
                 behind it yet. */}

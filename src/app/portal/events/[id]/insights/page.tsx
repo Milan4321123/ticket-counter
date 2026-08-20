@@ -6,6 +6,7 @@ import { activeConsentCount } from '@/lib/marketing';
 import { formatMoney } from '@/lib/money';
 import { getStats } from '@/lib/orders';
 import { organizerPlanActive } from '@/lib/organizers';
+import { promoTotalsForOrganizer, promoUsageForEvent } from '@/lib/promos';
 import { getReferralRewardSettings, voucherTotalsForOrganizer } from '@/lib/referrals';
 import { BUYER_RETENTION_DAYS } from '@/lib/retention';
 import { vocabFor } from '@/lib/vocab';
@@ -57,6 +58,13 @@ export default async function PortalInsightsPage({ params }: { params: Promise<{
   // this listing only, and the copy says so.
   const rewards = getReferralRewardSettings(organizer.id);
   const vouchers = voucherTotalsForOrganizer(organizer.id);
+  // The organizer's OWN codes, next to the vouchers the rewards issue: same
+  // kind of thing to a buyer (the seller's discount on the seller's price),
+  // and both are redeemed through the same box at checkout. The totals are
+  // account-wide like the vouchers above; the usage line underneath is this
+  // listing's confirmed orders only, which is why it is a separate number.
+  const promos = promoTotalsForOrganizer(organizer.id);
+  const promoUsage = promoUsageForEvent(event.id);
 
   const hasSales = stats.ordersPaid > 0 || stats.awaitingTransferOrders > 0;
   const checkinPct = stats.ticketsSold > 0 ? Math.round((stats.checkedIn / stats.ticketsSold) * 100) : 0;
@@ -204,12 +212,12 @@ export default async function PortalInsightsPage({ params }: { params: Promise<{
           )}
         </div>
 
-        {/* ---- Top referrers ---- */}
-        {/* Only when at least one referred paid order exists: an empty "nobody
-            shared your event" table is a worse message than no table. */}
-        {(referrers.length > 0 || vouchers.earned > 0) && (
+        {/* ---- Referrals and codes ---- */}
+        {/* Only when there is something to say: an empty "nobody shared your
+            event" table is a worse message than no table. */}
+        {(referrers.length > 0 || vouchers.earned > 0 || promos.minted > 0) && (
           <div className="card anim-fade-up anim-d3">
-            <div className="card-title">Top referrers</div>
+            <div className="card-title">Referrals and codes</div>
             <p className="muted small" style={{ marginTop: 0 }}>
               Buyers whose shared link brought in a booking you have{' '}
               <strong>confirmed</strong> — test orders are never counted, and free reservations are
@@ -254,6 +262,36 @@ export default async function PortalInsightsPage({ params }: { params: Promise<{
                   discount on your own prices. Nothing is charged or deducted by the platform, and
                   the counts above run across all your listings, while the table below is this{' '}
                   {v.listing} only.
+                </p>
+              </>
+            )}
+            {/* The organizer's own codes, once they have made any. Kept in
+                this card rather than a new one: to a buyer a promo code and a
+                thank-you voucher are one thing typed into one box, and
+                splitting them across the page would suggest otherwise. */}
+            {promos.minted > 0 && (
+              <>
+                <div className="summary-row">
+                  <span className="muted">Your own codes (all your listings)</span>
+                  <span>
+                    {promos.minted} made · {promos.live} usable now · {promos.redeemed} redeemed
+                  </span>
+                </div>
+                <div className="summary-row">
+                  <span className="muted">What they took off this {v.listing}</span>
+                  <span>
+                    {promoUsage.orders} order{promoUsage.orders === 1 ? '' : 's'} ·{' '}
+                    {formatMoney(promoUsage.discountCents, event.currency)}
+                  </span>
+                </div>
+                <p className="muted small" style={{ margin: '8px 0 16px' }}>
+                  Your own discount on your own prices — those buyers transferred you that much
+                  less, and nothing was charged or deducted by the platform. A code counts as
+                  redeemed only while an order holds it: cancel an order, or let its payment lapse,
+                  and the code goes back — except a test-mode booking, which counts as paid and
+                  holds its redemption until the test orders are deleted before going live. Make
+                  and switch off codes under{' '}
+                  <Link href="/portal/promos">Discount codes</Link>.
                 </p>
               </>
             )}
