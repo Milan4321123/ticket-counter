@@ -216,9 +216,12 @@ export default async function PortalInsightsPage({ params }: { params: Promise<{
         </div>
 
         {/* ---- Referrals and codes ---- */}
-        {/* Only when there is something to say: an empty "nobody shared your
-            event" table is a worse message than no table. */}
-        {(referrers.length > 0 || vouchers.earned > 0 || promos.minted > 0) && (
+        {/* Shown when there is something to say — OR whenever rewards are
+            switched on, so an organizer who has just promised something can
+            always see that it is live. The empty referrer table is still
+            hidden further down; it was hiding the whole CARD that left a
+            brand-new promise invisible on the page it belongs to. */}
+        {(rewards.enabled || referrers.length > 0 || vouchers.earned > 0 || promos.minted > 0) && (
           <div className="card anim-fade-up anim-d3">
             <div className="card-title">Referrals and codes</div>
             <p className="muted small" style={{ marginTop: 0 }}>

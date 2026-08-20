@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "backup": "node scripts/backup.mjs --with-uploads --keep 30"
+    "backup": "node scripts/backup.mjs --with-uploads --keep 30",
+    "seed:bazaar": "node scripts/seed-bazaar.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",
