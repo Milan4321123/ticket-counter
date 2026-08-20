@@ -51,11 +51,22 @@ export default function MarketPage() {
           <h1 className="anim-fade-up anim-d1" style={{ fontSize: 'clamp(1.9rem, 4.4vw, 3rem)' }}>
             The Nepali bazaar, wherever you are in Germany
           </h1>
+          {/* "Every shop here belongs to a Nepali seller near you" stopped being
+              true the day the site published its own example shops (see
+              scripts/seed-bazaar.mjs): those name an invented seller and an
+              invented collection address, and a promise like this one is
+              exactly what would send somebody to a doorbell that does not
+              exist. Naming the marked-out exception keeps the sentence honest
+              without softening it — every shop that is NOT marked is still a
+              real Nepali seller, which is the claim the real sellers on this
+              page have earned. If the example shops ever come down, this
+              clause can go with them. */}
           <p className="feed-hero-sub anim-fade-up anim-d2" style={{ marginBottom: 0 }}>
             Momo folded the way somebody&rsquo;s mother taught them. Sel roti for the festival,
-            timur for the achar, dhaka for the photo. Every shop here belongs to a Nepali seller
-            near you — you order, pay them directly, and collect with the QR code on your order.
-            No middleman between you and the person who made it.
+            timur for the achar, dhaka for the photo. Every shop here that isn&rsquo;t marked
+            &ldquo;example shop&rdquo; belongs to a Nepali seller near you — you order, pay them
+            directly, and collect with the QR code on your order. No middleman between you and
+            the person who made it.
           </p>
         </div>
       </section>

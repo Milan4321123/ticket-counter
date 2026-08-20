@@ -250,4 +250,19 @@ At the door:
 - **Refunds are between organizer and buyer.** The platform never moves money, so it can't refund either — the organizer simply transfers the amount back. You, the platform owner, never refund ticket money, because you never had it. The full support playbook is in [PLATFORM.md](PLATFORM.md).
 - After each event, the organizer's bank statements plus your database backup are the complete, auditable record of the sale.
 
+### The example bazaar: take it down before you change how payments work
+
+The site can publish a set of **example shops** — seven invented Nepali storefronts with invented sellers and invented collection addresses — so that a seller being shown `/market` sees a full bazaar instead of an empty room. They are created and removed by one script:
+
+```
+npm run seed:bazaar -- --yes-seed-production   # put them up
+npm run seed:bazaar -- --clean                 # take them down
+```
+
+**If those shops are up, run `--clean` BEFORE you change `PAYMENT_MODE`, `PAYPAL_ENV`, `ALLOW_MOCK_PAYMENTS`, or add PayPal credentials — and put them back afterwards if you still want them.**
+
+Why: those listings are published, priced and open for orders, exactly like a real shop. The only thing that stops a buyer being charged is that they have **no payout account** and the site runs in `PAYMENT_MODE=transfer`, where an order against a listing with no payout account is refused outright. That refusal exists in **that mode only**. Switch the site to PayPal (or to mock payments) and the order is no longer refused: it is taken against the *platform's* PayPal credentials, and seven invented shops with invented addresses start accepting real money from real people. Nothing warns you — the change is made in the Render dashboard, and the shops simply begin working.
+
+The seeding script checks the payment mode once, at the moment it runs, and refuses to seed in any other mode. It has no way to check again afterwards, and these rows are meant to stay up for months. `--clean` is the one action that removes the dependency. It needs no flag, works on production exactly as it does locally, and removes only rows whose id begins with `seed-bazaar-`.
+
 Have a great launch!

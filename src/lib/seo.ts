@@ -17,8 +17,10 @@ import { platformNameFromEnv } from './platform';
 // prove. A confident lie in structured data is worse than an omission — Google
 // checks the page against the claim, and a mismatch costs the rich result on
 // every event, not just the one that lied.
-import { getBaseUrl } from './config';
+import { getBaseUrl, getPaymentMode } from './config';
+import { paypalPayee } from './events';
 import type { EventRow, EventTierRow } from './events';
+import { effectivePayout } from './payout';
 import { readsAsComingSoon } from './ticketState';
 
 export const SITE_NAME = platformNameFromEnv();
@@ -105,6 +107,28 @@ export function machineDate(event: EventRow): string | null {
   return raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
 }
 
+/**
+ * Can a buyer actually pay for something on this listing?
+ *
+ * The same question POST /api/orders asks, in the same words, because the
+ * answer has to match: `mode === 'transfer' && !hasBankRoute && !hasPaypalRoute`
+ * is the branch that refuses the order, and effectivePayout() (not the raw
+ * columns) is what that branch reads, so a payout change still inside its
+ * waiting period is not counted as an account yet.
+ *
+ * In any other payment mode the platform's own credentials take the money, so a
+ * listing with no payout route of its own is still perfectly orderable — the
+ * seller simply has no way to be paid afterwards. That is a different problem
+ * and not one structured data should be lying about in either direction.
+ */
+function canTakePaidOrders(event: EventRow): boolean {
+  if (getPaymentMode() !== 'transfer') return true;
+  const payout = effectivePayout(event);
+  const hasBankRoute = Boolean(payout.iban.trim() && payout.holder.trim());
+  const hasPaypalRoute = paypalPayee({ paypalAccount: payout.paypal }) !== null;
+  return hasBankRoute || hasPaypalRoute;
+}
+
 export interface EventJsonLdInput {
   event: EventRow;
   tiers: EventTierRow[];
@@ -176,8 +200,24 @@ export function eventJsonLd({
   // tiers stay in the list marked SoldOut — dropping them would make a sold-out
   // event look merely priceless, and the marked-up state is what lets Google
   // stop advertising tickets nobody can buy.
-  if (tiers.length) {
-    data.offers = tiers.map((tier) => ({
+  //
+  // A PRICED tier on a listing with no payout route is a different case, and it
+  // gets no Offer at all. Checkout on such a listing refuses every order at the
+  // last step, so an Offer would be advertising a price nobody can pay — and
+  // there is no availability value that says so honestly. SoldOut is false
+  // (nothing is sold), PreOrder promises a checkout that opens later and none
+  // is scheduled, and InStock, which is what this used to emit for every
+  // published listing, is the outright lie. So the offer is omitted, exactly as
+  // machineDate() returns null rather than a guessed date and location is
+  // dropped rather than emitted as an empty shell: the rule at the top of this
+  // file is that a confident lie in structured data costs the rich result on
+  // EVERY listing on the domain, not just the one that lied.
+  //
+  // Free tiers survive the filter: a €0 booking never reaches the payout guard
+  // (see `isFree` in POST /api/orders), so it really can be reserved.
+  const offerableTiers = canTakePaidOrders(event) ? tiers : tiers.filter((t) => t.priceCents === 0);
+  if (offerableTiers.length) {
+    data.offers = offerableTiers.map((tier) => ({
       '@type': 'Offer',
       name: tier.name,
       price: (tier.priceCents / 100).toFixed(2),

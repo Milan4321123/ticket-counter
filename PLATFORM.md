@@ -17,6 +17,8 @@ Besides being simple, this keeps you out of dangerous territory: businesses that
 
 And since the platform charges nothing itself, there is no platform bank account anywhere in the system: **the organizers' own payout details are the only bank accounts the site knows about.**
 
+**One consequence to hold on to, if the example bazaar is up.** The site can publish seven *example shops* (`npm run seed:bazaar`) so a seller browsing `/market` sees a real-looking bazaar rather than an empty room. Those listings are published, priced and open for orders like any other; the only reason a buyer cannot be charged on them is that they have no payout account and the site runs in `PAYMENT_MODE=transfer`, where an order against a listing with no payout account is refused. **That refusal exists in transfer mode only.** So if the money model above ever changes — PayPal switched on, PayPal credentials added, `PAYPAL_ENV=live`, mock payments enabled — **take the example bazaar down first with `npm run seed:bazaar -- --clean`**, or seven invented shops with invented collection addresses quietly become genuinely orderable, against the platform's own PayPal account. The full note is in [GO-LIVE.md](GO-LIVE.md) §8 and in the header of `scripts/seed-bazaar.mjs`.
+
 ## 3. Onboarding a new organizer
 
 Most organizers apply through the site (section 8) — you approve the application and the site creates the account and emails the sign-in details. To create one by hand:

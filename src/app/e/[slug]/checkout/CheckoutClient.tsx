@@ -1366,9 +1366,21 @@ export default function CheckoutClient({
              buyer — with a message telling those buyers to contact the very
              person whose page it was. PayPal is a complete route on its own. */
           !transferConfigured && !paypalOffered ? (
+            /* Say what is true about THIS LISTING and stop there.
+               The old wording — "please check back soon or contact the
+               organizer" — made two promises this component cannot keep. It
+               promised the listing is about to start working, when nothing
+               here knows whether anyone will ever add a payout account; and it
+               sent the buyer after a person, when the reason there is no
+               payout account may be that there is nobody behind the page at
+               all (an abandoned draft that got published, a listing kept up as
+               an example). A buyer chasing a seller who does not exist is a
+               worse outcome than a buyer who simply knows this one cannot be
+               ordered from. The seller's own "ask a question" box is still on
+               the listing page for anyone who does want to reach them. */
             <div className="notice notice-error">
-              Payment is not set up yet, so orders cannot be placed right now. Please check back
-              soon or contact the organizer.
+              This {v.listing} has no payment details, so an order cannot be placed on it.
+              Nothing has been reserved and nothing can be charged.
             </div>
           ) : (
             <>
