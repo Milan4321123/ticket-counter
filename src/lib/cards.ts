@@ -231,6 +231,8 @@ export interface CardOrderRow {
   eventId: string;
   eventName: string;
   eventSlug: string;
+  /** The listing's own status — 'published' is the only one a stranger can open. */
+  eventStatus: string;
   eventKind: EventKind;
   whenDisplay: string;
   totalCents: number;
@@ -265,6 +267,7 @@ export function cardOrders(card: CustomerCardRow, limit = 50): CardOrderRow[] {
               o.event_id AS eventId,
               e.name AS eventName,
               e.slug AS eventSlug,
+              e.status AS eventStatus,
               e.kind AS eventKind,
               e.date_display AS whenDisplay,
               o.total_cents AS totalCents,
@@ -316,7 +319,13 @@ export interface CustomerCardView {
   orders: CardOrderRow[];
   /** Their referral code (their newest order's share code), or null if they have none. */
   referralCode: string | null;
-  /** The listing that code points at, so the code is something they can actually share. */
+  /**
+   * The listing that code points at, so the code is something they can actually
+   * share — null once that listing is no longer public, because a link (or a QR
+   * held up in front of a friend) that opens a not-found page is worse than no
+   * link at all. The CODE survives: it is the seller's to honour at any of
+   * their checkouts, and only the pointer went stale.
+   */
   referralSlug: string | null;
   rewards: ReferralProgress;
   /** Discount codes they are holding and have not spent. */
@@ -343,7 +352,9 @@ export function cardView(card: CustomerCardRow, sellerName: string): CustomerCar
     holderName: orders[0]?.buyerName ?? '',
     orders,
     referralCode: withCode?.shareCode ?? null,
-    referralSlug: withCode?.eventSlug ?? null,
+    // Same guard the order page puts on its own referral link and QR: only a
+    // PUBLISHED listing can be opened by the friend it is shown to.
+    referralSlug: withCode?.eventStatus === 'published' ? withCode.eventSlug : null,
     rewards: referralProgressFor(card.organizerId, card.email),
     vouchers: listUnredeemedVouchers(card.organizerId, card.email),
   };

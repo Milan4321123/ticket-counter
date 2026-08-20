@@ -170,7 +170,57 @@ export function returningBuyerCount(eventId: string, organizerId: string): numbe
   return row.n;
 }
 
-/** One referring buyer: how many confirmed bookings their shared link brought in. */
+/**
+ * What a buyer is called once lib/retention.ts has erased their details. The
+ * erased row keeps a placeholder NAME and ADDRESS in the database so the
+ * columns stay non-null; neither may ever reach a screen, so every read model
+ * here degrades to this one label instead. One constant, so the referrer
+ * summary and the chain underneath it can never anonymise people differently.
+ */
+const ANONYMOUS_BUYER = 'a past guest';
+
+/**
+ * One booking that arrived through somebody's link — a single link in the
+ * chain, as opposed to the totals in ReferrerRow.
+ */
+export interface ReferredBookingRow {
+  /** This listing's order, for a stable React key — never rendered. */
+  orderId: string;
+  /** The referred buyer's name, or the anonymous label once erased. */
+  name: string;
+  /** The day it was CONFIRMED ('YYYY-MM-DD'), falling back to when it was placed. */
+  confirmedOn: string;
+  /** What the booking was worth. */
+  totalCents: number;
+  /** Seats/items it brought — QR codes minted, one scan each. */
+  units: number;
+  /**
+   * How many confirmed bookings THIS PERSON went on to bring to this same
+   * listing — the depth of the chain, and 0 for almost everyone.
+   *
+   * Counted per BUYER, not per order: a repeat buyer's share link comes from
+   * their newest order, so the friends they bring arrive carrying that order's
+   * code while this row is some older order of theirs. Keying on one order's
+   * code showed exactly the people who refer most as "0 onward". It is the sum
+   * over every share_code that buyer owns with this seller, so both of their
+   * rows in one chain always read the same number.
+   *
+   * 0 for a buyer the retention sweep has erased: their address is a shared
+   * placeholder, and summing on it would merge every erased buyer into one
+   * imaginary, very busy person.
+   *
+   * Visibility only. It changes nobody's reward: a voucher is earned for
+   * DIRECT referrals and nothing else (see lib/referrals paidReferralSql), and
+   * the page that shows this number says so.
+   */
+  broughtOnward: number;
+}
+
+/**
+ * One referring BUYER: how many confirmed bookings their shared links brought
+ * in — every code they own with this seller summed into one row, because a
+ * repeat buyer mints a new share_code with every order and is still one person.
+ */
 export interface ReferrerRow {
   /** The referrer's display name, or 'a past guest' once retention erased them. */
   name: string;
@@ -178,11 +228,41 @@ export interface ReferrerRow {
   referredOrders: number;
   /** Seats/items those orders brought — QR codes minted, one scan each. */
   referredSeats: number;
+  /** WHO those bookings were, newest first — at most REFERRED_BOOKINGS_CAP of them. */
+  bookings: ReferredBookingRow[];
+  /**
+   * Bookings this row's totals count but the list above does not show. Never
+   * dropped silently: the page prints "and N more" so the table and the count
+   * beside the name cannot look like they disagree.
+   */
+  moreBookings: number;
 }
 
 /**
+ * The whole referral card for one listing: the referrers it lists, and how
+ * many it had to leave out.
+ *
+ * An object rather than a bare array because the cap has to be SAYABLE. This
+ * page is opened often and a popular listing can carry hundreds of referrers
+ * with a booking each; rendering all of them (and every booking under each)
+ * buries the summary an organizer came for and makes the DOM the slowest thing
+ * on the page. Truncating without saying so would instead be a quiet lie about
+ * who brought people.
+ */
+export interface ReferralChain {
+  referrers: ReferrerRow[];
+  /** Referrers the cap left out — 0 when the list is complete. */
+  moreReferrers: number;
+}
+
+/** How many referrers one card lists, and how many bookings under each. */
+export const REFERRER_LIST_CAP = 20;
+export const REFERRED_BOOKINGS_CAP = 10;
+
+/**
  * Who brought friends: confirmed bookings grouped by the referral code they
- * arrived with, resolved back to the referring buyer's name.
+ * arrived with, resolved back to the referring buyer — and then to the PERSON,
+ * so somebody who has bought twice is one row and not two.
  *
  * Counts what REALLY HAPPENED — confirmed, not test-mode — using the shared
  * fragment in lib/referrals.ts rather than a rule invented here. Deliberately
@@ -204,9 +284,29 @@ export interface ReferrerRow {
  * retention sweep has erased still shows their COUNT — the seats they brought
  * are the organizer's arithmetic — but as 'a past guest', because the person
  * is no longer identifiable and must stay that way.
+ *
+ * Each row also carries the CHAIN: the individual bookings behind its totals,
+ * so the organizer can see who a referrer actually brought and not just how
+ * many. Same listing, same rule, same anonymisation — it is the rows the
+ * counts were summed from, not a second, looser query.
+ *
+ * FOUR queries, whatever the numbers, and none of them per code. Resolving
+ * each referrer's name with its own lookup was an N+1 over orders.share_code
+ * — a full table scan each, on a page organizers open constantly — so the
+ * owners of every code on this listing are read in ONE grouped query, which
+ * doubles as the ownership map the onward counts are summed over.
  */
-export function topReferrers(eventId: string): ReferrerRow[] {
+export function topReferrers(eventId: string): ReferralChain {
   const db = getDb();
+  // The seller this listing belongs to. A code is spendable across all of
+  // their listings (see lib/referrals), so ownership is resolved at that
+  // scope — and never one step wider: another seller's buyers are their own
+  // business.
+  const owner = db
+    .prepare(`SELECT organizer_id AS organizerId FROM events WHERE id = ?`)
+    .get(eventId) as { organizerId: string } | undefined;
+  if (!owner) return { referrers: [], moreReferrers: 0 };
+
   const rows = db
     .prepare(
       `SELECT o.referred_by AS code,
@@ -217,35 +317,186 @@ export function topReferrers(eventId: string): ReferrerRow[] {
        WHERE o.event_id = ? AND ${confirmedReferralSql('o')}
          AND o.referred_by != ''
        GROUP BY o.referred_by
-       ORDER BY referredOrders DESC, referredSeats DESC`
+       ORDER BY referredOrders DESC, referredSeats DESC, code`
     )
     .all(eventId) as { code: string; referredOrders: number; referredSeats: number }[];
 
-  const nameOf = db.prepare(
-    `SELECT buyer_name AS name, buyer_erased_at AS erasedAt
-     FROM orders
-     WHERE share_code = ? AND share_code != '' AND status = 'paid'
-       AND event_id IN (
-         SELECT id FROM events
-         WHERE organizer_id = (SELECT organizer_id FROM events WHERE id = ?)
-       )
-     LIMIT 2`
-  );
-  return rows.map((r) => {
-    const referrers = nameOf.all(r.code, eventId) as {
-      name: string;
-      erasedAt: string | null;
-    }[];
-    // Exactly one un-erased match names a person; anything else — erased,
-    // vanished, a code from before share_code existed, or the (astronomically
-    // unlikely) duplicated code — stays a guest.
-    const referrer = referrers.length === 1 && !referrers[0].erasedAt ? referrers[0] : null;
-    return {
-      name: referrer?.name?.trim() || 'a past guest',
-      referredOrders: r.referredOrders,
-      referredSeats: r.referredSeats,
+  // WHO owns each of those codes, in one query instead of one per code.
+  // Grouped by the code so a duplicate can be SEEN rather than silently
+  // resolved to whichever row came back first: `owners` is how many paid
+  // orders of this seller carry it, and only exactly one names a person. The
+  // aggregates over name/email/erased are read only in that case, where each
+  // is simply that one row's value.
+  const ownerRows = db
+    .prepare(
+      `SELECT r.share_code AS code,
+              COUNT(*) AS owners,
+              MIN(r.buyer_name) AS name,
+              MIN(lower(r.buyer_email)) AS email,
+              MAX(CASE WHEN r.buyer_erased_at IS NULL THEN 0 ELSE 1 END) AS erased
+       FROM orders r
+       JOIN events re ON re.id = r.event_id
+       WHERE re.organizer_id = ?
+         AND r.status = 'paid'
+         AND r.share_code != ''
+         AND r.share_code IN (
+           SELECT o.referred_by FROM orders o
+           WHERE o.event_id = ? AND ${confirmedReferralSql('o')}
+             AND o.referred_by != ''
+         )
+       GROUP BY r.share_code`
+    )
+    .all(owner.organizerId, eventId) as {
+    code: string;
+    owners: number;
+    name: string;
+    email: string;
+    erased: number;
+  }[];
+  const ownerByCode = new Map(ownerRows.map((r) => [r.code, r]));
+
+  /** Exactly one un-erased paid order carries this code, so it names a person. */
+  const identified = (code: string) => {
+    const row = ownerByCode.get(code);
+    return row && row.owners === 1 && !row.erased ? row : null;
+  };
+
+  // One row per PERSON, not per code. A repeat buyer mints a fresh share_code
+  // with every order, so counting by code split one referrer into several
+  // part-rows — and left the "and brought N of their own" note below unable to
+  // agree with any of them. Their codes are summed into one row instead, which
+  // is also what makes that note reconcilable: the number under a chain entry
+  // is exactly the number beside that person's own row.
+  //
+  // A code with no identifiable owner — erased, vanished, duplicated, or
+  // carrying a blank address — is its own row and joins nobody. Merging on a
+  // shared erasure placeholder would build one imaginary, very busy person,
+  // which is the thing the erasure rule exists to prevent.
+  interface Group {
+    key: string;
+    codes: string[];
+    name: string;
+    email: string;
+    referredOrders: number;
+    referredSeats: number;
+  }
+  const groups = new Map<string, Group>();
+  for (const r of rows) {
+    const person = identified(r.code);
+    const email = person?.email || '';
+    const key = email ? `email:${email}` : `code:${r.code}`;
+    const g = groups.get(key) ?? {
+      key,
+      codes: [],
+      name: person?.name?.trim() || ANONYMOUS_BUYER,
+      email,
+      referredOrders: 0,
+      referredSeats: 0,
     };
-  });
+    g.codes.push(r.code);
+    g.referredOrders += r.referredOrders;
+    g.referredSeats += r.referredSeats;
+    groups.set(key, g);
+  }
+  // Biggest first, with the key as the last tiebreak so a cap cannot make the
+  // list jump about between two loads that are actually identical.
+  const ranked = [...groups.values()].sort(
+    (a, b) =>
+      b.referredOrders - a.referredOrders ||
+      b.referredSeats - a.referredSeats ||
+      a.key.localeCompare(b.key)
+  );
+
+  // How far the chain goes, PER PERSON — the same total their own row above
+  // shows, read by address so a chain entry can find it.
+  const onwardByPerson = new Map<string, number>();
+  for (const g of ranked) {
+    if (g.email) onwardByPerson.set(g.email, g.referredOrders);
+  }
+
+  // Only the referrers actually listed get their chain read: the rest are
+  // reported as a count, so there is nothing to show under them.
+  const listed = ranked.slice(0, REFERRER_LIST_CAP);
+  const codes = listed.flatMap((g) => g.codes);
+
+  // The chain itself: every confirmed booking that arrived through one of the
+  // listed codes, one row each — the same rows the totals query summed, read
+  // individually. Grouped by o.id so the LEFT JOIN onto tickets can count
+  // seats without fanning the money out: one order, one row, whatever its
+  // party size.
+  const bookingRows = codes.length
+    ? (db
+        .prepare(
+          `SELECT o.id AS orderId,
+                  o.referred_by AS code,
+                  o.buyer_name AS name,
+                  lower(o.buyer_email) AS email,
+                  o.buyer_erased_at AS erasedAt,
+                  date(COALESCE(o.paid_at, o.created_at)) AS confirmedOn,
+                  o.total_cents AS totalCents,
+                  COUNT(t.code) AS units
+           FROM orders o
+           LEFT JOIN tickets t ON t.order_id = o.id
+           WHERE o.event_id = ? AND ${confirmedReferralSql('o')}
+             AND o.referred_by IN (${codes.map(() => '?').join(',')})
+           GROUP BY o.id
+           ORDER BY confirmedOn DESC, o.id`
+        )
+        .all(eventId, ...codes) as {
+        orderId: string;
+        code: string;
+        name: string;
+        email: string;
+        erasedAt: string | null;
+        confirmedOn: string;
+        totalCents: number;
+        units: number;
+      }[])
+    : [];
+
+  // Which listed referrer each code belongs to, so one buyer's several codes
+  // pour into ONE chain — in the order the query returned them, which is
+  // newest first across all of them.
+  const groupOfCode = new Map<string, string>();
+  for (const g of listed) for (const code of g.codes) groupOfCode.set(code, g.key);
+
+  const chainByGroup = new Map<string, ReferredBookingRow[]>();
+  for (const b of bookingRows) {
+    const key = groupOfCode.get(b.code);
+    if (!key) continue;
+    const list = chainByGroup.get(key) ?? [];
+    chainByGroup.set(key, list);
+    // Past the cap the row is counted (moreBookings, below) and not built —
+    // the count beside the referrer's name still comes from the totals query,
+    // so nothing about the arithmetic changes here.
+    if (list.length >= REFERRED_BOOKINGS_CAP) continue;
+    list.push({
+      orderId: b.orderId,
+      // Erased first: the sweep leaves a placeholder NAME behind, and printing
+      // it would be worse than useless — it would look like a person.
+      name: b.erasedAt ? ANONYMOUS_BUYER : b.name?.trim() || ANONYMOUS_BUYER,
+      confirmedOn: b.confirmedOn,
+      totalCents: b.totalCents,
+      units: b.units,
+      // The PERSON's onward total, not this one order's. An erased buyer has
+      // no identity to sum on and stays at 0 — see ReferredBookingRow.
+      broughtOnward: b.erasedAt || !b.email ? 0 : onwardByPerson.get(b.email) ?? 0,
+    });
+  }
+
+  return {
+    referrers: listed.map((g) => {
+      const bookings = chainByGroup.get(g.key) ?? [];
+      return {
+        name: g.name,
+        referredOrders: g.referredOrders,
+        referredSeats: g.referredSeats,
+        bookings,
+        moreBookings: Math.max(0, g.referredOrders - bookings.length),
+      };
+    }),
+    moreReferrers: ranked.length - listed.length,
+  };
 }
 
 /**

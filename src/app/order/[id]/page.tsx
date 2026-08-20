@@ -20,7 +20,7 @@ import { formatMoney } from '@/lib/money';
 import { getBaseUrl } from '@/lib/config';
 import { getOrder, getOrderItems, getTicketsForOrder, paymentReference, referralCode } from '@/lib/orders';
 import { orderPayout } from '@/lib/payout';
-import { referralProgressFor } from '@/lib/referrals';
+import { referralProgressFor, referralRewardsReachable } from '@/lib/referrals';
 import { paymentQrDataUrl } from '@/lib/paymentQr';
 import { machineDate } from '@/lib/seo';
 import { ticketQrDataUrl } from '@/lib/tickets';
@@ -620,6 +620,25 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         )
       : null;
 
+  // The same invitation as a QR, for the times a link cannot be sent: hold the
+  // phone up, a friend scans it, and they are on the listing with this buyer's
+  // referral code already attached.
+  //
+  // WHY THIS IS A SECOND, SEPARATE QR and not the ones on the tickets below: a
+  // ticket QR encodes a TICKET CODE, which is a private, single-use identifier
+  // — the seller scans it at the door, and anybody who photographs it can walk
+  // in on this buyer's seat. This one encodes nothing but a PUBLIC URL that
+  // anyone may open. One is an identifier to guard, the other is an invitation
+  // to broadcast, so they can never be the same image, and the labels on the
+  // page say which is which.
+  //
+  // Only on a published listing with a code to carry — a QR pointing at a page
+  // nobody else can open, or carrying no referral at all, is not worth showing.
+  const referralQr =
+    refCode && shareEventUrl && event && event.status === 'published'
+      ? await ticketQrDataUrl(shareEventUrl)
+      : null;
+
   // What the link above has actually earned this buyer, when the organizer has
   // switched referral rewards on. Nothing new appears on the page when they
   // have not — an unasked-for promise is worse than silence.
@@ -631,12 +650,14 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   //
   // And only where the promise can actually come true. This buyer's share link
   // points at THIS listing, and a referral is counted on the order it brings
-  // here — so on a listing where nothing costs money, no booking it brings can
-  // ever be "actually paid for" and the counter would sit at zero for good.
-  // Rewards are an ACCOUNT setting, so an organizer with one paid listing and
-  // one free one would otherwise promise every RSVP guest something the rules
-  // can never give them.
-  const rewardsReachable = orderTiers.some((t) => t.priceCents > 0);
+  // here — so on a listing where nothing a buyer can buy costs money, no
+  // booking it brings can ever be "actually paid for" and the counter would sit
+  // at zero for good. Rewards are an ACCOUNT setting, so an organizer with one
+  // paid listing and one free one would otherwise promise every RSVP guest
+  // something the rules can never give them. Same function as the public
+  // listing page asks, so the offer somebody read before booking and the
+  // progress they read after it are decided by one rule.
+  const rewardsReachable = referralRewardsReachable(orderTiers);
   const rewards =
     event && !order.buyerErasedAt && rewardsReachable
       ? referralProgressFor(event.organizerId, order.buyerEmail)
@@ -697,6 +718,42 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           </a>
         </p>
       )}
+
+      {/* The share button's other half, for when you are standing next to the
+          person instead of messaging them. Deliberately labelled against the
+          ticket QRs further down — see the comment where referralQr is built:
+          one of these images is a private identifier, the other is a public
+          invitation, and a buyer must never have to guess which. */}
+      {referralQr && shareEventUrl ? (
+        <div className="card anim-fade-up anim-d1 no-print">
+          <div className="card-title">Your referral QR — for your friends to scan</div>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={referralQr}
+              alt="QR code that opens this listing with your referral link"
+              width={180}
+              height={180}
+              style={{ borderRadius: 12 }}
+            />
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <p className="muted small" style={{ marginTop: 0 }}>
+                Hold your phone up and a friend scans this with their camera. It opens{' '}
+                {event ? event.name : `this ${v.listing}`} with your referral link already on it, so{' '}
+                {sellerName} can see that you brought them.
+              </p>
+              <p className="muted small" style={{ margin: 0 }}>
+                Safe to show anyone: it carries a public link and nothing about you or this order.
+                Your {v.codes} below are the opposite — those QR codes are yours alone, they are
+                what gets scanned at {v.where}, and each one works exactly once.
+              </p>
+              <p className="mono small muted" style={{ margin: '8px 0 0', wordBreak: 'break-all' }}>
+                {shareEventUrl}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* The other half of that share button: what it has actually brought,
           and what it has earned. Shown ONLY when the organizer rewards

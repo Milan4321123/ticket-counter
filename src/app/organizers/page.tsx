@@ -39,6 +39,7 @@ const INCLUDED: string[] = [
   'Sold-out waitlist',
   'Table & group bookings',
   'Announcements to opted-in fans',
+  'Referral rewards you set yourself',
   'AI page designer',
   'AI question assistant, 24/7',
   'Automatic payment reminders',
@@ -258,8 +259,13 @@ export default function OrganizersPage() {
                   tickets, check-ins, and who keeps coming back.
                 </FeatPoint>
                 <FeatPoint>
-                  <strong>Referrals and your fan list</strong> — see whose shared links
-                  brought friends, and who opted in to hear about your next event.
+                  <strong>The referral chain, name by name</strong> — open a referrer and
+                  see the bookings they brought, each one saying how many that guest went on
+                  to bring in turn.
+                </FeatPoint>
+                <FeatPoint>
+                  <strong>Your fan list</strong> — everyone who opted in to hear about your
+                  next event.
                 </FeatPoint>
               </ul>
             </div>
@@ -291,6 +297,87 @@ export default function OrganizersPage() {
               <Link href="/contact?intent=account" className="btn btn-brand btn-lg">
                 Get started
               </Link>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ---- Reward the people who bring friends ----
+           The feature tour shows referrals as something to LOOK at; this is the
+           half an organizer can switch on, and it was previously mentioned
+           nowhere on the page they read before applying. Placed here, after the
+           tour, because it only makes sense once you know what a listing and an
+           order are — and it is the one feature on this page where the word
+           "discount" appears, so it says whose money it is in the first line. */}
+      <section className="section">
+        <div className="container container-narrow">
+          <p className="feed-kicker anim-fade-up">Word of mouth</p>
+          <h2 className="feed-section-title anim-fade-up">Reward the people who bring friends</h2>
+          <p className="muted anim-fade-up" style={{ marginTop: -6 }}>
+            Every buyer gets their own share link. If you want to thank the ones whose link
+            actually brings people, switch rewards on and say what the thank-you is — it is your
+            own discount on your own prices, and we take nothing out of it.
+          </p>
+          <div className="card anim-fade-up anim-d1">
+            <ul className="check-list" style={{ margin: 0 }}>
+              <li className="check-item">
+                <span className="check-dot check-dot-done">&#10003;</span>
+                <span>
+                  <strong>You set two numbers.</strong> How many confirmed, paid bookings someone
+                  has to bring, and what one voucher is worth. Nothing else to configure — and
+                  leaving <em>both</em> empty switches the whole thing off again.
+                </span>
+              </li>
+              <li className="check-item">
+                <span className="check-dot check-dot-done">&#10003;</span>
+                <span>
+                  <strong>It is your discount, on your prices.</strong> A voucher means that buyer
+                  transfers you less next time. No money moves through us, we never fund a voucher
+                  and we never take a cut of one — the platform is free, and it stays out of this
+                  entirely.
+                </span>
+              </li>
+              <li className="check-item">
+                <span className="check-dot check-dot-done">&#10003;</span>
+                <span>
+                  <strong>Only real bookings count.</strong> A booking counts once you have
+                  confirmed the payment — a reservation waiting for money, a test order, a free
+                  reservation and a booking one of your own codes already part-paid never earn
+                  anyone the next voucher. Nobody can loop a voucher into another voucher.
+                </span>
+              </li>
+              <li className="check-item">
+                <span className="check-dot check-dot-done">&#10003;</span>
+                <span>
+                  <strong>Your buyers see the offer where they are looking.</strong> Switch it on
+                  and the offer appears on your listing page in your own numbers, so people
+                  browsing know about it before they book. After they book, their own link, their
+                  progress and their vouchers are on their order page — and we email them the
+                  moment one is earned.
+                </span>
+              </li>
+              <li className="check-item">
+                <span className="check-dot check-dot-done">&#10003;</span>
+                <span>
+                  <strong>Counted across your listings, from the day you promise it.</strong>{' '}
+                  Someone who brought two friends to one night and three to the next has brought
+                  five. Referrals from before you switched rewards on do not suddenly owe anybody a
+                  pile of vouchers, and a voucher already earned is never taken away.
+                </span>
+              </li>
+              <li className="check-item">
+                <span className="check-dot check-dot-done">&#10003;</span>
+                <span>
+                  <strong>The switch lives in your portal, under Settings.</strong> Change the
+                  numbers or turn it off whenever you like. Vouchers are typed into the same
+                  discount-code box at checkout, each works once, and none of them expires.
+                </span>
+              </li>
+            </ul>
+            <p className="muted small" style={{ margin: '14px 0 0' }}>
+              One honest limit: a listing where nothing costs money never shows the offer, because
+              a free reservation can never be a booking that was &ldquo;actually paid for&rdquo; —
+              so there would be no way to earn the voucher we had just promised.
             </p>
           </div>
         </div>

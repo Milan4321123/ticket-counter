@@ -694,6 +694,14 @@ function migrateToPlatform(db: Database.Database): void {
   if (!orderCols.includes('share_code')) {
     db.exec(`ALTER TABLE orders ADD COLUMN share_code TEXT NOT NULL DEFAULT ''`);
   }
+  // A code is looked UP far more often than it is minted: every checkout that
+  // arrives with a ?ref= resolves it (lib/orders, lib/referrals), and the
+  // Insights referral card resolves every code on the listing at once. Without
+  // this, each of those is a full scan of orders — the one table that grows
+  // forever. Not UNIQUE: nothing in the schema promises two rows cannot share
+  // a code, and the readers deliberately treat a duplicate as "names nobody"
+  // rather than trusting an index to have made it impossible.
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_orders_share_code ON orders(share_code)`);
 
   // Whether the public page counts down the remaining tickets.
   //

@@ -52,7 +52,10 @@ export default async function PortalInsightsPage({ params }: { params: Promise<{
   // carried it. Counts only confirmed, not-unsubscribed addresses — a pending
   // request is not a subscriber.
   const subscribers = activeConsentCount(organizer.id);
-  const referrers = topReferrers(event.id);
+  // The biggest referrers, plus how many did not fit — see ReferralChain for
+  // why the card is capped and why the leftovers are said out loud.
+  const chain = topReferrers(event.id);
+  const referrers = chain.referrers;
   // Rewards are an ACCOUNT setting and vouchers are earned across all of this
   // organizer's listings, so both are read per organizer — the table above is
   // this listing only, and the copy says so.
@@ -221,8 +224,8 @@ export default async function PortalInsightsPage({ params }: { params: Promise<{
             <p className="muted small" style={{ marginTop: 0 }}>
               Buyers whose shared link brought in a booking you have{' '}
               <strong>confirmed</strong> — test orders are never counted, and free reservations are
-              counted here as the bookings they are. Buyers erased by the privacy sweep show as
-              &ldquo;a past guest&rdquo;.
+              counted here as the bookings they are. Open a name to see exactly who they brought.
+              Buyers erased by the privacy sweep show as &ldquo;a past guest&rdquo;.
               {rewards.enabled ? (
                 <>
                   {' '}
@@ -299,26 +302,90 @@ export default async function PortalInsightsPage({ params }: { params: Promise<{
                 listing: an empty table under a filled-in voucher summary would
                 read as a bug rather than as "not yet". */}
             {referrers.length > 0 && (
-              <div className="table-wrap">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Referrer</th>
-                      <th>Orders brought</th>
-                      <th>{v.Units} brought</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {referrers.map((r, i) => (
-                      <tr key={`${r.name}-${i}`}>
-                        <td>{r.name}</td>
-                        <td>{r.referredOrders}</td>
-                        <td>{r.referredSeats}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                {/* One line per referrer, opening into the actual chain on
+                    demand. A table of everyone's referred bookings all at once
+                    would bury the summary an organizer opens this card for —
+                    and most rows have one booking under them, which is not
+                    worth a screen of table. */}
+                <div style={{ display: 'grid', gap: 2 }}>
+                  {referrers.map((r, i) => (
+                    <details
+                      key={`${r.name}-${i}`}
+                      style={{ borderTop: '1px solid var(--border-soft)', padding: '8px 0' }}
+                    >
+                      <summary style={{ cursor: 'pointer' }}>
+                        <strong>{r.name}</strong>
+                        <span className="muted small">
+                          {' '}
+                          — {r.referredOrders} booking{r.referredOrders === 1 ? '' : 's'} ·{' '}
+                          {r.referredSeats} {r.referredSeats === 1 ? v.unit : v.units}
+                        </span>
+                      </summary>
+                      <div className="table-wrap" style={{ marginTop: 10 }}>
+                        <table className="table">
+                          <thead>
+                            <tr>
+                              <th>Who they brought</th>
+                              <th>Confirmed</th>
+                              <th>Worth</th>
+                              <th>{v.Units}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {r.bookings.map((b) => (
+                              <tr key={b.orderId}>
+                                <td>
+                                  {b.name}
+                                  {/* The chain going one step deeper. Said, not
+                                      paid for: the reward rule is unchanged
+                                      (direct referrals only), and the note
+                                      under this list says so in as many
+                                      words. */}
+                                  {b.broughtOnward > 0 && (
+                                    <span className="muted small">
+                                      {' '}
+                                      — and brought {b.broughtOnward} of their own
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="small">{b.confirmedOn}</td>
+                                <td>{formatMoney(b.totalCents, event.currency)}</td>
+                                <td>{b.units}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        {/* Never truncated in silence: the count beside the
+                            name is the whole total, so a shorter table under
+                            it has to say what it left out. */}
+                        {r.moreBookings > 0 && (
+                          <p className="muted small" style={{ margin: '8px 0 0' }}>
+                            and {r.moreBookings} more booking{r.moreBookings === 1 ? '' : 's'} not
+                            listed here — the newest {r.bookings.length} are shown.
+                          </p>
+                        )}
+                      </div>
+                    </details>
+                  ))}
+                </div>
+                {chain.moreReferrers > 0 && (
+                  <p className="muted small" style={{ margin: '10px 0 0' }}>
+                    and {chain.moreReferrers} more{' '}
+                    {chain.moreReferrers === 1 ? 'person who brought' : 'people who brought'} someone
+                    — the {referrers.length} who brought the most are shown.
+                  </p>
+                )}
+                <p className="muted small" style={{ margin: '12px 0 0' }}>
+                  Someone who was brought here can bring people themselves, and where that has
+                  happened their row says so — they also have a row of their own in this list, with
+                  their bookings under it. That is the chain, and it is only ever something to
+                  see: {rewards.enabled ? 'a voucher is earned for' : 'if you switch rewards on, a voucher is earned for'}{' '}
+                  <strong>direct referrals only</strong>, so bringing someone who then brings two
+                  more earns you one referral, not three. Nothing deeper down the chain pays anyone
+                  anything.
+                </p>
+              </>
             )}
           </div>
         )}

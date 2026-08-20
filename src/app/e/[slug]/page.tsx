@@ -40,7 +40,13 @@ import { getAvailability } from '@/lib/inventory';
 import { runWaitlistNotifySweep } from '@/lib/waitlist';
 import WaitlistForm from '@/components/WaitlistForm';
 import { ticketState, fromPriceCents, visibleTiers, comingSoonLabel } from '@/lib/ticketState';
+import { platformName } from '@/lib/platform';
 import { currentOrganizer, getOrganizer } from '@/lib/organizers';
+import {
+  getReferralRewardSettings,
+  organizerCurrency,
+  referralRewardsReachable,
+} from '@/lib/referrals';
 import { formatMoney } from '@/lib/money';
 import {
   SITE_NAME,
@@ -551,6 +557,31 @@ export default async function EventPage({ params, searchParams }: Params) {
   // putting the event on, and Google attributes the event to them.
   const organizer = getOrganizer(event.organizerId);
   const organizerDisplayName = organizer?.name?.trim() || 'the organizer';
+
+  // ---------------- The seller's referral offer ----------------
+  //
+  // Once the seller has switched rewards on, the offer belongs on the page
+  // people are BROWSING — until now it only appeared on the order page, so the
+  // only people who ever heard about it were the ones who had already bought.
+  //
+  // Null — and nothing renders — in two cases, both of them promises this page
+  // must not make:
+  //   - rewards are off, so there is no offer to describe;
+  //   - nothing a buyer can actually buy here costs money. A referral only
+  //     earns a voucher when the booking it brought was ACTUALLY PAID FOR
+  //     (lib/referrals paidReferralSql), so on a free RSVP listing no link
+  //     anyone shares here can ever qualify. referralRewardsReachable is the
+  //     SAME function the progress card on the order page asks — one rule, so
+  //     the page somebody browses and the page they land on after booking
+  //     cannot promise different things.
+  // The amount is the seller's own money in the seller's own currency; the
+  // platform is not part of the offer and the copy below says so.
+  const referralRewards = getReferralRewardSettings(event.organizerId);
+  const referralOffer =
+    referralRewards.enabled && referralRewardsReachable(tiers)
+      ? { settings: referralRewards, currency: organizerCurrency(event.organizerId) }
+      : null;
+
   const socialImageUrl = socialImage(event);
   const eventLd = eventJsonLd({
     event,
@@ -1206,6 +1237,34 @@ export default async function EventPage({ params, searchParams }: Params) {
               </li>
             ))}
           </ol>
+
+          {/* The seller's own thank-you for bringing friends, placed at the END
+              of "how it works" rather than up beside the prices: it is
+              something that happens AFTER a booking, and a discount on a
+              future order has no business competing with what someone came
+              here to buy. Quiet card, same width as the steps above it. */}
+          {referralOffer && (
+            <div className="card" style={{ maxWidth: 680, marginTop: 18 }}>
+              <div className="card-title">Bring a friend, and {organizerDisplayName} says thank you</div>
+              <p className="muted small" style={{ marginTop: 0, marginBottom: 0 }}>
+                Book here and you get your own link to share. When{' '}
+                {referralOffer.settings.threshold === 1
+                  ? 'a friend books'
+                  : `${referralOffer.settings.threshold} friends book`}{' '}
+                through it and{' '}
+                {referralOffer.settings.threshold === 1 ? 'that booking is' : 'those bookings are'}{' '}
+                confirmed as paid, {organizerDisplayName} gives you{' '}
+                <strong>
+                  {formatMoney(referralOffer.settings.rewardCents, referralOffer.currency)} off
+                </strong>{' '}
+                your next booking with them. It is their own discount on their own prices — you
+                simply pay them less next time, and none of it passes through {platformName()}. Only
+                bookings {organizerDisplayName} has confirmed as paid count, and the link is yours
+                once you have booked.
+              </p>
+            </div>
+          )}
+
           <div className="event-closing-actions">
             {canBuy ? (
               <Link href={checkoutHref} className="btn btn-primary btn-lg">

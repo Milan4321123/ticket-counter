@@ -11,13 +11,16 @@
 // takes a cut of any of this money, and owes nobody anything — nothing here
 // may ever be read as the platform paying for a reward.
 //
-// Deliberately imports lib/db and nothing else. lib/orders.ts calls INTO this
-// module (to claim and release vouchers while an order is being written), so a
-// static import of lib/email.ts here would close the loop
+// Deliberately imports lib/db and lib/ticketState and nothing else at runtime
+// (ticketState is pure and reaches no further than lib/vocab). lib/orders.ts
+// calls INTO this module (to claim and release vouchers while an order is being
+// written), so a static import of lib/email.ts here would close the loop
 // orders -> referrals -> email -> orders at module-load time; the one function
 // that emails reaches for it with a dynamic import instead.
 import crypto from 'crypto';
 import { getDb } from './db';
+import type { EventTierRow } from './events';
+import { visibleTiers } from './ticketState';
 
 // ---------------- What counts as a referral (the ONE rule) ----------------
 
@@ -79,6 +82,30 @@ export function countsAsPaidReferral(order: {
     order.totalCents > 0 &&
     !(order.voucherCode || '').trim()
   );
+}
+
+/**
+ * Could a referral to THIS listing ever earn a voucher? The ONE test behind
+ * every surface that advertises the offer — the public listing page and the
+ * buyer's own order page — so the two cannot advertise different things.
+ *
+ * Rewards are an ACCOUNT setting, but the promise is read on one listing at a
+ * time, and paidReferralSql only counts a booking that was actually paid for.
+ * So on a listing where a buyer cannot spend money, no link shared from it can
+ * ever qualify, and the offer must not appear at all.
+ *
+ * Reads the tiers a BUYER can see — the same visible set the page prices
+ * itself from (see ticketState visibleTiers/fromPriceCents) — and not every
+ * row in the table. A hidden tier is not on the page, cannot be put in a
+ * basket, and is often exactly the leftover of last season's paid ticket kept
+ * for next time; counting it made a free RSVP listing advertise a thank-you no
+ * booking on it could earn. A merely announced tier does count: it is a real,
+ * priced thing this listing will sell, and blinking the offer out until the
+ * early bird opens would take the offer away precisely while people are
+ * sharing the page.
+ */
+export function referralRewardsReachable(tiers: EventTierRow[]): boolean {
+  return visibleTiers(tiers).some((t) => t.priceCents > 0);
 }
 
 // ---------------- The organizer's setting ----------------

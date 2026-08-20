@@ -131,6 +131,17 @@ export default function ReferralRewardsCard({ initialThreshold, initialRewardCen
         your listings, so somebody who brings two friends to one and three to the next has brought
         five.
       </p>
+      {/* Switching this on CHANGES A PUBLIC PAGE, so it is said here rather
+          than discovered later: the offer shows up on the listing itself, in
+          these numbers. Not on a listing where everything is free — no booking
+          it brings could ever be "actually paid", so the offer would be a
+          promise the rule above can never keep. */}
+      <p className="muted small" style={{ marginTop: 0 }}>
+        While this is on, your buyers are <strong>told about it on your listing page</strong>, in
+        these numbers — so people browsing know before they book, not just after. The one exception
+        is a listing where nothing costs money: no booking it brings can ever be &ldquo;actually
+        paid&rdquo;, so the offer stays off it rather than promising something unreachable.
+      </p>
       <p className="muted small" style={{ marginTop: 0 }}>
         Counting starts <strong>the day you switch this on</strong> — referrals from before that
         earn nothing, so turning rewards on never lands you with a pile of vouchers for bookings you

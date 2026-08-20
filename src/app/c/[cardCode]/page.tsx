@@ -55,10 +55,27 @@ export default async function CustomerCardPage({ params, searchParams }: Params)
   const sp = await searchParams;
   const confirming = (Array.isArray(sp.close) ? sp.close[0] : sp.close) === '1';
 
+  // Null unless there is a code AND a listing a stranger can actually open —
+  // cardView withholds the slug once the seller unpublishes (see there), so the
+  // link and the QR below both disappear together rather than sending a friend
+  // to a not-found page.
   const shareUrl =
     view.referralCode && view.referralSlug
       ? `${getBaseUrl()}/e/${view.referralSlug}?ref=${view.referralCode}`
       : null;
+
+  // This page carries TWO QR codes, and they mean opposite things.
+  //
+  // The one above encodes the CARD CODE: a private identifier, the 24 random
+  // characters that are also the secret in this page's URL. It exists for the
+  // seller to scan at the counter, and anybody who photographs it can open
+  // this card — so it must never be the thing held up to strangers.
+  //
+  // This one encodes a PUBLIC URL: the seller's listing with this holder's
+  // referral code on it. It is an invitation, meant to be shown to anyone, and
+  // it says nothing about who is holding it. Same helper, deliberately two
+  // images, each labelled with who is supposed to scan it.
+  const shareQr = shareUrl ? await ticketQrDataUrl(shareUrl) : null;
 
   const heldSince = card.createdAt.slice(0, 10);
 
@@ -94,14 +111,16 @@ export default async function CustomerCardPage({ params, searchParams }: Params)
       </div>
 
       <div className="card anim-fade-up anim-d1" style={{ textAlign: 'center' }}>
+        <div className="card-title">Your card QR — for {sellerName} to scan</div>
         {/* Same QR helper the tickets use — one image, one meaning: this code
             says who is standing there, and nothing more. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={qr} alt="QR code for your customer card" width={260} height={260} />
         <div className="ticket-code mono">{card.cardCode}</div>
         <p className="muted small" style={{ margin: '10px 0 0' }}>
-          This QR is your card. It carries this code and nothing else — not your name, not your
-          email, nothing about you. Only {sellerName} can look it up.
+          This QR is your card, and it is for {sellerName} at {v.where} — not for your friends. It
+          carries this code and nothing else — not your name, not your email, nothing about you.
+          Only {sellerName} can look it up.
         </p>
       </div>
 
@@ -117,6 +136,39 @@ export default async function CustomerCardPage({ params, searchParams }: Params)
               {shareUrl ? (
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
                   <CopyButton value={shareUrl} label="Copy your link" />
+                </div>
+              ) : null}
+              {/* The invitation, as something a friend standing next to you can
+                  simply scan. Labelled against the card QR at the top of the
+                  page on purpose — see the comment where shareQr is built. */}
+              {shareQr ? (
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 14,
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    marginTop: 14,
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={shareQr}
+                    alt="QR code that opens the seller's listing with your referral link"
+                    width={160}
+                    height={160}
+                    style={{ borderRadius: 12 }}
+                  />
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <p style={{ margin: 0, fontWeight: 600 }}>
+                      Your referral QR — for your friends to scan
+                    </p>
+                    <p className="muted small" style={{ margin: '6px 0 0' }}>
+                      Hold it up and they scan it with their camera: it opens {sellerName}&rsquo;s{' '}
+                      {v.listing} with your link already on it. Safe to show anyone — it is a public
+                      link, and unlike the QR at the top of this page it says nothing about you.
+                    </p>
+                  </div>
                 </div>
               ) : null}
             </>
