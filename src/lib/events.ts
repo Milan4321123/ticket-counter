@@ -33,6 +33,12 @@ export interface EventRow {
    * '' on every event, and on rows written before the column existed.
    */
   pickupInfo: string;
+  /**
+   * Shops only: which shelf of the /market bazaar this shop sits on — a key
+   * from lib/categories.ts, whitelisted on write. '' means uncategorised
+   * (always legal), and is what every event and every pre-column row carries.
+   */
+  category: string;
   address: string;
   city: string;
   currency: string;
@@ -202,6 +208,7 @@ const EVENT_COLS = `
   event_date AS eventDate,
   venue_name AS venueName,
   pickup_info AS pickupInfo,
+  category,
   address,
   city,
   currency,
@@ -258,6 +265,7 @@ function rowToEvent(row: Record<string, unknown> | undefined): EventRow | null {
     // to what those rows have always meant: an event, with nothing to collect.
     kind: asEventKind(row.kind),
     pickupInfo: (row.pickupInfo as string | null) ?? '',
+    category: (row.category as string | null) ?? '',
     // Added by migration, and a free-text column, so anything unrecognised
     // falls back to the wording that is always safe to show.
     whatsapp: (row.whatsapp as string | null) ?? '',

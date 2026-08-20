@@ -18,6 +18,7 @@ import {
   type TierStatus,
   FOCUS_RE,
 } from '@/lib/events';
+import { isShopCategory } from '@/lib/categories';
 import { readJsonLimited, BodyTooLargeError } from '@/lib/http';
 import { organizerTotpEnabled } from '@/lib/organizerTotp';
 import {
@@ -301,6 +302,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const v = strField(body.pickupInfo, 'The collection details', MAX_PICKUP_INFO);
       set('pickup_info', v);
       merged.pickupInfo = v;
+    }
+    // The bazaar shelf a shop sits on. A closed list, not free text: /market
+    // groups by this, and grouping only works when the values are shared — so
+    // anything not on the list (except '', "not picked", which is always legal)
+    // is refused rather than stored. Like pickupInfo above, not gated on kind.
+    if ('category' in body) {
+      const v = strField(body.category, 'The shop category', 40);
+      need(v === '' || isShopCategory(v), 'Please pick a category from the list.');
+      set('category', v);
+      merged.category = v;
     }
     if ('address' in body) {
       const v = strField(body.address, 'The address', 240);

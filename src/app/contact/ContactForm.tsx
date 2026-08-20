@@ -290,7 +290,7 @@ export default function ContactForm({ contactEmail, intent = 'custom-design' }: 
 
       <div className="field">
         <label htmlFor="contact-message">
-          {wantsAccount ? 'Tell us about your event' : 'What would you like?'}
+          {wantsAccount ? 'Tell us about your event or shop' : 'What would you like?'}
         </label>
         <textarea
           id="contact-message"
@@ -301,14 +301,14 @@ export default function ContactForm({ contactEmail, intent = 'custom-design' }: 
           maxLength={2000}
           placeholder={
             wantsAccount
-              ? 'For example: we run a Nepali cultural night in Frankfurt twice a year and we want to sell tickets online instead of collecting cash at the door. We usually have two singers and a dance group, tickets around €20, and a student price. This is our fourth one.'
+              ? 'For example: we run a Nepali cultural night in Frankfurt twice a year and we want to sell tickets online instead of collecting cash at the door. Or: I make momo and sweets at home in Munich — people order ahead and pick them up from me on Saturdays.'
               : 'For example: a custom-designed event page for our autumn concert, a landing page for a two-day festival, sponsor logos across the top, help importing our photos and videos…'
           }
           style={{ resize: 'vertical', fontFamily: 'inherit' }}
         />
         <p className="muted small" style={{ margin: '6px 0 0' }}>
           {wantsAccount
-            ? 'Who you are, what you are putting on, and anything that helps us see it is real — a few sentences is plenty. A person reads this, and if it all looks right we set your account up and email you the sign-in details.'
+            ? 'Who you are, what you are putting on — or, for a shop, what you sell, where you are, and how people collect their orders — and anything that helps us see it is real. A few sentences is plenty. A person reads this, and if it all looks right we set your account up and email you the sign-in details.'
             : 'Dates, budget, and a link to anything you like the look of all help — but a couple of sentences is a perfectly good start.'}
         </p>
       </div>

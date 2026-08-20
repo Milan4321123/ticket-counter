@@ -39,23 +39,23 @@ export default async function ContactPage({
       <section className="feed-hero" style={{ padding: '64px 0 36px' }}>
         <div className="container">
           <p className="feed-kicker anim-fade-up">
-            {wantsAccount ? 'Start selling tickets' : 'Custom page design'}
+            {wantsAccount ? 'Start selling here' : 'Custom page design'}
           </p>
           <h1 className="anim-fade-up anim-d1" style={{ fontSize: 'clamp(1.9rem, 4.4vw, 3rem)' }}>
-            {wantsAccount ? 'Tell us about your event' : "We'll design your page for you"}
+            {wantsAccount ? 'Tell us about your event or shop' : "We'll design your page for you"}
           </h1>
           {wantsAccount ? (
             <>
               <p className="feed-hero-sub anim-fade-up anim-d2" style={{ marginBottom: 0 }}>
-                Every event on this site started exactly here: a few sentences in this form.
-                There is no signup button — tell us what you are putting on, a real person
-                reads it, and if it all looks right we set your account up and email you your
-                sign-in details.
+                Every event and every shop on this site started exactly here: a few sentences
+                in this form. There is no signup button — tell us what you are putting on, or
+                what you sell, a real person reads it, and if it all looks right we set your
+                account up and email you your sign-in details.
               </p>
               <p className="feed-hero-sub anim-fade-up anim-d2" style={{ marginTop: 14 }}>
-                The account is free, publishing is free, and we never take a cut of your ticket
+                The account is free, publishing is free, and we never take a cut of your
                 sales. Nothing to pay at all, and no payment details to enter — just the story
-                of your event.
+                of your event or shop.
               </p>
 
               {/* A way back OUT of the form. Someone who arrived here from a
@@ -139,7 +139,7 @@ export default async function ContactPage({
               style={{ textAlign: 'center', margin: '0 0 18px' }}
             >
               {wantsAccount
-                ? 'Everything below is optional except your name, email, and a few words about the event — a rough answer is better than none. The account is free, and so is publishing.'
+                ? 'Everything below is optional except your name, email, and a few words about your event or shop — a rough answer is better than none. The account is free, and so is publishing.'
                 : 'The standard self-service page is free and already included — this is for when you want more than that.'}
             </p>
 

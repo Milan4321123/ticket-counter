@@ -120,6 +120,11 @@ function faqs(anyPaypal: boolean) {
       'No. Show the QR code on your phone at the door and it gets scanned once per ticket. Paper works just as well if you would rather bring it printed.',
   },
   {
+    question: 'Can I order food or goods here, not just tickets?',
+    answer:
+      'Yes — alongside the events there is a bazaar of shops run by Nepali sellers: momo to pre-order, sweets, crafts and more. Ordering works just like tickets: pick what you want, pay that seller directly with your personal reference, and a QR collection code arrives by email. Show it when you pick your order up — one scan, and the goods are yours. Browse every shop by category at /market.',
+  },
+  {
     question: 'Who am I actually buying from?',
     answer:
       `The organizer of that particular event. They set the prices, receive the payment in their own account, issue the tickets and run the door. ${platformNameFromEnv()} is the platform they use to sell — every event page names the organizer behind it.`,
@@ -160,6 +165,9 @@ interface Row {
   title: string;
   events: EventRow[];
   past?: boolean;
+  /** A quiet "see all of these" link beside the heading, for rows that are a
+      taste of a fuller page rather than the whole list. */
+  more?: { href: string; label: string };
 }
 
 /**
@@ -242,6 +250,10 @@ function buildRows(listings: EventRow[]): Row[] {
       kicker: 'Order & collect',
       title: 'Buy from local sellers',
       events: shops,
+      // The rail shows whatever is published; the bazaar page is the full
+      // directory, sorted by category, so the row points at it rather than
+      // pretending to be it.
+      more: { href: '/market', label: 'Browse the whole bazaar →' },
     });
   }
 
@@ -359,7 +371,9 @@ export default function HomePage() {
             suddenly Saturday has a plan. This is where that poster leads — concerts, cultural
             nights and parties from Nepali organizers. Reserve your tickets in one click,
             pay {anyPaypal ? 'by bank transfer or PayPal' : 'by bank transfer'}, and your QR
-            tickets arrive by email before you have picked what to wear.
+            tickets arrive by email before you have picked what to wear — and between the
+            shows, the bazaar stays open: momo to pre-order, sweets and crafts from Nepali
+            sellers, paid straight to them and collected with a QR code.
           </p>
           <p className="feed-hero-actions anim-fade-up anim-d2">
             <a href="#events" className="btn btn-brand btn-lg">
@@ -447,6 +461,13 @@ export default function HomePage() {
                   <div className="rail-head anim-fade-up">
                     <p className="feed-kicker">{row.kicker}</p>
                     <h2 className="feed-section-title">{row.title}</h2>
+                    {row.more && (
+                      <p className="muted small" style={{ margin: '4px 0 0' }}>
+                        <Link href={row.more.href} className="inline-link">
+                          {row.more.label}
+                        </Link>
+                      </p>
+                    )}
                   </div>
                   <div className="rail-bleed">
                     <EventRail label={row.title}>

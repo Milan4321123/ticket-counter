@@ -27,7 +27,7 @@ export const metadata: Metadata = {
    */
   metadataBase: new URL(getBaseUrl()),
   title: {
-    default: `${PLATFORM_NAME} — Nepali concerts, cultural nights & events`,
+    default: `${PLATFORM_NAME} — Nepali events, tickets & bazaar`,
     // Every page supplies its own short title and gets the brand appended, so a
     // search result reads "Dashain Night 2026 — Tickets | MartNepali" without
     // each page having to remember to say so.
@@ -40,14 +40,14 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     siteName: PLATFORM_NAME,
-    title: `${PLATFORM_NAME} — Nepali concerts, cultural nights & events`,
+    title: `${PLATFORM_NAME} — Nepali events, tickets & bazaar`,
     description: SITE_DESCRIPTION,
     url: '/',
     locale: 'en',
   },
   twitter: {
     card: 'summary_large_image',
-    title: `${PLATFORM_NAME} — Nepali concerts, cultural nights & events`,
+    title: `${PLATFORM_NAME} — Nepali events, tickets & bazaar`,
     description: SITE_DESCRIPTION,
   },
   robots: {
@@ -146,8 +146,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Logo size={30} />
               <p className="footer-about">
                 A little corner of Nepal, wherever you have landed — concerts, cultural
-                nights, festivals and community events from organizers you know, with QR
-                tickets straight to your inbox.
+                nights, festivals and community events from organizers you know, and a
+                bazaar of Nepali sellers: momo to pre-order, sweets, crafts. You pay each
+                seller directly, and your QR tickets and collection codes come straight
+                to your inbox.
               </p>
             </div>
             <nav aria-label="Footer">
@@ -164,6 +166,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </li>
                 <li>
                   <Link href="/patro">Nepali patro</Link>
+                </li>
+                <li>
+                  <Link href="/market">The bazaar</Link>
                 </li>
                 <li>
                   <Link href="/organizers">For organizers</Link>
@@ -188,8 +193,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="container footer-bottom">
             <p className="footer-main">{PLATFORM_NAME} — find your next night out</p>
             <p className="footer-sub">
-              Made with love for the Nepali community · Tickets arrive by email as QR
-              codes — see you at the show.
+              Made with love for the Nepali community · Tickets and collection codes
+              arrive by email as QR codes — see you at the show, or at the counter.
             </p>
           </div>
         </footer>

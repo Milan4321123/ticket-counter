@@ -310,6 +310,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
               eventDate: event.eventDate ?? '',
               venueName: event.venueName,
               pickupInfo: event.pickupInfo,
+              category: event.category,
               address: event.address,
               city: event.city,
               currency: event.currency,

@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS events (
   event_date TEXT,                        -- 'YYYY-MM-DD' for feed ordering (optional)
   venue_name TEXT NOT NULL DEFAULT '',
   pickup_info TEXT NOT NULL DEFAULT '',   -- shops only: where and when to collect
+  category TEXT NOT NULL DEFAULT '',      -- shops only: a lib/categories key; '' = uncategorised
   address TEXT NOT NULL DEFAULT '',       -- full street address (feeds the Open-in-Maps link)
   city TEXT NOT NULL DEFAULT '',
   currency TEXT NOT NULL DEFAULT 'EUR',
@@ -525,6 +526,13 @@ function migrateToPlatform(db: Database.Database): void {
   // and the date, which is why publishing a shop asks for this and not those.
   if (!eventCols.includes('pickup_info')) {
     db.exec(`ALTER TABLE events ADD COLUMN pickup_info TEXT NOT NULL DEFAULT ''`);
+  }
+  // Which shelf of the bazaar a SHOP sits on — a key from lib/categories.ts,
+  // whitelisted on write. Only shops carry one; '' means uncategorised and is
+  // always legal, so no listing (and no row from before this column) is ever
+  // blocked or broken by not having picked. The /market page groups by it.
+  if (!eventCols.includes('category')) {
+    db.exec(`ALTER TABLE events ADD COLUMN category TEXT NOT NULL DEFAULT ''`);
   }
 
   // Who asked a question, so the answer can be emailed back rather than only

@@ -18,8 +18,9 @@ export async function generateMetadata() {
   const brand = platformNameFromEnv();
   const title = `Sell tickets on ${brand} — for organizers`;
   const description =
-    `Your own beautiful event page, QR tickets, door scanning, and ticket money straight to your bank ` +
-    `account. Completely free — no fees, no commission on ticket sales.`;
+    `Your own beautiful event page, QR tickets, door scanning — or a shop in the bazaar with QR ` +
+    `collection codes. Every payment lands straight in your own bank account. Completely free — ` +
+    `no fees, no commission on your sales.`;
   return {
     title,
     description,
@@ -265,6 +266,32 @@ export default function OrganizersPage() {
             <div className="anim-fade-up anim-d1">
               <InsightsMock />
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ---- The other door in: sellers, not organizers ----
+           Right after the feature tour, because everything it just showed — the
+           page, the orders, the scanning, the numbers — is the same machine a
+           shop runs on. Compact on purpose: a full pitch would repeat the page. */}
+      <section className="section">
+        <div className="container">
+          <div className="cta-band anim-fade-up">
+            <div>
+              <h2 className="cta-band-title">Not putting on an event? Open a shop.</h2>
+              <p className="cta-band-body">
+                The same toolkit sells goods: your own shop page in the bazaar — momo to
+                pre-order, sweets, crafts, whatever you make — with orders that arrive as QR
+                collection codes you scan when the buyer picks up. Buyers pay you directly, so
+                the money lands straight in your own account, and we keep the books for you:
+                live Insights, plus a monthly statement you can hand to a tax advisor as it is.
+              </p>
+            </div>
+            <p className="cta-band-actions">
+              <Link href="/contact?intent=account" className="btn btn-brand btn-lg">
+                Get started
+              </Link>
+            </p>
           </div>
         </div>
       </section>

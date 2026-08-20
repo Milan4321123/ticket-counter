@@ -3,6 +3,7 @@
 // event row.
 import Link from 'next/link';
 import CardVideo from '@/components/CardVideo';
+import { categoryLabel } from '@/lib/categories';
 import { getEventTiers, parsePageDesign } from '@/lib/events';
 import type { EventRow, PageDesign } from '@/lib/events';
 import { getAvailability } from '@/lib/inventory';
@@ -100,6 +101,10 @@ export default function EventCard({ event, past = false, delayClass = '' }: Even
   // the thing the date was communicating on the tiles beside it.
   const isShop = event.kind === 'shop';
   const chip = isShop ? 'Shop' : dateChipLabel(event);
+  // Which shelf of the bazaar this shop sits on — '' (no chip) when the seller
+  // has not picked one, or for a key the list no longer knows. Events never
+  // carry one, so their tiles are untouched.
+  const shopCategory = isShop ? categoryLabel(event.category) : '';
 
   return (
     <Link
@@ -143,6 +148,9 @@ export default function EventCard({ event, past = false, delayClass = '' }: Even
           {!past && state.kind !== 'coming-soon' && comingSoonLabel(state) ? (
             <span className="badge badge-green">{comingSoonLabel(state)}</span>
           ) : null}
+          {/* The shop's bazaar shelf, when the seller picked one — what a buyer
+              scanning a mixed feed wants after "Shop": shop of WHAT. */}
+          {shopCategory ? <span className="badge badge-accent">{shopCategory}</span> : null}
         </span>
         {/* Fades the photo into the card body so the two are one object rather
             than a picture sitting on a panel. */}

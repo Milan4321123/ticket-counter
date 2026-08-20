@@ -25,6 +25,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const staticPages: MetadataRoute.Sitemap = [
     { url: base, changeFrequency: 'daily', priority: 1 },
     { url: `${base}/organizers`, changeFrequency: 'monthly', priority: 0.8 },
+    // The bazaar: every published shop, grouped by category. Weekly — shops
+    // come and go far more slowly than the event feed turns over.
+    { url: `${base}/market`, changeFrequency: 'weekly', priority: 0.8 },
     // The evergreen festival pages: same URL every year, so their search
     // standing compounds. Weekly — the events listed on them change.
     { url: `${base}/dashain`, changeFrequency: 'weekly', priority: 0.8 },

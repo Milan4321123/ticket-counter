@@ -6,6 +6,7 @@ import GoToTab from './GoToTab';
 import ContactPhotoFramer from '@/components/ContactPhotoFramer';
 import SpeechInput from '@/components/SpeechInput';
 import { saveEvent } from './save';
+import { SHOP_CATEGORIES } from '@/lib/categories';
 import { vocabFor } from '@/lib/vocab';
 import type { EventKind } from '@/lib/types';
 
@@ -21,6 +22,8 @@ interface Props {
     eventDate: string; // '' when unset
     venueName: string;
     pickupInfo: string;
+    /** Shops only: a lib/categories key, or '' while none is picked. */
+    category: string;
     address: string;
     city: string;
     currency: string;
@@ -56,6 +59,7 @@ export default function DetailsForm({ eventId, isDraft, kind, initial }: Props) 
   const [eventDate, setEventDate] = useState(initial.eventDate);
   const [venueName, setVenueName] = useState(initial.venueName);
   const [pickupInfo, setPickupInfo] = useState(initial.pickupInfo);
+  const [category, setCategory] = useState(initial.category);
   const [address, setAddress] = useState(initial.address);
   const [city, setCity] = useState(initial.city);
   const [totalCapacity, setTotalCapacity] = useState(String(initial.totalCapacity));
@@ -162,6 +166,9 @@ export default function DetailsForm({ eventId, isDraft, kind, initial }: Props) 
       eventDate,
       venueName,
       pickupInfo,
+      // Only a shop's form shows the picker, so only a shop's save sends the
+      // field — an event must not quietly overwrite a column it never edits.
+      ...(isShop ? { category } : {}),
       address,
       city,
       totalCapacity: capacity,
@@ -274,6 +281,29 @@ export default function DetailsForm({ eventId, isDraft, kind, initial }: Props) 
               }}
               onText={(text) => setPickupInfo(pickupSpeechBase.current + text)}
             />
+          </div>
+          {/* A closed list, not free text: the /market page groups shops by
+              this, and a browse page only works when sellers pick from the
+              same shelves. Optional — an unpicked shop still publishes, it
+              just files under "More from the bazaar" instead of a shelf. */}
+          <div className="field" style={{ marginTop: 12, marginBottom: 0 }}>
+            <label htmlFor="ev-category">Category</label>
+            <select
+              id="ev-category"
+              className="input"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              <option value="">Not picked yet</option>
+              {SHOP_CATEGORIES.map((c) => (
+                <option key={c.key} value={c.key}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+            <p className="muted small" style={{ margin: '6px 0 0' }}>
+              Where your shop sits in the bazaar — buyers browse by it.
+            </p>
           </div>
         </div>
       ) : (
