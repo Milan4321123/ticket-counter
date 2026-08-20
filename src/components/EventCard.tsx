@@ -12,8 +12,11 @@ import { formatMoney } from '@/lib/money';
 
 type AccentName = NonNullable<PageDesign['accent']>;
 
-/** Poster stand-in when an event has no photos yet, tinted by its accent. */
-const PLACEHOLDER_GRADIENTS: Record<AccentName, string> = {
+/** Poster stand-in when an event has no photos yet, tinted by its accent.
+    Exported: the event page's stall cards are built from the same tile
+    classes, and a shop with no photo must fall back to the same deliberate
+    gradient there — not to a second guess at it. */
+export const PLACEHOLDER_GRADIENTS: Record<AccentName, string> = {
   violet: 'linear-gradient(135deg, #2e1065, #7c3aed 55%, #ec4899)',
   sunset: 'linear-gradient(135deg, #431407, #ea580c 55%, #ec4899)',
   ocean: 'linear-gradient(135deg, #082f49, #0284c7 55%, #22d3ee)',
@@ -50,8 +53,10 @@ export function dateChipLabel(event: EventRow): string | null {
   return null;
 }
 
-/** Colour follows meaning: green is fine, amber is a nudge, red is a stop. */
-const BADGE_TONE: Record<string, string> = {
+/** Colour follows meaning: green is fine, amber is a nudge, red is a stop.
+    Exported for the same reason as the gradients above: a stall card's chip
+    must colour a state exactly the way the feed tile colours it. */
+export const BADGE_TONE: Record<string, string> = {
   'on-sale': 'badge-green',
   'coming-soon': 'badge-green',
   closed: 'badge-amber',

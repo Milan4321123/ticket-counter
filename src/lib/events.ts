@@ -825,6 +825,11 @@ export function deleteEventCompletely(eventId: string): DeletedEventSummary {
     // would otherwise outlive every link it was ever counting for.
     db.prepare(`DELETE FROM kv WHERE key = ?`).run(`scan_epoch:${eventId}`);
 
+    // Stall links (lib/stalls.ts) reference this listing from EITHER side —
+    // as the host event or as the shop — so both directions go with it. The
+    // link is consent only, never money, so nothing here needs a husk.
+    db.prepare(`DELETE FROM event_stalls WHERE host_event_id = ? OR shop_event_id = ?`).run(eventId, eventId);
+
     db.prepare(`DELETE FROM events WHERE id = ?`).run(eventId);
   });
   tx();

@@ -2500,3 +2500,306 @@ export async function sendMarketingConfirmationEmail(
     return { sent: false, reason: 'send-failed' };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Vendor stalls (organizer ↔ organizer)
+//
+// A stall is a kind='shop' listing standing at a kind='event' listing with the
+// host's consent (lib/stalls.ts). These three mails carry the consent flow —
+// request, decision, removal — between the two organizers. No money moves at
+// any point: buyers order from the shop's own page and pay the shop's own
+// account, and booth rent between host and vendor is their offline business,
+// which the platform never handles or mediates.
+// ---------------------------------------------------------------------------
+
+/**
+ * Tell the host organizer a shop is asking for a stall at their event.
+ *
+ * Links to the shop's PUBLIC page rather than describing it, so the host
+ * judges exactly what buyers would see before saying yes. Never throws — the
+ * request row is already written, and the host also sees it in their portal.
+ */
+export async function sendStallRequestEmail(
+  hostOrganizer: OrganizerContact,
+  hostEvent: Pick<EventRow, 'id' | 'name' | 'dateDisplay'>,
+  shop: Pick<EventRow, 'name' | 'slug' | 'organizerId'>,
+  message: string
+): Promise<{ sent: boolean; reason?: string }> {
+  try {
+    if (!isEmailConfigured()) return { sent: false, reason: 'email-not-configured' };
+
+    const sellerName = organizerDisplayName(shop.organizerId) || 'a seller';
+    const shopUrl = `${getBaseUrl()}/e/${shop.slug}`;
+    const panelUrl = `${getBaseUrl()}/portal/events/${hostEvent.id}/edit?tab=stalls`;
+    const headline = `${shop.name} wants a stall at ${hostEvent.name}`;
+
+    const bodyHtml =
+      pHtml(`Hi ${escapeHtml(hostOrganizer.name)},`) +
+      pHtml(
+        `${strong(sellerName)} would like to stand at ${strong(hostEvent.name)} with their shop ` +
+          `<a class="brandtext" href="${escapeHtml(shopUrl)}" style="color:${C.brandDeep};font-weight:700;">${escapeHtml(shop.name)}</a>. ` +
+          `That link is their public page — exactly what buyers would see.`,
+        20
+      ) +
+      (message.trim() ? quoteHtml('Their message', multilineHtml(message.trim())) : '') +
+      pHtml(
+        `Approving puts their card in the &ldquo;Order ahead&rdquo; section of your event page, linking out ` +
+          `to their shop. Buyers order from the shop and pay ${escapeHtml(sellerName)} directly — nothing ` +
+          `about your own tickets or your own money changes, and you can remove the stall again at any time.`,
+        20
+      ) +
+      buttonHtml(panelUrl, 'Decide in your portal') +
+      smallHtml(
+        `${escapeHtml(platformName())} never handles or mediates any payment between you and a vendor — ` +
+          `booth rent, if any, is your own offline business.`
+      );
+
+    const text = renderText({
+      headline,
+      context: [hostEvent.dateDisplay],
+      lines: [
+        `Hi ${hostOrganizer.name},`,
+        '',
+        wrapText(
+          `${sellerName} would like to stand at ${hostEvent.name} with their shop "${shop.name}". ` +
+            `Their public page — exactly what buyers would see — is here: ${shopUrl}`
+        ),
+        ...(message.trim() ? ['', 'THEIR MESSAGE', wrapText(message.trim())] : []),
+        '',
+        wrapText(
+          `Approving puts their card in the "Order ahead" section of your event page, linking out to ` +
+            `their shop. Buyers order from the shop and pay ${sellerName} directly — nothing about your ` +
+            `own tickets or your own money changes, and you can remove the stall again at any time.`
+        ),
+        '',
+        `Decide in your portal: ${panelUrl}`,
+        '',
+        wrapText(
+          `${platformName()} never handles or mediates any payment between you and a vendor — booth ` +
+            `rent, if any, is your own offline business.`
+        ),
+      ],
+      footer: [`${platformName()} · organizer portal`],
+    });
+
+    await createTransporter().sendMail({
+      from: emailFromOrganizers(),
+      replyTo: replyToOrganizers(),
+      to: hostOrganizer.email,
+      subject: `Stall request for ${hostEvent.name}: ${shop.name}`,
+      text,
+      html: renderEmail({
+        title: headline,
+        preheader: `${sellerName} asks to stand at ${hostEvent.name} — view their shop and decide in your portal.`,
+        kicker: 'Stall request',
+        headline,
+        metaLines: [hostEvent.dateDisplay],
+        bodyHtml,
+        footerLines: [
+          `${escapeHtml(platformName())} · organizer portal`,
+          'You are getting this because a shop asked for a stall at your event.',
+        ],
+      }),
+    });
+    return { sent: true };
+  } catch (err) {
+    console.error('[email] Failed to send stall request:', err instanceof Error ? err.message : err);
+    return { sent: false, reason: 'send-failed' };
+  }
+}
+
+/**
+ * Tell the shop owner the host has decided — approved or declined.
+ *
+ * Approved leads with what they gained (a card on the event page) and the one
+ * useful next step: the per-event collection note. Never throws — the decision
+ * is already committed, and their portal shows it either way.
+ */
+export async function sendStallDecisionEmail(
+  shopOrganizer: OrganizerContact,
+  hostEvent: Pick<EventRow, 'name' | 'slug' | 'dateDisplay'>,
+  shop: Pick<EventRow, 'id' | 'name'>,
+  decision: 'approved' | 'declined'
+): Promise<{ sent: boolean; reason?: string }> {
+  try {
+    if (!isEmailConfigured()) return { sent: false, reason: 'email-not-configured' };
+
+    const approved = decision === 'approved';
+    const eventUrl = `${getBaseUrl()}/e/${hostEvent.slug}`;
+    const panelUrl = `${getBaseUrl()}/portal/events/${shop.id}/edit?tab=stalls`;
+    const headline = approved
+      ? `You're in: ${shop.name} has a stall at ${hostEvent.name}`
+      : `${hostEvent.name} declined your stall request`;
+
+    const bodyHtml =
+      pHtml(`Hi ${escapeHtml(shopOrganizer.name)},`) +
+      (approved
+        ? pHtml(
+            `The organizer of <a class="brandtext" href="${escapeHtml(eventUrl)}" style="color:${C.brandDeep};font-weight:700;">${escapeHtml(hostEvent.name)}</a> ` +
+              `said yes: ${strong(shop.name)} now has a card in the &ldquo;Order ahead&rdquo; section of their ` +
+              `event page, linking to your shop. Buyers pre-order from your own page and pay your own ` +
+              `account, exactly as they do today — and you scan your own collection codes at the event ` +
+              `with your usual scanner link.`,
+            20
+          ) +
+          pHtml(
+            `One thing worth doing now: tell buyers where to find you at the event — ` +
+              `&ldquo;Stall 4, food row, from 17:00&rdquo; — with the collection note in your portal.`,
+            20
+          ) +
+          buttonHtml(panelUrl, 'Add your collection note')
+        : pHtml(
+            `The organizer of ${strong(hostEvent.name)} decided not to take ${strong(shop.name)} this ` +
+              `time. Nothing about your shop changes — it stays live, buyers order as before, and you ` +
+              `can ask this host again later or take your shop to another event from your portal.`,
+            20
+          ) + buttonHtml(panelUrl, 'Find another event'));
+
+    const text = renderText({
+      headline,
+      lines: [
+        `Hi ${shopOrganizer.name},`,
+        '',
+        wrapText(
+          approved
+            ? `The organizer of ${hostEvent.name} said yes: ${shop.name} now has a card in the ` +
+                `"Order ahead" section of their event page (${eventUrl}), linking to your shop. Buyers ` +
+                `pre-order from your own page and pay your own account, exactly as they do today — and ` +
+                `you scan your own collection codes at the event with your usual scanner link.`
+            : `The organizer of ${hostEvent.name} decided not to take ${shop.name} this time. Nothing ` +
+                `about your shop changes — it stays live, buyers order as before, and you can ask this ` +
+                `host again later or take your shop to another event from your portal.`
+        ),
+        '',
+        approved
+          ? wrapText(
+              `One thing worth doing now: tell buyers where to find you at the event — "Stall 4, food ` +
+                `row, from 17:00" — with the collection note in your portal: ${panelUrl}`
+            )
+          : `Your portal: ${panelUrl}`,
+      ],
+      footer: [`${platformName()} · organizer portal`],
+    });
+
+    await createTransporter().sendMail({
+      from: emailFromOrganizers(),
+      replyTo: replyToOrganizers(),
+      to: shopOrganizer.email,
+      subject: approved
+        ? `Approved: your stall at ${hostEvent.name}`
+        : `Declined: your stall request for ${hostEvent.name}`,
+      text,
+      html: renderEmail({
+        title: headline,
+        preheader: approved
+          ? `Your card is live on the event page — add a collection note so buyers can find your stall.`
+          : `The host said no this time. Your shop is unchanged.`,
+        kicker: approved ? 'Stall approved' : 'Stall declined',
+        headline,
+        metaLines: [hostEvent.dateDisplay],
+        bodyHtml,
+        footerLines: [
+          `${escapeHtml(platformName())} · organizer portal`,
+          'You are getting this because you asked for a stall at this event.',
+        ],
+      }),
+    });
+    return { sent: true };
+  } catch (err) {
+    console.error('[email] Failed to send stall decision:', err instanceof Error ? err.message : err);
+    return { sent: false, reason: 'send-failed' };
+  }
+}
+
+/**
+ * Tell the shop owner the host removed their approved stall.
+ *
+ * The card is already gone from the event page by the time this sends. The
+ * mail's real job is the amber sentence: buyers may hold paid pre-orders they
+ * placed expecting to collect at that event, and honouring or refunding those
+ * is the shop owner's — money went buyer → shop, the platform holds nothing it
+ * could give back. Never throws.
+ */
+export async function sendStallRevokedEmail(
+  shopOrganizer: OrganizerContact,
+  hostEvent: Pick<EventRow, 'name'>,
+  shop: Pick<EventRow, 'id' | 'name'>
+): Promise<{ sent: boolean; reason?: string }> {
+  try {
+    if (!isEmailConfigured()) return { sent: false, reason: 'email-not-configured' };
+
+    const ordersUrl = `${getBaseUrl()}/portal/events/${shop.id}/orders`;
+    const headline = `${hostEvent.name} removed your stall`;
+
+    const bodyHtml =
+      pHtml(`Hi ${escapeHtml(shopOrganizer.name)},`) +
+      pHtml(
+        `The organizer of ${strong(hostEvent.name)} has removed ${strong(shop.name)} from their event ` +
+          `page. The card is gone as of now. Your shop itself is untouched — it stays live and buyers ` +
+          `can still order from your own page.`,
+        20
+      ) +
+      calloutHtml(
+        `<strong>You may have pre-orders to honour or refund.</strong> Buyers who ordered expecting to ` +
+          `collect at ${escapeHtml(hostEvent.name)} still hold paid orders — they were not cancelled, and ` +
+          `their money went straight to you. Check your orders and tell those buyers how they get their ` +
+          `items now, or pay them back yourself.`
+      ) +
+      buttonHtml(ordersUrl, 'Check your orders') +
+      smallHtml(
+        `If you think this was a mistake, talk to the host directly — a removed stall cannot be ` +
+          `re-requested from the portal.`
+      );
+
+    const text = renderText({
+      headline,
+      lines: [
+        `Hi ${shopOrganizer.name},`,
+        '',
+        wrapText(
+          `The organizer of ${hostEvent.name} has removed ${shop.name} from their event page. The card ` +
+            `is gone as of now. Your shop itself is untouched — it stays live and buyers can still ` +
+            `order from your own page.`
+        ),
+        '',
+        wrapText(
+          `IMPORTANT: you may have pre-orders to honour or refund. Buyers who ordered expecting to ` +
+            `collect at ${hostEvent.name} still hold paid orders — they were not cancelled, and their ` +
+            `money went straight to you. Check your orders and tell those buyers how they get their ` +
+            `items now, or pay them back yourself.`
+        ),
+        '',
+        `Your orders: ${ordersUrl}`,
+        '',
+        wrapText(
+          `If you think this was a mistake, talk to the host directly — a removed stall cannot be ` +
+            `re-requested from the portal.`
+        ),
+      ],
+      footer: [`${platformName()} · organizer portal`],
+    });
+
+    await createTransporter().sendMail({
+      from: emailFromOrganizers(),
+      replyTo: replyToOrganizers(),
+      to: shopOrganizer.email,
+      subject: `Removed: your stall at ${hostEvent.name}`,
+      text,
+      html: renderEmail({
+        title: headline,
+        preheader: `Your card is off the event page. You may have pre-orders to honour or refund.`,
+        kicker: 'Stall removed',
+        headline,
+        bodyHtml,
+        footerLines: [
+          `${escapeHtml(platformName())} · organizer portal`,
+          'You are getting this because your approved stall at this event was removed by the host.',
+        ],
+      }),
+    });
+    return { sent: true };
+  } catch (err) {
+    console.error('[email] Failed to send stall revocation:', err instanceof Error ? err.message : err);
+    return { sent: false, reason: 'send-failed' };
+  }
+}

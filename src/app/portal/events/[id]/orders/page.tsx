@@ -13,6 +13,7 @@ import {
   type OrderStatus,
 } from '@/lib/orders';
 import { organizerPlanActive } from '@/lib/organizers';
+import { listStallLinksForShop } from '@/lib/stalls';
 import TransferActions from '@/app/admin/TransferActions';
 import ResendButton from '@/app/admin/orders/ResendButton';
 import PlanExpired from '../../../PlanExpired';
@@ -73,6 +74,11 @@ export default async function PortalOrdersPage({
   const takesPaypal = effectivePayout(event).paypal.trim() !== '';
   const orders = listOrders({ eventId: event.id, query });
   const stats = getStats(event.id);
+  // A shop with an approved stall will meet buyers face to face at someone
+  // else's event — the one place a transfer sent that morning may not have
+  // landed yet. The counter hint below tells the owner the fix is right here.
+  const hasApprovedStall =
+    event.kind === 'shop' && listStallLinksForShop(event.id).some((l) => l.status === 'approved');
   // Whether the EVENT has any orders at all, independent of the search box.
   // Gating the export on the filtered list made the button vanish the moment a
   // search matched nothing — exactly when someone is most likely to give up and
@@ -137,6 +143,16 @@ export default async function PortalOrdersPage({
               A bank transfer carries the reference for you. <strong>PayPal does not</strong> — it has
               nowhere to put one — so for those, match the <strong>name</strong> the money came from
               instead. Both work.
+            </p>
+          )}
+          {/* The stall counter-confirmation hint (stalls plan §7): a buyer
+              standing at the stall whose transfer has not landed yet is not
+              stuck — the owner confirms right here and scans a moment later. */}
+          {hasApprovedStall && (
+            <p className="muted small" style={{ marginTop: 0 }}>
+              This works at your stall too: when a buyer is standing in front of you but their payment
+              has not landed yet, confirm it here on the spot — their {v.code} is emailed straight away,
+              ready to scan at {v.where}.
             </p>
           )}
           <div>

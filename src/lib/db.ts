@@ -842,6 +842,30 @@ function migrateToPlatform(db: Database.Database): void {
     db.exec(`ALTER TABLE contact_requests ADD COLUMN organizer_id TEXT`);
   }
 
+  // A shop standing at an event, with the host organizer's consent.
+  // The link is CONSENT + PLACEMENT ONLY. It carries no money: orders stay on
+  // the shop row, pay the shop's own account, and are matched by the shop's
+  // owner. Nothing in this table may ever be read by money-facing code.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS event_stalls (
+      id TEXT PRIMARY KEY,
+      host_event_id TEXT NOT NULL REFERENCES events(id),   -- kind='event'
+      shop_event_id TEXT NOT NULL REFERENCES events(id),   -- kind='shop'
+      status TEXT NOT NULL DEFAULT 'requested',
+        -- requested | approved | declined | revoked | withdrawn
+      initiated_by TEXT NOT NULL DEFAULT 'shop',           -- 'shop' now; 'host' reserved for invites (not slice 2)
+      message TEXT NOT NULL DEFAULT '',                    -- stall owner's note to the host, shown once in the host portal
+      stall_pickup_info TEXT NOT NULL DEFAULT '',          -- optional: where/when to collect AT THIS EVENT ("Stall 4, from 17:00")
+      sort INTEGER NOT NULL DEFAULT 0,                     -- host's display order; UI deferred (order by sort, decided_at)
+      requested_at TEXT NOT NULL DEFAULT (datetime('now')),
+      decided_at TEXT,                                     -- approve/decline stamp
+      ended_at TEXT,                                       -- revoke/withdraw stamp
+      UNIQUE (host_event_id, shop_event_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_event_stalls_host ON event_stalls(host_event_id, status);
+    CREATE INDEX IF NOT EXISTS idx_event_stalls_shop ON event_stalls(shop_event_id, status);
+  `);
+
   const haveEvents = (db.prepare(`SELECT COUNT(*) AS n FROM events`).get() as { n: number }).n > 0;
   if (!haveEvents) {
     const configPath = path.join(process.cwd(), 'event.config.json');

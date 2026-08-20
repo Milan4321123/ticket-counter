@@ -10,12 +10,19 @@ import {
   cropTag,
   listEventPosts,
   listEventQuestions,
+  listPublishedEvents,
   listingDetailChecks,
   listingDetailsComplete,
   mediaUrl,
   parseCropRect,
   parsePageDesign,
 } from '@/lib/events';
+import { getOrganizer } from '@/lib/organizers';
+import {
+  listStallLinksForHostEvent,
+  listStallLinksForShop,
+  stallVisibleOnEventPage,
+} from '@/lib/stalls';
 import { listAnnouncementAudience } from '@/lib/marketing';
 import { MAX_PHOTOS_PER_EVENT, MAX_VIDEOS_PER_EVENT } from '@/lib/media';
 import { getStats } from '@/lib/orders';
@@ -36,9 +43,11 @@ import EditorTabs from './EditorTabs';
 import DetailsForm from './DetailsForm';
 import { FAQ_SUGGESTIONS_EVENT } from './faqBridge';
 import MediaPanel from './MediaPanel';
+import HostStallsPanel from './HostStallsPanel';
 import PageContentPanel from './PageContentPanel';
 import PublishPanel from './PublishPanel';
 import QuestionsPanel from './QuestionsPanel';
+import StallRequestsPanel from './StallRequestsPanel';
 import TiersEditor from './TiersEditor';
 
 export const dynamic = 'force-dynamic';
@@ -126,6 +135,100 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
   const v = vocabFor(event.kind);
   const isShop = event.kind === 'shop';
 
+  // ---- Vendor stalls (lib/stalls) ----
+  // Which side of a stall link this editor shows depends on the kind: a shop
+  // asks to stand at events, an event decides on the shops that asked. Dates
+  // compare as ISO yyyy-mm-dd strings, the same arithmetic lib/stalls uses.
+  const stallToday = new Date().toISOString().slice(0, 10);
+
+  const shopStallLinks = isShop ? listStallLinksForShop(event.id) : [];
+  const shopStallRows = shopStallLinks.map((link) => {
+    const host = getEventById(link.hostEventId);
+    return {
+      id: link.id,
+      status: link.status,
+      stallPickupInfo: link.stallPickupInfo,
+      hostName: host?.name ?? 'a removed event',
+      // Only link out when the public page actually answers — an unpublished
+      // host 404s for everyone but its owner.
+      hostSlug: host?.status === 'published' ? host.slug : '',
+      hostDate: host?.dateDisplay ?? '',
+      hostPast: !host?.eventDate || host.eventDate < stallToday,
+      hostOrganizerName: (host && getOrganizer(host.organizerId)?.name?.trim()) || 'the organizer',
+    };
+  });
+  // Hosts the picker offers: published, upcoming, and not already holding a
+  // live link with this shop. Declined and withdrawn hosts stay offered — the
+  // state machine allows the re-ask; requested/approved would only refuse the
+  // duplicate, and revoked is terminal for the shop side.
+  const askedHostIds = new Set(
+    shopStallLinks
+      .filter((l) => l.status === 'requested' || l.status === 'approved' || l.status === 'revoked')
+      .map((l) => l.hostEventId)
+  );
+  const stallHostOptions = isShop
+    ? listPublishedEvents()
+        .filter(
+          (e) =>
+            e.kind === 'event' && e.eventDate !== null && e.eventDate >= stallToday && !askedHostIds.has(e.id)
+        )
+        .map((e) => ({ id: e.id, name: e.name, dateDisplay: e.dateDisplay, city: e.city }))
+    : [];
+
+  // The host panel's two lists, joined with each shop's public identity. The
+  // host sees shop metadata and one aggregate count only — never a stall's
+  // buyers (the EventSalesSummary doctrine holds across the tenant line).
+  const hostStallLinks = !isShop ? listStallLinksForHostEvent(event.id) : [];
+  const pendingStalls = hostStallLinks
+    .filter((l) => l.status === 'requested')
+    .flatMap((link) => {
+      const shop = getEventById(link.shopEventId);
+      if (!shop) return [];
+      return [
+        {
+          id: link.id,
+          shopName: shop.name,
+          // '' when the shop is unpublished: its public page 404s, and a link that
+          // promises "what buyers would see" must not lead to an error page.
+          shopSlug: shop.status === 'published' ? shop.slug : '',
+          sellerName: getOrganizer(shop.organizerId)?.name?.trim() || 'the seller',
+          message: link.message,
+          requestedAt: link.requestedAt,
+        },
+      ];
+    });
+  const approvedStalls = hostStallLinks
+    .filter((l) => l.status === 'approved')
+    .flatMap((link) => {
+      const shop = getEventById(link.shopEventId);
+      if (!shop) return [];
+      // The same rule the public event page reads, so the tick in this panel
+      // can never disagree with what buyers actually see.
+      const visible = stallVisibleOnEventPage(link, event, shop, stallToday);
+      return [
+        {
+          id: link.id,
+          shopName: shop.name,
+          // '' when the shop is unpublished — its public page 404s, and the
+          // panel renders a plain name instead of a dead link.
+          shopSlug: shop.status === 'published' ? shop.slug : '',
+          sellerName: getOrganizer(shop.organizerId)?.name?.trim() || 'the seller',
+          stallPickupInfo: link.stallPickupInfo,
+          // Shop-wide, because orders carry no host attribution — the panel's
+          // wording says so honestly wherever the number shows.
+          paidOrders: countPaidOrdersForEvent(shop.id),
+          visible,
+          hiddenReason: visible
+            ? ''
+            : event.status !== 'published'
+              ? 'your event is not published'
+              : shop.status !== 'published'
+                ? 'the shop is unpublished right now'
+                : 'the event date has passed',
+        },
+      ];
+    });
+
   // Tab and section completion: what still needs doing, at a glance.
   const detailsDone = listingDetailsComplete(event);
   // What buyers are being given today, and any change still inside its waiting
@@ -162,6 +265,17 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
       // a person on the other end of it, and it should be readable from the
       // strip without opening anything.
       badge: openQuestions.length > 0 ? `${openQuestions.length} new` : undefined,
+    },
+    {
+      // One key, two jobs: a shop takes itself to events, an event hosts the
+      // shops that asked. The stall emails link straight to ?tab=stalls on
+      // either editor, so the key must be the same on both sides.
+      key: 'stalls',
+      label: isShop ? 'Events' : 'Stalls',
+      status: 'neutral' as const,
+      // Green and on the tab, like Questions: a pending request is a person
+      // waiting on this organizer's decision.
+      badge: !isShop && pendingStalls.length > 0 ? `${pendingStalls.length} new` : undefined,
     },
     { key: 'publish', label: 'Publish', status: publishDone ? ('done' as const) : ('todo' as const) },
   ];
@@ -395,6 +509,29 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
           }))}
           answeredCount={answeredQuestionCount}
         />
+      </div>
+    ),
+    // Two panels behind one tab key, picked by kind — see the tabs list above.
+    stalls: isShop ? (
+      <div className="card">
+        <SectionHead
+          title="Take this shop to an event"
+          hint="Ask a host for a stall — approved shops get a card on the event page that links back here."
+        />
+        <StallRequestsPanel
+          shopId={event.id}
+          hosts={stallHostOptions}
+          links={shopStallRows}
+          paidOrders={paidOrders}
+        />
+      </div>
+    ) : (
+      <div className="card">
+        <SectionHead
+          title="Stalls"
+          hint="Shops asking to stand at your event. Buyers order from and pay each seller directly — never you."
+        />
+        <HostStallsPanel eventId={event.id} pending={pendingStalls} approved={approvedStalls} />
       </div>
     ),
     publish: (

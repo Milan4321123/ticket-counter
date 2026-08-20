@@ -14,6 +14,7 @@ import type { EventSectionLink } from './SectionNav';
 import StickyCtaBar from './StickyCtaBar';
 import {
   cropTag,
+  getEventById,
   getEventBySlug,
   getEventFaqs,
   getEventMedia,
@@ -30,6 +31,10 @@ import {
 } from '@/lib/events';
 import type { EventRow, PageDesign } from '@/lib/events';
 import type { EventKind } from '@/lib/types';
+import { listStallLinksForShop, listVisibleStallsForEvent, stallBannerVisibleOnShopPage } from '@/lib/stalls';
+import type { StallLinkRow } from '@/lib/stalls';
+import { listingStillUrl } from '@/lib/listing';
+import { BADGE_TONE, PLACEHOLDER_GRADIENTS } from '@/components/EventCard';
 import { vocabFor } from '@/lib/vocab';
 import { getAvailability } from '@/lib/inventory';
 import { runWaitlistNotifySweep } from '@/lib/waitlist';
@@ -483,6 +488,27 @@ export default async function EventPage({ params, searchParams }: Params) {
   const checkoutBase = `/e/${event.slug}/checkout`;
   const checkoutHref = refCode ? `${checkoutBase}?ref=${refCode}` : checkoutBase;
   const headline = design.headline || event.name;
+
+  // ---------------- Stalls (slice 2) ----------------
+  //
+  // An event page lists the shops approved to stand at it; a shop page tells
+  // buyers which events it will be standing at. Both lists arrive pre-filtered
+  // through the ONE visibility rule in stalls.ts (approved link, both sides
+  // published, host date not yet passed), so this page never re-derives who is
+  // allowed to show. Money is untouched by all of it: a stall card links to
+  // the shop's OWN page, and an order placed there pays the shop's own account
+  // exactly like any other shop order.
+  const stalls = isShop ? [] : listVisibleStallsForEvent(event.id);
+  // Same day arithmetic as stalls.ts itself: dates compare as ISO strings.
+  const today = new Date().toISOString().slice(0, 10);
+  const hostStalls = !isShop
+    ? []
+    : listStallLinksForShop(event.id)
+        .map((link) => ({ link, host: getEventById(link.hostEventId) }))
+        .filter(
+          (x): x is { link: StallLinkRow; host: EventRow } =>
+            x.host !== null && stallBannerVisibleOnShopPage(x.link, x.host, today)
+        );
   // Never buyable in preview. The event is not public, its fee may be unpaid,
   // and POST /api/orders would refuse the order anyway — offering a button that
   // cannot work is just a trap for the person testing their own page.
@@ -495,6 +521,7 @@ export default async function EventPage({ params, searchParams }: Params) {
   // heading is the organizer's own wording and can be a paragraph long.
   const navSections: EventSectionLink[] = [
     { id: 'tickets', label: v.Units },
+    stalls.length > 0 ? { id: 'stalls', label: 'Stalls' } : null,
     event.description.trim() ? { id: 'about', label: 'About' } : null,
     legacyVideo ? { id: 'watch', label: 'Watch' } : null,
     posts.length > 0 ? { id: 'updates', label: 'Updates' } : null,
@@ -884,6 +911,30 @@ export default async function EventPage({ params, searchParams }: Params) {
 
             {hasWhereCard && (
               <aside className="event-aside">
+                {/* Where this shop will be standing (its approved stall links),
+                    ABOVE the generic collection details: a buyer working out
+                    how to get their order should meet the event option first,
+                    while the shop's own pickup_info below stays untouched and
+                    true for everything bought outside the event. */}
+                {hostStalls.map(({ link, host }) => (
+                  <div className="notice notice-success" key={link.id}>
+                    <div>
+                      Find us at{' '}
+                      <Link
+                        href={`/e/${host.slug}`}
+                        style={{ fontWeight: 700, textDecoration: 'underline' }}
+                      >
+                        {host.name}
+                        {host.dateDisplay ? ` — ${host.dateDisplay}` : ''}
+                      </Link>
+                    </div>
+                    {link.stallPickupInfo ? (
+                      <div className="small" style={{ marginTop: 4 }}>
+                        {link.stallPickupInfo}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
                 <div className="card glow-card">
                   <div className="card-title">{v.logistics}</div>
                   <ul className="event-fact-list">
@@ -951,6 +1002,98 @@ export default async function EventPage({ params, searchParams }: Params) {
           </div>
         </div>
       </section>
+
+      {/* Shops standing at this event (slice 2), each card linking OUT to the
+          stall's own page — never straight to checkout. The stall's page is
+          where the seller's identity, pickup details and payment claims live,
+          and the disclosed-agent posture needs every one of those claims made
+          by the seller's own page, not vouched for by the host's. */}
+      {stalls.length > 0 && (
+        <section className="section event-section" id="stalls">
+          <div className="container">
+            <p className="section-kicker">At the event</p>
+            <h2 className="page-title">Order ahead from the stalls</h2>
+            <p className="muted small event-section-sub">
+              Pre-order and skip the queue — collect at their stall at the event.
+            </p>
+            <div className="feed-grid" style={{ margin: '24px 0 16px' }}>
+              {stalls.map(({ link, shop }) => {
+                // Each card answers the same three questions the feed tile
+                // does — what is it, can I order, from how much — through the
+                // same one source of truth, so a stall can never claim a state
+                // its own page would contradict one click later.
+                const shopTiers = getEventTiers(shop.id);
+                const shopAvailability = getAvailability(shop.id);
+                const shopState = ticketState(shop, shopTiers, shopAvailability);
+                const shopPrice = fromPriceCents(shopTiers, shopAvailability);
+                // The one label ticketState words generically: a paused SHOP
+                // reads "Orders closed" to a buyer, not "Sales closed".
+                const chip = shopState.kind === 'closed' ? 'Orders closed' : shopState.badge;
+                const sellerName = getOrganizer(shop.organizerId)?.name?.trim() || 'the organizer';
+                const stillUrl = listingStillUrl(shop);
+                const accent = parsePageDesign(shop.pageDesign).accent ?? 'violet';
+                return (
+                  <Link href={`/e/${shop.slug}`} className="event-card" key={link.id}>
+                    <div className="event-card-media">
+                      {stillUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={stillUrl}
+                          alt={`${shop.name} photo`}
+                          loading="lazy"
+                          className="event-card-shot"
+                        />
+                      ) : (
+                        <div
+                          className="event-card-placeholder"
+                          aria-hidden="true"
+                          style={{ background: PLACEHOLDER_GRADIENTS[accent] }}
+                        >
+                          <span className="event-card-initial">
+                            {shop.name.trim().charAt(0).toUpperCase() || '•'}
+                          </span>
+                        </div>
+                      )}
+                      <span className="event-card-status">
+                        <span className={`badge ${BADGE_TONE[shopState.kind] ?? 'badge-green'}`}>
+                          {chip}
+                        </span>
+                      </span>
+                      <span className="event-card-scrim" aria-hidden />
+                    </div>
+                    <div className="event-card-body">
+                      <div className="event-card-title">{shop.name}</div>
+                      {/* The disclosed-agent line, non-negotiable: every buyer
+                          surface that shows a stall names its seller. */}
+                      <div className="event-card-meta">
+                        Sold by <strong>{sellerName}</strong>
+                      </div>
+                      {link.stallPickupInfo ? (
+                        <div className="event-card-meta">{link.stallPickupInfo}</div>
+                      ) : null}
+                      <div className="event-card-foot">
+                        {shopPrice !== null ? (
+                          <span className="event-card-price">
+                            {shopPrice === 0 ? 'Free' : `from ${formatMoney(shopPrice, shop.currency)}`}
+                          </span>
+                        ) : (
+                          <span />
+                        )}
+                        <span className="event-card-go">View stall</span>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+            <p className="muted small">
+              Every stall is its own shop: ordering takes you to their page, and you pay each
+              seller directly into their own account — payments never pass through {SITE_NAME} or
+              the event organizer.
+            </p>
+          </div>
+        </section>
+      )}
 
       {event.description.trim() && (
         <section className="section event-section" id="about">
