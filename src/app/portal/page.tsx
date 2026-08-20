@@ -314,6 +314,20 @@ export default async function PortalDashboardPage({
               <div className="card-title">Create something new</div>
               <CreateEventForm />
             </div>
+
+            {/* Only shown once there are listings: a statements card on an
+                account that has never sold anything is a promise with nothing
+                behind it yet. */}
+            <div className="card anim-fade-up anim-d4" style={{ marginTop: 16 }}>
+              <div className="card-title">Monthly statements</div>
+              <p className="muted small" style={{ marginTop: 0 }}>
+                Simple monthly bookkeeping you can hand to your tax advisor — every euro on it
+                arrived in your own account, and it stays valid after buyer details are erased.
+              </p>
+              <Link href="/portal/statements" className="btn btn-sm">
+                Open statements
+              </Link>
+            </div>
           </>
         )}
       </div>
