@@ -1,4 +1,6 @@
-// Which pages analytics is allowed to see, and why the answer is "not those".
+// The two decisions analytics makes on the client: WHERE it may run, and WHAT
+// it sends when it does. Both live here rather than in the component so both
+// can be tested without a browser.
 //
 // This site has a private half, and its privacy does not come from a login —
 // it comes from the URL itself being a secret:
@@ -77,4 +79,61 @@ export function isPrivatePath(pathname: string): boolean {
   return ANALYTICS_PRIVATE_PREFIXES.some(
     (prefix) => pathname === prefix.replace(/\/$/, '') || pathname.startsWith(prefix)
   );
+}
+
+
+// ---------------------------------------------------------------------------
+// What to send, and in what order
+// ---------------------------------------------------------------------------
+
+/** One gtag command, as it will be pushed into dataLayer. */
+export type GtagCommand = [string, ...unknown[]];
+
+/**
+ * The commands for one render, in the order they must be pushed.
+ *
+ * The order is the entire point, and it is a rule of gtag rather than a
+ * preference: dataLayer is processed in sequence, and an event that arrives
+ * before there is a `config` for its measurement ID is DROPPED. Silently.
+ *
+ * This site shipped exactly that bug to production. The config was injected by
+ * next/script with `afterInteractive` — which defers — while the page view was
+ * pushed from a useEffect, which does not. The view therefore reached the
+ * queue first, was thrown away, and because `send_page_view` had been turned
+ * off there was nothing else to send: the property received nothing at all and
+ * looked precisely like a tag that had never been installed. It took a live
+ * deployment reporting "No data received" to notice.
+ *
+ * So the sequence is decided here, as a pure function, and tested:
+ *
+ *   first render  ->  js, config(send_page_view: true)
+ *   later renders ->  event page_view
+ *
+ * The first view belongs to `config` because that is the one ordering gtag
+ * guarantees. Every later one is sent by hand, because this site navigates
+ * without reloading and gtag would otherwise count a whole visit as one page.
+ */
+export function analyticsCommands(input: {
+  measurementId: string;
+  /** The path being viewed. Never a URL, never with a query string. */
+  pathname: string;
+  /** window.location.origin. */
+  origin: string;
+  /** Has `config` already been sent in this page? */
+  configured: boolean;
+}): GtagCommand[] {
+  const { measurementId, pathname, origin, configured } = input;
+  if (!measurementId) return [];
+
+  // Built from the pathname alone, never from window.location.href: a `?ref=`
+  // share code or a `?token=` pasted into the wrong place must not ride along.
+  const page_location = `${origin}${pathname}`;
+
+  if (!configured) {
+    return [
+      ['js', new Date()],
+      ['config', measurementId, { page_location, send_page_view: true }],
+    ];
+  }
+  return [['event', 'page_view', { page_path: pathname, page_location }]];
 }
