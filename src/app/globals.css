@@ -6107,9 +6107,12 @@ html:has(.event-page.has-section-nav) {
    being compressed rather than shortened, which is the worst of both: cramped
    AND tall.
 
-   So nothing wraps any more, and below 520px each link swaps its long label for
-   a short one. Both links stay visible, which is the point: a header that drops
-   an item on a phone hides the very thing someone went looking for. */
+   So nothing wraps any more, and below 660px each link swaps its long label for
+   a short one. Every link stays visible, which is the point: a header that
+   drops an item on a phone hides the very thing someone went looking for.
+   There are THREE of them since the bazaar joined the row, which moved both
+   breakpoints — see the two media queries below, each with the measurement
+   that set it. */
 
 .header-nav {
   display: flex;
@@ -6127,15 +6130,52 @@ html:has(.event-page.has-section-nav) {
   white-space: nowrap;
 }
 
+/* The bazaar sits between the two in weight, because it sits between them in
+   the row: a warm tint marks it as a place to go, while the solid green button
+   beside it stays the only call to action and the neutral sign-in button after
+   it stays the utility. Amber rather than another purple because the bazaar is
+   the market half of the site — spices and cloth, not a stage. */
+.site-header .header-bazaar {
+  white-space: nowrap;
+  border-color: rgba(251, 191, 36, 0.38);
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.site-header .header-bazaar:hover:not(:disabled) {
+  border-color: var(--amber);
+  background: rgba(251, 191, 36, 0.2);
+}
+
 .header-label-short {
   display: none;
 }
 
-@media (max-width: 520px) {
-  .header-nav {
-    gap: 10px;
+/* Three items beside the wordmark do not fit on a phone. Measured at 375px:
+   the brand lockup is 125.6px of the 335px content box and the three short
+   buttons need 261px, which overflows by ~52px — the exact failure that put
+   the portal's check-in tab off-screen.
+   The word goes and the pennant stays. It is the least load-bearing pixel in
+   the row (the visitor knows which site they are on, the mark is distinctive,
+   and the brand link keeps its full accessible name), and the alternative —
+   wrapping the nav onto a second line — makes a STICKY header ~110px tall on
+   an 812px screen and charges every page for it. 480px, and not the 660px the
+   labels use, because above ~443px the wordmark still fits alongside the three
+   SHORT labels — there is no reason to take it away earlier than it hurts. */
+@media (max-width: 480px) {
+  .site-header .brand .logo-word {
+    display: none;
   }
+}
 
+/* The long labels used to swap out at 520px, which was right for TWO items and
+   wrong the moment there were three: measured with the bazaar added, "Browse
+   events · The bazaar · Organizer sign in" needs about 593px beside the
+   wordmark, so at 521px the row ran 51px past the viewport. Swapped at 660px
+   instead — comfortably clear of that 593px, because these buttons use the
+   system font stack and Segoe UI on Windows sets several percent wider than
+   SF does here. */
+@media (max-width: 660px) {
   .header-label-long {
     display: none;
   }
@@ -6143,9 +6183,16 @@ html:has(.event-page.has-section-nav) {
   .header-label-short {
     display: inline;
   }
+}
+
+@media (max-width: 520px) {
+  .header-nav {
+    gap: 10px;
+  }
 
   /* The wordmark is the widest thing in the row and the least load-bearing —
-     the visitor already knows which site they are on. */
+     the visitor already knows which site they are on. Below 480px it goes
+     entirely; see above. */
   .site-header .brand svg {
     height: 19px;
     width: auto;

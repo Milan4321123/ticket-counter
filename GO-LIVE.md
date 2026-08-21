@@ -252,16 +252,18 @@ At the door:
 
 ### The example bazaar: take it down before you change how payments work
 
-The site can publish a set of **example shops** — seven invented Nepali storefronts with invented sellers and invented collection addresses — so that a seller being shown `/market` sees a full bazaar instead of an empty room. They are created and removed by one script:
+The site can publish an **example shop** — one invented Nepali storefront, with an invented seller and an invented collection address — so that a seller being shown `/market` can see what their own shop here would look like instead of an empty room. It is created and removed by one script:
 
 ```
-npm run seed:bazaar -- --yes-seed-production   # put them up
-npm run seed:bazaar -- --clean                 # take them down
+npm run seed:bazaar -- --yes-seed-production   # put it up
+npm run seed:bazaar -- --clean                 # take it down
 ```
+
+One, not seven: `/market` is where the real sellers list, and invented storefronts standing beside them bury the people actually trading. Six further example shops are kept in the script and seeded only with `--all-shops`, if you ever want a fuller demo. Everything below applies to whichever number is up.
 
 **If those shops are up, run `--clean` BEFORE you change `PAYMENT_MODE`, `PAYPAL_ENV`, `ALLOW_MOCK_PAYMENTS`, or add PayPal credentials — and put them back afterwards if you still want them.**
 
-Why: those listings are published, priced and open for orders, exactly like a real shop. The only thing that stops a buyer being charged is that they have **no payout account** and the site runs in `PAYMENT_MODE=transfer`, where an order against a listing with no payout account is refused outright. That refusal exists in **that mode only**. Switch the site to PayPal (or to mock payments) and the order is no longer refused: it is taken against the *platform's* PayPal credentials, and seven invented shops with invented addresses start accepting real money from real people. Nothing warns you — the change is made in the Render dashboard, and the shops simply begin working.
+Why: those listings are published, priced and open for orders, exactly like a real shop. The only thing that stops a buyer being charged is that they have **no payout account** and the site runs in `PAYMENT_MODE=transfer`, where an order against a listing with no payout account is refused outright. That refusal exists in **that mode only**. Switch the site to PayPal (or to mock payments) and the order is no longer refused: it is taken against the *platform's* PayPal credentials, and an invented shop with an invented address starts accepting real money from real people. Nothing warns you — the change is made in the Render dashboard, and the shops simply begin working.
 
 The seeding script checks the payment mode once, at the moment it runs, and refuses to seed in any other mode. It has no way to check again afterwards, and these rows are meant to stay up for months. `--clean` is the one action that removes the dependency. It needs no flag, works on production exactly as it does locally, and removes only rows whose id begins with `seed-bazaar-`.
 

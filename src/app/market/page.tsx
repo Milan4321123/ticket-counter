@@ -47,6 +47,19 @@ export default function MarketPage() {
   // hidden for skipping an optional field — they just file at the end.
   const uncategorised = shops.filter((s) => !isShopCategory(s.category));
 
+  // The state between "no shops at all" (which has its own page below) and a
+  // stocked bazaar — a handful of shops on one or two shelves. It is where
+  // this page really sits now that the seed publishes ONE example shop rather
+  // than seven (scripts/seed-bazaar.mjs), and it will sit here for a while.
+  //
+  // It does not LOOK broken: .feed-grid centres its columns at max 300px, so a
+  // single tile sits centred at card width instead of stretching across the
+  // page. But the hero above promises a bazaar across Germany, and a visitor
+  // who then counts two tiles is owed the reason in words rather than left to
+  // decide the site is abandoned. One line, and no growth claim we cannot
+  // keep.
+  const isYoungBazaar = shops.length > 0 && shops.length <= 3;
+
   return (
     <>
       <section className="feed-hero" style={{ padding: '64px 0 36px' }}>
@@ -100,6 +113,15 @@ export default function MarketPage() {
             </div>
           ) : (
             <>
+              {isYoungBazaar && (
+                <p
+                  className="muted anim-fade-up"
+                  style={{ textAlign: 'center', maxWidth: 560, margin: '0 auto 30px' }}
+                >
+                  Early days — {shops.length === 1 ? 'one shop' : `${shops.length} shops`} on the
+                  shelves so far. The bazaar fills up as sellers join, and joining is free.
+                </p>
+              )}
               {shelves.map((shelf, i) => (
                 <div key={shelf.key} style={{ marginTop: i === 0 ? 0 : 36 }}>
                   <h2 className="feed-section-title anim-fade-up">{shelf.label}</h2>

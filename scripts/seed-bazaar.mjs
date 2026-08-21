@@ -1,22 +1,28 @@
 #!/usr/bin/env node
-// Fill the bazaar with EXAMPLE shops, so a Nepali seller can see their own.
+// Put ONE worked EXAMPLE shop in the bazaar, so a Nepali seller can see their own.
 //
-// Why this exists: /market groups every published shop by its shelf, and a
-// bazaar with one shop on one shelf does not look like a bazaar — it looks
-// like an empty building with a table in it. Anybody being shown this
-// platform (a seller deciding whether to list, a community group deciding
-// whether to point their members at it) judges it in about four seconds, from
-// the browse page. This script stocks that page: real Nepali products, prices
-// a diaspora buyer would recognise as sane, collection details that sound like
-// a person wrote them, and a cover picture per shop.
+// Why this exists: a seller deciding whether to list, or a community group
+// deciding whether to point their members at this, judges the platform in
+// about four seconds from /market — and a page with nothing on it answers
+// none of their questions. So this script writes a shop that is finished the
+// way a good one would be: real Nepali products, prices a diaspora buyer would
+// recognise as sane, collection details that sound like a person wrote them,
+// and a picture on the shop and on every item.
+//
+// ONE, not a stocked bazaar. That is a change from how this started, and the
+// reason is that /market is not a showroom — real sellers list there. Seven
+// invented storefronts do not fill the room, they bury the people actually
+// trading in it, and a visitor cannot tell which of the tiles are the point.
+// One example answers the only question this seed exists to answer (what would
+// MY shop look like here) and costs the real sellers one tile. The other six
+// shops are still in this file, complete, behind --all-shops for a walkthrough
+// that genuinely wants a full bazaar — see DEFAULT_SHOP_ID.
 //
 // The point is not "look, the software works". The point is THIS COULD BE YOUR
-// SHOP. Every listing is written as an invitation to the seller reading it —
-// here is what your cardamom, your achar, your dhaka would look like on this
-// site, and you can have it, free, in an afternoon — and every one of them
-// says so in the first paragraph and points at /organizers, the page that
-// signs sellers up. The truth underneath is identical to the old wording; only
-// the feeling changed, from a warning to an offer.
+// SHOP. The listing is written as an invitation to the seller reading it —
+// here is what your cardamom would look like on this site, and you can have
+// it, free, in an afternoon — and it says so in the first paragraph and points
+// at /organizers, the page that signs sellers up.
 //
 // This file lives in a PUBLIC repository, and it is meant to be run against
 // the LIVE SITE. Every safeguard below is therefore structural — a refusal, a
@@ -78,7 +84,7 @@
 //     npm run seed:bazaar -- --clean     <- BEFORE touching PAYMENT_MODE,
 //                                           PAYPAL_ENV, or the PayPal keys.
 //
-// What makes these seven listings harmless is not a property of the ROWS. It
+// What makes these listings harmless is not a property of the ROWS. It
 // is a property of the ENVIRONMENT they are standing in. The rows are
 // published, priced and sales-open, exactly like a real shop; the only reason a
 // buyer cannot be charged is the one branch in POST /api/orders that exists
@@ -88,8 +94,8 @@
 //
 // So the day PAYMENT_MODE stops resolving to 'transfer' — a PayPal integration
 // switched on, PAYPAL_CLIENT_ID/SECRET added, PAYPAL_ENV=live, ALLOW_MOCK_
-// PAYMENTS set — seven invented shops with invented collection addresses
-// become genuinely orderable, against the platform's own PayPal credentials,
+// PAYMENTS set — every invented shop with its invented collection address
+// becomes genuinely orderable, against the platform's own PayPal credentials,
 // with nothing in the code left to stop it. Nobody gets a warning: the change
 // is made in the hosting dashboard, and the shops just quietly start working.
 //
@@ -146,7 +152,7 @@
 // plaintext: it is never printed, never written, never leaves the closure that
 // made it. Nobody knows it, so nobody can type it, and the @seed.invalid
 // addresses mean password-reset mail and sign-in codes have nowhere to arrive.
-// A live site is not a place to leave three published storefronts standing
+// A live site is not a place to leave published storefronts standing
 // behind a password somebody once read off a terminal.
 //
 // Stated plainly, because the older wording here said "nobody can sign in as
@@ -206,8 +212,8 @@
 //     localhost, NODE_ENV=production, and a database outside this checkout's
 //     own ./data (GO-LIVE.md sets DATA_DIR=/data). ANY ONE of them is enough,
 //     because being wrong in the cautious direction costs a developer one flag
-//     and being wrong the other way costs a live site three sign-in-able
-//     published storefronts. See PRODUCTION_SIGNALS below.
+//     and being wrong the other way costs a live site sign-in-able published
+//     storefronts. See PRODUCTION_SIGNALS below.
 //     Publishing invented shops into the live feed, /market and the sitemap,
 //     beside real sellers' listings, is a real decision and must be a
 //     deliberate one — so it takes a flag nobody types by accident. WITH the
@@ -251,10 +257,18 @@
 // an interrupted run leaves the site exactly as it found it rather than with
 // no example shops at all: see the comment above the render loop.
 //
-//   node scripts/seed-bazaar.mjs            -> (re)seed the example bazaar
-//   node scripts/seed-bazaar.mjs --clean    -> take it all down again, and exit
+//   node scripts/seed-bazaar.mjs                -> (re)seed the ONE example shop
+//   node scripts/seed-bazaar.mjs --all-shops    -> seed all of them instead
+//   node scripts/seed-bazaar.mjs --clean        -> take it all down again, and exit
 //   npm run seed:bazaar
+//   npm run seed:bazaar -- --all-shops
 //   npm run seed:bazaar -- --clean
+//
+// --all-shops changes the COUNT and nothing else: every safety property below
+// is per-row and applies identically either way. --clean never needs it — it
+// finds seeded rows by their marker in the database, so a --clean after an
+// --all-shops run removes all of them, and so does a plain re-seed (the old
+// seed is deleted in full before the new one is written).
 //
 // On the live server, from the app directory, with the same env the app runs
 // with (so DATA_DIR and NEXT_PUBLIC_BASE_URL point at the real database and
@@ -341,7 +355,7 @@ function dbIsOutsideRepo() {
  * So production is read from things that are actually TRUE on the server,
  * three of them, ORed. The only safe failure here is "treated as production
  * when it was not": that costs a developer one extra flag, while the other
- * direction costs a live site three sign-in-able published storefronts.
+ * direction costs a live site sign-in-able published storefronts.
  *
  *   · NEXT_PUBLIC_BASE_URL names a deployed origin. GO-LIVE.md step 2.4 sets
  *     it to https://martnepali.com on the server; a developer's .env.local
@@ -389,7 +403,7 @@ const mockOverride = process.argv.includes(MOCK_OVERRIDE_FLAG);
 /**
  * getBaseUrl() from src/lib/config.ts, mirrored — same reason resolvePaymentMode
  * is mirrored below. It is printed in the production banner (an owner about to
- * publish seven shops should see WHICH SITE they land on) and it supplies the
+ * publish example shops should see WHICH SITE they land on) and it supplies the
  * /organizers link written into every listing, so a locally seeded shop links
  * to localhost and a production one links to the real domain.
  */
@@ -567,7 +581,20 @@ function announceProductionRun(paymentMode) {
   line(`  · ${IMAGE_COUNT} generated images served from /api/media — a cover, a tile`);
   line(`    and a round mark per shop, plus one per product;`);
   line(`  · ${PRODUCT_COUNT} products, each with its own picture and its own page;`);
-  line(`  · ${SELLERS.length} seller accounts, named as the Veranstalter on those pages.`);
+  line(`  · ${SELLERS.length} seller account(s), named as the Veranstalter on those pages.`);
+  line();
+  // How many, and why that many — the one number an owner should be sure of
+  // before publishing invented shops next to real sellers.
+  if (seedAllShops) {
+    line(`${ALL_SHOPS_FLAG} was given: this is the FULL example bazaar, all`);
+    line(`${ALL_SHOPS.length} of them, rather than the single shop a plain run seeds. On a`);
+    line('live marketplace every extra tile sits in front of somebody who is');
+    line('actually trading. Drop the flag if you did not mean that.');
+  } else {
+    line('That is the default: ONE example shop, so the live /market stays a');
+    line(`page about its real sellers. ${ALL_SHOPS_FLAG} seeds all ${ALL_SHOPS.length}`);
+    line('instead, if a fuller demo is genuinely what you want here.');
+  }
   line();
   line('Each one carries "(example shop)" in its name, says what it is in the');
   line('first paragraph of its description and of its collection details,');
@@ -578,7 +605,7 @@ function announceProductionRun(paymentMode) {
   line(`in '${paymentMode}' mode checkout refuses the order outright. payout_locked = 1.`);
   line('That refusal is a property of PAYMENT_MODE, not of these rows — take');
   line('the bazaar down with --clean BEFORE you ever change how the site takes');
-  line('money, or seven invented shops quietly become orderable.');
+  line(`money, or ${SHOPS.length} invented shop(s) quietly become orderable.`);
   line();
   line('This run hands nobody a password to the seller accounts: it is random,');
   line("hashed, and discarded unprinted, and the rows are written 'disabled'.");
@@ -666,10 +693,17 @@ if (!cleanOnly) {
 }
 
 // ---------------------------------------------------------------------------
-// The sellers. Three accounts, because a marketplace with one seller is a
-// shop; the shops below are split between them the way a real family business
-// splits — the grower's son sells what the hills produce, the Newari kitchen
-// sells what it cooks, and the importer runs the three non-food storefronts.
+// The sellers. Three accounts written the way a real family business splits —
+// the grower's son sells what the hills produce, the Newari kitchen sells what
+// it cooks, and the importer runs the three non-food storefronts.
+//
+// Only the ones that actually OWN a seeded shop are written: SELLERS is
+// derived from SHOPS below, so the default one-shop run creates exactly one
+// account and --all-shops creates all three. An example seller account with no
+// listing behind it is a sign-in-able row that nothing on the site explains —
+// pure surface, no showcase. (Cleanup is unaffected either way: --clean finds
+// seller rows by the marker in the database, not from this list, so accounts
+// left over from a fuller run are still removed.)
 //
 // The display name carries "(example seller)" because it is PUBLIC: it is the
 // Veranstalter named on the listing and the name in "Ask … a question". A
@@ -692,7 +726,7 @@ const EXAMPLE_SELLER_NOTE =
     : 'Password is random per run and printed by that run only. ') +
   'Delete with `npm run seed:bazaar -- --clean`.';
 
-const SELLERS = [
+const ALL_SELLERS = [
   {
     id: `${MARKER}seller-rajendra`,
     name: 'Rajendra Limbu (example seller)',
@@ -717,8 +751,12 @@ const SELLERS = [
 // The shops. `category` keys come from src/lib/categories.ts and are checked
 // against it below, so a renamed shelf fails here instead of quietly filing
 // every example shop under "uncategorised".
+//
+// ALL of them live here, but a default run seeds only the FIRST — see
+// DEFAULT_SHOP_ID under the array. The rest are kept, in full, behind
+// --all-shops.
 // ---------------------------------------------------------------------------
-const SHOPS = [
+const ALL_SHOPS = [
   // ------------------------------------------------------------------ HERO --
   {
     slug: 'taplejung-alaichi-ghar',
@@ -1431,6 +1469,56 @@ Cushion and striker are not included at this size — most people at this point 
     ],
   },
 ];
+
+/**
+ * ONE example shop by default, and which one.
+ *
+ * The cardamom shop, because it is the best-written page of the set and it is
+ * the thing the owner actually knows about — a seller reading it can tell the
+ * difference between a page somebody cared about and filler, and that
+ * difference is the entire pitch.
+ *
+ * Why one and not seven: /market is a REAL marketplace with real sellers on
+ * it, and seven invented storefronts do not "fill the room" so much as bury
+ * the people who are actually trading. One is enough to answer the only
+ * question this seed exists to answer — what would MY shop look like here —
+ * and it is the smallest amount of invented seller that answers it. Every
+ * safety property below is per-row and unchanged; this only changes how many
+ * rows there are.
+ */
+const DEFAULT_SHOP_ID = `${MARKER}alaichi`;
+
+/**
+ * The fuller demo, one flag away. Nothing is deleted from this file when the
+ * default shrinks — six good pages that took real work to write are not worth
+ * losing to a count, and a walkthrough that wants a stocked bazaar (several
+ * shelves, three sellers, category grouping doing something visible) gets it
+ * by typing the flag.
+ */
+const ALL_SHOPS_FLAG = '--all-shops';
+const seedAllShops = process.argv.includes(ALL_SHOPS_FLAG);
+
+const SHOPS = seedAllShops ? ALL_SHOPS : ALL_SHOPS.filter((s) => s.id === DEFAULT_SHOP_ID);
+
+// A renamed or deleted hero shop would otherwise seed NOTHING and report it
+// cheerfully — an empty bazaar that claims to have been filled. Fail here.
+// Never on the --clean path: removal reads the marker out of the DATABASE and
+// does not care what this file currently lists, and a cleanup that a typo in
+// DEFAULT_SHOP_ID could block is exactly the failure this script must not have.
+if (!cleanOnly && !SHOPS.length) {
+  console.error(
+    `The default example shop (${DEFAULT_SHOP_ID}) is not in ALL_SHOPS — it has been renamed or removed.\n` +
+      `Point DEFAULT_SHOP_ID at the shop that should stand alone, or run with ${ALL_SHOPS_FLAG}.`
+  );
+  process.exit(1);
+}
+
+/**
+ * The sellers that own something in THIS run. See the note above ALL_SELLERS:
+ * an example account with no listing behind it is surface without a showcase,
+ * and on production it would be a disabled row nothing on the site explains.
+ */
+const SELLERS = ALL_SELLERS.filter((seller) => SHOPS.some((shop) => shop.seller === seller.id));
 
 /**
  * How many products the bazaar sells, and how many pictures it generates.
@@ -2392,21 +2480,23 @@ const euro = (cents) => `€${(cents / 100).toFixed(2)}`;
 console.log(`\nSeeded the example bazaar into ${dbPath}`);
 console.log(`Site: ${BASE_URL}${isProduction ? '   (PRODUCTION — these are live and public now)' : ''}\n`);
 
-console.log(`${SELLERS.length} example seller accounts (status '${SELLER_STATUS}'):`);
+console.log(`${SELLERS.length} example seller account${SELLERS.length === 1 ? '' : 's'} (status '${SELLER_STATUS}'):`);
 for (const s of SELLERS) console.log(`  ${s.name.padEnd(34)} ${s.email}`);
 
 if (ACCOUNT.printable) {
-  console.log(`\n  PASSWORD FOR ALL THREE, THIS RUN ONLY: ${ACCOUNT.printable}`);
+  console.log(
+    `\n  PASSWORD FOR ${SELLERS.length === 1 ? 'THE ACCOUNT' : `ALL ${SELLERS.length}`}, THIS RUN ONLY: ${ACCOUNT.printable}`
+  );
   console.log(`  It is random, generated a moment ago, printed here and nowhere else — there is no`);
   console.log(`  password in the script to find in the repository. Copy it now; if you lose it, just`);
   console.log(`  re-run and get a new one.`);
-  console.log(`\n  What these accounts can do: sign in at /portal/login, open and edit the ${SHOPS.length} example`);
-  console.log(`  listings, and be shown to somebody. What they cannot do: touch a real organizer's`);
-  console.log(`  listing, order or payout account (they own nothing but ${MARKER}* rows), take money`);
-  console.log(`  (no payout route, and checkout refuses), or redirect money IMMEDIATELY (payout_locked`);
-  console.log(`  is 1, so any account added waits 24 hours and is written to the audit trail; the`);
-  console.log(`  warning email goes to @seed.invalid, so the delay and the record are the real`);
-  console.log(`  protection here, not the alarm).`);
+  console.log(`\n  What a seeded account can do: sign in at /portal/login, open and edit the ${SHOPS.length}`);
+  console.log(`  example listing${SHOPS.length === 1 ? '' : 's'}, and be shown to somebody. What it cannot do: touch a real`);
+  console.log(`  organizer's listing, order or payout account (it owns nothing but ${MARKER}* rows),`);
+  console.log(`  take money (no payout route, and checkout refuses), or redirect money IMMEDIATELY`);
+  console.log(`  (payout_locked is 1, so any account added waits 24 hours and is written to the`);
+  console.log(`  audit trail; the warning email goes to @seed.invalid, so the delay and the record`);
+  console.log(`  are the real protection here, not the alarm).`);
   console.log(`  The addresses are @seed.invalid — deliberately undeliverable, so nothing can ever`);
   console.log(`  email a person who does not exist. (If you switch PORTAL_EMAIL_OTP on, these`);
   console.log(`  accounts can no longer sign in at all, because their code has nowhere to go.)`);
@@ -2435,7 +2525,9 @@ if (ACCOUNT.printable) {
   console.log(`  production signals, and that run prints a password.\n`);
 }
 
-console.log(`${SHOPS.length} shops, all published as EXAMPLE listings, sales open, EUR:`);
+console.log(
+  `${SHOPS.length} shop${SHOPS.length === 1 ? '' : 's'}, published as EXAMPLE listing${SHOPS.length === 1 ? '' : 's'}, sales open, EUR:`
+);
 for (const shop of SHOPS) {
   const prices = shop.tiers.map((t) => t.price);
   console.log(
@@ -2443,6 +2535,22 @@ for (const shop of SHOPS) {
       `${String(shop.tiers.length).padStart(2)} products  ${euro(Math.min(...prices))}–${euro(Math.max(...prices))}  /e/${shop.slug}`
   );
 }
+// The count is a decision, so say which one this run made and how to make the
+// other one — otherwise "only one shop appeared" reads as a bug rather than as
+// the default it is.
+if (seedAllShops) {
+  console.log(`\n  ${ALL_SHOPS_FLAG} was given, so the FULL example bazaar is up: ${ALL_SHOPS.length} shops`);
+  console.log(`  across several shelves. A plain re-run puts it back to the single default shop`);
+  console.log(`  (${DEFAULT_SHOP_ID}) and removes the rest, rows and pictures alike.`);
+} else {
+  console.log(`\n  ONE example shop by default — /market belongs to the real sellers on it, and`);
+  console.log(`  invented storefronts beside them bury the people actually trading. The other`);
+  console.log(`  ${ALL_SHOPS.length - SHOPS.length} example shops are still in scripts/seed-bazaar.mjs, complete, one flag away:`);
+  console.log(`      npm run seed:bazaar -- ${ALL_SHOPS_FLAG}`);
+  console.log(`  That re-seeds in place — it does not double up — and a plain run brings it back`);
+  console.log(`  to this one shop again.`);
+}
+
 console.log(`\n  Each one says what it is in its name, in the first paragraph of its description,`);
 console.log(`  in the first paragraph of its collection details, on its cover art and to the AI`);
 console.log(`  assistant — so a buyer cannot arrange a collection with somebody who does not`);
@@ -2474,7 +2582,9 @@ console.log(`  *`);
 console.log(`  *  TAKE THE EXAMPLE BAZAAR DOWN BEFORE YOU CHANGE HOW THE SITE`);
 console.log(`  *  TAKES MONEY:   npm run seed:bazaar -- --clean`);
 console.log(`  *`);
-console.log(`  *  These ${SHOPS.length} listings are published, priced and open for orders,`);
+console.log(
+  `  *  ${SHOPS.length === 1 ? 'This listing is' : `These ${SHOPS.length} listings are`} published, priced and open for orders,`
+);
 console.log(`  *  exactly like a real shop. The ONLY reason a buyer cannot be`);
 console.log(`  *  charged is the one branch of POST /api/orders that exists in`);
 console.log(`  *  'transfer' mode. This script checked that once, just now, and`);
@@ -2482,8 +2592,8 @@ console.log(`  *  can never check it again — and these rows are meant to stay 
 console.log(`  *`);
 console.log(`  *  So the day PAYMENT_MODE stops resolving to 'transfer' — PayPal`);
 console.log(`  *  switched on, PAYPAL_CLIENT_ID/SECRET added, PAYPAL_ENV=live,`);
-console.log(`  *  ALLOW_MOCK_PAYMENTS set — these seven invented shops with their`);
-console.log(`  *  invented collection addresses become genuinely orderable, and`);
+console.log(`  *  ALLOW_MOCK_PAYMENTS set — ${SHOPS.length === 1 ? 'this invented shop with its' : `these ${SHOPS.length} invented shops with their`}`);
+console.log(`  *  invented collection address${SHOPS.length === 1 ? '' : 'es'} become${SHOPS.length === 1 ? 's' : ''} genuinely orderable, and`);
 console.log(`  *  nothing in the code is left to stop it. The change is made in`);
 console.log(`  *  the hosting dashboard and nobody gets a warning.`);
 console.log(`  *`);
@@ -2513,8 +2623,12 @@ console.log(`  #  Run it from this directory with the same environment (so DATA_
 console.log(`  #  still points at ${dbPath}).`);
 console.log(`  #  It needs no flag and works on production exactly as it does here.`);
 console.log(`  #`);
-console.log(`  #  It removes the ${SHOPS.length} listings, their ${PRODUCT_COUNT} products, their ${IMAGE_COUNT} images, the`);
-console.log(`  #  ${SELLERS.length} accounts, and everything that hangs off them — visitor`);
+console.log(
+  `  #  It removes the ${SHOPS.length} listing${SHOPS.length === 1 ? '' : 's'}, their ${PRODUCT_COUNT} products, their ${IMAGE_COUNT} images, the`
+);
+console.log(
+  `  #  ${SELLERS.length} account${SELLERS.length === 1 ? '' : 's'}, and everything that hangs off them — visitor`
+);
 console.log(`  #  questions, FAQs, posts, waitlist entries, stall links, promo`);
 console.log(`  #  codes, payout records — because with foreign keys on, one child`);
 console.log(`  #  row left behind fails the whole delete. And nothing else, ever:`);
@@ -2529,7 +2643,7 @@ console.log(`double up. Every picture is rendered before the database is touched
 console.log(`seed is removed and the new one written in one transaction — an interrupted run`);
 console.log(`changes nothing.`);
 if (isProduction) {
-  console.log(`\nThe live site now shows ${SHOPS.length} example shops. Every one of them is an invitation`);
+  console.log(`\nThe live site now shows ${SHOPS.length} example shop${SHOPS.length === 1 ? '' : 's'}. Every one of them is an invitation`);
   console.log(`to a Nepali seller to open a real one at ${ORGANIZERS_LINK}.`);
 }
 console.log('');

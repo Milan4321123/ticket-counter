@@ -101,13 +101,31 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   the width where the long one stops fitting. A phone gets the
                   short one; the accessible name stays the full phrase either
                   way, so nothing is lost to a screen reader. Shortening beats
-                  hiding: the visitor asked for BOTH of these to stay visible,
-                  and a nav that drops an item on small screens is a nav that
-                  hides the thing you were looking for. */}
+                  hiding: all three of these are meant to stay visible, and a
+                  nav that drops an item on small screens is a nav that hides
+                  the thing you were looking for.
+                  Three of them no longer fit beside the wordmark on a phone —
+                  measured, not assumed — so below 480px the header keeps the
+                  pennant mark and drops the word. See globals.css. */}
               <Link href="/" className="btn btn-sm btn-green" aria-label="Browse events">
                 <span className="header-label-long">Browse events</span>
                 <span className="header-label-short" aria-hidden="true">
                   Browse
+                </span>
+              </Link>
+              {/* The bazaar had exactly one link in the whole site — the
+                  footer — so a visitor who landed on any page had no visible
+                  way to it, and the shops might as well not have existed.
+                  Second of three on purpose: browsing events is still the only
+                  brand-coloured call to action, this is the site's other
+                  BUYER destination and sits straight after it, and organizer
+                  sign-in stays last because it is a utility for the few. The
+                  warm tint puts it between the two in weight — clearly a place
+                  to go, clearly not competing with the green button. */}
+              <Link href="/market" className="btn btn-sm header-bazaar" aria-label="The bazaar">
+                <span className="header-label-long">The bazaar</span>
+                <span className="header-label-short" aria-hidden="true">
+                  Bazaar
                 </span>
               </Link>
               {/* Named for what it does. The home page's "For organizers"
