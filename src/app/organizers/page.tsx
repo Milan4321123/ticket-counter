@@ -5,6 +5,7 @@ import PlatformAssistant from '@/components/PlatformAssistant';
 import EditorMock from '@/components/mockups/EditorMock';
 import EventPageMock from '@/components/mockups/EventPageMock';
 import InsightsMock from '@/components/mockups/InsightsMock';
+import ShopMock from '@/components/mockups/ShopMock';
 
 // The brand name comes from an env var — read it fresh on every request.
 export const dynamic = 'force-dynamic';
@@ -16,11 +17,12 @@ export const dynamic = 'force-dynamic';
  */
 export async function generateMetadata() {
   const brand = platformNameFromEnv();
-  const title = `Sell tickets on ${brand} — for organizers`;
+  const title = `Sell tickets or open a shop on ${brand} — organizers & sellers`;
   const description =
-    `Your own beautiful event page, QR tickets, door scanning — or a shop in the bazaar with QR ` +
-    `collection codes. Every payment lands straight in your own bank account. Completely free — ` +
-    `no fees, no commission on your sales.`;
+    `Your own beautiful event page with QR tickets and door scanning — or your own shop in the ` +
+    `bazaar, items with photos and their own pages, orders collected with a QR code. Every ` +
+    `payment lands straight in your own bank account. Completely free — no fees, no commission ` +
+    `on your sales.`;
   return {
     title,
     description,
@@ -30,11 +32,11 @@ export async function generateMetadata() {
 }
 
 const INCLUDED: string[] = [
-  'No commission on ticket sales',
+  'No commission on your sales',
   'Payments straight to your bank',
-  'QR tickets emailed automatically',
-  'Door scanning links for staff',
-  'Sales analytics & guest insights',
+  'QR tickets & collection codes emailed',
+  'Door & counter scanning links',
+  'Sales analytics & buyer insights',
   'WhatsApp poster in one tap',
   'Sold-out waitlist',
   'Table & group bookings',
@@ -44,7 +46,14 @@ const INCLUDED: string[] = [
   'AI question assistant, 24/7',
   'Automatic payment reminders',
   'Student tiers with ID checks',
-  'Event page updates and built-in FAQ',
+  'Page updates and built-in FAQ',
+  // The shop half. Listed here rather than only in its feature row: this band
+  // is what somebody screenshots to decide, and a seller reading fourteen
+  // ticket features would conclude the goods side is an afterthought.
+  'Your own shop page in the bazaar',
+  'Item pages with photos & live stock',
+  'Found in the bazaar-wide item search',
+  'Monthly statements for your books',
   'Free account, free publishing',
 ];
 
@@ -67,7 +76,7 @@ export default function OrganizersPage() {
       {/* ---- Hero ---- */}
       <section className="feed-hero">
         <div className="container">
-          <p className="feed-kicker anim-fade-up">For event organizers</p>
+          <p className="feed-kicker anim-fade-up">For organizers &amp; sellers</p>
           <h1 className="anim-fade-up anim-d1">
             Sell tickets for your event — the easy way
           </h1>
@@ -101,6 +110,17 @@ export default function OrganizersPage() {
             <Link href="/" className="btn btn-lg">
               See a live event page
             </Link>
+          </p>
+          {/* The other half of who this page is for, said in the hero rather
+              than only two thousand words down. It is a line and a link, not a
+              second pitch: the shop row below does the pitching, and a hero
+              that argued for both at equal length would sell neither. */}
+          <p className="muted small anim-fade-up anim-d3" style={{ marginTop: 10 }}>
+            Selling goods rather than staging a night?{' '}
+            <a href="#shop" style={{ color: 'var(--brand-text)', fontWeight: 700 }}>
+              Open a shop in the bazaar instead &rarr;
+            </a>{' '}
+            Same toolkit, same price: free.
           </p>
         </div>
       </section>
@@ -273,31 +293,57 @@ export default function OrganizersPage() {
               <InsightsMock />
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* ---- The other door in: sellers, not organizers ----
-           Right after the feature tour, because everything it just showed — the
-           page, the orders, the scanning, the numbers — is the same machine a
-           shop runs on. Compact on purpose: a full pitch would repeat the page. */}
-      <section className="section">
-        <div className="container">
-          <div className="cta-band anim-fade-up">
-            <div>
-              <h2 className="cta-band-title">Not putting on an event? Open a shop.</h2>
-              <p className="cta-band-body">
-                The same toolkit sells goods: your own shop page in the bazaar — momo to
-                pre-order, sweets, crafts, whatever you make — with orders that arrive as QR
-                collection codes you scan when the buyer picks up. Buyers pay you directly, so
-                the money lands straight in your own account, and we keep the books for you:
-                live Insights, plus a monthly statement you can hand to a tax advisor as it is.
+          {/* The other door in: sellers, not organizers.
+              A full feature row rather than the one-paragraph band this used
+              to be. Every mock above it is an EVENT, so someone who could run
+              a shop read four screenshots of a thing they are not doing and
+              one paragraph asking them to imagine the rest. It sits last, and
+              inside the same tour, because everything the rows above showed —
+              the page, the orders, the scanning, the numbers — is the same
+              machine a shop runs on; this row only says what changes.
+              Unflipped, so the left-right rhythm carries on from Insights. */}
+          <div className="feat-row" id="shop" style={{ scrollMarginTop: 90 }}>
+            <div className="feat-copy anim-fade-up">
+              <p className="feed-kicker">Your shop in the bazaar</p>
+              <h2 className="feat-title">Selling something rather than staging something?</h2>
+              <ul className="feat-points">
+                <FeatPoint>
+                  <strong>Your own shop page in the bazaar</strong> — filed on a shelf shoppers
+                  browse, and everything you sell turns up in the bazaar&rsquo;s item search
+                  alongside every other seller&rsquo;s.
+                </FeatPoint>
+                <FeatPoint>
+                  <strong>Items with photos, each on its own page</strong> — a picture, your own
+                  write-up, the price and what is left in stock. Momo to pre-order, achar,
+                  sweets, spices, crafts, whatever you make.
+                </FeatPoint>
+                <FeatPoint>
+                  <strong>Orders arrive as QR collection codes</strong> — scan the buyer&rsquo;s
+                  code at the counter when they pick up, the same way a door scanner works.
+                </FeatPoint>
+                <FeatPoint>
+                  <strong>Buyers pay you directly</strong> — into your own account. We never hold
+                  your money, so there is no payout to wait for.
+                </FeatPoint>
+                <FeatPoint>
+                  <strong>The books kept for you</strong> — live Insights on what is selling, plus
+                  a monthly statement you can hand to a tax advisor as it is.
+                </FeatPoint>
+              </ul>
+              <p className="muted small" style={{ margin: '14px 0 0' }}>
+                Free while we grow, exactly like the event side: no fees, no commission, nothing
+                taken out of a single jar you sell.
+              </p>
+              <p style={{ margin: '14px 0 0' }}>
+                <Link href="/contact?intent=account" className="btn btn-brand btn-lg">
+                  Get started
+                </Link>
               </p>
             </div>
-            <p className="cta-band-actions">
-              <Link href="/contact?intent=account" className="btn btn-brand btn-lg">
-                Get started
-              </Link>
-            </p>
+            <div className="anim-fade-up anim-d1">
+              <ShopMock />
+            </div>
           </div>
         </div>
       </section>

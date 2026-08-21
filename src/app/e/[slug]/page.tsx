@@ -34,11 +34,11 @@ import {
 } from '@/lib/events';
 import type { EventRow, PageDesign } from '@/lib/events';
 import { ACCENT_THEMES } from '@/lib/accents';
-import type { EventKind } from '@/lib/types';
 import { listStallLinksForShop, listVisibleStallsForEvent, stallBannerVisibleOnShopPage } from '@/lib/stalls';
 import type { StallLinkRow } from '@/lib/stalls';
 import { listingStillUrl, socialImageUrl } from '@/lib/listing';
 import { BADGE_TONE, PLACEHOLDER_GRADIENTS } from '@/components/EventCard';
+import { howItWorks } from '@/lib/howItWorks';
 import { vocabFor } from '@/lib/vocab';
 import { loadFeedSnapshot } from '@/lib/feedSnapshot';
 import { getAvailability } from '@/lib/inventory';
@@ -88,55 +88,6 @@ function vibeTuning(vibe: PageDesign['vibe']): {
     default:
       return { hero: {}, h1: {} };
   }
-}
-
-/**
- * The four steps, told for THIS listing: an organizer who also takes PayPal
- * should not have their page promising a bank transfer is the only way, and one
- * who does not must not have PayPal dangled in front of their buyers.
- *
- * A shop runs the identical four steps — reserve, pay, confirmed, show the code
- * — so only the nouns and the last step's setting change.
- */
-function howItWorks(takesPaypal: boolean, kind: EventKind) {
-  const isShop = kind === 'shop';
-  return [
-    isShop
-      ? {
-          title: 'Place your order',
-          desc: 'Pick what you want at checkout and reserve it in one click — no account needed, and your items are held for you right away.',
-        }
-      : {
-          title: 'Reserve your tickets',
-          desc: 'Pick your tickets at checkout and reserve them in one click — no account needed, and your seats are held for you right away.',
-        },
-    takesPaypal
-      ? {
-          title: 'Pay by bank transfer or PayPal',
-          desc: 'You get the organizer’s bank details, their PayPal address, and a personal payment reference. Send the money whichever way suits you — just remember to include the reference.',
-        }
-      : {
-          title: 'Pay by bank transfer',
-          desc: 'You get the organizer’s bank details and a personal payment reference. Send a normal transfer from any bank app — just remember to include the reference.',
-        },
-    {
-      title: 'Your payment is confirmed',
-      desc:
-        (takesPaypal
-          ? 'PayPal usually arrives within minutes and a bank transfer takes 1–2 business days. As soon as yours lands, the seller confirms it and your '
-          : 'As soon as the transfer arrives (usually 1–2 business days), the seller confirms it and your ') +
-        (isShop ? 'QR collection code is emailed to you.' : 'QR-code tickets land in your inbox.'),
-    },
-    isShop
-      ? {
-          title: 'Show the code when you collect',
-          desc: 'Bring your code on your phone or on paper. One quick scan when you arrive and your order is handed over.',
-        }
-      : {
-          title: 'Show the QR code at the door',
-          desc: 'Bring your QR codes on your phone or on paper. One quick scan per ticket and you are in — enjoy the show!',
-        },
-  ];
 }
 
 function CalendarIcon() {

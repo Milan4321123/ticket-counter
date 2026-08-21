@@ -641,8 +641,13 @@ summary {
     0 16px 40px -22px rgba(139, 92, 246, 0.4);
 }
 
-/* A tier card that is an <a>. Only rendered as a link when the type can
-   actually be bought, so this styling never advertises a dead click. */
+/* A tier card that is an <a>. Two callers, and they point at different things
+   on purpose:
+     - a shop's own page makes the card a link only when the type can actually
+       be BOUGHT, so the styling never advertises a dead checkout;
+     - /market/items makes every card a link to that item's own PAGE, which
+       renders for any visible tier — sold out or not, there is always
+       something there to read. */
 .tier-card-link {
   text-decoration: none;
   color: inherit;
@@ -2845,6 +2850,92 @@ summary {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ---------- Shop mock internals ---------- */
+
+/* Goods sit in a grid of pictures with prices under them, where an event's
+   ticket tiers are text rows (.mock-tier). That difference is the whole point
+   of the shot: a glance has to say "things for sale", not "seats". */
+
+.mock-goods {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7em;
+  margin: 1.2em 0 1em;
+}
+
+.mock-good {
+  border: 1px solid var(--border);
+  border-radius: 0.8em;
+  background: var(--bg-card);
+  /* The picture area runs edge to edge inside the tile, so the rounded corner
+     has to clip it rather than the picture squaring it off. */
+  overflow: hidden;
+}
+
+/* The photo. Colour comes from the existing .mock-thumb-a/b/c gradients the
+   editor mock already uses, so a goods tile costs no new palette. */
+
+.mock-good-pic {
+  height: 3.7em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.mock-good-glyph {
+  width: 2em;
+  height: 2em;
+  color: #fff;
+  opacity: 0.72;
+}
+
+.mock-good-body {
+  padding: 0.55em 0.65em 0.7em;
+}
+
+.mock-good-name {
+  font-size: 0.8em;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.mock-good-price {
+  font-size: 0.92em;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  margin-top: 0.2em;
+}
+
+/* Stacked under the price, not beside it: a tile is barely 100px wide on a
+   phone, and a price and a chip on one line would collide there. */
+
+.mock-avail {
+  display: inline-block;
+  margin-top: 0.4em;
+  font-size: 0.62em;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--green);
+  background: var(--green-soft);
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  border-radius: 999px;
+  padding: 0.2em 0.7em;
+}
+
+/* Running low — the same amber the real listing badge uses for "Only N left". */
+
+.mock-avail-low {
+  color: var(--amber);
+  background: var(--amber-soft);
+  border-color: rgba(251, 191, 36, 0.4);
+}
+
+.mock-goods-foot {
+  margin-bottom: 1.1em;
 }
 
 /* ---------- Editor mock internals ---------- */
@@ -6711,6 +6802,49 @@ html:has(.event-page.has-section-nav) {
   object-fit: cover;
   border-radius: var(--radius) var(--radius) 0 0;
   background: var(--bg-elevated);
+}
+
+/* The stand-in when an item has no picture of its own, on a grid where every
+   tile beside it does — /market/items, which lays goods from every shop side
+   by side. On an event page a photo-less ticket type simply has no frame,
+   because most never will and a row of grey boxes would make a finished page
+   look half-built. In a grid of PRODUCTS the opposite is true: a card that
+   starts with text where its neighbours start with a photograph reads as an
+   image that failed to load. The item's initial on the accent wash — the same
+   treatment .item-photo-blank gives the item page — reads as a decision. */
+.tier-card-photo-blank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse 70% 70% at 30% 10%, var(--accent-soft), transparent),
+    var(--bg-elevated);
+}
+
+.tier-card-photo-blank span {
+  font-family: var(--font-display, var(--font));
+  font-size: 2.6rem;
+  font-weight: 800;
+  color: var(--accent-text);
+  opacity: 0.7;
+}
+
+/* The bazaar-wide search: one box and its button on a line, wrapping to two on
+   a narrow phone rather than squeezing the input down to a few characters.
+   min-width on the field is what makes the wrap happen instead of the shrink —
+   flex items refuse to go below their content otherwise, and a search box you
+   cannot read what you typed into is not a search box. */
+.market-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.market-search .input {
+  flex: 1 1 220px;
+  min-width: 0;
+  width: auto;
 }
 
 /* The tier NAME is the link to the item page, and its ::after covers the whole

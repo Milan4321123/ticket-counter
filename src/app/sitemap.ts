@@ -35,6 +35,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // The bazaar: every published shop, grouped by category. Weekly — shops
     // come and go far more slowly than the event feed turns over.
     { url: `${base}/market`, changeFrequency: 'weekly', priority: 0.8 },
+    // The same bazaar goods-first: every item every published shop sells, on
+    // one page. Daily rather than weekly — a shop's shelves turn over (and
+    // sell out) far faster than the list of shops does. Only the BARE URL is
+    // offered: every ?q= and ?c= is a slice of this list, the page canonicals
+    // them all back to here, and a sitemap full of search results is how a
+    // domain teaches a crawler that most of its pages are near-duplicates.
+    { url: `${base}/market/items`, changeFrequency: 'daily', priority: 0.8 },
     // The evergreen festival pages: same URL every year, so their search
     // standing compounds. Weekly — the events listed on them change.
     { url: `${base}/dashain`, changeFrequency: 'weekly', priority: 0.8 },

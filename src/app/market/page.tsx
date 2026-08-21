@@ -3,6 +3,7 @@ import EventCard from '@/components/EventCard';
 import { SHOP_CATEGORIES, isShopCategory } from '@/lib/categories';
 import { listPublishedEvents } from '@/lib/events';
 import { loadFeedSnapshot } from '@/lib/feedSnapshot';
+import { howItWorks } from '@/lib/howItWorks';
 import { platformNameFromEnv } from '@/lib/platform';
 
 // The public bazaar: every published shop on the platform, grouped by the
@@ -85,6 +86,18 @@ export default function MarketPage() {
             directly, and collect with the QR code on your order. No middleman between you and
             the person who made it.
           </p>
+          {/* The same bazaar the other way round. Named rather than hinted at,
+              because "browse" on its own does not tell anybody which of two
+              pages they are about to land on: this one is a wall of SHOPS,
+              that one is a wall of GOODS with a search box over it. Somebody
+              who came looking for a seller wants this page; somebody who came
+              looking for sel roti wants that one, and until now had to guess a
+              shop before they could see a single thing on sale. */}
+          <p className="anim-fade-up anim-d3" style={{ marginTop: 18 }}>
+            <Link href="/market/items" className="btn btn-brand">
+              Browse everything on sale →
+            </Link>
+          </p>
         </div>
       </section>
 
@@ -145,6 +158,51 @@ export default function MarketPage() {
                   </div>
                 </div>
               )}
+              {/* How buying here actually WORKS.
+                  The page above sells the feeling — momo folded the way
+                  somebody's mother taught them — and then leaves a first-time
+                  visitor to open a shop before they learn there is no card
+                  field, that they transfer the money to the seller themselves,
+                  and that what arrives is a code to show at a door. That is a
+                  surprising enough shape that it should not be a surprise.
+
+                  Four steps, and not one word of them written here: they come
+                  from lib/howItWorks, the same function every seller's own
+                  page calls, so the bazaar's front page and a shop's page
+                  cannot promise different things. 'varies' is what this page
+                  honestly knows about payment — each seller chooses their own
+                  routes, and only their own page can say which.
+
+                  Kept short and placed BELOW the shelves: the shops are the
+                  point of this page, and an explainer above them would be a
+                  wall of process in front of the thing people came for. */}
+              <div style={{ marginTop: 44 }}>
+                <h2 className="feed-section-title anim-fade-up">How ordering works here</h2>
+                <p className="muted anim-fade-up" style={{ margin: '4px 0 0' }}>
+                  Every shop is run by its own seller. You order from them, pay them, and collect
+                  from them — {platformNameFromEnv()} is only the software in between, and never
+                  touches the money.
+                </p>
+                <ol className="step-list anim-fade-up" style={{ maxWidth: 680, marginTop: 20 }}>
+                  {howItWorks('varies', 'shop').map((item, i) => (
+                    <li className="step-item" key={item.title}>
+                      <span className="step-num">{i + 1}</span>
+                      <div>
+                        <div className="tier-name">{item.title}</div>
+                        <p className="tier-desc" style={{ margin: '2px 0 0' }}>
+                          {item.desc}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+                <p className="muted small anim-fade-up" style={{ maxWidth: 680, margin: '4px 0 0' }}>
+                  Each seller sets their own prices, their own collection days and how long they
+                  hold an order — their shop&rsquo;s own page says which, and that page is the one
+                  that counts.
+                </p>
+              </div>
+
               {/* One quiet line for the seller scrolling past the shelves and
                   thinking "I could do this" — because they can, for nothing. */}
               <p className="muted anim-fade-up" style={{ textAlign: 'center', marginTop: 40 }}>
