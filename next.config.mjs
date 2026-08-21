@@ -8,6 +8,35 @@ const isProd = process.env.NODE_ENV === 'production';
 // keeps working). The real wins here are frame-ancestors (anti-clickjacking of
 // the admin + checkout), object-src 'none', and base-uri 'self'.
 const PAYPAL = 'https://www.paypal.com https://www.paypalobjects.com';
+
+/**
+ * Google Analytics, in the Content-Security-Policy — but only when analytics
+ * is actually configured.
+ *
+ * The CSP is `default-src 'self'`, which is why this is needed at all: without
+ * these origins listed, the browser refuses to load gtag.js and refuses to let
+ * it send anything, and it does so SILENTLY apart from a console message
+ * nobody is looking at. The symptom is a Google property reporting "No data
+ * received" while the tag is demonstrably present in the page — which is
+ * exactly how this site spent its first day with analytics installed.
+ *
+ * Three directives, because GA uses three kinds of request:
+ *   script-src   loading gtag.js itself from googletagmanager.com
+ *   connect-src  the beacons — google-analytics.com, and the region-specific
+ *                *.analytics.google.com endpoints GA4 picks for EU traffic
+ *   img-src      the pixel fallback gtag uses when fetch/beacon is unavailable
+ *
+ * Gated on the measurement ID so a deployment that runs no analytics keeps the
+ * tighter policy. Read at BUILD time, exactly like the ID itself: this is the
+ * same NEXT_PUBLIC_GA_ID that decides whether the component does anything, so
+ * the policy and the code can never disagree about whether GA is in use.
+ */
+const GA_ID = (process.env.NEXT_PUBLIC_GA_ID || '').trim();
+const GA_SCRIPT = GA_ID ? ' https://www.googletagmanager.com' : '';
+const GA_CONNECT = GA_ID
+  ? ' https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com'
+  : '';
+const GA_IMG = GA_ID ? ' https://www.google-analytics.com https://*.google-analytics.com' : '';
 const csp = [
   `default-src 'self'`,
   `base-uri 'self'`,
@@ -16,12 +45,12 @@ const csp = [
   `form-action 'self' https://www.paypal.com`,
   // 'unsafe-eval' is dev-only: next dev's hot-reload runtime needs eval, and
   // without it every page's JS dies silently (dead buttons). Never in prod.
-  `script-src 'self' 'unsafe-inline'${isProd ? '' : " 'unsafe-eval'"} ${PAYPAL}`,
+  `script-src 'self' 'unsafe-inline'${isProd ? '' : " 'unsafe-eval'"} ${PAYPAL}${GA_SCRIPT}`,
   `style-src 'self' 'unsafe-inline'`,
-  `img-src 'self' data: blob: ${PAYPAL} https://*.paypal.com`,
+  `img-src 'self' data: blob: ${PAYPAL} https://*.paypal.com${GA_IMG}`,
   `font-src 'self' data:`,
   `media-src 'self' blob:`,
-  `connect-src 'self' ${PAYPAL} https://api-m.paypal.com https://api-m.sandbox.paypal.com`,
+  `connect-src 'self' ${PAYPAL} https://api-m.paypal.com https://api-m.sandbox.paypal.com${GA_CONNECT}`,
   `frame-src https://www.paypal.com`,
   `worker-src 'self' blob:`,
   `manifest-src 'self'`,

@@ -31,6 +31,7 @@
 //   caching      photos are cacheable; everything else under /api is not
 //   css          every class the pages use is one the stylesheets define
 //   hostile      a hand-edited URL cannot crash a page or inject into it
+//   csp          the site's own policy allows the third parties its code loads
 //   weight       a page arrives in a size and a time a phone can afford
 //
 // Run it against a dev server, a preview, or production:
@@ -553,6 +554,67 @@ function checkWeight(path, entry) {
 }
 
 /**
+ * A third party the site's own code loads, that the site's own policy forbids.
+ *
+ * This one cost a day. Google Analytics was installed correctly, consented to,
+ * deployed and present in the bundle — and the Content-Security-Policy said
+ * `default-src 'self'` with no mention of googletagmanager.com, so the browser
+ * refused to load it. CSP failures are silent apart from a console message
+ * nobody is looking at, so from the outside it looked exactly like a tag that
+ * had never been installed, and every other explanation got tried first.
+ *
+ * The check is deliberately narrow: the handful of third-party origins this
+ * site actually talks to, each mapped to the directive that governs it. A
+ * general "every https:// string in the JS must be allowed" would flag
+ * schema.org, documentation links and anything else that happens to appear in
+ * a string, and a check with false positives is a check nobody reads.
+ */
+const THIRD_PARTIES = [
+  { host: 'www.googletagmanager.com', directive: 'script-src', what: 'Google Analytics loads its script from here' },
+  { host: 'www.google-analytics.com', directive: 'connect-src', what: 'Google Analytics sends its beacons here' },
+  { host: 'www.paypal.com', directive: 'script-src', what: 'the PayPal button' },
+];
+
+async function checkCsp(html) {
+  const res = await fetch(base + '/market').catch(() => null);
+  const policy = res?.headers.get('content-security-policy') ?? '';
+  if (!policy) {
+    warn('csp', '/market', 'no Content-Security-Policy header at all');
+    return;
+  }
+
+  // What the site's own JavaScript actually references.
+  const sheets = [...html.matchAll(/<script[^>]+src="(\/_next\/[^"]+)"/g)].map((m) => decode(m[1]));
+  let code = '';
+  for (const src of sheets.slice(0, 12)) {
+    const chunk = await fetch(base + src).catch(() => null);
+    if (chunk?.ok) code += await chunk.text();
+  }
+
+  for (const { host, directive, what } of THIRD_PARTIES) {
+    if (!code.includes(host)) continue; // this deployment does not use it
+
+    // The directive as written, falling back to default-src exactly as a
+    // browser would.
+    const named = new RegExp(`(?:^|;)\\s*${directive}\\s([^;]*)`).exec(policy);
+    const fallback = /(?:^|;)\s*default-src\s([^;]*)/.exec(policy);
+    const sources = (named?.[1] ?? fallback?.[1] ?? '').trim();
+
+    const allowed =
+      sources.includes(host) ||
+      sources.includes(`*.${host.split('.').slice(-2).join('.')}`) ||
+      sources.includes('*');
+    if (!allowed) {
+      fail(
+        'csp',
+        '/market',
+        `the code loads ${host} (${what}) and ${directive} does not allow it — the browser will block it silently`
+      );
+    }
+  }
+}
+
+/**
  * What a hand-edited URL does to the page that has the most of them.
  *
  * /market/items reads eight parameters — a search, a shelf, a town, a seller, a
@@ -872,6 +934,7 @@ async function main() {
   await checkCaching(imageUrls);
   await checkCss(seen.get('/market')?.html ?? '');
   await checkHostileUrls();
+  await checkCsp(seen.get('/market')?.html ?? '');
 
   await checkSitemap(audited);
   checkDuplicates();
