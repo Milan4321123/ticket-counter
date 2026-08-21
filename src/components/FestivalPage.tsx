@@ -1,3 +1,4 @@
+import Np from '@/components/Np';
 import Link from 'next/link';
 import EventCard from '@/components/EventCard';
 import { listPublishedEvents } from '@/lib/events';
@@ -50,7 +51,8 @@ export default function FestivalPage({ festival }: { festival: Festival }) {
       <section className="feed-hero" style={{ padding: '64px 0 36px' }}>
         <div className="container">
           <p className="feed-kicker anim-fade-up">
-            {festival.nameNe} · {occurrence ? `${festival.name} ${occurrence.year}` : festival.name}
+            <Np>{festival.nameNe}</Np> ·{' '}
+            {occurrence ? `${festival.name} ${occurrence.year}` : festival.name}
           </p>
           <h1 className="anim-fade-up anim-d1" style={{ fontSize: 'clamp(1.9rem, 4.4vw, 3rem)' }}>
             {occurrence
@@ -63,10 +65,12 @@ export default function FestivalPage({ festival }: { festival: Festival }) {
                 <strong>
                   {occurrence.mainDayName} is {humanDate(occurrence.mainDay)}, {occurrence.year}
                 </strong>{' '}
-                ({occurrence.bsYear} BS). {festival.greetingNe}
+                ({occurrence.bsYear} BS). <Np>{festival.greetingNe}</Np>
               </>
             ) : (
-              <>Dates for the coming year are on their way. {festival.greetingNe}</>
+              <>
+                  Dates for the coming year are on their way. <Np>{festival.greetingNe}</Np>
+                </>
             )}
           </p>
         </div>
@@ -107,7 +111,9 @@ export default function FestivalPage({ festival }: { festival: Festival }) {
 
           <div className="card anim-fade-up anim-d1">
             <h2 className="card-title">
-              What is {festival.name}? <span className="muted">{festival.nameNe} के हो?</span>
+              What is {festival.name}? <span className="muted">
+                  <Np>{festival.nameNe} के हो?</Np>
+                </span>
             </h2>
             <p style={{ marginBottom: 0 }}>{festival.about}</p>
           </div>

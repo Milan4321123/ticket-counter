@@ -10,7 +10,8 @@
     "test:watch": "npm test -- --watch",
     "typecheck": "tsc --noEmit",
     "backup": "node scripts/backup.mjs --with-uploads --keep 30",
-    "seed:bazaar": "node scripts/seed-bazaar.mjs"
+    "seed:bazaar": "node scripts/seed-bazaar.mjs",
+    "audit": "node scripts/audit-bazaar.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

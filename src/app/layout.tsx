@@ -1,12 +1,21 @@
+import Np from '@/components/Np';
 import type { Metadata, Viewport } from 'next';
 import Link from 'next/link';
 import { Sora } from 'next/font/google';
+import Analytics from '@/components/Analytics';
 import ContactBubble from '@/components/ContactBubble';
 import Logo from '@/components/Logo';
 import { getBaseUrl } from '@/lib/config';
-import { SITE_DESCRIPTION, SITE_NAME, jsonLdScript, siteJsonLd } from '@/lib/seo';
+import { OG_HEIGHT, OG_WIDTH } from '@/lib/ogCard';
+import { SITE_META_DESCRIPTION, SITE_NAME, jsonLdScript, siteJsonLd } from '@/lib/seo';
 import { getPlatformContact } from '@/lib/platformPosts';
 import './globals.css';
+// The bazaar's marketplace furniture — tiles, rails, facets, stars, reviews.
+// After globals.css and never before it: the two files share a handful of
+// elements (a search field is `input bz-search-input`, a submit is
+// `btn bz-search-btn`), and the bazaar's denser version is meant to win those
+// ties. Its own header comment explains why it is a separate file at all.
+import './bazaar.css';
 
 const sora = Sora({
   subsets: ['latin'],
@@ -33,7 +42,7 @@ export const metadata: Metadata = {
     // each page having to remember to say so.
     template: `%s | ${PLATFORM_NAME}`,
   },
-  description: SITE_DESCRIPTION,
+  description: SITE_META_DESCRIPTION,
   applicationName: PLATFORM_NAME,
   // The home page is the canonical root; every other page sets its own.
   alternates: { canonical: '/' },
@@ -41,14 +50,26 @@ export const metadata: Metadata = {
     type: 'website',
     siteName: PLATFORM_NAME,
     title: `${PLATFORM_NAME} — Nepali events, tickets & bazaar`,
-    description: SITE_DESCRIPTION,
+    description: SITE_META_DESCRIPTION,
     url: '/',
     locale: 'en',
+    /**
+     * The site's default preview picture, inherited by every page that does
+     * not set its own — which is most of them: the home page, the bazaar, the
+     * festival calendar, the patro, /organizers. Without it a link pasted into
+     * a WhatsApp group renders as a grey box, and a forwarded link is how
+     * almost everything here travels.
+     *
+     * An event or an item page overrides this with its OWN photograph, which
+     * is always the better card. This is the floor, not the ceiling.
+     */
+    images: [{ url: '/api/og', width: OG_WIDTH, height: OG_HEIGHT, alt: PLATFORM_NAME }],
   },
   twitter: {
     card: 'summary_large_image',
     title: `${PLATFORM_NAME} — Nepali events, tickets & bazaar`,
-    description: SITE_DESCRIPTION,
+    description: SITE_META_DESCRIPTION,
+    images: ['/api/og'],
   },
   robots: {
     // Explicit rather than implied: this is the public shell, and the private
@@ -91,6 +112,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           type="application/ld+json"
           dangerouslySetInnerHTML={jsonLdScript(siteJsonLd())}
         />
+        {/* The first thing a keyboard reaches on every page.
+            Without it, somebody navigating by keyboard — or by switch, or by
+            voice — tabs through the wordmark and three header buttons before
+            they can reach the page they asked for, on every single page. It is
+            invisible until focused (see .skip-link in bazaar.css), so it costs
+            a mouse user nothing and gives everyone else back four tab stops. */}
+        <a href="#main" className="skip-link">
+          Skip to the page
+        </a>
         <header className="site-header">
           <div className="container header-inner">
             <Link href="/" className="brand" aria-label={`${PLATFORM_NAME} — home`}>
@@ -149,7 +179,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </nav>
           </div>
         </header>
-        <main className="anim-fade-up">{children}</main>
+        <main id="main" className="anim-fade-up">
+          {children}
+        </main>
         {/* Follows the visitor on every public page. The component decides for
             itself where it does not belong (admin, the scanner, /contact). */}
         <ContactBubble
@@ -177,7 +209,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <Link href="/">Browse events</Link>
                 </li>
                 <li>
-                  <Link href="/digest">यो हप्ता के छ · weekly digest</Link>
+                  <Link href="/digest">
+                    <Np>यो हप्ता के छ</Np> · weekly digest
+                  </Link>
                 </li>
                 <li>
                   <Link href="/festivals">Festival calendar</Link>
@@ -216,6 +250,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </p>
           </div>
         </footer>
+        {/* Google Analytics, and only where it belongs: the component is inert
+            unless NEXT_PUBLIC_GA_ID is set, and it refuses to load on an order
+            page, a ticket, a customer card, the scanner, /admin or /portal —
+            those URLs carry credentials, and GA reports the URL. */}
+        <Analytics />
       </body>
     </html>
   );

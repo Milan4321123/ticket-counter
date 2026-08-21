@@ -1,0 +1,1323 @@
+/* ==========================================================================
+   The bazaar's own stylesheet.
+
+   Why this is a second file at all, when the site has one big one:
+
+   globals.css is past 7,500 lines and is the shared skin for every surface —
+   the feed, the event pages, the portal, the admin, the scanner. The bazaar's
+   marketplace furniture (facets, rails, star ratings, review threads, saved
+   items, pagination) is a large new surface with its own density, and dropping
+   another thousand lines into the middle of a file another session is actively
+   editing is how two people spend an afternoon resolving a conflict in a
+   stylesheet neither of them changed the same rule in. Keeping it apart also
+   means the bazaar's rules can be read in one sitting by whoever maintains the
+   bazaar.
+
+   The rules this file lives under:
+
+   - It NEVER defines a colour. Every colour here is one of globals.css's
+     tokens (--bg-card, --border, --accent, --green, --amber, --text-dim …) or
+     a transparent white/black wash over them. Two palettes is how a site stops
+     looking like one site.
+   - It NEVER restyles a globals.css class. It only adds bz- ones. The one
+     exception is `.bz-tile-media .badge`, which is a badge sitting ON a
+     photograph and has to survive that; it is scoped so tightly it cannot
+     reach a badge anywhere else.
+   - It is imported from layout.tsx immediately after './globals.css', so where
+     an element carries both a globals class and a bz- one (`input bz-search-input`,
+     `btn bz-search-btn`) this file wins the ties. Every bz- class that could be
+     used alone is written to stand alone, because a page that forgets the
+     globals class should still look deliberate.
+
+   The look, in one line: the same dark violet skin, but denser and more
+   shop-like — the price loud and first, --green for "you can have this now",
+   --amber for "only a few left" and for stars, a tighter 8px corner than the
+   site's 12px, and gaps small enough that a grid reads as stock rather than as
+   a gallery.
+   ========================================================================== */
+
+:root {
+  /* The bazaar's corner. --radius is 12px, which is right for a card you read
+     one of; a tile you scan forty of wants less rounding or the whole grid
+     starts to look like a pill collection. Named rather than repeated so the
+     tiles, the facet panel and the toolbar can never drift apart. */
+  --bz-radius: 8px;
+  /* The gap between tiles. Deliberately small: this is the single number that
+     decides whether the grid reads as a shop or as a portfolio. */
+  --bz-gap: 12px;
+}
+
+/* ---------- The grid of goods ---------- */
+
+/* auto-FILL, not auto-fit. auto-fit collapses the empty tracks and lets three
+   results stretch into three enormous tiles across a 1000px page — the exact
+   failure the feed strip's comment in globals.css documents. auto-fill keeps
+   the tracks, so a short result set looks like a short result set.
+
+   min(180px, 100%) rather than a bare 180px: at 180px the track is wider than
+   any container narrower than that, and a grid track wider than its container
+   is horizontal overflow of the whole page. The min() is a safety net only —
+   at every width where the container is 180px or more it computes to exactly
+   the 180px the design calls for, so the column count never changes.
+
+   At 360px the container's content box is 320px, so this lands as ONE column
+   with a 320px tile. That is intended, and it is why .bz-tile-media below is
+   capped in height: a full-width square photograph on a phone is a good
+   product shot, but an uncapped one is a whole screen per item. */
+.bz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr));
+  gap: var(--bz-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  /* A grid that is itself a grid/flex child defaults to min-width: auto, which
+     means it refuses to shrink below its contents and pushes the page sideways
+     instead. Stated here so .bz-layout's results column can actually narrow. */
+  min-width: 0;
+}
+
+@media (min-width: 760px) {
+  .bz-grid {
+    --bz-gap: 14px;
+  }
+}
+
+/* ---------- One good, as a tile ---------- */
+
+/* The whole tile is one link (ui-shared gives it a single accessible name), so
+   everything inside it is decoration as far as the accessibility tree goes and
+   the hover state belongs to the box rather than to any one line in it. */
+.bz-tile {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--bz-radius);
+  /* Clips the photograph into the corner radius. It does not clip this
+     element's own focus outline — an outline is drawn outside the border box
+     and is not subject to the element's own overflow — so a keyboard user
+     still sees the ring. */
+  overflow: hidden;
+  color: inherit;
+  transition:
+    border-color 0.18s ease,
+    transform 0.18s var(--ease-out),
+    box-shadow 0.18s ease;
+}
+
+.bz-tile:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
+}
+
+/* The picture. Square, matching the decision globals.css already made for
+   .tier-card-photo: the file behind it is the 4:5 'card' render, and a full
+   portrait in a 180px column pushes the price below the fold of the tile.
+   Square throws away far less of the picture than landscape would.
+
+   The height cap only bites in the one-column case on a phone, where the tile
+   is as wide as the screen; in a real grid the aspect-ratio wins. */
+.bz-tile-media {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  max-height: 260px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-soft);
+  overflow: hidden;
+}
+
+.bz-tile-photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* A missing photo cannot be left as a blank box here: the tiles beside it are
+   photographs, so an empty one reads as an image that failed rather than as an
+   item without a picture. The item's initial on the accent wash — the same
+   treatment .tier-card-photo-blank and .item-photo-blank already give it — is
+   the version that reads as a decision. */
+.bz-tile-blank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(ellipse 70% 70% at 30% 10%, var(--accent-soft), transparent),
+    var(--bg-elevated);
+  font-family: var(--font-display, var(--font));
+  font-size: clamp(2rem, 9vw, 3.2rem);
+  font-weight: 800;
+  line-height: 1;
+  color: var(--accent-text);
+  opacity: 0.7;
+}
+
+/* Badges work in either place ui-shared may put them: as a row in the body, or
+   laid over the photograph. The base rule is the plain row; the overlay is the
+   variant, so nothing breaks if the markup changes its mind. */
+.bz-tile-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.bz-tile-media .bz-tile-badges {
+  position: absolute;
+  inset: 6px 6px auto 6px;
+  z-index: 1;
+  /* The card is a link and these are decoration; they must not eat the tap. */
+  pointer-events: none;
+}
+
+/* The globals badge backgrounds are 14%-alpha tints, which are designed to sit
+   on --bg-card and are unreadable over a photograph of food. Over the picture
+   they get a near-opaque dark plate instead and keep their own text and border
+   colour, so "Sold out" is still red and "Example shop" is still amber. Scoped
+   to the photo overlay only — a badge anywhere else in the site is untouched. */
+.bz-tile-media .bz-tile-badges .badge {
+  background-color: rgba(10, 11, 16, 0.82);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-size: 0.7rem;
+  padding: 2px 9px;
+}
+
+.bz-tile-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+  padding: 10px 11px 12px;
+}
+
+/* The loudest thing in the tile, whatever order the markup puts it in. This
+   file deliberately does NOT use `order` to hoist it above the name: flex
+   reordering splits the visual order from the DOM order, and the one thing
+   that must stay trustworthy on a page of prices is which price belongs to
+   which name. Weight and size do the job that `order` was tempting. */
+.bz-tile-price {
+  font-family: var(--font-display, var(--font));
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Two lines, then an ellipsis. Sellers name their own goods and some of those
+   names are a sentence; an unclamped one turns a 180px tile into a paragraph
+   and every tile in the row grows to match it. */
+.bz-tile-name {
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.32;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+/* "Includes 6 items" — the price above is per bundle, not per piece, and a
+   shopper comparing two tiles has to be told which they are comparing. */
+.bz-tile-unit {
+  font-size: 0.76rem;
+  color: var(--text-dim);
+}
+
+/* Who is actually selling this. NOT decoration and never clamped, hidden or
+   shortened at any width: a buyer-facing page that shows a price without
+   naming the seller can make the whole order value this platform's turnover
+   under §3 Abs. 11 UStG. It is pushed to the bottom of the tile so it is in
+   the same place on every tile in a row, and long shop names wrap rather than
+   overflow. If you are ever tempted to `display: none` this line to win back a
+   row of height, the answer is no. */
+.bz-tile-seller {
+  margin: 0;
+  margin-top: auto;
+  padding-top: 5px;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+
+/* Green means a shopper can have it now. Same green the rest of the site uses
+   for a completed, working state. */
+.bz-tile-stock {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--green);
+}
+
+/* Amber means hurry, and it is only ever printed when the shop is genuinely
+   showing its remaining count — the number comes from availability, not from a
+   marketing decision made in CSS. */
+.bz-tile-low {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--amber);
+}
+
+/* ---------- Stars ---------- */
+
+/* Written so it works whether ui-shared renders inline <svg> stars or plain
+   characters: the SVG takes its fill from currentColor and the character takes
+   its size from font-size, and both read the same two colours. An empty star
+   is a dimmed --text-dim rather than a different hue, so a rating of two is
+   legible as "two out of five" and not as two colours fighting. */
+.bz-stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.bz-star {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  font-size: 13px;
+  line-height: 1;
+  color: rgba(154, 161, 181, 0.4);
+  fill: currentColor;
+}
+
+.bz-star-on {
+  color: var(--amber);
+}
+
+.bz-rating-count {
+  margin-left: 5px;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Bigger stars for the item page's own heading and the review summary, where
+   the rating is a headline rather than a line in a tile. */
+.bz-stars-md .bz-star {
+  width: 17px;
+  height: 17px;
+  font-size: 17px;
+}
+
+/* ---------- Rails ---------- */
+
+/* A horizontally scrolling row of tiles. Three hard requirements, all of them
+   things this pattern gets wrong by default:
+
+   1. It must never widen the PAGE. A flex or grid child defaults to
+      min-width: auto and refuses to shrink below its contents, so a rail of
+      twelve tiles inside a grid column pushes the whole document sideways and
+      every page on the phone gains a horizontal scrollbar. min-width: 0 on the
+      rail and max-width: 100% on the track are what stop that.
+   2. The scrollbar is hidden but the scrolling is real. Hidden because a
+      permanent grey bar under every rail on Windows is four rails' worth of
+      visual noise; real because a mouse wheel, a trackpad, a touch drag and a
+      Tab through the tiles all still work — the tiles are links, so keyboard
+      users reach every one and the browser scrolls the track to them.
+   3. A sideways swipe stays in the rail. overscroll-behavior-x: contain stops
+      a flick past the end of the row from triggering the browser's back
+      gesture, which on iOS otherwise navigates away mid-scroll.
+
+   No fade mask and no arrow buttons: a mask would swallow the focus ring of
+   the tile at the edge, and arrows are a control that only works with a mouse.
+   The next tile being half-visible is the affordance. */
+.bz-rail {
+  min-width: 0;
+  margin: 0 0 26px;
+}
+
+.bz-rail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.bz-rail-title {
+  font-family: var(--font-display, var(--font));
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.bz-rail-link {
+  flex: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent-text);
+}
+
+.bz-rail-link:hover {
+  text-decoration: underline;
+}
+
+.bz-rail-track {
+  display: flex;
+  gap: var(--bz-gap);
+  max-width: 100%;
+  overflow-x: auto;
+  /* Not `visible`: a scroll container with one axis scrollable makes the other
+     axis scroll too, which gives the rail a pointless vertical scrollbar the
+     moment a tile is one pixel taller than the track. */
+  overflow-y: hidden;
+  /* proximity, not mandatory. A mandatory snap on a row of small tiles fights
+     the shopper on every short drag and makes a flick feel sticky; proximity
+     tidies up the resting position without taking the scroll away. */
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  /* 3px of breathing room inside the scroll container so the focus ring and
+     the hover lift of the first and last tile are not clipped by it, pulled
+     back out with a matching negative margin so the rail still lines up with
+     the text above it. The container's own 20px of padding absorbs the 3px,
+     so this cannot reach the edge of the viewport. */
+  padding: 3px 3px 6px;
+  margin: -3px -3px 0;
+  scroll-padding-inline: 3px;
+}
+
+.bz-rail-track::-webkit-scrollbar {
+  display: none;
+}
+
+/* Tiles in a rail have a fixed width rather than a share of the row: a rail is
+   a row you scroll, so the width of a tile must not depend on how many are in
+   it — otherwise "Fresh on the shelves" with four items and "In stock today"
+   with thirty would be different-sized rows on the same page. */
+.bz-rail-track > * {
+  flex: 0 0 168px;
+  scroll-snap-align: start;
+}
+
+@media (min-width: 640px) {
+  .bz-rail-track > * {
+    flex-basis: 190px;
+  }
+}
+
+/* ---------- Search box and quick searches ---------- */
+
+/* One box and its button on a line, wrapping to two on a narrow phone rather
+   than squeezing the field down to five characters. The min-width: 0 with a
+   flex-basis is what makes it wrap instead of shrink — flex items refuse to go
+   below their content width otherwise, and a search box you cannot read what
+   you typed into is not a search box. */
+.bz-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Styled to stand alone, so it looks right with or without the globals .input
+   class beside it. Taller than .input because this is the hero's search and
+   the first thing anybody does on the page. */
+.bz-search-input {
+  flex: 1 1 240px;
+  min-width: 0;
+  width: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 1rem;
+  padding: 12px 15px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.bz-search-input::placeholder {
+  color: var(--text-dim);
+  opacity: 0.6;
+}
+
+.bz-search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+.bz-search-btn {
+  flex: none;
+}
+
+/* Six words people actually type, offered as searches rather than as shelves.
+   Amber-tinted on hover because the bazaar is the market half of the site —
+   the same reasoning the header's bazaar button already follows. Centred: the
+   only place these appear is under the hero's search box, which is centred. */
+.bz-quick {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 7px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bz-quick-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-card);
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 5px 13px;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.bz-quick-chip:hover {
+  border-color: rgba(251, 191, 36, 0.45);
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+/* ---------- Departments (the seven shelves) ---------- */
+
+.bz-depts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bz-dept {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 13px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--bz-radius);
+  background: var(--bg-card);
+  color: inherit;
+  transition:
+    border-color 0.15s ease,
+    transform 0.18s var(--ease-out);
+}
+
+.bz-dept:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+/* The Nepali name leads, in amber, because it is the thing a Nepali shopper
+   recognises first and the English label underneath is the translation rather
+   than the other way round. The generous line-height is not taste: Devanagari
+   hangs matras above and below the baseline, and at the 1.32 the rest of this
+   file uses the top marks of खाजा were being clipped by the line box. */
+.bz-dept-np {
+  font-family: var(--font-display, var(--font));
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--amber);
+}
+
+.bz-dept-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.bz-dept-line {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+/* Pinned to the bottom so the counts line up across a row of cards whose
+   one-line descriptions are different lengths. An empty shelf prints "nothing
+   yet" here rather than a zero — page-market's wording, not this file's, but
+   the box is sized for a short phrase and not only for a number. */
+.bz-dept-count {
+  margin-top: auto;
+  padding-top: 7px;
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Festival strip ---------- */
+
+/* Only rendered when a festival is genuinely near, so it is allowed to be the
+   warmest thing on the page. Amber wash rather than the accent violet: this is
+   the market's own colour, and the strip must not compete with the primary
+   call to action beside it. */
+.bz-festival {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(251, 191, 36, 0.34);
+  border-radius: var(--bz-radius);
+  background:
+    linear-gradient(180deg, rgba(251, 191, 36, 0.07), transparent 70%),
+    var(--bg-card);
+}
+
+.bz-festival-body {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.bz-festival-body > :last-child {
+  margin-bottom: 0;
+}
+
+/* ---------- Results layout: facets beside the grid ---------- */
+
+/* One column on a phone, sidebar and results at 900px — the same breakpoint
+   the item page's own two-column layout uses, so the site has one width at
+   which it goes wide rather than three.
+
+   236px for the facet column: the widest facet label the bazaar can produce
+   ("Clothing & fabrics" with a three-digit count) fits on one line at that
+   width, and anything narrower starts wrapping shelf names onto two lines
+   where they read as two shelves. */
+.bz-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .bz-layout {
+    grid-template-columns: 236px minmax(0, 1fr);
+    column-gap: 28px;
+  }
+
+  /* The facets follow the results down a long page. 78px clears the sticky
+     header (65px on desktop) with room to spare; the max-height and its own
+     scrollbar are what stop a bazaar with forty sellers producing a sidebar
+     taller than the screen, which sticky positioning cannot help with. */
+  .bz-facets {
+    position: sticky;
+    top: 78px;
+    max-height: calc(100vh - 96px);
+    max-height: calc(100svh - 96px);
+    overflow-y: auto;
+  }
+}
+
+/* The facet panel is a <details> so it can be collapsed on a phone, where an
+   expanded column of four filter groups would push the actual results a full
+   screen down.
+
+   The summary is hidden at 900px and up ONLY when the panel is open, which is
+   what makes this safe: page-serp renders <details class="bz-facets" open>, so
+   a wide screen sees a plain sidebar with no toggle, and a phone sees the same
+   panel with a real "Filters" bar it can close. If the element is ever
+   rendered closed, the summary stays visible at every width, so the filters
+   can never become unreachable — which is exactly what happens with the
+   ::details-content approach on a browser that does not support it yet. */
+.bz-facets {
+  border: 1px solid var(--border);
+  border-radius: var(--bz-radius);
+  background: var(--bg-card);
+  min-width: 0;
+}
+
+.bz-facets > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 13px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  /* The default marker is a black triangle that ignores every colour token in
+     the file; replaced below with a +/- that at least matches the text. */
+  list-style: none;
+}
+
+.bz-facets > summary::-webkit-details-marker {
+  display: none;
+}
+
+.bz-facets > summary::after {
+  content: '+';
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-dim);
+}
+
+.bz-facets[open] > summary::after {
+  /* U+2212 minus sign, not a hyphen: a hyphen next to a plus reads as a dash. */
+  content: '\2212';
+}
+
+@media (min-width: 900px) {
+  .bz-facets[open] > summary {
+    display: none;
+  }
+
+  .bz-facets[open] > .bz-facet:first-of-type {
+    border-top: 0;
+  }
+}
+
+.bz-facet {
+  padding: 11px 13px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.bz-facet-title {
+  margin: 0 0 7px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.bz-facet-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Label left, count right, and the count never wraps under the label — a facet
+   row that becomes two lines makes a list of eight shelves look like sixteen. */
+.bz-facet-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  line-height: 1.35;
+  color: var(--text-dim);
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.bz-facet-link:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+
+/* Both spellings of "this one is on". page-serp marks the active facet with
+   aria-current for screen readers; the class is what a sighted visitor reads.
+   Styling both means neither can be forgotten without the other showing it. */
+.bz-facet-on,
+.bz-facet-link[aria-current='true'],
+.bz-facet-link[aria-current='page'] {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 700;
+}
+
+.bz-facet-count {
+  flex: none;
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.bz-facet-on .bz-facet-count,
+.bz-facet-link[aria-current='true'] .bz-facet-count {
+  color: inherit;
+  opacity: 0.85;
+}
+
+/* ---------- Toolbar: how many, and in what order ---------- */
+
+.bz-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--bz-radius);
+  background: var(--bg-card);
+}
+
+.bz-toolbar-count {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The sort control keeps its Apply button visible at all times — the page
+   works without JavaScript, so there is no change handler to submit the form
+   and a select that silently does nothing is worse than no sort at all. */
+.bz-sort {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.bz-sort label {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+
+.bz-sort select {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.88rem;
+  padding: 7px 10px;
+  /* Tells the browser to draw the native dropdown list itself dark. Without it
+     the options open as black text on white in the middle of a dark page. */
+  color-scheme: dark;
+}
+
+.bz-sort select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* ---------- Active filter pills ---------- */
+
+/* Each pill is a link that removes only itself, so the hover state has to say
+   "remove", not "go" — hence the red border rather than the accent one every
+   other link on the page lifts to. */
+.bz-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bz-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.3;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.bz-pill:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.bz-pill-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.bz-pill:hover .bz-pill-x {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+/* ---------- Breadcrumbs ---------- */
+
+/* The separator is generated rather than typed into the markup, so it is not
+   read out as a word by a screen reader working through the list. `> * + *`
+   rather than `li + li` so this works whether the trail is an <ol> of <li> or
+   a <nav> of spans and links. */
+.bz-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+.bz-crumbs > * + *::before {
+  content: '\203A';
+  margin-right: 5px;
+  opacity: 0.55;
+}
+
+.bz-crumbs a:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+/* ---------- Reviews ---------- */
+
+/* Stars in a tile and on the item page link to #reviews. Without a
+   scroll-margin the sticky header lands on top of the heading and the jump
+   looks like it overshot — the same 70px the feed's #events anchor uses, for
+   the same measured header. */
+.bz-reviews {
+  scroll-margin-top: 70px;
+}
+
+.bz-rev-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--bz-radius);
+  background: var(--bg-card);
+}
+
+.bz-rev-avg {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 92px;
+}
+
+.bz-rev-avg-num {
+  font-family: var(--font-display, var(--font));
+  font-size: 2.1rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.bz-rev-bars {
+  flex: 1 1 220px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Three fixed columns — "5 stars", the bar, the count — so the five rows line
+   up as a chart rather than as five sentences of different lengths. */
+.bz-rev-bar {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.bz-rev-bar-track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+/* The width comes from an inline style on the element, because it is data —
+   the share of reviews at this many stars — and data does not belong in a
+   stylesheet. Amber, matching the stars it counts. A zero-count row renders as
+   an empty track rather than a hairline of colour, which is the honest picture
+   of "nobody gave this two stars". */
+.bz-rev-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--amber);
+}
+
+.bz-rev {
+  padding: 14px 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.bz-rev-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.bz-rev-author {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+/* Green, and its own pill rather than a globals .badge, because this one says
+   something the site can actually prove: the review is attached to a paid
+   order for this exact item. It is the most load-bearing word on the page and
+   is never printed on anything that is not verified. */
+.bz-rev-verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  border-radius: 999px;
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* Pushed to the far end of the row so every review's date is in the same
+   place down the list. It wraps under on a narrow phone rather than squeezing
+   the name, which is what auto-margin plus flex-wrap gives for free. */
+.bz-rev-date {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* pre-line keeps the buyer's own paragraph breaks without the text ever being
+   rendered as HTML — they typed it, so it is printed as text and nothing else.
+   overflow-wrap because somebody will paste a URL into a review. */
+.bz-rev-body {
+  margin: 7px 0 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+/* The seller's answer, indented under the review it answers. An accent bar
+   rather than a box: it is a reply and must never look like a second, equal
+   review with its own rating. */
+.bz-rev-reply {
+  margin: 9px 0 0;
+  padding: 9px 13px;
+  border-left: 2px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  background: rgba(139, 92, 246, 0.07);
+  font-size: 0.9rem;
+}
+
+.bz-rev-reply > :last-child {
+  margin-bottom: 0;
+}
+
+.bz-rev-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--bz-radius);
+  background: var(--bg-card);
+}
+
+/* ---------- The five-star input ---------- */
+
+/* A real radio group: five <input type="radio">s that are invisible but still
+   focusable and still announced, with the star as their label. Nothing here is
+   a div pretending to be a control, so arrow keys move through the group and
+   the form submits without JavaScript.
+
+   Two selector families, because the accessible markup for this can reasonably
+   put the input inside the label or beside it, and this file should not be the
+   reason flow-review has to build it one particular way.
+
+   The cumulative fill (choosing four lights four stars, not just the fourth)
+   is done with :has() on the value, which is the only way to express "every
+   star up to the chosen one" without dictating that the markup be rendered
+   backwards and flipped with row-reverse. The plain :checked rules below it
+   are the fallback: on anything without :has() the chosen star alone lights
+   up, which is still a legible answer to "what did I pick". */
+.bz-stars-input {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.bz-stars-input input {
+  /* Not display: none and not visibility: hidden — both take the control out
+     of the tab order and out of the accessibility tree, which would leave a
+     keyboard user with no way to rate anything at all. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.bz-stars-input label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 7px;
+  cursor: pointer;
+  color: rgba(154, 161, 181, 0.45);
+  font-size: 1.5rem;
+  line-height: 1;
+  transition:
+    color 0.12s ease,
+    background-color 0.12s ease;
+}
+
+.bz-stars-input label:hover {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.bz-stars-input:has(input[value='1']:checked) label:nth-of-type(-n + 1),
+.bz-stars-input:has(input[value='2']:checked) label:nth-of-type(-n + 2),
+.bz-stars-input:has(input[value='3']:checked) label:nth-of-type(-n + 3),
+.bz-stars-input:has(input[value='4']:checked) label:nth-of-type(-n + 4),
+.bz-stars-input:has(input[value='5']:checked) label:nth-of-type(-n + 5),
+.bz-stars-input input:checked + label,
+.bz-stars-input label:has(input:checked) {
+  color: var(--amber);
+}
+
+/* The focus ring has to move to the label, because the input it belongs to is
+   a one-pixel box somewhere off in the corner. */
+.bz-stars-input input:focus-visible + label,
+.bz-stars-input label:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------- Save for later ---------- */
+
+/* A real button, and the saved state is a filled accent rather than only a
+   changed word, so the answer to "is this saved" survives a glance. */
+.bz-save {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 15px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.bz-save:hover {
+  border-color: var(--accent);
+}
+
+.bz-save-on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+/* ---------- Often bought together ---------- */
+
+/* Only ever rendered when at least two separate paid orders contain both
+   items, so the panel is allowed to state a fact rather than hedge. Rows are a
+   list, not a grid: there are at most a handful, each names its own price and
+   therefore its own seller, and stacking them keeps those names on the same
+   line as the price they belong to. */
+.bz-together {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--bz-radius);
+  background: var(--bg-card);
+}
+
+.bz-together-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  min-width: 0;
+}
+
+.bz-together-row + .bz-together-row {
+  border-top: 1px solid var(--border-soft);
+}
+
+/* The plus between two rows. aria-hidden in the markup — it is punctuation. */
+.bz-together-plus {
+  flex: none;
+  width: 22px;
+  text-align: center;
+  color: var(--text-dim);
+  font-weight: 700;
+}
+
+/* ---------- Empty states ---------- */
+
+/* Dashed, because an empty shelf is not a broken one: the same box with a
+   solid border reads as a panel that failed to load, and every empty state in
+   this bazaar is a place a seller could put something. */
+.bz-empty {
+  padding: 24px 20px;
+  border: 1px dashed var(--border);
+  border-radius: var(--bz-radius);
+  background: rgba(255, 255, 255, 0.015);
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.bz-empty > :last-child {
+  margin-bottom: 0;
+}
+
+/* ---------- Pagination ---------- */
+
+/* 40px targets, which is the smallest a page number can be and still be
+   tapped reliably with a thumb; the numbers are the whole navigation on a
+   48-per-page result set, so missing one costs a whole page load. */
+.bz-pages {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 26px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bz-page-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.bz-page-link:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* The page you are on is not a link, so it gets the accent fill and stays put
+   under the pointer — nothing lifts, because there is nowhere to go. */
+.bz-page-current,
+.bz-page-link[aria-current='page'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  cursor: default;
+}
+
+/* ---------- Reduced motion ---------- */
+
+/* globals.css already kills every duration site-wide under this query. What it
+   cannot know about are the transforms these classes settle into on hover — a
+   zero-duration transform still jumps, which is exactly the movement somebody
+   who set this preference asked not to see. */
+@media (prefers-reduced-motion: reduce) {
+  .bz-tile:hover,
+  .bz-dept:hover {
+    transform: none !important;
+  }
+
+  .bz-rail-track {
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Skip to the page
+   ---------------------------------------------------------------------------
+   Off-screen until it is focused, then a real, visible, clickable control at
+   the top-left. Deliberately NOT display:none or visibility:hidden — both take
+   it out of the tab order entirely, which is the one thing it must stay in.
+   The transform keeps it out of the layout without the clipping tricks that
+   make some screen readers skip it as well. */
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 200;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-strong);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: var(--shadow-lift);
+  transform: translateY(-160%);
+}
+
+.skip-link:focus-visible,
+.skip-link:focus {
+  transform: translateY(0);
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .skip-link {
+    transition: transform 0.18s var(--ease-out);
+  }
+}

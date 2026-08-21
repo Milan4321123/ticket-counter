@@ -292,6 +292,36 @@ export function runBuyerDataRetentionSweep(force = false): { erased: number } {
     );
     const askersErased = eraseAskers.run(ERASED_BUYER_NAME, ERASED_BUYER_EMAIL, cutoff, cutoff).changes;
 
+    // A review keeps its WORDS and loses its AUTHOR, which is the same split
+    // the questions above take and for the same reason: what somebody wrote is
+    // about the goods, not about themselves. "Hotter than I expected, and the
+    // jar arrived intact" is still the truest thing on that item's page a year
+    // later, and the next shopper is owed it whether or not the person who
+    // wrote it can still be named. Deleting the row instead would also quietly
+    // improve the seller's score every time a buyer was erased, which is a
+    // privacy sweep silently editing somebody's ratings.
+    //
+    // Driven off buyer_erased_at rather than off the batch just erased above,
+    // so it is self-healing: a review written between two sweeps on an order
+    // that was already erased (the buyer's emailed link outlives the sweep)
+    // gets caught on the next pass rather than keeping a name forever. The
+    // `<>` makes it idempotent — an already-anonymous row matches nothing.
+    //
+    // Spelled out here rather than calling lib/reviews.anonymizeReviewsForOrder
+    // in a loop: that function is the single-order path for an explicit "erase
+    // everything about me" request, and importing it would make lib/reviews and
+    // this file import each other (reviews reads ANONYMOUS_BUYER_NAME from
+    // here). One statement over the whole backlog is also what the rest of this
+    // sweep does.
+    const reviewsAnonymized = db
+      .prepare(
+        `UPDATE item_reviews
+         SET author_name = ?
+         WHERE author_name <> ?
+           AND order_id IN (SELECT id FROM orders WHERE buyer_erased_at IS NOT NULL)`
+      )
+      .run(ANONYMOUS_BUYER_NAME, ANONYMOUS_BUYER_NAME).changes;
+
     // Waitlist addresses are DELETED rather than overwritten: unlike an order,
     // a waitlist row reconciles no money and mints no ticket — the email IS
     // the row, so keeping an emptied husk would preserve nothing.
@@ -359,6 +389,9 @@ export function runBuyerDataRetentionSweep(force = false): { erased: number } {
     }
     if (waitlistDeleted > 0) {
       console.log(`Retention sweep: deleted ${waitlistDeleted} waitlist address(es).`);
+    }
+    if (reviewsAnonymized > 0) {
+      console.log(`Retention sweep: took the author's name off ${reviewsAnonymized} review(s).`);
     }
     return { erased };
   } catch (e) {

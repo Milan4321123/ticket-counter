@@ -1,3 +1,4 @@
+import { shareImages } from '@/lib/seo';
 import FestivalPage from '@/components/FestivalPage';
 import { currentOccurrence, getFestival } from '@/lib/festivals';
 
@@ -18,7 +19,7 @@ export function generateMetadata() {
     title,
     description,
     alternates: { canonical: '/tihar' },
-    openGraph: { type: 'website', title, description, url: '/tihar' },
+    openGraph: { type: 'website', title, description, url: '/tihar', images: shareImages() },
   };
 }
 

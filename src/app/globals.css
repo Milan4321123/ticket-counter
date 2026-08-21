@@ -646,12 +646,42 @@ summary {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 22px;
   }
+
+  /* Two goods take the whole row rather than two thirds of it. A pair of big
+     cards reads as "this shop sells two things"; two normal tiles with an
+     empty third of the page beside them reads as a page that failed to
+     finish loading. */
+  .goods-grid:has(.tier-card:nth-child(2):last-child) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* And one good is capped instead of stretched. A single tile alone in a
+   1000px row is the worst-looking case this grid has — but a card blown up to
+   the full width is not a product card any more, so it stops at a size a
+   photograph still flatters. :has() rather than a count passed down from the
+   page: the grid is the thing that knows how many tiles are in it, and a
+   server-rendered class would have to be kept in step with these breakpoints
+   by hand. */
+@media (min-width: 520px) {
+  .goods-grid:has(.tier-card:only-child) {
+    grid-template-columns: minmax(0, 420px);
+  }
 }
 
 /* Inside a shop tile the rows sit closer than a ticket card's. The picture
    already carries most of the height, and 8px of air between six stacked
-   blocks made the tile read as a list of fields rather than as one product. */
+   blocks made the tile read as a list of fields rather than as one product.
+
+   The 4px off the padding is what buys the footer its single line at the
+   narrowest column — 228px a tile at 768 left the button and the read-link
+   two pixels short of fitting side by side. --tier-card-pad exists so the
+   photo's edge-to-edge bleed stays in step with whatever the padding is; the
+   plain .tier-card-photo keeps its own hard-coded 22px, because the cards that
+   use it are the ones whose padding did not change. */
 .goods-grid .tier-card {
+  --tier-card-pad: 18px;
+  padding: var(--tier-card-pad);
   gap: 6px;
 }
 
@@ -6950,8 +6980,8 @@ html:has(.event-page.has-section-nav) {
    padding, doubled for the width; they have to stay in step with it. */
 .tier-card-media {
   position: relative;
-  width: calc(100% + 44px);
-  margin: -22px -22px 4px;
+  width: calc(100% + var(--tier-card-pad, 22px) * 2);
+  margin: calc(var(--tier-card-pad, 22px) * -1) calc(var(--tier-card-pad, 22px) * -1) 4px;
   border-radius: var(--radius) var(--radius) 0 0;
   overflow: hidden;
 }
@@ -7091,7 +7121,7 @@ html:has(.event-page.has-section-nav) {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   margin-top: auto;
   padding-top: 6px;
 }

@@ -1,3 +1,4 @@
+import { shareImages } from '@/lib/seo';
 import Link from 'next/link';
 import { platformContactEmail, platformName } from '@/lib/platform';
 import { BUYER_RETENTION_DAYS, WAITLIST_NOTIFIED_RETENTION_DAYS } from '@/lib/retention';
@@ -15,8 +16,7 @@ export const metadata = {
     type: 'website',
     title: 'Your details, and what happens to them',
     description: 'What we ask for when you book a ticket, why we need it, who it goes to, and when it is erased.',
-    url: '/privacy',
-  },
+    url: '/privacy', images: shareImages() },
 };
 
 const PLATFORM_NAME = platformName();
@@ -237,6 +237,38 @@ export default function PrivacyPage() {
               and edit remain.
             </p>
           </div>
+
+          {/* Only when analytics is actually switched on. A privacy notice that
+              describes a tracker the deployment does not run is as wrong as
+              one that hides a tracker it does: both leave a reader unable to
+              trust the rest of the page. The same env var that loads the tag
+              writes this section, so the two cannot disagree. */}
+          {process.env.NEXT_PUBLIC_GA_ID ? (
+            <div className="card glow-card anim-fade-up anim-d3">
+              <h2 className="card-title">Counting visits</h2>
+              <p>
+                We use <strong>Google Analytics</strong> to see which pages people actually read —
+                how many opened the bazaar, which shop pages get looked at, whether a festival page
+                was worth writing. It is how we decide what to build next, and it is the only
+                measurement on this site.
+              </p>
+              <p>
+                What it is told is the <strong>page</strong>: the address without anything after
+                the question mark, plus the ordinary things any website sees — roughly where in the
+                world you are, what browser you used, which link brought you. Google sets a cookie
+                on your device to tell one visit from the next.
+              </p>
+              <p style={{ marginBottom: 0 }}>
+                Where it does <strong>not</strong> run: your order page, your tickets, your
+                customer card, the door scanner, and the organizer and admin areas. Those addresses
+                contain a code that opens your own order, so no part of them is ever sent anywhere.
+                Nothing you typed — your name, your email, what you bought — is sent to Google by
+                any page on this site. If you would rather not be counted at all, a browser that
+                blocks analytics cookies, or any of the usual blockers, stops it completely and
+                nothing else on the site changes.
+              </p>
+            </div>
+          ) : null}
 
           <div className="card glow-card anim-fade-up anim-d3">
             <h2 className="card-title">Ask us anything</h2>

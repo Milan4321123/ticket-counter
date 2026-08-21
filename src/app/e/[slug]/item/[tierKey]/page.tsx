@@ -10,13 +10,28 @@
 // It never DECIDES anything about availability: the state, the badge and the
 // button all come from lib/ticketState, the same call the listing page makes,
 // so an item page cannot say "Available" beside a grid saying "Sold out".
+//
+// On a SHOP it is also where the rest of the bazaar hangs off one thing: the
+// shelf this sits on, the stars people who bought it left, the rest of the
+// seller's stall, the same shelf at other stalls, and what other people
+// actually put in the same basket as this. All of it is read ONCE, above the
+// JSX, and the reads are counted deliberately — a page of related goods is the
+// classic place a site starts asking the database a question per tile, and
+// this one asks four questions no matter how many tiles come back.
+import { MixedScript } from '@/components/Np';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import ItemRail from '@/components/ItemRail';
+import ItemReviews from '@/components/ItemReviews';
 import MediaSwiper from '@/components/MediaSwiper';
 import type { MediaSwiperItem } from '@/components/MediaSwiper';
+import SaveButton from '@/components/SaveButton';
+import Stars from '@/components/Stars';
+import TrackView from '@/components/TrackView';
 import WaitlistForm from '@/components/WaitlistForm';
 import { ACCENT_THEMES } from '@/lib/accents';
+import { shopCategory } from '@/lib/categories';
 import {
   getEventBySlug,
   getEventMedia,
@@ -27,10 +42,15 @@ import {
   unclaimedPhotos,
 } from '@/lib/events';
 import type { EventMediaRow, EventRow, EventTierRow } from '@/lib/events';
+import { readListingName } from '@/lib/exampleShop';
 import { getAvailability } from '@/lib/inventory';
 import { socialImageUrl } from '@/lib/listing';
+import { listShopItems } from '@/lib/marketItems';
 import { formatMoney } from '@/lib/money';
 import { getOrganizer } from '@/lib/organizers';
+import { boughtTogether, moreFromShop, othersOnShelf } from '@/lib/relatedItems';
+import { listReviewsForItem, ratingForItem } from '@/lib/reviews';
+import type { SavedItem } from '@/lib/savedItems';
 import {
   SITE_NAME,
   absoluteUrl,
@@ -38,6 +58,8 @@ import {
   itemDescription,
   itemJsonLd,
   jsonLdScript,
+  SHARE_CARD,
+  shareImages,
 } from '@/lib/seo';
 import { tierBadge, ticketState, visibleTiers } from '@/lib/ticketState';
 import { vocabFor } from '@/lib/vocab';
@@ -76,6 +98,47 @@ function photoOf(event: EventRow, tier: EventTierRow): EventMediaRow | null {
   return tierPhoto(tier, getEventMedia(event.id));
 }
 
+/**
+ * The other things people bought in the same order as this one, reduced to the
+ * ones a shopper could actually add to their basket today.
+ *
+ * boughtTogether() has already applied the honesty floor — it refuses to
+ * answer at all below two separate PAID orders, because one shared basket is
+ * one person having an afternoon and not a pattern anybody should be told
+ * about. What it cannot know is whether those items still exist to be bought:
+ * it counts history, and the pairing that carried a shop through last Dashain
+ * may be a row its seller has since hidden or taken off sale.
+ *
+ * So every key it returns is looked up in the tiers this page is already
+ * holding and dropped unless it is BOTH visible and on sale. Visible, because
+ * a hidden row is off the seller's own page and this must not be the one place
+ * left where it can be reached. On sale, because a suggestion a shopper cannot
+ * act on is worse than no suggestion — it spends their attention and gives
+ * back a dead end with a price on it.
+ *
+ * The lookup is a Map built once rather than a find() per row: there are at
+ * most four rows, so this is not about speed, it is about the loop below
+ * having exactly one way to answer "is this still for sale".
+ */
+function pairedItems(
+  eventId: string,
+  tiers: EventTierRow[],
+  tierKey: string
+): { orders: number; tier: EventTierRow }[] {
+  const sellable = new Map(
+    visibleTiers(tiers)
+      .filter((t) => t.status === 'on-sale')
+      .map((t) => [t.tierKey, t])
+  );
+
+  const out: { orders: number; tier: EventTierRow }[] = [];
+  for (const row of boughtTogether(eventId, tierKey)) {
+    const paired = sellable.get(row.tierKey);
+    if (paired) out.push({ orders: row.orders, tier: paired });
+  }
+  return out;
+}
+
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug, tierKey } = await params;
   const found = load(slug, decodeURIComponent(tierKey));
@@ -98,7 +161,18 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const path = `/e/${event.slug}/item/${encodeURIComponent(tier.tierKey)}`;
   // The thing, then whose it is — what somebody types is the product name, and
   // the shop name after it is what tells them they have found the right one.
-  const title = `${tier.name} — ${event.name}`;
+  //
+  // But only while both fit. Google shows roughly 60 characters and the layout
+  // appends " | MartNepali" to every title, so this has about 45 to spend, and
+  // "Gift box · pods, tin & chiya masala — Taplejung Alaichi Ghar (example
+  // shop)" is 88 — cut by Google exactly where the shop name was supposed to
+  // be doing its work. When the pair will not fit, the ITEM name stays whole
+  // and the shop name goes: the item name is the half somebody typed, the shop
+  // name is on the page they land on, and a title truncated mid-word looks
+  // like a broken site rather than a long one.
+  const TITLE_BUDGET = 60 - ` | ${SITE_NAME}`.length;
+  const withShop = `${tier.name} — ${event.name}`;
+  const title = withShop.length <= TITLE_BUDGET ? withShop : tier.name;
 
   return {
     title,
@@ -112,25 +186,25 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
       description,
       url: absoluteUrl(path),
       siteName: SITE_NAME,
-      ...(image
-        ? {
-            images: [
-              // 800x1000 for the item's own photo, 1600x740 for the listing
-              // fallback — declared honestly either way, because a stated size
-              // that does not match the bytes is what makes a preview render a
-              // stretched thumbnail.
-              photo
-                ? { url: image, width: 800, height: 1000, alt: tier.name }
-                : { url: image, width: 1600, height: 740, alt: tier.name },
-            ],
-          }
-        : {}),
+      // Three pictures in order of how much they say about this item: its own
+      // photo, then the listing's cover, then the site's card. Sizes are
+      // declared honestly for each — a stated size that does not match the
+      // bytes is what makes a preview render a stretched thumbnail — and the
+      // last one means an item with no photograph anywhere still arrives in a
+      // chat as something rather than a grey box.
+      images: shareImages(
+        image
+          ? photo
+            ? { url: image, width: 800, height: 1000, alt: tier.name }
+            : { url: image, width: 1600, height: 740, alt: tier.name }
+          : null
+      ),
     },
     twitter: {
-      card: image ? 'summary_large_image' : 'summary',
+      card: 'summary_large_image',
       title,
       description,
-      ...(image ? { images: [image] } : {}),
+      images: [image ?? SHARE_CARD.url],
     },
   };
 }
@@ -220,11 +294,90 @@ export default async function ItemPage({ params, searchParams }: Params) {
   const organizer = getOrganizer(event.organizerId);
   const sellerName = organizer?.name?.trim() || 'the organizer';
 
-  const itemUrl = absoluteUrl(`/e/${event.slug}/item/${encodeURIComponent(tier.tierKey)}`);
+  // The shop's own name with the "(example shop)" mark split off, so the mark
+  // can be shown as its own chip rather than read as part of the name. See
+  // lib/exampleShop — a visitor must never be able to take a shop the site
+  // invented for a real seller, and on a trail of small grey crumbs the words
+  // "(example shop)" tucked inside a name is exactly what gets skipped.
+  const listing = readListingName(event.name);
+  // The shelf this shop is filed under, for the breadcrumb and the cross-shop
+  // rail. null when its seller picked none, and then neither of those two
+  // things is rendered rather than being rendered against a blank shelf.
+  const shelf = isShop ? shopCategory(event.category) : null;
+
+  // ---- The bazaar's furniture, read once, and for shops only ----
+  //
+  // The isShop gate is not a performance note dressed up as a rule. A review
+  // of an event cannot exist at all — writeReview() refuses anything whose
+  // listing is not a shop — so the "nobody has reviewed this yet" line would
+  // be promising a concert ticket something that can never happen to it.
+  // listShopItems() returns shops and nothing else, so both rails would come
+  // back empty. And an event carries no category, because a category answers
+  // "what does this shop sell?". An event's item page therefore keeps exactly
+  // what it had before, and pays for none of this.
+  const rating = isShop ? ratingForItem(event.id, tier.tierKey) : null;
+  const reviews = isShop ? listReviewsForItem(event.id, tier.tierKey) : [];
+  const together = isShop ? pairedItems(event.id, tiers, tier.tierKey) : [];
+
+  // ONE read for BOTH rails, and it is the same read /market and /market/items
+  // already make: every published shop, its items, its photos, what is left of
+  // each and every rating, in a fixed handful of statements whatever the size
+  // of the bazaar (see lib/marketItems). The obvious alternative — "the other
+  // things this shop sells" and "the same shelf elsewhere" as two queries of
+  // their own — is the N+1 that lib/feedSnapshot exists to prevent, and it
+  // would read at a different instant from the availability above, so a rail
+  // could offer as available something the badge at the top of this very page
+  // had just called sold out.
+  const bazaar = isShop ? listShopItems() : [];
+  // This page's own row inside that array — what both rails exclude, and what
+  // tells othersOnShelf which shelf to look along. Matched on the pair (shop,
+  // tier key) rather than on the href, because a tier key is unique only
+  // WITHIN a listing and the href is merely one spelling of that pair.
+  const self =
+    bazaar.find((row) => row.shop.id === event.id && row.tier.tierKey === tier.tierKey) ?? null;
+  const alsoFromShop = self ? moreFromShop(bazaar, self) : [];
+  const onSameShelf = self ? othersOnShelf(bazaar, self) : [];
+
+  const itemPath = `/e/${event.slug}/item/${encodeURIComponent(tier.tierKey)}`;
+
+  // The flat copy of this item that goes onto the shopper's own "saved" and
+  // "recently viewed" lists — in their browser's localStorage, on their own
+  // device, and nowhere else. See lib/savedItems for why it is a copy rather
+  // than an id, and why nothing here is ever sent to a server.
+  //
+  // The href is the page's canonical path with no ?ref= on it: the lists key
+  // items by href, so a referral code riding along would put the same jar on
+  // the list twice under two names, and one of them would credit a sharer for
+  // a visit the shopper made from their own saved list.
+  //
+  // The example mark stays INSIDE the name here, which is the one place on the
+  // site that does that. Everywhere else the mark is split off and shown as an
+  // amber chip, because there is a chip to show it in; a SavedItem is a flat
+  // record with no field for the fact, and the saved page prints "Sold by
+  // <name>" beside a price. Rather than let an invented seller be listed there
+  // as a real one, the warning travels in the only field that can carry it.
+  const savedItem: SavedItem = {
+    href: itemPath,
+    name: tier.name,
+    shopName: listing.isExample ? `${listing.name} (example shop)` : listing.name,
+    city: event.city,
+    priceCents: tier.priceCents,
+    currency: event.currency,
+    photoId: photo?.id ?? null,
+    at: Date.now(),
+  };
+
+  const itemUrl = absoluteUrl(itemPath);
   // The SAME URL generateMetadata puts in og:image. A crawler fetches the head
   // and the body of one response: two different pictures for one product is the
   // kind of mismatch that gets structured data ignored.
   const ogImage = photo ? mediaUrl(photo.id, 'card', null) : socialImageUrl(event);
+  // The rating goes through lib/seo rather than being bolted onto the object
+  // it returns, so every item page emits one shape. It is the SAME `rating`
+  // object the stars under the title and the review list below are drawn from
+  // — Google validates aggregateRating against what the page shows, so the
+  // markup and the pixels have to come from one read. Null (no reviews yet,
+  // which is most items on a bazaar this young) emits no rating at all.
   const productLd = itemJsonLd({
     event,
     tiers,
@@ -236,6 +389,7 @@ export default async function ItemPage({ params, searchParams }: Params) {
     // under the button. See the note in lib/seo itemJsonLd.
     sellerName: organizer?.name?.trim() || SITE_NAME,
     url: itemUrl,
+    rating,
   });
 
   // Paragraphs, not a wall: sellers type their write-up with blank lines in it,
@@ -279,12 +433,59 @@ export default async function ItemPage({ params, searchParams }: Params) {
         dangerouslySetInnerHTML={jsonLdScript(itemBreadcrumbJsonLd(event, tier))}
       />
 
+      {/* Where this thing sits in the bazaar, for the shopper who arrived on a
+          search result with no history to go back to: the market, the shelf it
+          is filed under, the stall that sells it, and then the thing itself.
+          The last crumb is not a link, because a link to the page you are
+          already standing on is a control that does nothing.
+
+          Shops only. An event has no shelf — a category answers "what does
+          this shop sell?" and events carry none — so the trail would come out
+          as two crumbs with a hole where the middle one should be, under a
+          heading calling a concert ticket part of a market. */}
+      {isShop && (
+        <nav aria-label="Breadcrumb">
+          <ol className="bz-crumbs">
+            <li>
+              <Link href="/market">The bazaar</Link>
+            </li>
+            {shelf && (
+              <li>
+                <Link href={`/market/c/${shelf.key}`}>{shelf.label}</Link>
+              </li>
+            )}
+            <li>
+              <Link href={backHref}>{listing.name}</Link>
+              {/* As loud in the trail as it is on a tile. The mark is split off
+                  the name so it does not read as part of it, then put straight
+                  back as a chip — the one fact on this page a visitor must not
+                  be allowed to miss is that some of these sellers are the
+                  site's own invention. */}
+              {listing.isExample && (
+                <span className="badge badge-amber" style={{ marginLeft: 6 }}>
+                  Example shop
+                </span>
+              )}
+            </li>
+            <li aria-current="page">{tier.name}</li>
+          </ol>
+        </nav>
+      )}
+
       {/* The way back to the whole shop, at the top where a browser's own back
           button would be on a phone — someone who landed here from a search
-          result has no history to go back to. */}
-      <p className="item-back">
-        <Link href={backHref}>← All {v.units} at {event.name}</Link>
-      </p>
+          result has no history to go back to.
+
+          On a shop that job now belongs to the breadcrumb above, which says
+          the same thing and two more besides, so this line would be a second
+          back link stacked on the first one and competing with it. An event
+          keeps it: there is no trail above an event, and this is still the
+          only way back to the listing without a browser button. */}
+      {!isShop && (
+        <p className="item-back">
+          <Link href={backHref}>← All {v.units} at {event.name}</Link>
+        </p>
+      )}
 
       {/* Three children, not two: the gallery is a SIBLING of the picture and
           the detail column rather than a child of the media column, because
@@ -315,7 +516,32 @@ export default async function ItemPage({ params, searchParams }: Params) {
             {tier.studentOnly && <span className="badge badge-student">Student</span>}
           </div>
 
-          <h1 className="page-title item-title">{tier.name}</h1>
+          <h1 className="page-title item-title">
+            {/* The seller's own words, with any Devanagari in them marked as
+                Nepali on the way out — see MixedScript. Sellers here write
+                "Taplejung ko अलैंची" inside one line, and no editor field
+                could ask them to say which half is which. */}
+            <MixedScript>{tier.name}</MixedScript>
+          </h1>
+
+          {/* The score, directly under the name and directly above the price —
+              the three things a shopper weighs against each other, in the
+              order they weigh them. It is a link to the reviews themselves
+              because a number nobody can check is a number nobody should be
+              asked to believe; #reviews is at the bottom of this page and
+              scroll-margin lands it clear of the sticky header.
+
+              Rendered only when there is a rating at all. Stars itself draws
+              nothing for null, so this wrapper is guarded too — an empty
+              paragraph would leave a gap between the title and the price that
+              reads as something that failed to load. The class on the wrapper
+              is what makes these the big stars rather than tile-sized ones. */}
+          {rating && (
+            <p className="bz-stars-md" style={{ margin: '2px 0 10px' }}>
+              <Stars rating={rating} size="md" href="#reviews" />
+            </p>
+          )}
+
           <p className="item-seller-line">
             {isShop ? 'From' : 'Part of'} <Link href={backHref}>{event.name}</Link>
           </p>
@@ -335,7 +561,9 @@ export default async function ItemPage({ params, searchParams }: Params) {
           )}
 
           {tier.description.trim() && (
-            <p className="item-lede">{tier.description}</p>
+            <p className="item-lede">
+              <MixedScript>{tier.description}</MixedScript>
+            </p>
           )}
 
           {/* The same sentence the listing card prints, and for the same
@@ -349,7 +577,16 @@ export default async function ItemPage({ params, searchParams }: Params) {
             </p>
           )}
 
-          <p className="item-actions">
+          {/* A flex row rather than the inline flow these two would otherwise
+              fall into. The buy control is btn-lg and the save toggle is a
+              normal button, and inline layout sits the smaller one's text on
+              the bigger one's baseline, which reads as a mistake rather than
+              as two controls. Wrapping is what keeps both of them whole on a
+              360px screen instead of squeezing the primary one. */}
+          <p
+            className="item-actions"
+            style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}
+          >
             {buyable ? (
               /* Short label, full name in the accessible one. The button sits
                  directly under the h1 that names the item, so repeating a name
@@ -367,6 +604,24 @@ export default async function ItemPage({ params, searchParams }: Params) {
                 {state.kind === 'past' ? state.badge : badge.label}
               </span>
             )}
+
+            {/* Beside the button rather than under it: the two things a
+                shopper can do on this page are buy it now and come back to it
+                later, and the second one is the whole answer for somebody
+                comparing four sellers of the same achar. It also survives a
+                sold-out row — an item you cannot have today is exactly the one
+                worth keeping a note of.
+
+                It renders NOTHING until it has read this browser's own list,
+                so this row is one control wide on the server and two a frame
+                after mount; see SaveButton for why guessing would cost a
+                hydration mismatch.
+
+                Shops only. The saved page renders these as goods, with a
+                seller and a price beside each, and dropping a dated concert
+                ticket into that list would make a claim about what the list
+                is that the list cannot keep. */}
+            {isShop && <SaveButton item={savedItem} />}
           </p>
 
           {/* The way into the seller's own writing, and the reason it shows two
@@ -456,10 +711,143 @@ export default async function ItemPage({ params, searchParams }: Params) {
           <h2 className="page-title item-about-title">About this {v.unit}</h2>
           {detailParagraphs.map((p, i) => (
             <p key={i} className="item-prose">
-              {p}
+              <MixedScript>{p}</MixedScript>
             </p>
           ))}
         </section>
+      )}
+
+      {together.length > 0 && (
+        /* The only block on this page that makes a claim about OTHER PEOPLE,
+           which is why it is the one with a floor under it and a sentence
+           saying where the claim comes from.
+
+           Everything here survived two filters. lib/relatedItems refused to
+           answer below two separate paid orders, and pairedItems() above threw
+           away anything that is no longer visible and on sale. What is left is
+           a short list of things that genuinely turned up in the same baskets
+           and can genuinely still be bought — which is why the copy is allowed
+           to say so flatly instead of hedging with "you might also like". */
+        <section className="section">
+          <h2 className="page-title" style={{ margin: '0 0 8px' }}>
+            Often bought together
+          </h2>
+          <p className="muted small" style={{ margin: '0 0 14px', maxWidth: '68ch' }}>
+            Built from what people actually ordered here, not from what looks similar: every item
+            below turned up in at least two separate paid orders alongside this one.
+          </p>
+
+          <div className="bz-together">
+            {/* This item leads the list, unlinked — it is the page you are on,
+                and a link back to it would be the one row in the panel that
+                goes nowhere. The empty plus keeps its name and price in the
+                same two columns as the rows under it. */}
+            <div className="bz-together-row">
+              <span className="bz-together-plus" aria-hidden="true" />
+              <span style={{ flex: '1 1 auto', minWidth: 0 }}>
+                {tier.name} <span className="muted small">— the one you are looking at</span>
+              </span>
+              <strong style={{ flex: 'none' }}>
+                {tier.priceCents === 0 ? 'Free' : formatMoney(tier.priceCents, event.currency)}
+              </strong>
+            </div>
+
+            {together.map(({ tier: paired, orders }) => (
+              <div className="bz-together-row" key={paired.tierKey}>
+                <span className="bz-together-plus" aria-hidden="true">
+                  +
+                </span>
+                <span style={{ flex: '1 1 auto', minWidth: 0 }}>
+                  {/* ?ref= rides on, exactly as it does everywhere else on this
+                      page: a shopper who arrived on somebody's shared link and
+                      then followed a suggestion is still that sharer's visit. */}
+                  <Link
+                    href={`/e/${event.slug}/item/${encodeURIComponent(paired.tierKey)}${
+                      refCode ? `?ref=${refCode}` : ''
+                    }`}
+                  >
+                    {paired.name}
+                  </Link>{' '}
+                  {/* The evidence, printed beside the claim rather than left
+                      implied — it is never fewer than two, and a shopper can
+                      weigh "in 2 orders" for themselves in a way they cannot
+                      weigh the word "often". */}
+                  <span className="muted small">in {orders} orders with this one</span>
+                </span>
+                <strong style={{ flex: 'none' }}>
+                  {paired.priceCents === 0
+                    ? 'Free'
+                    : formatMoney(paired.priceCents, event.currency)}
+                </strong>
+              </div>
+            ))}
+          </div>
+
+          {/* Prices are shown above, so the seller is named under them. Not
+              decoration and not repetition for its own sake: a buyer-facing
+              panel with prices on it that does not name the Veranstalter is
+              what turns the whole order value into this platform's turnover
+              (§3 Abs. 11 UStG). Everything in this panel is one shop's, which
+              is why one line covers all of it. */}
+          <p className="muted small" style={{ margin: '10px 0 0' }}>
+            Sold by <strong>{sellerName}</strong> — every price here is theirs, and each of these
+            is ordered from them and paid straight to them.
+          </p>
+        </section>
+      )}
+
+      {/* Two rails, in this order. The rest of this seller's stall first,
+          because somebody holding one jar of their pickle is likeliest to want
+          the next thing the same hands made; the same shelf at OTHER stalls
+          second, which is the one place in the bazaar where a shopper is
+          deliberately handed a competitor.
+
+          Both draw nothing at all below three tiles — see ItemRail. Two items
+          under a heading is not a selection, it is everything there was,
+          dressed up as one. Neither is rendered on an event page, because
+          `bazaar` is empty there by construction.
+
+          "More from this shop" and not "More from <shop name>", which is the
+          heading the PHOTO rail up in the media column already carries. Two
+          headings reading "More from Taplejung Alaichi Ghar" on one page, one
+          over pictures of this jar and one over other things for sale, is a
+          shopper being told the same words mean two different things a screen
+          apart. The shop is named on every tile in the row anyway — "Sold by"
+          is not optional there — so nothing is lost by letting the other
+          heading keep the name. */}
+      <ItemRail
+        title="More from this shop"
+        items={alsoFromShop}
+        href={backHref}
+        hrefLabel="Everything at this shop"
+      />
+      <ItemRail
+        title="Others on this shelf"
+        items={onSameShelf}
+        href={shelf ? `/market/items?c=${encodeURIComponent(shelf.key)}` : undefined}
+        hrefLabel="See the whole shelf"
+        note={
+          shelf
+            ? `Other sellers filed under ${shelf.label}. Nobody pays to be in this row: things ` +
+              `you can buy today come first, real shops before the site's own example ones, and ` +
+              `that is the whole of it.`
+            : undefined
+        }
+      />
+
+      {/* The reviews, and the anchor every star cluster on the site points at.
+          The component owns the id itself so the two can never be separated by
+          a rearrangement of this page. Shops only, for the reason given where
+          `reviews` is read: an event's ticket can never be reviewed by anyone,
+          so an empty block explaining how to review it would be an invitation
+          nobody can accept. */}
+      {isShop && (
+        <ItemReviews
+          rating={rating}
+          reviews={reviews}
+          itemName={tier.name}
+          sellerName={sellerName}
+        />
       )}
 
       {/* The collection/venue details live on the listing page and are the same
@@ -470,6 +858,13 @@ export default async function ItemPage({ params, searchParams }: Params) {
           Back to {event.name}
         </Link>
       </p>
+
+      {/* Renders nothing, fetches nothing, sends nothing anywhere: it drops
+          this item onto the "recently viewed" list in this browser's own
+          storage and stops. Last in the tree because it is not content — where
+          it sits changes nothing a shopper sees, and putting it higher would
+          put a client component ahead of the page's own words in the stream. */}
+      {isShop && <TrackView item={savedItem} />}
     </div>
   );
 }

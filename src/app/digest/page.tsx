@@ -1,3 +1,5 @@
+import { MixedScript } from '@/components/Np';
+import Np from '@/components/Np';
 import CopyButton from '@/components/CopyButton';
 import { digestText } from '@/lib/digest';
 
@@ -21,7 +23,7 @@ export default function DigestPage() {
     <div className="container container-narrow section">
       <div className="anim-fade-up" style={{ marginBottom: 18 }}>
         <h1 className="page-title" style={{ margin: 0 }}>
-          यो हप्ता के छ?
+          <Np>यो हप्ता के छ?</Np>
         </h1>
         <p className="muted small" style={{ margin: '4px 0 0' }}>
           This week&rsquo;s events as one WhatsApp-ready message. Copy it, paste it into your
@@ -47,7 +49,7 @@ export default function DigestPage() {
             margin: 0,
           }}
         >
-          {text}
+          <MixedScript>{text}</MixedScript>
         </pre>
       </div>
 

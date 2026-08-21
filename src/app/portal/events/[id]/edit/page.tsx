@@ -45,6 +45,7 @@ import { FAQ_SUGGESTIONS_EVENT } from './faqBridge';
 import MediaPanel from './MediaPanel';
 import HostStallsPanel from './HostStallsPanel';
 import PageContentPanel from './PageContentPanel';
+import { qualitySummary, shopQualityHints } from '@/lib/listingQuality';
 import PublishPanel from './PublishPanel';
 import QuestionsPanel from './QuestionsPanel';
 import StallRequestsPanel from './StallRequestsPanel';
@@ -132,6 +133,9 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
 
   // The words this listing is described in, and what its kind asks for. Both
   // come from one place each, so the editor and the publish gate cannot drift.
+  // Shops only; shopQualityHints returns [] for an event, and the panel then
+  // renders nothing at all rather than an empty heading.
+  const qualityHints = shopQualityHints(event, tiers, media);
   const v = vocabFor(event.kind);
   const isShop = event.kind === 'shop';
 
@@ -560,6 +564,11 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
             slug={event.slug}
             kind={event.kind}
             checklist={checklist}
+            // Advice about how the shop reads to a buyer, from the same rows
+            // the public pages render from — so it can never point at a
+            // problem the bazaar does not actually have.
+            quality={qualityHints}
+            qualityLine={event.kind === 'shop' ? qualitySummary(qualityHints, event) : ''}
             // The same query the announce route walks — the count promised on
             // the button is the count the route would email.
             announceAudience={listAnnouncementAudience(organizer.id, event.id).length}

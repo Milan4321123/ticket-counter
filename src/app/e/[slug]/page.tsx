@@ -1,3 +1,6 @@
+import Stars from '@/components/Stars';
+import { ratingForShop, ratingsForItems } from '@/lib/reviews';
+import { MixedScript } from '@/components/Np';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -60,6 +63,8 @@ import {
   eventDescription,
   eventJsonLd,
   jsonLdScript,
+  SHARE_CARD,
+  shareImages,
 } from '@/lib/seo';
 
 // Availability comes from the database — always render fresh.
@@ -163,7 +168,18 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   // name alone, and still reads like a sentence rather than keyword soup. A
   // shop's buyers are searching for something else entirely, so it says so.
   const searchNoun = event.kind === 'shop' ? 'Order online' : 'Tickets';
-  const title = `${event.name} — ${searchNoun}${event.city.trim() ? `, ${event.city.trim()}` : ''}`;
+  // The town earns its place until the title stops fitting in a result.
+  //
+  // Google shows roughly 60 characters and the layout appends " | MartNepali"
+  // to every title, so the page's own half has about 45 to spend. A long
+  // listing name plus a noun plus a town went past that and got cut — and what
+  // gets cut is the END, which is precisely the town this was added for. So
+  // when it will not fit, the town is dropped deliberately rather than
+  // truncated by somebody else: a whole shorter title beats a longer one with
+  // its last word missing.
+  const TITLE_BUDGET = 60 - ` | ${SITE_NAME}`.length;
+  const withCity = `${event.name} — ${searchNoun}${event.city.trim() ? `, ${event.city.trim()}` : ''}`;
+  const title = withCity.length <= TITLE_BUDGET ? withCity : `${event.name} — ${searchNoun}`;
 
   return {
     title,
@@ -177,13 +193,18 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
       description,
       url,
       siteName: SITE_NAME,
-      ...(image ? { images: [{ url: image, width: 1600, height: 740, alt: event.name }] } : {}),
+      // The listing's own cover if it has one, the site's card if it does not.
+      // A listing with no photograph used to ship no og:image at all, so the
+      // one thing an organizer does the hour they publish — paste the link
+      // into their community's WhatsApp group — produced a grey box.
+      images: shareImages(image ? { url: image, width: 1600, height: 740, alt: event.name } : null),
     },
     twitter: {
-      card: image ? 'summary_large_image' : 'summary',
+      // Always the large card now: there is always a picture behind it.
+      card: 'summary_large_image',
       title,
       description,
-      ...(image ? { images: [image] } : {}),
+      images: [image ?? SHARE_CARD.url],
     },
   };
 }
@@ -344,6 +365,18 @@ export default async function EventPage({ params, searchParams }: Params) {
   // a night out, and every noun below comes from here rather than a literal.
   const v = vocabFor(event.kind);
   const isShop = event.kind === 'shop';
+
+  // Everything buyers have said about this shop, in TWO statements for the
+  // whole page however many items are on it: one aggregate per item for the
+  // grid, one for the shop as a whole. A rating per card would be a query per
+  // card, which is the N+1 the rest of this codebase goes to some length to
+  // avoid — see lib/reviews ratingsForItems.
+  //
+  // Shops only. An event's tickets are not reviewed here: "Standard entry, 3
+  // stars" is a verdict on somebody's evening, not on a thing that was sold.
+  const itemRatings = isShop ? ratingsForItems([event.id]) : new Map();
+  const shopRating = isShop ? ratingForShop(event.id) : null;
+
   const heroCollectLine =
     event.pickupInfo
       .split('\n')
@@ -637,6 +670,21 @@ export default async function EventPage({ params, searchParams }: Params) {
           >
             {headline}
           </h1>
+          {/* What this shop's buyers have said, taken together — under the
+              name, where somebody deciding whether to trust a stranger with a
+              bank transfer is already looking.
+
+              Nothing renders until at least one person who actually paid has
+              spoken (Stars returns null for null), so a shop that opened this
+              morning shows a clean heading rather than five empty outlines
+              that read as a bad score. It links down to the items, because
+              this page has no review list of its own — every review lives
+              under the thing it is about, which is where it means something. */}
+          {shopRating ? (
+            <p className="hero-meta anim-fade-up anim-d2" style={{ marginBottom: 12 }}>
+              <Stars rating={shopRating} href="#tickets" />
+            </p>
+          ) : null}
           {design.tagline ? (
             <p className="hero-meta anim-fade-up anim-d2" style={{ maxWidth: 640, marginBottom: 14 }}>
               {design.tagline}
@@ -893,6 +941,13 @@ export default async function EventPage({ params, searchParams }: Params) {
                       <div className="tier-price">
                         {tier.priceCents === 0 ? 'Free' : formatMoney(tier.priceCents, event.currency)}
                       </div>
+                      {/* What buyers said about THIS item, on the shop's own
+                          grid. It renders nothing at all until somebody who
+                          bought it has spoken — see Stars — so a young shop
+                          shows a clean card rather than rows of grey outlines
+                          reading as a bad score. One bulk read for the whole
+                          grid (itemRatings above), never one per card. */}
+                      <Stars rating={itemRatings.get(`${event.id}:${tier.tierKey}`) ?? null} size="sm" />
                       {/* A bundled tier is bought as ONE booking for a group —
                           said plainly on the card, because the price above is
                           per table, not per person, and a buyer comparing it
@@ -1141,7 +1196,12 @@ export default async function EventPage({ params, searchParams }: Params) {
             <h2 className="page-title">
               {design.aboutTitle || (isShop ? 'About this shop' : 'About the event')}
             </h2>
-            <p className="muted event-prose">{event.description}</p>
+            <p className="muted event-prose">
+              {/* Whatever Devanagari the seller wrote in here, marked as
+                  Nepali on the way out. They type one description in one box
+                  and it is routinely both languages at once. */}
+              <MixedScript>{event.description}</MixedScript>
+            </p>
           </div>
         </section>
       )}

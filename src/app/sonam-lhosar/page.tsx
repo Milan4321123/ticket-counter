@@ -1,3 +1,4 @@
+import { shareImages } from '@/lib/seo';
 import FestivalPage from '@/components/FestivalPage';
 import { currentOccurrence, getFestival } from '@/lib/festivals';
 
@@ -20,7 +21,7 @@ export function generateMetadata() {
     title,
     description,
     alternates: { canonical: '/sonam-lhosar' },
-    openGraph: { type: 'website', title, description, url: '/sonam-lhosar' },
+    openGraph: { type: 'website', title, description, url: '/sonam-lhosar', images: shareImages() },
   };
 }
 

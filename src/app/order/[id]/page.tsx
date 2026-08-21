@@ -4,6 +4,7 @@ import CheckPaymentButton from '@/components/CheckPaymentButton';
 import OrganizerWhatsApp from '@/components/OrganizerWhatsApp';
 import CopyButton from '@/components/CopyButton';
 import PrintButton from '@/components/PrintButton';
+import ReviewForm from '@/components/ReviewForm';
 import { buyerAccountForOrder, issueCardForOrder } from '@/lib/buyerAccount';
 import {
   cropTag,
@@ -24,6 +25,7 @@ import { orderPayout } from '@/lib/payout';
 import { withAnonymizedBuyer } from '@/lib/retention';
 import { getReferralRewardSettings, referralRewardsReachable } from '@/lib/referrals';
 import { paymentQrDataUrl } from '@/lib/paymentQr';
+import { MAX_REVIEW_CHARS, reviewableItems } from '@/lib/reviews';
 import { machineDate } from '@/lib/seo';
 import { ticketQrDataUrl } from '@/lib/tickets';
 import { vocabFor } from '@/lib/vocab';
@@ -703,6 +705,28 @@ export default async function OrderPage({
   // the road the link travels and sends anyone who cannot find it to the seller.
   const mailConfigured = isEmailConfigured();
 
+  // ---- What this buyer may review, and whether they may review at all ------
+  //
+  // Three conditions, and the token is the one that matters. A shop's own
+  // seller can read every order id it has ever taken out of their portal, so
+  // "knows the order id" would let them post five stars on their own goods all
+  // afternoon. The token is an HMAC that only travels in the mail sent to
+  // orders.buyer_email, and account.mailboxProven is the answer this page has
+  // ALREADY worked out from it a few lines above — asking verifyOrderAccessToken
+  // a second time here would be a second place for the rule to drift, and it
+  // would also skip the axes buyerAccountForOrder fails closed on (an unpaid
+  // order, an erased buyer whose byline no longer belongs to anybody).
+  //
+  // The raw token still has to be passed down, because the form POSTs it back
+  // and /api/reviews checks it again — a rendered form is not authority.
+  //
+  // Shops only: an event's ticket tiers are not goods, and a star rating under
+  // "Standard ticket" would be a review of somebody's evening. reviewableItems
+  // enforces that itself and returns [] either way; the kind check here just
+  // saves the read on the far commoner case.
+  const reviewToken = event?.kind === 'shop' && account.mailboxProven ? accessToken : null;
+  const reviewable = reviewToken ? reviewableItems(order.id) : [];
+
   /**
    * Create the card, because the buyer pressed the button asking for one.
    *
@@ -1004,6 +1028,57 @@ export default async function OrderPage({
           </Link>
         ))}
       </div>
+
+      {/* The review panel. Below the codes on purpose: the codes are what the
+          buyer came for, and nothing should stand between them and the thing
+          they paid for. no-print because a printed sheet of collection codes
+          carrying an empty star input is nonsense.
+
+          It exists at all only because this page was opened from the buyer's
+          own email — see reviewToken above — so the panel appearing IS the
+          proof of the mailbox, and it needs no explanation of who may write. */}
+      {reviewToken && reviewable.length > 0 ? (
+        /* id="review" because the collection email links straight here —
+           "once you have collected and tried it, say how it was" — and this
+           card is a long way down a page that opens on payment instructions
+           and a grid of QR codes. Without the anchor the link lands at the top
+           and the invitation reads as if it went nowhere. scroll-margin keeps
+           the heading clear of the sticky site header. */
+        <div
+          id="review"
+          className="card glow-card anim-fade-up anim-d4 no-print"
+          style={{ marginTop: 20, scrollMarginTop: 90 }}
+        >
+          <div className="card-title">How was it?</div>
+          <p className="muted small" style={{ marginTop: 0 }}>
+            You paid for {reviewable.length === 1 ? 'this' : 'these'}, which is the only way anybody
+            gets to say anything about {reviewable.length === 1 ? 'it' : 'them'} here. What you write
+            goes on the shop&rsquo;s own page, under the item.
+          </p>
+          <p className="muted small">
+            {/* The one sentence the panel owes the buyer BEFORE they type: what
+                strangers will see over their words. lib/reviews stores exactly
+                this — a first name and an initial, frozen at write time — and
+                the address they ordered with never goes near a review. */}
+            Your name shows as <strong>&ldquo;First L.&rdquo;</strong> — never your surname in full,
+            never your email address. The seller can reply to you in public; they cannot edit or take
+            down what you wrote.
+          </p>
+          <div style={{ display: 'grid', gap: 14 }}>
+            {reviewable.map((it) => (
+              <ReviewForm
+                key={it.tierKey}
+                orderId={order.id}
+                token={reviewToken}
+                tierKey={it.tierKey}
+                itemName={it.name}
+                existing={it.existing}
+                maxChars={MAX_REVIEW_CHARS}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="anim-fade-up anim-d4">
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>

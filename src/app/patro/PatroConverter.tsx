@@ -1,5 +1,6 @@
 'use client';
 
+import Np from '@/components/Np';
 import { useState } from 'react';
 import {
   BS_MONTHS,
@@ -56,7 +57,9 @@ export default function PatroConverter({ todayIso }: { todayIso: string }) {
           {bsResult ? (
             <>
               <strong>{formatBs(bsResult)} BS</strong>{' '}
-              <span className="muted">· {formatBsNe(bsResult)}</span>
+              <span className="muted">
+                · <Np>{formatBsNe(bsResult)}</Np>
+              </span>
             </>
           ) : (
             <span className="muted small">
@@ -90,7 +93,13 @@ export default function PatroConverter({ todayIso }: { todayIso: string }) {
               onChange={(e) => setBsMonth(Number(e.target.value))}
             >
               {BS_MONTHS.map((m, i) => (
-                <option key={m.name} value={i + 1}>
+                /* lang on the <option> itself: an option's label is a flat
+                   string, so there is nowhere inside it to mark one half. The
+                   whole row is declared Nepali because the half that needs the
+                   Nepali voice is the half a wrong voice ruins — "बैशाख" read
+                   as English is unusable, while "Baishakh" read with a Nepali
+                   voice is still recognisable. */
+                <option key={m.name} value={i + 1} lang="ne">
                   {m.name} · {m.nameNe}
                 </option>
               ))}

@@ -1,3 +1,5 @@
+import { shareImages } from '@/lib/seo';
+import Np from '@/components/Np';
 import Link from 'next/link';
 import { FESTIVALS, currentOccurrence } from '@/lib/festivals';
 import { adToBs, formatBs, formatBsNe } from '@/lib/patro';
@@ -16,8 +18,7 @@ export const metadata = {
     title: 'Nepali patro — today’s date & BS ↔ AD converter',
     description:
       'Today’s Bikram Sambat date, a two-way BS ↔ AD converter, and the next Nepali festival dates.',
-    url: '/patro',
-  },
+    url: '/patro', images: shareImages() },
 };
 
 /** Today's ISO date in Europe/Berlin — where this site's visitors wake up. */
@@ -55,9 +56,11 @@ export default function PatroPage() {
     <>
       <section className="feed-hero" style={{ padding: '64px 0 36px' }}>
         <div className="container">
-          <p className="feed-kicker anim-fade-up">नेपाली पात्रो · Nepali calendar</p>
+          <p className="feed-kicker anim-fade-up">
+            <Np>नेपाली पात्रो</Np> · Nepali calendar
+          </p>
           <h1 className="anim-fade-up anim-d1" style={{ fontSize: 'clamp(1.9rem, 4.4vw, 3rem)' }}>
-            {todayBs ? formatBsNe(todayBs) : 'Nepali patro'}
+            {todayBs ? <Np>{formatBsNe(todayBs)}</Np> : 'Nepali patro'}
           </h1>
           <p className="feed-hero-sub anim-fade-up anim-d2" style={{ marginBottom: 0 }}>
             {todayBs ? (
@@ -84,7 +87,10 @@ export default function PatroPage() {
                   <div className="summary-row" key={festival.slug}>
                     <span>
                       <Link href={`/${festival.slug}`}>
-                        {festival.name} <span className="muted">{festival.nameNe}</span>
+                        {festival.name}{' '}
+                        <span className="muted">
+                          <Np>{festival.nameNe}</Np>
+                        </span>
                       </Link>
                     </span>
                     <span className="muted" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>

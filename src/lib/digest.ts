@@ -12,8 +12,11 @@
 // same information any visitor sees — so there is nothing to consent to and
 // nothing personal riding along.
 import { getBaseUrl } from './config';
+import { readListingName } from './exampleShop';
 import { listPublishedEvents, type EventRow } from './events';
+import { loadFeedSnapshot } from './feedSnapshot';
 import { currentOccurrence, FESTIVALS } from './festivals';
+import { ticketState, visibleTiers } from './ticketState';
 
 /** "Sat 17 Oct" — short enough for a phone screen, day name first because
  * that is how people decide whether they can come. The year appears only when
@@ -49,8 +52,14 @@ export interface DigestSections {
   thisWeek: EventRow[];
   /** Dated events beyond the fortnight. */
   comingUp: EventRow[];
-  /** Shops — no date, order any time. */
+  /**
+   * Shops worth a line THIS WEEK, best first and capped — see DIGEST_SHOPS.
+   * Only shops with something actually on sale: a line pointing at an empty
+   * shelf spends a stranger's tap and their patience.
+   */
   shops: EventRow[];
+  /** How many shops are open in total, so the message can say what it left out. */
+  shopsTotal: number;
   /** A festival whose window starts within ~35 days, if any. */
   festivalLine: string | null;
 }
@@ -79,13 +88,54 @@ export function digestSections(today = new Date()): DigestSections {
     }
   }
 
+  // ---- the bazaar's share of the message ---------------------------------
+  //
+  // Events bound themselves: they have dates, and the fortnight horizon above
+  // decides which ones are news. A shop has no date, so "every published shop"
+  // was the whole list forever — fine at seven, and an unpasteable wall at
+  // fifty. WhatsApp truncates a long message and a reader gives up well before
+  // that, so the digest that lists everything is the digest nobody forwards.
+  //
+  // Three rules, in this order:
+  //   1. only shops with something ON SALE — a line to an empty shelf spends a
+  //      stranger's tap and teaches them the list is padded;
+  //   2. real sellers before the site's own example shops, exactly as /market
+  //      orders them, because the point of the message is trade;
+  //   3. capped, with the remainder named honestly and handed to /market.
+  const openShops = all.filter((e) => e.kind === 'shop');
+  const snapshot = loadFeedSnapshot(openShops);
+  const sellable = openShops.filter((shop) => {
+    const tiers = snapshot.tiers.get(shop.id) ?? [];
+    const availability = snapshot.availability.get(shop.id);
+    if (!availability) return false;
+    const state = ticketState(shop, tiers, availability);
+    if (!state.buyable) return false;
+    return visibleTiers(tiers).some(
+      (t) => t.status === 'on-sale' && (availability.tiers[t.tierKey]?.remaining ?? 0) > 0
+    );
+  });
+  const ranked = [...sellable].sort(
+    (a, b) => Number(readListingName(a.name).isExample) - Number(readListingName(b.name).isExample)
+  );
+
   return {
     thisWeek: dated.filter((e) => (e.eventDate as string).slice(0, 10) <= horizon),
     comingUp: dated.filter((e) => (e.eventDate as string).slice(0, 10) > horizon),
-    shops: all.filter((e) => e.kind === 'shop'),
+    shops: ranked.slice(0, DIGEST_SHOPS),
+    shopsTotal: ranked.length,
     festivalLine,
   };
 }
+
+/**
+ * How many shops one message may carry.
+ *
+ * Six is about the point where a pasted message stops being scannable on a
+ * phone — past that a reader scrolls rather than reads, and the events above
+ * lose the attention they were the reason for. The rest are not hidden: the
+ * line under them says how many there are and links to the bazaar.
+ */
+export const DIGEST_SHOPS = 6;
 
 /**
  * The whole message, ready for the clipboard. Bilingual on the lines that are
@@ -93,7 +143,7 @@ export function digestSections(today = new Date()): DigestSections {
  * data — the mix the community's own group messages actually use.
  */
 export function digestText(today = new Date()): string {
-  const { thisWeek, comingUp, shops, festivalLine } = digestSections(today);
+  const { thisWeek, comingUp, shops, shopsTotal, festivalLine } = digestSections(today);
   const base = getBaseUrl();
 
   const parts: string[] = ['🙏 *यो हप्ता के छ? · What’s on*'];
@@ -107,9 +157,14 @@ export function digestText(today = new Date()): string {
     parts.push('*अब आउँदै · Coming up*\n\n' + comingUp.map((e) => eventLine(e, base)).join('\n\n'));
   }
   if (shops.length > 0) {
+    const rest =
+      shopsTotal > shops.length
+        ? `\n\n   +${shopsTotal - shops.length} more in the bazaar: ${base}/market`
+        : `\n\n   The whole bazaar: ${base}/market`;
     parts.push(
       '*अर्डर गर्नुहोस् · Order for collection*\n\n' +
-        shops.map((s) => `🥟 *${s.name}*\n   ${base}/e/${s.slug}`).join('\n\n')
+        shops.map((s) => `🥟 *${s.name}*\n   ${base}/e/${s.slug}`).join('\n\n') +
+        rest
     );
   }
   if (thisWeek.length === 0 && comingUp.length === 0 && shops.length === 0) {

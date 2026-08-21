@@ -1,3 +1,5 @@
+import Np from '@/components/Np';
+import { shareImages } from '@/lib/seo';
 import Link from 'next/link';
 import { platformContactEmail, platformNameFromEnv } from '@/lib/platform';
 import DashboardMock from '@/components/mockups/DashboardMock';
@@ -16,18 +18,21 @@ export const dynamic = 'force-dynamic';
  * page whose whole job is recruiting organizers.
  */
 export async function generateMetadata() {
-  const brand = platformNameFromEnv();
-  const title = `Sell tickets or open a shop on ${brand} — organizers & sellers`;
+  // Short enough to survive the " | MartNepali" the layout appends. The brand
+  // used to appear twice in one 77-character title, and the half that got cut
+  // was the half that said what the page is for.
+  const title = 'Sell tickets or open a shop — free for organizers';
+  // Under the ~155 characters a search result shows. Of everything this page
+  // says, the two facts that make somebody click are "your own bank account"
+  // and "free", so those are the two that survive the cut.
   const description =
-    `Your own beautiful event page with QR tickets and door scanning — or your own shop in the ` +
-    `bazaar, items with photos and their own pages, orders collected with a QR code. Every ` +
-    `payment lands straight in your own bank account. Completely free — no fees, no commission ` +
-    `on your sales.`;
+    'Your own event page with QR tickets, or your own shop in the bazaar. Payments land in ' +
+    'your own bank account. Completely free — no fees, no commission.';
   return {
     title,
     description,
     alternates: { canonical: '/organizers' },
-    openGraph: { type: 'website', title, description, url: '/organizers' },
+    openGraph: { type: 'website', title, description, url: '/organizers', images: shareImages() },
   };
 }
 
@@ -321,6 +326,29 @@ export default function OrganizersPage() {
                 <FeatPoint>
                   <strong>Orders arrive as QR collection codes</strong> — scan the buyer&rsquo;s
                   code at the counter when they pick up, the same way a door scanner works.
+                </FeatPoint>
+                {/* Three things the bazaar grew that a seller cannot see from
+                    outside, and that decide whether their shop is FOUND. They
+                    are listed because they are true, and each one names what it
+                    actually does rather than what it sounds like: a seller
+                    deciding where to spend an afternoon deserves the mechanism,
+                    not an adjective. */}
+                <FeatPoint>
+                  <strong>People find you in the words they think in</strong> — somebody typing
+                  &ldquo;cardamom&rdquo; finds your alaichi, &ldquo;dumplings&rdquo; finds your{' '}
+                  <Np>मोमो</Np>, and the shelf you pick has its own page that Google indexes. Shoppers
+                  filter by town, by price and by what is in stock today.
+                </FeatPoint>
+                <FeatPoint>
+                  <strong>Reviews from people who actually bought</strong> — only a buyer who paid
+                  can write one, so a good score cannot be bought or faked. You can reply to any of
+                  them in public. You cannot edit or delete them, and neither can we without a
+                  reason on the record — which is exactly what makes them worth reading.
+                </FeatPoint>
+                <FeatPoint>
+                  <strong>Your shop shares properly</strong> — pasted into a WhatsApp group it
+                  arrives as your photo, your name and your prices, not a grey box. That is how
+                  most people here will ever hear of you.
                 </FeatPoint>
                 <FeatPoint>
                   <strong>Buyers pay you directly</strong> — into your own account. We never hold

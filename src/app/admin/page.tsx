@@ -109,6 +109,12 @@ export default async function AdminDashboardPage() {
           <Link href="/admin/sales" className="btn btn-sm">
             Sales
           </Link>
+          {/* Moderation lives only here. A seller can answer a review of their
+              own goods and nothing else, so the power to take one down has to
+              sit with somebody who has no stake in the score. */}
+          <Link href="/admin/reviews" className="btn btn-sm">
+            Reviews
+          </Link>
           <Link href="/admin/contact" className="btn btn-primary btn-sm">
             Applications
             {newContactRequests > 0 ? (

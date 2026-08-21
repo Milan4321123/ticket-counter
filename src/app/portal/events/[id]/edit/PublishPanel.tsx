@@ -25,6 +25,14 @@ interface Props {
    * the number sent.
    */
   announceAudience: number;
+  /**
+   * Advice, never a gate — see lib/listingQuality. Empty for events, and empty
+   * for a shop that is already doing everything, in which case the panel says
+   * so rather than drawing a box with nothing in it.
+   */
+  quality?: { key: string; label: string; why: string; tab: string }[];
+  /** One line above them, or the praise line when there are none. */
+  qualityLine?: string;
 }
 
 // There used to be a fee card here — the per-event platform fee, its bank
@@ -32,7 +40,16 @@ interface Props {
 // platform is free while it grows, so publishing now waits on nothing but the
 // checklist. The card was removed rather than hidden so this tab can never
 // show a price again by accident.
-export default function PublishPanel({ eventId, kind, status, slug, checklist, announceAudience }: Props) {
+export default function PublishPanel({
+  eventId,
+  kind,
+  status,
+  slug,
+  checklist,
+  announceAudience,
+  quality = [],
+  qualityLine = '',
+}: Props) {
   const router = useRouter();
   const v = vocabFor(kind);
   const [busy, setBusy] = useState(false);
@@ -241,6 +258,37 @@ export default function PublishPanel({ eventId, kind, status, slug, checklist, a
             <p className="muted small" style={{ margin: '10px 0 0' }}>
               The button unlocks once every item above is done.
             </p>
+          )}
+        </div>
+      )}
+
+      {/* How the shop LOOKS, as opposed to whether it may be published.
+          Deliberately below everything else and deliberately not a checklist
+          with ticks: nothing here blocks anything, and a second list of
+          circles beside the publish gate would read as more rules. Each line
+          says what a shopper sees today, because a seller who is told the
+          consequence can decide for themselves whether they care. */}
+      {qualityLine && (
+        <div style={{ marginTop: 26, borderTop: '1px solid var(--border)', paddingTop: 18 }}>
+          <div className="card-step-head" style={{ marginBottom: 4 }}>
+            <strong>How your shop looks to a buyer</strong>
+          </div>
+          <p className="muted small" style={{ margin: '0 0 12px' }}>
+            {qualityLine}
+          </p>
+          {quality.length > 0 && (
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 12 }}>
+              {quality.map((hint) => (
+                <li key={hint.key}>
+                  <div className="tier-name" style={{ marginBottom: 2 }}>
+                    {hint.label}
+                  </div>
+                  <p className="muted small" style={{ margin: 0 }}>
+                    {hint.why}
+                  </p>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       )}

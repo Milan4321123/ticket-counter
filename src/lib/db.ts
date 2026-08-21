@@ -1085,6 +1085,59 @@ function migrateToPlatform(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_customer_cards_org ON customer_cards(organizer_id);
   `);
 
+  // ---- Reviews of GOODS, written only by people who actually bought them ---
+  //
+  // The trust model is the whole table, and it is enforced by the ORDER
+  // column, not by a flag somebody could set. There is no reviewer id and no
+  // account here: a row can only come into being from a PAID order of a SHOP
+  // that really contains that tier — lib/reviews.ts checks all three before it
+  // writes — and the route on top of it demands the buyer's own order access
+  // token, which exists only inside the emailed link. So "Verified order" on
+  // the item page is not a badge the platform awards; it is the only way a row
+  // in here can exist at all, and that is why the page is allowed to say it.
+  //
+  // UNIQUE (order_id, tier_key) is the second half of the same idea: one paid
+  // purchase of one item earns exactly one opinion of it. A buyer who changes
+  // their mind while their link still works UPDATES their own row (updated_at
+  // is stamped then), so nobody can stack five reviews of the same jar by
+  // pressing submit five times, and a seller cannot buy their own goods
+  // repeatedly to manufacture a score.
+  //
+  // author_name holds a SHORTENED name ("Sunita T."), never the email and
+  // never the full surname — it is written once at review time and read
+  // straight back, because the buyer's own row in `orders` is overwritten by
+  // the retention sweep long before this review stops being useful. When that
+  // sweep runs it rewrites author_name here too, to the anonymous label, and
+  // deliberately LEAVES body untouched: a review is a statement about the
+  // goods, not about the person, and the next shopper deciding whether the
+  // achar is too hot is owed that sentence whether or not the person who wrote
+  // it is still identifiable. Erasure removes the author, not the evidence.
+  //
+  // status/hidden_reason belong to the platform, not the seller: a seller can
+  // reply (seller_reply) and nothing else, so a bad review cannot be made to
+  // disappear by the person it is about. Aggregates count 'published' rows
+  // only, which is why the item index carries status as its third column.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS item_reviews (
+      id TEXT PRIMARY KEY,
+      event_id TEXT NOT NULL REFERENCES events(id),
+      tier_key TEXT NOT NULL,
+      order_id TEXT NOT NULL REFERENCES orders(id),
+      rating INTEGER NOT NULL,
+      body TEXT NOT NULL DEFAULT '',
+      author_name TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT,
+      status TEXT NOT NULL DEFAULT 'published',
+      hidden_reason TEXT NOT NULL DEFAULT '',
+      seller_reply TEXT NOT NULL DEFAULT '',
+      seller_reply_at TEXT,
+      UNIQUE (order_id, tier_key)
+    );
+    CREATE INDEX IF NOT EXISTS idx_item_reviews_item ON item_reviews(event_id, tier_key, status);
+    CREATE INDEX IF NOT EXISTS idx_item_reviews_order ON item_reviews(order_id);
+  `);
+
   const haveEvents = (db.prepare(`SELECT COUNT(*) AS n FROM events`).get() as { n: number }).n > 0;
   if (!haveEvents) {
     const configPath = path.join(process.cwd(), 'event.config.json');

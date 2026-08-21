@@ -200,6 +200,40 @@ Do one complete dress rehearsal on the real site, wearing all four hats: admin, 
 
 When all of this works, you're ready to onboard your first paying organizer.
 
+### The two-minute check before any deploy
+
+The dress rehearsal above is for the first time. After that, three commands catch
+the things a person reading a page will not:
+
+```bash
+npm test          # the logic: pricing, tenancy, inventory, reviews, retention
+npm run typecheck # nothing broken by a rename
+npm run audit     # the RUNNING site, from outside
+```
+
+`npm run audit` crawls a running copy — `npm run audit` on its own checks
+`http://localhost:3000`, or pass a URL: `npm run audit -- https://martnepali.com`.
+It fetches only public pages (never `/admin`, `/portal`, `/order` or a ticket)
+and it fails the run, with exit code 1, when it finds any of these:
+
+- a price shown without naming the seller it belongs to — the VAT rule this whole
+  platform's structure depends on;
+- an example shop appearing anywhere without its mark;
+- a star rating with no reviews behind it, or "often bought together" without the
+  orders it claims;
+- a link on a public page that 404s, or a sitemap entry that does;
+- an image with no `alt`, a form control with no name, a page with no `<main>` or
+  no skip link, two `<h1>`s, or a duplicate `id`;
+- a page with no title, no description, or two canonical links;
+- **a database column reaching the browser** — an IBAN or a private note serialised
+  into a page because a row was handed to a client component;
+- a photo served `no-store` (every visitor re-downloading every picture), or an
+  API response served cacheable;
+- two indexable pages sharing a title, or a page that would arrive in a WhatsApp
+  group as a grey box.
+
+Run it against production after a deploy too. It only reads.
+
 ## 6b. Backups — the one thing you must not skip
 
 Every organizer, order and issued ticket lives in a single file on the server's disk. The app is not the risk; losing that file is. A ticketing platform that cannot say who paid is finished, so treat this as part of going live, not as housekeeping.

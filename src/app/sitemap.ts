@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next';
+import { SHOP_CATEGORIES, isShopCategory } from '@/lib/categories';
 import { getBaseUrl } from '@/lib/config';
 import {
   getEventMedia,
@@ -104,5 +105,33 @@ export default function sitemap(): MetadataRoute.Sitemap {
       }));
   });
 
-  return [...staticPages, ...eventPages, ...itemPages];
+  /**
+   * The bazaar's shelves — /market/c/<key>.
+   *
+   * These are the evergreen landing pages of the whole site: a fixed URL per
+   * shelf, wording that does not change with a query string, and exactly seven
+   * of them. "Nepali sweets in Germany" is a search somebody makes every
+   * Dashain, and this is the page that should answer it.
+   *
+   * Only STOCKED shelves are offered. A department nobody has listed anything
+   * on is a heading, an invitation to sellers and nothing else — thin content,
+   * and asking Google to index it teaches the crawler that this domain
+   * publishes empty pages. The page itself agrees: with nothing on the shelf
+   * it renders `noindex, follow`, so "indexable" and "in the sitemap" say the
+   * same thing about every shelf rather than two different things.
+   */
+  const stocked = new Set(
+    events.filter((e) => e.kind === 'shop' && isShopCategory(e.category)).map((e) => e.category)
+  );
+  const shelfPages: MetadataRoute.Sitemap = SHOP_CATEGORIES.filter((c) => stocked.has(c.key)).map(
+    (c) => ({
+      url: `${base}/market/c/${c.key}`,
+      // Between /market (weekly) and /market/items (daily): a shelf changes
+      // when a shop on it lists something, which is oftener than shops open.
+      changeFrequency: 'weekly' as const,
+      priority: 0.8,
+    })
+  );
+
+  return [...staticPages, ...shelfPages, ...eventPages, ...itemPages];
 }

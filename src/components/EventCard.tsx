@@ -5,6 +5,7 @@
 import Link from 'next/link';
 import CardVideo from '@/components/CardVideo';
 import { categoryLabel } from '@/lib/categories';
+import { readListingName } from '@/lib/exampleShop';
 import { getEventTiers, parsePageDesign } from '@/lib/events';
 import type { EventRow, PageDesign } from '@/lib/events';
 import type { FeedSnapshot } from '@/lib/feedSnapshot';
@@ -120,6 +121,22 @@ export default function EventCard({
   // the thing the date was communicating on the tiles beside it.
   const isShop = event.kind === 'shop';
   const chip = isShop ? 'Shop' : dateChipLabel(event);
+  /**
+   * The example mark, moved out of the title and into a pill of its own.
+   *
+   * The mark lives in the listing NAME — "Taplejung Alaichi Ghar (example
+   * shop)" — which was fine while a tile was 300px wide and its title had
+   * three lines to spend. On the bazaar's compact tile it is four words of
+   * parenthesis in the middle of a wrapping heading, i.e. exactly the shape a
+   * scanning eye skips, and the honesty rule here is that a visitor must never
+   * mistake an invented seller for a real one AT ANY TILE SIZE. A pill beside
+   * the availability badge is louder than the parenthesis was, not quieter.
+   *
+   * Nothing changes for anything unmarked: readListingName only matches that
+   * exact suffix, so every event and every real seller's shop renders exactly
+   * as before.
+   */
+  const listing = readListingName(event.name);
   // Which shelf of the bazaar this shop sits on — '' (no chip) when the seller
   // has not picked one, or for a key the list no longer knows. Events never
   // carry one, so their tiles are untouched.
@@ -160,6 +177,10 @@ export default function EventCard({
         )}
         {chip ? <span className="event-date-chip">{chip}</span> : null}
         <span className="event-card-status">
+          {/* First in the pile, before availability: the badges wrap on a
+              narrow tile, and the one fact a buyer must not miss cannot be the
+              one that ends up on the last line. */}
+          {listing.isExample ? <span className="badge badge-amber">Example shop</span> : null}
           <span className={`badge ${BADGE_TONE[state.kind] ?? 'badge-green'}`}>{state.badge}</span>
           {/* A second pill, not a replacement: an event can be on sale AND have
               a type still to come, and a sold-out one with something coming is

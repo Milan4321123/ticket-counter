@@ -15,7 +15,7 @@ interface PortalNavEvent {
 
 interface Props {
   /** Which top-level portal link is the current page. */
-  active?: 'events' | 'settings';
+  active?: 'events' | 'reviews' | 'settings';
   /** When set, a second row shows the event name and its section tabs. */
   event?: PortalNavEvent;
   /** Which event tab is the current page. */
@@ -40,6 +40,16 @@ export default function PortalNav({ active, event, tab }: Props) {
             className={`portal-nav-link${active === 'events' ? ' portal-nav-link-active' : ''}`}
           >
             My events
+          </Link>
+          {/* Across every shop at once, because a review arrives against an
+              ITEM and a seller has no idea which of their listings it landed
+              on until they look. Buried under one event's tabs it would only
+              ever be found by somebody already expecting it. */}
+          <Link
+            href="/portal/reviews"
+            className={`portal-nav-link${active === 'reviews' ? ' portal-nav-link-active' : ''}`}
+          >
+            Reviews
           </Link>
           <Link
             href="/portal/settings"

@@ -1,3 +1,5 @@
+import { shareImages } from '@/lib/seo';
+import Np from '@/components/Np';
 import Link from 'next/link';
 import { FESTIVALS, currentOccurrence } from '@/lib/festivals';
 
@@ -15,8 +17,7 @@ export const metadata = {
     description:
       'Every Nepali festival with its next date, on one page — Dashain, Tihar, Teej, Chhath, ' +
       'Holi, the Lhosars and more.',
-    url: '/festivals',
-  },
+    url: '/festivals', images: shareImages() },
 };
 
 // One line per festival for the index card — the 'about' texts on the festival
@@ -63,7 +64,9 @@ export default function FestivalsPage() {
     <>
       <section className="feed-hero" style={{ padding: '64px 0 36px' }}>
         <div className="container">
-          <p className="feed-kicker anim-fade-up">चाडपर्वको पात्रो · festival calendar</p>
+          <p className="feed-kicker anim-fade-up">
+            <Np>चाडपर्वको पात्रो</Np> · festival calendar
+          </p>
           <h1 className="anim-fade-up anim-d1" style={{ fontSize: 'clamp(1.9rem, 4.4vw, 3rem)' }}>
             The Nepali festival calendar
           </h1>
@@ -81,7 +84,10 @@ export default function FestivalsPage() {
               <div className="summary-row" key={festival.slug}>
                 <span>
                   <Link href={`/${festival.slug}`} style={{ fontWeight: 600 }}>
-                    {festival.name} <span className="muted">{festival.nameNe}</span>
+                    {festival.name}{' '}
+                    <span className="muted">
+                      <Np>{festival.nameNe}</Np>
+                    </span>
                   </Link>
                   <br />
                   <span className="muted small">{ONE_LINERS[festival.slug] ?? ''}</span>

@@ -70,6 +70,34 @@ const nextConfig = {
         source: '/api/:path*',
         headers: [{ key: 'Cache-Control', value: 'no-store, must-revalidate' }],
       },
+      // …with two deliberate exceptions, both of which are PICTURES and
+      // neither of which can carry anything private.
+      //
+      // The blanket rule above is right for API responses: they are answers
+      // about one person's order, one organizer's events, one buyer's card,
+      // and a shared proxy holding any of that is exactly the accident it
+      // prevents. But two routes under /api serve public image bytes and
+      // nothing else, and both of them already ask, in their own code, to be
+      // cached hard — `public, max-age=86400, immutable` on every photo and
+      // video (api/media) and a year on the social card (api/og).
+      //
+      // The blanket was silently overruling both. The effect was not subtle:
+      // EVERY PHOTOGRAPH ON THE SITE was re-downloaded on every page view, for
+      // every visitor, forever — a feed of forty tiles, a shop's gallery, an
+      // item page — on a site whose audience is mostly on a phone and mostly
+      // on mobile data. The route authors' intent was the correct one; this
+      // simply stops the config from throwing it away.
+      //
+      // Listed AFTER the blanket because a later match wins for the same
+      // header key. Anything not named here keeps no-store.
+      {
+        source: '/api/media/:path*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=86400, immutable' }],
+      },
+      {
+        source: '/api/og',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
       // Order + ticket pages carry buyer PII and a scannable QR: never let a
       // shared proxy cache them or a search engine index them.
       {

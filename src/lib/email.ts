@@ -793,6 +793,31 @@ export async function sendTicketEmail(
               `It is checked at the door.`
           )}</div>`
         : '') +
+      // The one moment a review can honestly be asked for.
+      //
+      // Nothing else on the site ever invites one, so the review system has
+      // been sitting there waiting for buyers who had no reason to come back:
+      // the order page is somewhere people go BEFORE they pay, not after they
+      // have eaten. This mail already goes to the buyer's own address and
+      // already carries the access token that is the entire right to write one
+      // — so the ask costs no new email, no schedule and nothing to
+      // unsubscribe from.
+      //
+      // Shops only, and worded for AFTER collection. An event has no item to
+      // review, and asking somebody to rate food they have not picked up yet
+      // is how a bazaar fills with reviews of an unopened parcel.
+      // …and only when the link can actually deliver it. The review form on the
+      // order page appears for a reader holding the access token and nobody
+      // else, and that token does not exist on a deployment with no APP_SECRET
+      // (orderUrlForBuyerEmail then returns the bare path). Inviting somebody
+      // to say how it was and landing them on a page with no form is a worse
+      // outcome than never asking.
+      (isShop && orderUrl.includes('token=')
+        ? smallHtml(
+            `Once you have collected and tried it, <a href="${escapeHtml(orderUrl)}#review" style="color:${C.brandDeep};font-weight:700;">say how it was</a>. ` +
+              `Only people who actually ordered can, so a few honest words are worth more here than anywhere else — and they help ${escapeHtml(organizerName || 'the seller')} more than anything else you could do.`
+          )
+        : '') +
       smallHtml(
         (isShop
           ? `Each code covers one item and can be scanned once. A screenshot works just as well as paper — ` +
@@ -851,6 +876,16 @@ export async function sendTicketEmail(
         ...(isFreeOrder ? [] : [`Total paid: ${total}`, '']),
         `Your ${v.codes}: ${orderUrl}`,
         '',
+        ...(isShop && orderUrl.includes('token=')
+          ? [
+              wrapText(
+                `Once you have collected and tried it, say how it was: ${orderUrl}#review — only people ` +
+                  `who actually ordered can leave a review, so a few honest words are worth more here ` +
+                  `than anywhere else.`
+              ),
+              '',
+            ]
+          : []),
         wrapText(
           isShop
             ? 'Each code covers one item and can be scanned once. A screenshot works just as ' +

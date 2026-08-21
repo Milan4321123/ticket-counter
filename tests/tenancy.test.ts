@@ -53,6 +53,15 @@ import {
 } from '../src/lib/cards.ts';
 import { getEventMedia, getEventTier, getEventTiers, tierPhoto } from '../src/lib/events.ts';
 import {
+  listReviewsForItem,
+  listReviewsForOrganizer,
+  ratingForItem,
+  ratingsForItems,
+  setReviewStatus,
+  setSellerReply,
+  writeReview,
+} from '../src/lib/reviews.ts';
+import {
   activeConsentCount,
   claimAnnouncementSend,
   confirmMarketingConsent,
@@ -912,4 +921,123 @@ test('an erased buyer never renders as the placeholder at the counter either', (
   const scan = checkInTicket(stillValid.code, { eventId: pastEvent.id });
   assert.equal(scan.result, 'ok');
   assertNoPlaceholder('checkInTicket', scan);
+});
+
+// ---------------------------------------------------------------------------
+// REVIEWS
+// ---------------------------------------------------------------------------
+//
+// Reviews are the one thing on this platform a seller is not allowed to
+// control, which makes them the one thing a seller has a motive to reach
+// across the fence for: silence a bad word on a rival's shop, or quietly
+// answer on a review that is not theirs. Both are one dropped WHERE clause
+// away, and neither would ever be noticed by the seller it happened to.
+//
+// Two shops selling items under the SAME tier key, so a query missing its
+// owner scope returns a plausible row rather than nothing.
+//
+// Their own sellers, deliberately NOT alpha and beta: those two are the
+// fixture the money and buyer-list tests above measure to the cent, and paid
+// orders added here would quietly change their totals. A test that breaks a
+// neighbouring test's arithmetic is a test that will be deleted rather than
+// read.
+
+const rivalA = makeOrganizer({ name: 'Rival A' });
+const rivalB = makeOrganizer({ name: 'Rival B' });
+
+const shopA = makeEvent({
+  organizerId: rivalA.id,
+  kind: 'shop',
+  name: 'Alpha Kitchen',
+  tiers: [{ tierKey: 'momo', name: 'Chicken momo', priceCents: 950, cap: 50 }],
+});
+const shopB = makeEvent({
+  organizerId: rivalB.id,
+  kind: 'shop',
+  name: 'Beta Kitchen',
+  tiers: [{ tierKey: 'momo', name: 'Chicken momo', priceCents: 950, cap: 50 }],
+});
+
+const reviewA = (() => {
+  const { order } = makePaidOrder({ eventId: shopA.id, items: [{ tierId: 'momo', quantity: 1 }], buyerName: ANA.name, buyerEmail: ANA.email });
+  return writeReview({ orderId: order.id, tierKey: 'momo', rating: 5, body: 'Alpha\u2019s momo, wonderful.' });
+})();
+const reviewB = (() => {
+  const { order } = makePaidOrder({ eventId: shopB.id, items: [{ tierId: 'momo', quantity: 1 }], buyerName: BOB.name, buyerEmail: BOB.email });
+  return writeReview({ orderId: order.id, tierKey: 'momo', rating: 2, body: 'Beta\u2019s momo, cold.' });
+})();
+
+test('a seller cannot reply to a review of another seller\u2019s goods', () => {
+  // The check lives in the UPDATE's own WHERE clause rather than in the route,
+  // so it holds for every caller there will ever be.
+  assert.equal(
+    setSellerReply(reviewB.id, rivalA.id, 'Actually ours are excellent.'),
+    false,
+    'A must not be able to answer on B\u2019s shop'
+  );
+  assert.equal(listReviewsForItem(shopB.id, 'momo')[0].sellerReply, '', 'and nothing was written');
+
+  // …and the same call on their own review works, so the refusal above is
+  // isolation and not a broken function.
+  assert.equal(setSellerReply(reviewA.id, rivalA.id, 'Thank you!'), true);
+  assert.equal(listReviewsForItem(shopA.id, 'momo')[0].sellerReply, 'Thank you!');
+});
+
+test('a seller\u2019s review screen shows only reviews of their own goods', () => {
+  const mine = listReviewsForOrganizer(rivalA.id);
+  assert.ok(mine.length > 0, 'fixture check: A has one');
+  assert.ok(
+    mine.every((r) => r.eventId === shopA.id),
+    `A\u2019s screen showed a review from another seller: ${JSON.stringify(mine.map((r) => r.eventName))}`
+  );
+  // B's two-star review is the one that would be most tempting to see.
+  assert.ok(!mine.some((r) => r.body.includes('cold')), 'B\u2019s bad review is none of A\u2019s business');
+});
+
+test('a rating never pools two sellers\u2019 reviews, even under the same tier key', () => {
+  // Both shops sell 'momo'. A key collision here would average a 5 and a 2 into
+  // 3.5 on both shops, which is the shape of bug that looks like an opinion.
+  assert.equal(ratingForItem(shopA.id, 'momo')?.average, 5);
+  assert.equal(ratingForItem(shopA.id, 'momo')?.count, 1);
+  assert.equal(ratingForItem(shopB.id, 'momo')?.average, 2);
+  assert.equal(ratingForItem(shopB.id, 'momo')?.count, 1);
+
+  const bulk = ratingsForItems([shopA.id, shopB.id]);
+  assert.equal(bulk.get(`${shopA.id}:momo`)?.average, 5);
+  assert.equal(bulk.get(`${shopB.id}:momo`)?.average, 2);
+});
+
+test('a review can only ever land on the listing its own order was placed with', () => {
+  // There is no parameter here that could aim a review at another shop: the
+  // ORDER decides, and writeReview re-reads it. Both shops sell a tier called
+  // 'momo', so if the tier key were ever trusted on its own, B’s buyer could
+  // score A’s kitchen. Asserted as "the row landed on B and A is unchanged"
+  // rather than as an exception, because the design makes the attempt
+  // unexpressible rather than refused — which is the stronger property.
+  const before = ratingForItem(shopA.id, 'momo')!;
+  const { order } = makePaidOrder({ eventId: shopB.id, items: [{ tierId: 'momo', quantity: 1 }], buyerName: BOB.name, buyerEmail: BOB.email });
+  const written = writeReview({ orderId: order.id, tierKey: 'momo', rating: 1, body: 'One star.' });
+
+  assert.equal(written.eventId, shopB.id, 'the order\u2019s own listing, always');
+  assert.equal(ratingForItem(shopA.id, 'momo')!.count, before.count, 'A\u2019s score is untouched');
+  assert.equal(ratingForItem(shopA.id, 'momo')!.average, before.average);
+  assert.equal(ratingForItem(shopB.id, 'momo')!.count, 2, 'and B now carries both');
+});
+
+test('hiding is the platform\u2019s power, and it is not scoped to a seller at all', () => {
+  // Deliberately asserting the ASYMMETRY: a seller cannot make a review go
+  // away, and the admin can — which is the whole reason a rating here is worth
+  // reading. setReviewStatus takes no organizer id, and no seller route
+  // reaches it.
+  const before = ratingForItem(shopB.id, 'momo')!.count;
+  assert.equal(setReviewStatus(reviewB.id, 'hidden', 'Contains a phone number'), true);
+  assert.equal(
+    listReviewsForItem(shopB.id, 'momo').some((r) => r.id === reviewB.id),
+    false,
+    'a hidden row leaves the public page'
+  );
+  assert.equal(ratingForItem(shopB.id, 'momo')!.count, before - 1, 'and stops counting toward the score');
+
+  assert.equal(setReviewStatus(reviewB.id, 'published', ''), true);
+  assert.equal(ratingForItem(shopB.id, 'momo')!.count, before, 'restoring brings it back');
 });

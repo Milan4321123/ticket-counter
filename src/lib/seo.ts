@@ -1,3 +1,4 @@
+import { OG_HEIGHT, OG_WIDTH } from './ogCard';
 import { platformNameFromEnv } from './platform';
 // Everything Google needs to find this site, understand it, and show it well.
 //
@@ -17,6 +18,8 @@ import { platformNameFromEnv } from './platform';
 // prove. A confident lie in structured data is worse than an omission — Google
 // checks the page against the claim, and a mismatch costs the rich result on
 // every event, not just the one that lied.
+import { categoryLabel, isShopCategory } from './categories';
+import { readListingName } from './exampleShop';
 import { getBaseUrl, getPaymentMode } from './config';
 import { paypalPayee } from './events';
 import type { EventRow, EventTierRow } from './events';
@@ -34,6 +37,27 @@ export const SITE_NAME = platformNameFromEnv();
  */
 export const SITE_DESCRIPTION =
   'Nepali concerts, cultural nights, festivals and community events across Europe, plus a bazaar of Nepali sellers — momo, sweets, crafts. Reserve or order in one click, pay the organizer or seller directly, and your QR tickets or collection codes arrive by email.';
+
+/**
+ * The same site, in the length a search result actually shows.
+ *
+ * SITE_DESCRIPTION above is 261 characters. That is a fine paragraph for the
+ * Organization node in structured data, where nothing is truncated and more
+ * detail genuinely helps a crawler — and it is far too long for a <meta
+ * name="description">, which Google cuts around 155. Every page that does not
+ * write its own description inherits the site one, so the untrimmed version
+ * was shipping a sentence that ends mid-word on most of the site.
+ *
+ * Written short rather than machine-trimmed on purpose: metaText() would cut
+ * the paragraph above at "…pay the organizer or seller" and leave the reader
+ * with a dangling clause, where a purpose-written sentence gets to keep a
+ * verb, the two things this site does, and the promise about the money.
+ *
+ * scripts/audit-bazaar.mjs measures the rendered tag on every page, so if this
+ * one grows past the budget the audit says so before a deploy does.
+ */
+export const SITE_META_DESCRIPTION =
+  'Nepali events and tickets across Europe, plus a bazaar of Nepali sellers. Pay the organizer or seller directly — QR tickets and codes arrive by email.';
 
 /**
  * Country for venue addresses in structured data, as an ISO code.
@@ -292,6 +316,20 @@ export interface ItemJsonLdInput {
   sellerName: string;
   /** This item page's own canonical URL. */
   url: string;
+  /**
+   * What people who bought this actually said, or null — which is what
+   * ratingForItem() returns for the overwhelming majority of items on a bazaar
+   * this young. Optional, and guarded twice below.
+   *
+   * This is the single most dangerous field in the file. aggregateRating is
+   * what puts stars in a Google result, and Google checks the claim against
+   * the page: a rating in the markup that the page does not show, or one built
+   * out of zero reviews, is a structured-data violation that costs rich
+   * results across the whole DOMAIN, not just the item that lied. So it is
+   * emitted only when there is a count of at least one, and the page that
+   * passes it is the same page that renders the stars and the review list.
+   */
+  rating?: { count: number; average: number } | null;
 }
 
 /**
@@ -326,6 +364,7 @@ export function itemJsonLd({
   images,
   sellerName,
   url,
+  rating = null,
 }: ItemJsonLdInput): Record<string, unknown> {
   const data: Record<string, unknown> = {
     '@context': 'https://schema.org',
@@ -335,6 +374,22 @@ export function itemJsonLd({
     url,
   };
   if (images.length) data.image = images;
+
+  // A real opinion, from a real order. reviewCount is what Google validates
+  // against the visible page, so a zero — or the null this is handed most of
+  // the time — writes nothing at all rather than a hopeful 0.
+  if (rating && rating.count >= 1) {
+    data.aggregateRating = {
+      '@type': 'AggregateRating',
+      // One decimal, matching what the page prints under the title. A mismatch
+      // between "4.5" in the markup and "4.5" on the page is the kind of thing
+      // that gets flagged, and toFixed keeps the two spellings identical.
+      ratingValue: rating.average.toFixed(1),
+      reviewCount: rating.count,
+      bestRating: 5,
+      worstRating: 1,
+    };
+  }
 
   const offerable = canTakePaidOrders(event) || tier.priceCents === 0;
   if (offerable) {
@@ -366,26 +421,146 @@ export function itemJsonLd({
  */
 export function itemDescription(event: EventRow, tier: EventTierRow): string {
   const own = (tier.details || tier.description).replace(/\s+/g, ' ').trim();
-  if (own) return metaText(own);
   const where = event.city.trim() ? ` — ${event.city.trim()}` : '';
-  return metaText(`${tier.name}, from ${event.name}${where}.`);
+  const context = `${readListingName(event.name).name}${where}`;
+
+  // A seller's own words, and then WHOSE they are — but only when their words
+  // are short enough to leave room.
+  //
+  // Sellers write one honest line on an item and nothing more: a real shop on
+  // this site describes its momo as "Steamed, with tomato achar." That is a
+  // fine line on a card and a 27-character meta description, which Google
+  // treats as thin and usually replaces with a scrap of the page. Adding the
+  // shop and the town gets it to a length worth showing AND adds the two words
+  // people actually search with — a shop's name and a city.
+  //
+  // Only below the threshold: a seller who wrote three good paragraphs has
+  // already said more than a search result can hold, and appending the shop
+  // name to that would only push a real sentence out of view. metaText still
+  // cuts whatever comes out to the length a result shows.
+  const SHORT = 90;
+  if (own) return metaText(own.length < SHORT ? `${own} From ${context}.` : own);
+  return metaText(`${tier.name}, from ${context}.`);
 }
 
-/** Home > Listing > Item, so an item page shows its shop in the trail. */
+/**
+ * The preview picture a page falls back to when it has no photograph.
+ *
+ * Next does NOT deep-merge openGraph: a page that declares its own
+ * `openGraph` block replaces the parent's entirely, images and all. So the
+ * root layout's card is inherited by exactly the pages that declare nothing —
+ * and every page that bothered to write a good og:title lost the picture as a
+ * side effect, which is the opposite of what the author intended. Each of them
+ * spreads this in instead.
+ *
+ * Real photographs still win wherever there is one: an event's cover, an
+ * item's own shot. This is the floor.
+ */
+export const SHARE_CARD = {
+  url: '/api/og',
+  width: OG_WIDTH,
+  height: OG_HEIGHT,
+  alt: SITE_NAME,
+} as const;
+
+/**
+ * The og:image list for a page: its own picture if it has one, the site card
+ * if it does not. Never an empty array — an empty `images` is the grey box
+ * this whole thing exists to stop.
+ */
+export function shareImages(
+  own?: { url: string; width: number; height: number; alt: string } | null
+): { url: string; width: number; height: number; alt: string }[] {
+  return [own ?? SHARE_CARD];
+}
+
+/**
+ * A page that IS a list of products, described as one.
+ *
+ * /market/items and each department page are the two surfaces on this site
+ * that exist to show many things at once. Without this, a crawler sees a wall
+ * of links and has to guess; with it, the page says "these are products, in
+ * this order, at these URLs" — which is what lets a listing page show as a
+ * carousel of goods rather than a blue link, and it is the single highest-value
+ * piece of markup a shop-listing page can carry.
+ *
+ * ONLY the items actually rendered, in the order they are rendered. That is
+ * not a detail: an ItemList claiming forty products on a page that shows
+ * twenty-four is a mismatch Google checks for, and the whole page's structured
+ * data is dropped when it fails. So the caller passes what it drew, after its
+ * own filtering and its own cap, and never the unpaginated total.
+ *
+ * Deliberately a list of URLs and names, not a nest of full Product nodes. The
+ * item's own page carries the Product with its price, its availability and its
+ * seller, and a summary here that fell out of step with it would be a second
+ * source of truth for the same facts.
+ */
+export function itemListJsonLd(
+  name: string,
+  items: { name: string; url: string }[]
+): Record<string, unknown> {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name,
+    numberOfItems: items.length,
+    itemListElement: items.map((item, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: item.name,
+      url: item.url,
+    })),
+  };
+}
+
+/**
+ * The trail above an item, in markup — and it has to be the SAME trail the
+ * page draws above the title.
+ *
+ * That is not a stylistic preference. Google's breadcrumb rich result is only
+ * granted when the markup matches a trail the page actually shows, and a shop
+ * item was claiming "Events › <shop> › <item>" while the page printed
+ * "The bazaar › Groceries & spices › <shop> › <item>". Two different stories
+ * about the same page, one of which says a jar of cardamom lives under events.
+ *
+ * So the trail is built from the listing's KIND, exactly as the page builds
+ * it: a shop hangs off /market and, when its seller has picked one, off that
+ * shelf; an event still hangs off the feed at the root, which is where events
+ * are found. The shelf step is skipped when the shop has no category, again
+ * matching the page — a trail with an empty rung is worse than a shorter one.
+ *
+ * The listing's own name goes in unmarked. The visible trail puts the
+ * "(example shop)" mark back as a chip beside it, which is a rendering
+ * decision; putting parentheses inside a structured name would make the mark
+ * part of the shop's name everywhere the name is quoted.
+ */
 export function itemBreadcrumbJsonLd(event: EventRow, tier: EventTierRow): Record<string, unknown> {
+  const itemUrl = absoluteUrl(`/e/${event.slug}/item/${encodeURIComponent(tier.tierKey)}`);
+  const trail: { name: string; item: string }[] =
+    event.kind === 'shop'
+      ? [
+          { name: 'The bazaar', item: absoluteUrl('/market') },
+          ...(isShopCategory(event.category)
+            ? [{ name: categoryLabel(event.category), item: absoluteUrl(`/market/c/${event.category}`) }]
+            : []),
+          { name: readListingName(event.name).name, item: absoluteUrl(`/e/${event.slug}`) },
+          { name: tier.name, item: itemUrl },
+        ]
+      : [
+          { name: 'Events', item: getBaseUrl() },
+          { name: event.name, item: absoluteUrl(`/e/${event.slug}`) },
+          { name: tier.name, item: itemUrl },
+        ];
+
   return {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
-    itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Events', item: getBaseUrl() },
-      { '@type': 'ListItem', position: 2, name: event.name, item: absoluteUrl(`/e/${event.slug}`) },
-      {
-        '@type': 'ListItem',
-        position: 3,
-        name: tier.name,
-        item: absoluteUrl(`/e/${event.slug}/item/${encodeURIComponent(tier.tierKey)}`),
-      },
-    ],
+    itemListElement: trail.map((step, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: step.name,
+      item: step.item,
+    })),
   };
 }
 
