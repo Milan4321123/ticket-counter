@@ -418,6 +418,25 @@ export function getPrimaryEvent(): EventRow | null {
 
 // ---------------- Tiers ----------------
 
+/**
+ * The 1..20 clamp below, written in SQL, for the seat counters that read
+ * event_tiers directly instead of through getEventTiers.
+ *
+ * Those counters (lib/orders.ts's per-address ceilings and its awaiting-tickets
+ * tile) SUM the column across a join, so they cannot borrow the reader's
+ * clamp — and an unclamped 0 there makes every hold weigh nothing, which lets
+ * one address hold a whole event past the anti-hoarding ceiling, while an
+ * unclamped 100 refuses buyers over seats the room never sold. Sharing the
+ * expression is what keeps the ceiling and the room describing the same event.
+ *
+ * Takes the table's alias because every caller joins event_tiers under one;
+ * COALESCE first so a LEFT JOIN miss (a deleted tier) still weighs one seat,
+ * exactly as lib/inventory.ts counts it.
+ */
+export function seatsPerUnitSql(tierAlias: string): string {
+  return `MIN(20, MAX(1, CAST(ROUND(COALESCE(${tierAlias}.seats_per_unit, 1)) AS INTEGER)))`;
+}
+
 export function getEventTiers(eventId: string): EventTierRow[] {
   const rows = getDb()
     .prepare(
@@ -448,6 +467,8 @@ export function getEventTiers(eventId: string): EventTierRow[] {
     // Re-clamped on read for the same reason status is whitelisted: this number
     // multiplies seat consumption and ticket minting, so a hand-edited row must
     // never be able to zero out (or explode) an event's inventory arithmetic.
+    // seatsPerUnitSql() above is this same clamp, for the counters that sum the
+    // column in SQL rather than reading tiers through here.
     seatsPerUnit: Math.min(20, Math.max(1, Math.round(Number(r.seatsPerUnit) || 1))),
   }));
 }

@@ -6,6 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "node --experimental-transform-types --enable-source-maps --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./tests/register.mjs --test 'tests/**/*.test.ts'",
+    "test:watch": "npm test -- --watch",
+    "typecheck": "tsc --noEmit",
     "backup": "node scripts/backup.mjs --with-uploads --keep 30",
     "seed:bazaar": "node scripts/seed-bazaar.mjs"
   },

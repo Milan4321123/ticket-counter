@@ -7,6 +7,10 @@
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,
+    // Tests import repo source by its real path (`../src/lib/money.ts`) so Node's
+    // test runner can resolve it without a build step. Legal here because
+    // noEmit is on — nothing is compiled, so no extension is ever rewritten.
+    "allowImportingTsExtensions": true,
     "module": "esnext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,

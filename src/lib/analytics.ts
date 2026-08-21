@@ -15,6 +15,7 @@
 // placeholder address would invent a single very busy "buyer".
 import { getDb } from './db';
 import { confirmedReferralSql } from './referrals';
+import { ANONYMOUS_BUYER_NAME } from './retention';
 
 /** One calendar day of confirmed money — real payments only, like getStats. */
 export interface DailySales {
@@ -174,10 +175,12 @@ export function returningBuyerCount(eventId: string, organizerId: string): numbe
  * What a buyer is called once lib/retention.ts has erased their details. The
  * erased row keeps a placeholder NAME and ADDRESS in the database so the
  * columns stay non-null; neither may ever reach a screen, so every read model
- * here degrades to this one label instead. One constant, so the referrer
- * summary and the chain underneath it can never anonymise people differently.
+ * here degrades to this one label instead. It lives beside the placeholders it
+ * replaces (lib/retention.ts) and is imported here, so the referrer summary,
+ * the chain underneath it and the orders list can never anonymise people
+ * differently.
  */
-const ANONYMOUS_BUYER = 'a past guest';
+const ANONYMOUS_BUYER = ANONYMOUS_BUYER_NAME;
 
 /**
  * One booking that arrived through somebody's link — a single link in the

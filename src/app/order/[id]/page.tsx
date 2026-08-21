@@ -20,6 +20,7 @@ import { formatMoney } from '@/lib/money';
 import { getBaseUrl } from '@/lib/config';
 import { getOrder, getOrderItems, getTicketsForOrder, paymentReference, referralCode } from '@/lib/orders';
 import { orderPayout } from '@/lib/payout';
+import { withAnonymizedBuyer } from '@/lib/retention';
 import { referralProgressFor, referralRewardsReachable } from '@/lib/referrals';
 import { paymentQrDataUrl } from '@/lib/paymentQr';
 import { machineDate } from '@/lib/seo';
@@ -39,6 +40,12 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const { id } = await params;
   const order = getOrder(id);
   if (!order) notFound();
+
+  // What this page may PRINT about the buyer. `order` keeps the real columns
+  // for the machinery below (the payment blocks, the card offer, the resend);
+  // this is the screen's copy, and after the retention sweep it says 'a past
+  // guest' instead of the placeholder that keeps those columns non-null.
+  const shown = withAnonymizedBuyer(order);
 
   // Every order belongs to an event — its name, venue, and bank details all
   // come from there.
@@ -230,7 +237,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <div>
                 <div className="tier-name">Your QR tickets arrive</div>
                 <p className="muted small" style={{ margin: '2px 0 0' }}>
-                  They&rsquo;re emailed to <strong>{order.buyerEmail}</strong> and appear right
+                  They&rsquo;re emailed to <strong>{shown.buyerEmail}</strong> and appear right
                   here on this page.
                 </p>
               </div>
@@ -857,11 +864,11 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         ) : null}
         <div className="summary-row">
           <span className="muted">Name</span>
-          <span>{order.buyerName}</span>
+          <span>{shown.buyerName}</span>
         </div>
         <div className="summary-row">
           <span className="muted">Email</span>
-          <span>{order.buyerEmail}</span>
+          <span>{shown.buyerEmail}</span>
         </div>
         {items.map((it) => {
           const seatsPerUnit = tierFor(it.tierId)?.seatsPerUnit ?? 1;

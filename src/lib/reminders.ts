@@ -115,7 +115,14 @@ export async function runTransferReminderSweep(force = false): Promise<{ emailed
          JOIN events e ON e.id = o.event_id
          JOIN organizers org ON org.id = e.organizer_id
          WHERE o.status = 'claimed' AND o.payment_mode = 'transfer'
-           AND org.status = 'active' AND org.reminders_enabled = 1`
+           AND org.status = 'active' AND org.reminders_enabled = 1
+           -- Erased orders drop out, exactly as they do from the buyer sweep
+           -- below. Two reasons, either sufficient: the row's buyer_name is now
+           -- the retention placeholder, which must never be printed as a
+           -- person (see lib/retention.ts), and markTransferOrderPaid refuses
+           -- an erased order anyway — so this would be chasing the organizer
+           -- about a payment they are no longer allowed to confirm.
+           AND o.buyer_erased_at IS NULL`
       )
       .all() as AwaitingRow[];
 

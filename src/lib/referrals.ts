@@ -489,7 +489,11 @@ export function claimVoucherForOrder(
  * Somebody who earned a reward, spent it on a booking they then abandoned, and
  * lost the reward for it would have been punished for changing their mind. The
  * voucher goes back to unredeemed and works again; a PAID order's voucher is
- * never touched here, because that one really was spent.
+ * never touched here, because that one really was spent — the same guard, in
+ * the same words, as its twin releasePromoForOrder in lib/promos.ts, and the
+ * exception for a TEST order is the same one for the same reason: purgeMockOrders
+ * deletes the row outright, and a deleted test booking must not go on holding a
+ * real reward.
  *
  * The order LOSES THE DISCOUNT in the same breath, and that half is not
  * cosmetic — it is what stops one voucher paying for two orders. An expired
@@ -504,6 +508,18 @@ export function claimVoucherForOrder(
 export function releaseVoucherForOrder(orderId: string): void {
   const db = getDb();
   const tx = db.transaction(() => {
+    const order = db
+      .prepare(`SELECT status, payment_mode AS paymentMode FROM orders WHERE id = ?`)
+      .get(orderId) as { status: string; paymentMode: string } | undefined;
+    // The one row this must never touch, guarded before anything moves —
+    // releasePromoForOrder guards its own counter in the same place with the
+    // same test. No caller reaches a paid order today; the next release path
+    // added (a refund, a chargeback, an organizer un-confirming a transfer)
+    // would otherwise hand a genuinely spent reward back while the order's row
+    // went on naming the code, a disagreement nothing downstream can see.
+    // A purged order (no row at all) still gets its voucher back: there is no
+    // sale left to have spent it.
+    if (order && order.status === 'paid' && order.paymentMode !== 'mock') return;
     db.prepare(
       `UPDATE referral_vouchers
        SET redeemed_at = NULL, redeemed_order_id = NULL

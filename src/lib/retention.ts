@@ -40,6 +40,57 @@ export const BUYER_RETENTION_DAYS: number = (() => {
 export const ERASED_BUYER_NAME = 'Erased after event';
 export const ERASED_BUYER_EMAIL = 'erased@erased.invalid';
 
+/**
+ * What an erased buyer is called on a SCREEN.
+ *
+ * The two placeholders above exist to keep the columns non-null; neither may
+ * ever be rendered, because in a "Buyer" column they read as a person's name
+ * and address rather than as the absence of one. So every read model that
+ * prints a buyer degrades to this one label instead — one constant shared with
+ * lib/analytics.ts, so two screens can never anonymise the same person
+ * differently. There is deliberately no anonymous EMAIL: no address exists any
+ * more, and printing one that looks deliverable is worse than a blank.
+ */
+export const ANONYMOUS_BUYER_NAME = 'a past guest';
+
+/**
+ * True once this order's buyer has been erased.
+ *
+ * Reads the stamp when the caller selected it, and falls back to the
+ * placeholder strings themselves when it did not: the rule is that those two
+ * values never reach a screen, so a read model that forgot to select
+ * buyer_erased_at must not be the reason one does.
+ */
+export function isErasedBuyer(row: {
+  buyerName?: string;
+  buyerEmail?: string;
+  buyerErasedAt?: string | null;
+}): boolean {
+  return Boolean(row.buyerErasedAt) || row.buyerName === ERASED_BUYER_NAME || row.buyerEmail === ERASED_BUYER_EMAIL;
+}
+
+/**
+ * Degrade one row's buyer fields to the anonymous label, leaving every other
+ * field exactly as it was — the counts, the money and the tickets are the
+ * seller's arithmetic and survive erasure untouched.
+ *
+ * Applied in the READ MODELS (lib/orders.ts's list and scan paths) rather than
+ * on each page, because a new screen that prints a buyer gets written far more
+ * often than this file gets read — the one place it cannot be forgotten.
+ *
+ * NOT applied to getOrder and the other write-model reads: the payment and
+ * delivery machinery has to see the real (undeliverable) address in order to
+ * refuse to use it — lib/email.ts and markTransferOrderPaid both do exactly
+ * that, and handing them 'a past guest' would hide the erasure from the only
+ * code that must notice it.
+ */
+export function withAnonymizedBuyer<T extends { buyerName: string; buyerEmail: string; buyerErasedAt?: string | null }>(
+  row: T
+): T {
+  if (!isErasedBuyer(row)) return row;
+  return { ...row, buyerName: ANONYMOUS_BUYER_NAME, buyerEmail: '' };
+}
+
 /** Rows touched per statement pass, so one sweep never loads a whole season. */
 const BATCH_SIZE = 500;
 /** Bound on one sweep's work; a large backlog simply finishes on later calls. */

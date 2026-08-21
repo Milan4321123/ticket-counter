@@ -4,7 +4,7 @@
 import crypto from 'crypto';
 import { getDb } from './db';
 import { getPaymentMode } from './config';
-import { getEventById, getEventTier, getEventTiers } from './events';
+import { getEventById, getEventTier, getEventTiers, seatsPerUnitSql } from './events';
 import { claimInventory } from './inventory';
 import { effectivePayout } from './payout';
 import {
@@ -12,6 +12,7 @@ import {
   reclaimDiscountCodeForOrder,
   releaseDiscountCodeForOrder,
 } from './promos';
+import { withAnonymizedBuyer } from './retention';
 import { generateTicketCode, normalizeTicketCode } from './tickets';
 import type { CheckinResponse } from './types';
 
@@ -311,11 +312,16 @@ const TICKET_COLS = `
  * Weighted by seats_per_unit because the cap is on PEOPLE'S SEATS, not
  * bookings: two held "Table of 8" bookings are sixteen seats off the market,
  * and counting them as two would let one address hold a room with tables.
+ *
+ * Re-clamped to 1..20 inside the sum (seatsPerUnitSql), the same clamp
+ * getEventTiers applies on read: the ceiling and the room have to be counting
+ * the same seats, or a corrupt 0 makes every hold weigh nothing here while
+ * still weighing one seat there.
  */
 export function heldUnpaidTicketsForEmail(eventId: string, buyerEmail: string): number {
   const row = getDb()
     .prepare(
-      `SELECT COALESCE(SUM(oi.quantity * COALESCE(et.seats_per_unit, 1)), 0) AS n
+      `SELECT COALESCE(SUM(oi.quantity * ${seatsPerUnitSql('et')}), 0) AS n
          FROM orders o JOIN order_items oi ON oi.order_id = o.id
          LEFT JOIN event_tiers et ON et.event_id = o.event_id AND et.tier_key = oi.tier_id
         WHERE o.event_id = ?
@@ -341,11 +347,11 @@ export function heldUnpaidTicketsForEmail(eventId: string, buyerEmail: string): 
  */
 export function freeTicketsForEmail(eventId: string, buyerEmail: string): number {
   // Weighted by seats_per_unit for the same reason as the transfer counter
-  // above: the ceiling protects seats, and one free bundled booking sits on
-  // several of them.
+  // above, and clamped for the same reason too: the ceiling protects seats, and
+  // one free bundled booking sits on several of them.
   const row = getDb()
     .prepare(
-      `SELECT COALESCE(SUM(oi.quantity * COALESCE(et.seats_per_unit, 1)), 0) AS n
+      `SELECT COALESCE(SUM(oi.quantity * ${seatsPerUnitSql('et')}), 0) AS n
          FROM orders o JOIN order_items oi ON oi.order_id = o.id
          LEFT JOIN event_tiers et ON et.event_id = o.event_id AND et.tier_key = oi.tier_id
         WHERE o.event_id = ?
@@ -579,9 +585,18 @@ export interface TicketWithOrder extends TicketRow {
   orderStatus: OrderStatus;
   buyerName: string;
   buyerEmail: string;
+  /** Set once lib/retention.ts erased the buyer — see below. */
+  buyerErasedAt: string | null;
   paymentMode: PaymentMethod;
 }
 
+/**
+ * The ticket and who it belongs to — a READ MODEL: every caller (the counter's
+ * scan, the ticket page's "Ticket holder" line) puts the buyer on a screen, so
+ * an erased row comes back as the anonymous label rather than as the
+ * placeholder the sweep wrote. The stamp itself is kept on the row so a caller
+ * can still tell "nobody to name" from "no name given".
+ */
 export function getTicketByCode(rawCode: string): TicketWithOrder | null {
   const code = normalizeTicketCode(rawCode);
   const row = getDb()
@@ -589,12 +604,13 @@ export function getTicketByCode(rawCode: string): TicketWithOrder | null {
       `SELECT t.code, t.order_id AS orderId, t.tier_id AS tierId, t.created_at AS createdAt,
               t.checked_in_at AS checkedInAt, o.event_id AS eventId, o.status AS orderStatus,
               o.buyer_name AS buyerName, o.buyer_email AS buyerEmail,
+              o.buyer_erased_at AS buyerErasedAt,
               o.payment_mode AS paymentMode
        FROM tickets t JOIN orders o ON o.id = t.order_id
        WHERE t.code = ?`
     )
     .get(code) as TicketWithOrder | undefined;
-  return row ?? null;
+  return row ? withAnonymizedBuyer(row) : null;
 }
 
 /**
@@ -641,8 +657,16 @@ export interface OrderListRow extends OrderRow {
   ticketCount: number;
 }
 
+/**
+ * The list read model behind every orders screen and the CSV export. Buyers
+ * are anonymised on the way out (an erased row prints 'a past guest', never
+ * the placeholder that keeps its columns non-null) — this is the choke point
+ * both listOrders and listAwaitingTransferOrders already pass through, so a
+ * new orders screen inherits the rule instead of having to remember it.
+ */
 function withItemsSummary(rows: OrderRow[]): OrderListRow[] {
-  return rows.map((o) => {
+  return rows.map((row) => {
+    const o = withAnonymizedBuyer(row);
     const items = getOrderItems(o.id);
     const itemsSummary = items
       .map((it) => `${it.quantity}× ${getEventTier(o.eventId, it.tierId)?.name ?? it.tierId}`)
@@ -848,11 +872,13 @@ export function getStats(eventId?: string): Stats {
     )
     .get(...scopeArgs) as { n: number; cents: number };
   // In TICKETS (people), matching its label everywhere it is shown: a waiting
-  // "2× Table of 8" reservation is 16 tickets on their way, not 2.
+  // "2× Table of 8" reservation is 16 tickets on their way, not 2. Clamped like
+  // the ceilings above, so this tile cannot promise more tickets than the room
+  // ever sold.
   const awaitingTickets = (
     db
       .prepare(
-        `SELECT COALESCE(SUM(oi.quantity * COALESCE(et.seats_per_unit, 1)), 0) AS n
+        `SELECT COALESCE(SUM(oi.quantity * ${seatsPerUnitSql('et')}), 0) AS n
          FROM order_items oi JOIN orders o ON o.id = oi.order_id
          LEFT JOIN event_tiers et ON et.event_id = o.event_id AND et.tier_key = oi.tier_id
          WHERE o.status = 'claimed' AND o.payment_mode = 'transfer' ${ticketScope}`
