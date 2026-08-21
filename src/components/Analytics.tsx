@@ -4,6 +4,7 @@ import Script from 'next/script';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { isPrivatePath } from '@/lib/analyticsScope';
+import { readConsent, subscribeConsent } from '@/lib/consent';
 
 /**
  * Google Analytics 4, on the public half of the site only.
@@ -41,15 +42,14 @@ import { isPrivatePath } from '@/lib/analyticsScope';
  *    on it are this site's business.
  *
  * ---------------------------------------------------------------------------
- * CONSENT
+ * CONSENT COMES FIRST
  * ---------------------------------------------------------------------------
- * This component does not ask for consent and does not pretend to. Under
- * TTDSG §25 and the GDPR, analytics that stores or reads anything on a
- * visitor's device — which GA4 does — needs consent in Germany before it runs.
- * Switching this on without a consent gate is a decision the operator makes
- * knowingly, and /privacy now says plainly that it is running. If a consent
- * banner is added later, this is the component it should gate: it is one
- * `if` away from being conditional, because everything it does is inside it.
+ * Nothing here loads until the visitor has said yes — see lib/consent and
+ * components/ConsentBanner. TTDSG §25 and the GDPR require consent BEFORE
+ * anything is stored on or read from a device, and GA4 sets a cookie the
+ * moment its script runs, so the order is: ask, then load. Not asked yet, or
+ * refused, or unreadable, all mean the same thing here — no script, no
+ * cookie, no request to Google.
  */
 
 export default function Analytics() {
@@ -75,7 +75,23 @@ export default function Analytics() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  const off = !measurementId || isPrivatePath(pathname);
+  /**
+   * Whether this visitor said yes. Starts as null — which is not 'granted' —
+   * so the state everybody begins in is "not counted", including the first
+   * moments of a page load and any browser where the answer cannot be read.
+   *
+   * Subscribed rather than read once, so pressing a button on the banner
+   * starts the tag immediately and withdrawing consent on /privacy stops it
+   * within the same page view. A control that only takes effect after a reload
+   * makes a visitor doubt it did anything at all.
+   */
+  const [consent, setConsentState] = useState<string | null>(null);
+  useEffect(() => {
+    setConsentState(readConsent());
+    return subscribeConsent((choice) => setConsentState(choice));
+  }, []);
+
+  const off = !measurementId || isPrivatePath(pathname) || consent !== 'granted';
 
   /**
    * EVERY page view, including the first.

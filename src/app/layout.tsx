@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import Link from 'next/link';
 import { Sora } from 'next/font/google';
 import Analytics from '@/components/Analytics';
+import ConsentBanner from '@/components/ConsentBanner';
 import ContactBubble from '@/components/ContactBubble';
 import Logo from '@/components/Logo';
 import { getBaseUrl } from '@/lib/config';
@@ -255,6 +256,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             page, a ticket, a customer card, the scanner, /admin or /portal —
             those URLs carry credentials, and GA reports the URL. */}
         <Analytics />
+        {/* Asked before anything is loaded, and only where something would be.
+            Analytics above stays inert until this is answered. */}
+        <ConsentBanner />
       </body>
     </html>
   );

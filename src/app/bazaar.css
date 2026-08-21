@@ -1321,3 +1321,98 @@
     transition: transform 0.18s var(--ease-out);
   }
 }
+
+/* ---------------------------------------------------------------------------
+   The consent question
+   ---------------------------------------------------------------------------
+   A bar at the bottom of the viewport, not a full-screen blocker: nothing on
+   this site is gated on the answer, so nothing should be covered by the asking.
+   It sits above the contact bubble and below nothing.
+
+   The two buttons are deliberately IDENTICAL — same size, same weight, same
+   colour. That is a legal property, not a stylistic one: consent is only
+   freely given if refusing is as easy as accepting, and making one button
+   louder is the most commonly enforced-against pattern in the EU. If a future
+   change gives one of them a brand colour, the analytics data collected after
+   that change stops being lawfully collected. */
+.consent {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 120;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lift);
+  padding: 14px 16px;
+}
+
+.consent-body {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.consent-text {
+  margin: 0;
+  flex: 1 1 460px;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+.consent-text strong {
+  color: var(--text);
+}
+
+.consent-link {
+  color: var(--accent-text);
+  text-decoration: underline;
+  white-space: nowrap;
+}
+
+.consent-actions {
+  display: flex;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+/* Equal by construction: one class, both buttons, no modifier. */
+.consent-btn {
+  min-width: 132px;
+  justify-content: center;
+}
+
+/* Below ~560px the buttons go full width and stay side by side, so neither
+   ends up above the other — a stacked pair reads as a first choice and a
+   second choice. */
+@media (max-width: 560px) {
+  .consent-body {
+    gap: 12px;
+  }
+  .consent-actions {
+    width: 100%;
+  }
+  .consent-btn {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+
+/* Where the visitor changes their mind, on /privacy. */
+.consent-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.consent-state-now {
+  font-weight: 700;
+  color: var(--text);
+}

@@ -1,3 +1,4 @@
+import ConsentControl from '@/components/ConsentControl';
 import { shareImages } from '@/lib/seo';
 import Link from 'next/link';
 import { platformContactEmail, platformName } from '@/lib/platform';
@@ -258,14 +259,31 @@ export default function PrivacyPage() {
                 world you are, what browser you used, which link brought you. Google sets a cookie
                 on your device to tell one visit from the next.
               </p>
-              <p style={{ marginBottom: 0 }}>
-                Where it does <strong>not</strong> run: your order page, your tickets, your
-                customer card, the door scanner, and the organizer and admin areas. Those addresses
-                contain a code that opens your own order, so no part of them is ever sent anywhere.
-                Nothing you typed — your name, your email, what you bought — is sent to Google by
-                any page on this site. If you would rather not be counted at all, a browser that
-                blocks analytics cookies, or any of the usual blockers, stops it completely and
-                nothing else on the site changes.
+              <p>
+                <strong>It only runs if you said yes.</strong> The first time you visit we ask, and
+                until you answer nothing is loaded at all — no script, no cookie, no request to
+                Google. Saying no is one click, the same size as saying yes, and it changes nothing
+                else about the site: nothing here is behind that answer. Ignoring the question
+                entirely counts as no.
+              </p>
+              <p>
+                Where it does <strong>not</strong> run, whatever you answered: your order page,
+                your tickets, your customer card, the door scanner, and the organizer and admin
+                areas. Those addresses contain a code that opens your own order, so no part of them
+                is ever sent anywhere. Nothing you typed — your name, your email, what you bought —
+                is sent to Google by any page on this site.
+              </p>
+              <p>
+                The recipient is <strong>Google Ireland Limited</strong>, and data may be
+                transferred to Google LLC in the <strong>United States</strong>. The legal basis is
+                your consent (Art. 6(1)(a) GDPR, §25 TTDSG), and you can take it back at any
+                moment — as easily as you gave it:
+              </p>
+              <ConsentControl />
+              <p className="muted small" style={{ marginBottom: 0 }}>
+                Taking it back stops the counting immediately and deletes the cookies Google has
+                already set on this device. A browser that blocks analytics cookies, or any of the
+                usual blockers, stops it too.
               </p>
             </div>
           ) : null}
