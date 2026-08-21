@@ -18,7 +18,14 @@ import {
 import { formatMoney } from './money';
 import { girocodePayload } from './girocode';
 import { vocabFor } from './vocab';
-import { getOrder, getOrderItems, getTicketsForOrder, paymentReference, referralCode } from './orders';
+import {
+  getOrder,
+  getOrderItems,
+  getTicketsForOrder,
+  orderUrlForBuyerEmail,
+  paymentReference,
+  referralCode,
+} from './orders';
 import { orderPayout } from './payout';
 import { getVoucher, organizerCurrency } from './referrals';
 import {
@@ -672,7 +679,12 @@ export async function sendTicketEmail(
     const whenLine = isShop ? firstLineOf(event.pickupInfo) : event.dateDisplay;
     const items = getOrderItems(orderId);
     const hasStudentTickets = items.some((it) => getEventTier(event.id, it.tierId)?.studentOnly === true);
-    const orderUrl = `${getBaseUrl()}/order/${orderId}`;
+    // Carries the order access token, and this is the one place that token is
+    // ever handed out: the mail goes TO order.buyer_email, so a reader holding
+    // this link has proved they read that mailbox — which is what unlocks the
+    // buyer's vouchers and card code on the order page (lib/buyerAccount.ts).
+    // A link built any other way must stay the bare /order/<id>.
+    const orderUrl = orderUrlForBuyerEmail(orderId);
     const tierName = (tierId: string) => getEventTier(event.id, tierId)?.name ?? tierId;
     const total = formatMoney(order.totalCents, order.currency);
     const one = tickets.length === 1;
@@ -1019,7 +1031,10 @@ export async function sendTransferInstructionsEmail(
       : `You are buying from ${event.kind === 'shop' ? 'the seller behind' : 'the organizer of'} ${event.name}`;
 
     const venue = venueDisplay(event);
-    const orderUrl = `${getBaseUrl()}/order/${orderId}`;
+    // Tokenized, for the same reason as the ticket mail: it is addressed to
+    // order.buyer_email, so this link is proof of that mailbox. A buyer who
+    // bookmarks it still has the working link once the order is paid.
+    const orderUrl = orderUrlForBuyerEmail(orderId);
     const reference = paymentReference(orderId);
     const items = getOrderItems(orderId);
     const hasStudentTickets = items.some(
@@ -1517,7 +1532,9 @@ export async function sendBuyerPaymentReminderEmail(
     const venue = venueDisplay(event);
     const amount = formatMoney(order.totalCents, order.currency);
     const reference = paymentReference(orderId);
-    const orderUrl = `${getBaseUrl()}/order/${orderId}`;
+    // Tokenized like the instructions mail this one repeats — same recipient,
+    // same proof, same link.
+    const orderUrl = orderUrlForBuyerEmail(orderId);
     const deadline = new Date(
       Date.parse(order.createdAt.replace(' ', 'T') + 'Z') + event.payWithinDays * 86_400_000
     );

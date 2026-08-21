@@ -1,15 +1,17 @@
 import Link from 'next/link';
 import PlatformAssistant from '@/components/PlatformAssistant';
 import {
-  listEventQuestions,
+  countOpenQuestionsByEvent,
+  getEventMediaBulk,
   listEventsForOrganizer,
+  type EventMediaRow,
   type EventRow,
   type EventStatus,
 } from '@/lib/events';
 import { listingStillUrl } from '@/lib/listing';
 import { vocabFor } from '@/lib/vocab';
 import { formatMoney } from '@/lib/money';
-import { getStats } from '@/lib/orders';
+import { getEventTotalsBulk, totalsFor } from '@/lib/orders';
 import { organizerPlanActive } from '@/lib/organizers';
 import { organizerTotpEnabled } from '@/lib/organizerTotp';
 import { runTransferReminderSweep } from '@/lib/reminders';
@@ -46,8 +48,8 @@ function firstLine(text: string): string {
   return text.split('\n').map((l) => l.trim()).find(Boolean) ?? '';
 }
 
-function dashboardThumb(event: EventRow): string | null {
-  return listingStillUrl(event);
+function dashboardThumb(event: EventRow, photos: EventMediaRow[]): string | null {
+  return listingStillUrl(event, photos);
 }
 
 export default async function PortalDashboardPage({
@@ -70,12 +72,22 @@ export default async function PortalDashboardPage({
 
   const hasAuthenticator = organizerTotpEnabled(organizer.id);
 
+  // Four statements for the whole dashboard, however many listings it shows.
+  // Each card wants sales totals, a photo and an open-question count, and
+  // asking per card cost eleven statements per listing — an account with
+  // twenty of them opened this page with 220 (measured), sixty with 660.
+  // Nothing here is cached: they are the same reads, asked for every row at
+  // once instead of one row at a time, so the page stays force-dynamic.
   const events = listEventsForOrganizer(organizer.id);
+  const eventIds = events.map((e) => e.id);
+  const totals = getEventTotalsBulk(eventIds);
+  const photos = getEventMediaBulk(eventIds);
+  const openQuestions = countOpenQuestionsByEvent(eventIds);
   const cards = events.map((event) => ({
     event,
-    stats: getStats(event.id),
-    openQuestions: listEventQuestions(event.id, 'open').length,
-    thumb: dashboardThumb(event),
+    stats: totalsFor(totals, event.id),
+    openQuestions: openQuestions.get(event.id) ?? 0,
+    thumb: dashboardThumb(event, photos.get(event.id) ?? []),
   }));
   const firstName = organizer.name.trim().split(/\s+/)[0] || organizer.name;
 

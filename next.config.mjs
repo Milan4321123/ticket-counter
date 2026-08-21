@@ -93,6 +93,20 @@ const nextConfig = {
           { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
         ],
       },
+      // The customer card is the same shape of secret and the highest-value
+      // one: its code IS the credential, and the page behind it holds a
+      // buyer's whole history with a seller plus the discount codes they are
+      // holding. The page already sets force-dynamic and noindex metadata, so
+      // this is the belt to that pair of braces — a header a proxy obeys
+      // without parsing HTML, and one that survives someone later deciding the
+      // card could be statically rendered.
+      {
+        source: '/c/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'no-store, must-revalidate' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+        ],
+      },
     ];
   },
 };

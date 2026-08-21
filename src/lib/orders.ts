@@ -2,8 +2,9 @@
 // to ONE event (orders.event_id); prices and tier names always come from that
 // event's rows in event_tiers — never from the browser.
 import crypto from 'crypto';
+import { getSigningSecret } from './auth';
 import { getDb } from './db';
-import { getPaymentMode } from './config';
+import { getBaseUrl, getPaymentMode } from './config';
 import { getEventById, getEventTier, getEventTiers, seatsPerUnitSql } from './events';
 import { claimInventory } from './inventory';
 import { effectivePayout } from './payout';
@@ -13,6 +14,7 @@ import {
   releaseDiscountCodeForOrder,
 } from './promos';
 import { withAnonymizedBuyer } from './retention';
+import { chunkIds } from './sqlIn';
 import { generateTicketCode, normalizeTicketCode } from './tickets';
 import type { CheckinResponse } from './types';
 
@@ -154,12 +156,25 @@ export function senderNameMatches(
   });
 }
 
+/**
+ * The reference itself, for a caller that already knows whether the order
+ * holds a student-only ticket.
+ *
+ * Split out because working that flag out costs three reads (the order, its
+ * items, each item's tier) and a screen listing a month of orders already has
+ * all three in hand — the statements page was spending them again per line.
+ * paymentReference() below is this same function plus those reads.
+ */
+export function paymentReferenceOf(orderId: string, hasStudentItem: boolean): string {
+  return (hasStudentItem ? 'TICKETS-S-' : 'TICKETS-') + orderId.slice(0, 8).toUpperCase();
+}
+
 export function paymentReference(orderId: string): string {
   const order = getOrder(orderId);
   const hasStudent = order
     ? getOrderItems(orderId).some((it) => getEventTier(order.eventId, it.tierId)?.studentOnly)
     : false;
-  return (hasStudent ? 'TICKETS-S-' : 'TICKETS-') + orderId.slice(0, 8).toUpperCase();
+  return paymentReferenceOf(orderId, hasStudent);
 }
 
 /**
@@ -181,6 +196,101 @@ export function getOrderByPaymentReference(reference: string): OrderRow | null {
     .prepare(`SELECT ${ORDER_COLS} FROM orders WHERE id LIKE ? || '%' LIMIT 2`)
     .all(key.toLowerCase()) as OrderRow[];
   return rows.length === 1 ? rows[0] : null;
+}
+
+// ---------------------------------------------------------------------------
+// The order access token: the ONE proof that the reader owns the mailbox.
+//
+// An order's id protects the ORDER — it is a random UUID, and whoever created
+// the order knows it. It proves nothing about the ADDRESS on that order,
+// because POST /api/orders only format-checks buyer_email: anybody may type
+// anybody's address into a checkout and be handed the new order id in the
+// response. So buyer_email is an unverified claim, and nothing keyed off it —
+// the referral vouchers that address holds, the customer card code that opens
+// its whole history with a seller — may be unlocked by the order id alone.
+//
+// This token is what closes that gap. It is minted for one order, it travels
+// ONLY inside emails sent TO the address on that order, and holding it is
+// therefore evidence of reading that mailbox. Same HMAC discipline as the
+// unsubscribe/confirm links in lib/marketing.ts and the scan tokens in
+// lib/auth.ts, constant-time compare included.
+//
+// It must NEVER be handed out at order creation (the post-checkout redirect
+// carries no token on purpose): an attacker creates orders too, so a token
+// given to whoever made the order proves exactly what the order id already
+// proved — nothing.
+//
+// No expiry, deliberately. It unlocks nothing that can spend money and nothing
+// the ticket email did not already put in that inbox, and a buyer who
+// bookmarks the link from their confirmation email should still find their
+// vouchers there next season.
+//
+// What we accept by putting it in the QUERY STRING, stated rather than left
+// implicit. A non-expiring bearer capability in a URL is copied verbatim into
+// reverse-proxy and CDN access logs, browser history, and any Referer a future
+// cross-origin request might carry. A URL FRAGMENT would avoid all three —
+// which is exactly how ScanClient keeps the scan key out of them (see
+// app/scan/ScanClient.tsx) — but a fragment never leaves the browser, and this
+// page is a server component that must decide what to RENDER before any client
+// JS runs. Query string is the only place the server can read it from. The
+// residual exposure is bounded by what the token unlocks (the vouchers and card
+// already mailed to that same inbox, nothing spendable), and next.config.mjs
+// keeps /order/* out of shared caches and search indexes.
+//
+// Two consequences worth knowing before touching either end:
+//   - Rotating APP_SECRET silently invalidates every buyer link ever mailed.
+//     The signature is over the order id alone with no key id, so old tokens do
+//     not fail loudly — they simply stop verifying, for everyone, at once.
+//   - An invalid, missing, or stale token DEGRADES, it does not error: the
+//     order page still renders in full and the two account-level panels are
+//     replaced by the explainer that says the link lives in the buyer's email
+//     (app/order/[id]/page.tsx). So a rotation shows up as panels quietly going
+//     missing across the whole site, not as a stack of 403s in the logs.
+// ---------------------------------------------------------------------------
+
+/** Constant-time compare (hash both sides so lengths always match). */
+function safeEqualHex(a: string, b: string): boolean {
+  const ha = crypto.createHash('sha256').update(a).digest();
+  const hb = crypto.createHash('sha256').update(b).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
+
+function signOrderAccess(orderId: string, secret: string): string {
+  return crypto.createHmac('sha256', secret).update(`order:${orderId}`).digest('hex');
+}
+
+/**
+ * The token for one order, or null on a deployment with no signing secret —
+ * in which case the emails simply link to the plain order page and the
+ * account-level panels stay shut. Failing closed is the only safe direction:
+ * an unsigned deployment that showed the panels anyway would be the bug.
+ */
+export function orderAccessToken(orderId: string): string | null {
+  const secret = getSigningSecret();
+  if (!secret || !orderId) return null;
+  return signOrderAccess(orderId, secret);
+}
+
+/** Does this token prove the holder was mailed about THIS order? */
+export function verifyOrderAccessToken(orderId: string, token: string | null | undefined): boolean {
+  if (!token || !orderId) return false;
+  const expected = orderAccessToken(orderId);
+  if (!expected) return false;
+  return safeEqualHex(token, expected);
+}
+
+/**
+ * The order-page link an email to the BUYER'S OWN ADDRESS may carry: with the
+ * token, so opening it from the inbox shows the rewards and card panels.
+ *
+ * Only for mail addressed to order.buyer_email. Anything shown to a reader who
+ * has not proved that mailbox — the post-checkout redirect, an organizer's
+ * copy, a support reply — must use the bare `/order/<id>` path instead.
+ */
+export function orderUrlForBuyerEmail(orderId: string): string {
+  const base = `${getBaseUrl()}/order/${orderId}`;
+  const token = orderAccessToken(orderId);
+  return token ? `${base}?token=${encodeURIComponent(token)}` : base;
 }
 
 // Referral share codes match what the orders API accepts (/^[A-Z0-9]{8}$/).
@@ -514,13 +624,44 @@ export function setPaypalOrderId(orderId: string, paypalOrderId: string): void {
   getDb().prepare(`UPDATE orders SET paypal_order_id = ? WHERE id = ?`).run(paypalOrderId, orderId);
 }
 
+const ORDER_ITEM_COLS = `order_id AS orderId, tier_id AS tierId, quantity, unit_price_cents AS unitPriceCents`;
+
 export function getOrderItems(orderId: string): OrderItemRow[] {
   return getDb()
-    .prepare(
-      `SELECT order_id AS orderId, tier_id AS tierId, quantity, unit_price_cents AS unitPriceCents
-       FROM order_items WHERE order_id = ?`
-    )
+    .prepare(`SELECT ${ORDER_ITEM_COLS} FROM order_items WHERE order_id = ?`)
     .all(orderId) as OrderItemRow[];
+}
+
+/**
+ * Items for MANY orders in one statement, keyed by order id — the batch
+ * companion to getOrderItems, for screens that already hold a page of orders
+ * and used to ask for each one's lines separately.
+ *
+ * ORDER BY is spelled out rather than left to the planner: the single-order
+ * reader above comes back in (order_id, tier_id) order because that is the
+ * UNIQUE index it searches, and a summary line built from this map has to read
+ * "2× Table, 1× Standard" in that same sequence or the same order would print
+ * differently depending on which reader fetched it.
+ *
+ * Orders with no items are simply absent; callers default to an empty list.
+ */
+export function getOrderItemsBulk(orderIds: string[]): Map<string, OrderItemRow[]> {
+  const out = new Map<string, OrderItemRow[]>();
+  for (const batch of chunkIds(orderIds)) {
+    const rows = getDb()
+      .prepare(
+        `SELECT ${ORDER_ITEM_COLS} FROM order_items
+         WHERE order_id IN (${batch.map(() => '?').join(',')})
+         ORDER BY order_id, tier_id`
+      )
+      .all(...batch) as OrderItemRow[];
+    for (const r of rows) {
+      const list = out.get(r.orderId);
+      if (list) list.push(r);
+      else out.set(r.orderId, [r]);
+    }
+  }
+  return out;
 }
 
 export function getTicketsForOrder(orderId: string): TicketRow[] {
@@ -793,97 +934,196 @@ export interface Stats {
   mockRevenueCents: number;
 }
 
+/** Everything in Stats except perTier, which is read per event (see below). */
+export type EventTotals = Omit<Stats, 'perTier'>;
+
+const EMPTY_EVENT_TOTALS: EventTotals = {
+  ordersPaid: 0,
+  ticketsSold: 0,
+  revenueCents: 0,
+  checkedIn: 0,
+  awaitingTransferOrders: 0,
+  awaitingTransferCents: 0,
+  awaitingTransferTickets: 0,
+  mockPaidOrders: 0,
+  mockTicketsSold: 0,
+  mockRevenueCents: 0,
+};
+
+/**
+ * Every headline number for MANY events in ONE statement, keyed by event id.
+ *
+ * This used to be seven separate single-row aggregates per event, which made
+ * the organizer's dashboard cost eleven statements per listing it showed
+ * (measured: 220 for a 20-event account). The numbers are cheap; asking for
+ * them one event at a time was the expense.
+ *
+ * The three branches are UNION ALLed rather than joined because they count
+ * DIFFERENT rows: one order has many tickets and many item lines, so joining
+ * orders to both at once would multiply every money column by the fan-out.
+ * Each branch therefore emits one row per row of its own table, zero in every
+ * column it knows nothing about, and the outer GROUP BY adds them up.
+ *
+ * The id list is bound with NAMED parameters because it appears three times —
+ * repeating a name costs one bound variable, repeating a `?` costs three, and
+ * the batch size in lib/sqlIn is chosen against the one-variable-per-id rule.
+ *
+ * Events with no orders at all are simply absent; read through getStats() or
+ * default to EMPTY_EVENT_TOTALS.
+ */
+export function getEventTotalsBulk(eventIds: string[]): Map<string, EventTotals> {
+  const out = new Map<string, EventTotals>();
+  for (const batch of chunkIds(eventIds)) {
+    const names = batch.map((_, i) => `@e${i}`).join(',');
+    const params = Object.fromEntries(batch.map((id, i) => [`e${i}`, id]));
+    const rows = getDb()
+      .prepare(
+        `SELECT eventId,
+                SUM(ordersPaid) AS ordersPaid, SUM(revenueCents) AS revenueCents,
+                SUM(mockOrders) AS mockPaidOrders, SUM(mockRevenueCents) AS mockRevenueCents,
+                SUM(awaitingOrders) AS awaitingTransferOrders, SUM(awaitingCents) AS awaitingTransferCents,
+                SUM(ticketsSold) AS ticketsSold, SUM(mockTickets) AS mockTicketsSold,
+                SUM(checkedIn) AS checkedIn, SUM(awaitingSeats) AS awaitingTransferTickets
+         FROM (
+           -- Money and order counts: one row per order.
+           SELECT o.event_id AS eventId,
+                  CASE WHEN o.status = 'paid' AND o.payment_mode != 'mock' THEN 1 ELSE 0 END AS ordersPaid,
+                  CASE WHEN o.status = 'paid' AND o.payment_mode != 'mock' THEN o.total_cents ELSE 0 END AS revenueCents,
+                  CASE WHEN o.status = 'paid' AND o.payment_mode = 'mock' THEN 1 ELSE 0 END AS mockOrders,
+                  CASE WHEN o.status = 'paid' AND o.payment_mode = 'mock' THEN o.total_cents ELSE 0 END AS mockRevenueCents,
+                  CASE WHEN o.status = 'claimed' AND o.payment_mode = 'transfer' THEN 1 ELSE 0 END AS awaitingOrders,
+                  CASE WHEN o.status = 'claimed' AND o.payment_mode = 'transfer' THEN o.total_cents ELSE 0 END AS awaitingCents,
+                  0 AS ticketsSold, 0 AS mockTickets, 0 AS checkedIn, 0 AS awaitingSeats
+           FROM orders o WHERE o.event_id IN (${names})
+           UNION ALL
+           -- People: one row per minted ticket. checkedIn deliberately ignores
+           -- order status — a scanned code was scanned.
+           SELECT o.event_id, 0, 0, 0, 0, 0, 0,
+                  CASE WHEN o.status = 'paid' THEN 1 ELSE 0 END,
+                  CASE WHEN o.status = 'paid' AND o.payment_mode = 'mock' THEN 1 ELSE 0 END,
+                  CASE WHEN t.checked_in_at IS NOT NULL THEN 1 ELSE 0 END,
+                  0
+           FROM tickets t JOIN orders o ON o.id = t.order_id WHERE o.event_id IN (${names})
+           UNION ALL
+           -- Seats still on their way, in PEOPLE: a waiting "2× Table of 8"
+           -- reservation is 16 tickets, not 2. No tickets are minted until the
+           -- money lands, so these are counted from the booking and clamped by
+           -- the same expression lib/inventory.ts consumes seats with.
+           SELECT o.event_id, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  oi.quantity * ${seatsPerUnitSql('et')}
+           FROM order_items oi JOIN orders o ON o.id = oi.order_id
+                LEFT JOIN event_tiers et ON et.event_id = o.event_id AND et.tier_key = oi.tier_id
+           WHERE o.status = 'claimed' AND o.payment_mode = 'transfer' AND o.event_id IN (${names})
+         )
+         GROUP BY eventId`
+      )
+      .all(params) as (EventTotals & { eventId: string })[];
+    for (const r of rows) {
+      const { eventId, ...totals } = r;
+      out.set(eventId, totals);
+    }
+  }
+  return out;
+}
+
+/** One event's totals, or all zeros when it has never sold anything. */
+export function totalsFor(totals: Map<string, EventTotals>, eventId: string): EventTotals {
+  return totals.get(eventId) ?? EMPTY_EVENT_TOTALS;
+}
+
+/**
+ * Per tier: 'sold' counts every paid seat (mock included — they hold capacity
+ * until purged); revenue counts REAL money only, matching the headline revenue.
+ */
+function perTierStats(eventId: string): TierStats[] {
+  const perTierRows = getDb()
+    .prepare(
+      `SELECT oi.tier_id AS tierId, COALESCE(SUM(oi.quantity), 0) AS sold,
+              COALESCE(SUM(CASE WHEN o.payment_mode != 'mock' THEN oi.quantity * oi.unit_price_cents ELSE 0 END), 0) AS revenueCents
+       FROM order_items oi JOIN orders o ON o.id = oi.order_id
+       WHERE o.status = 'paid' AND o.event_id = ?
+       GROUP BY oi.tier_id`
+    )
+    .all(eventId) as { tierId: string; sold: number; revenueCents: number }[];
+  const soldMap = new Map(perTierRows.map((r) => [r.tierId, r]));
+  return getEventTiers(eventId).map((t) => ({
+    tierId: t.tierKey,
+    name: t.name,
+    sold: soldMap.get(t.tierKey)?.sold ?? 0,
+    cap: t.cap,
+    revenueCents: soldMap.get(t.tierKey)?.revenueCents ?? 0,
+  }));
+}
+
 /**
  * Sales stats for one event (pass its id) or the whole platform (omit it).
  * Platform-wide numbers sum across events; perTier is [] there because tier
  * keys are only unique within an event.
+ *
+ * The single-event case reads its totals through getEventTotalsBulk so that
+ * one event's numbers and a dashboard full of them cannot drift apart — there
+ * is one definition of "paid", "mock" and "awaiting", and it is up there.
  */
 export function getStats(eventId?: string): Stats {
-  const db = getDb();
-  const scope = eventId ? `AND event_id = ?` : '';
-  const scopeArgs: string[] = eventId ? [eventId] : [];
-  const ticketScope = eventId ? `AND o.event_id = ?` : '';
+  if (eventId) {
+    return {
+      ...(getEventTotalsBulk([eventId]).get(eventId) ?? EMPTY_EVENT_TOTALS),
+      perTier: perTierStats(eventId),
+    };
+  }
 
+  const db = getDb();
   const paid = db
     .prepare(
       `SELECT COUNT(*) AS n, COALESCE(SUM(total_cents), 0) AS revenue
-       FROM orders WHERE status = 'paid' AND payment_mode != 'mock' ${scope}`
+       FROM orders WHERE status = 'paid' AND payment_mode != 'mock'`
     )
-    .get(...scopeArgs) as { n: number; revenue: number };
+    .get() as { n: number; revenue: number };
   const mock = db
     .prepare(
       `SELECT COUNT(*) AS n, COALESCE(SUM(total_cents), 0) AS revenue
-       FROM orders WHERE status = 'paid' AND payment_mode = 'mock' ${scope}`
+       FROM orders WHERE status = 'paid' AND payment_mode = 'mock'`
     )
-    .get(...scopeArgs) as { n: number; revenue: number };
+    .get() as { n: number; revenue: number };
   const mockTickets = (
     db
       .prepare(
         `SELECT COUNT(*) AS n FROM tickets t JOIN orders o ON o.id = t.order_id
-         WHERE o.status = 'paid' AND o.payment_mode = 'mock' ${ticketScope}`
+         WHERE o.status = 'paid' AND o.payment_mode = 'mock'`
       )
-      .get(...scopeArgs) as { n: number }
+      .get() as { n: number }
   ).n;
   const ticketsSold = (
     db
       .prepare(
         `SELECT COUNT(*) AS n FROM tickets t JOIN orders o ON o.id = t.order_id
-         WHERE o.status = 'paid' ${ticketScope}`
+         WHERE o.status = 'paid'`
       )
-      .get(...scopeArgs) as { n: number }
+      .get() as { n: number }
   ).n;
   const checkedIn = (
     db
       .prepare(
         `SELECT COUNT(*) AS n FROM tickets t JOIN orders o ON o.id = t.order_id
-         WHERE t.checked_in_at IS NOT NULL ${ticketScope}`
+         WHERE t.checked_in_at IS NOT NULL`
       )
-      .get(...scopeArgs) as { n: number }
+      .get() as { n: number }
   ).n;
-
-  // Per tier: 'sold' counts every paid seat (mock included — they hold
-  // capacity until purged); revenue counts REAL money only, matching the
-  // headline revenue.
-  let perTier: TierStats[] = [];
-  if (eventId) {
-    const perTierRows = db
-      .prepare(
-        `SELECT oi.tier_id AS tierId, COALESCE(SUM(oi.quantity), 0) AS sold,
-                COALESCE(SUM(CASE WHEN o.payment_mode != 'mock' THEN oi.quantity * oi.unit_price_cents ELSE 0 END), 0) AS revenueCents
-         FROM order_items oi JOIN orders o ON o.id = oi.order_id
-         WHERE o.status = 'paid' AND o.event_id = ?
-         GROUP BY oi.tier_id`
-      )
-      .all(eventId) as { tierId: string; sold: number; revenueCents: number }[];
-    const soldMap = new Map(perTierRows.map((r) => [r.tierId, r]));
-    perTier = getEventTiers(eventId).map((t) => ({
-      tierId: t.tierKey,
-      name: t.name,
-      sold: soldMap.get(t.tierKey)?.sold ?? 0,
-      cap: t.cap,
-      revenueCents: soldMap.get(t.tierKey)?.revenueCents ?? 0,
-    }));
-  }
-
   const awaiting = db
     .prepare(
       `SELECT COUNT(*) AS n, COALESCE(SUM(total_cents), 0) AS cents
-       FROM orders WHERE status = 'claimed' AND payment_mode = 'transfer' ${scope}`
+       FROM orders WHERE status = 'claimed' AND payment_mode = 'transfer'`
     )
-    .get(...scopeArgs) as { n: number; cents: number };
-  // In TICKETS (people), matching its label everywhere it is shown: a waiting
-  // "2× Table of 8" reservation is 16 tickets on their way, not 2. Clamped like
-  // the ceilings above, so this tile cannot promise more tickets than the room
-  // ever sold.
+    .get() as { n: number; cents: number };
   const awaitingTickets = (
     db
       .prepare(
         `SELECT COALESCE(SUM(oi.quantity * ${seatsPerUnitSql('et')}), 0) AS n
          FROM order_items oi JOIN orders o ON o.id = oi.order_id
          LEFT JOIN event_tiers et ON et.event_id = o.event_id AND et.tier_key = oi.tier_id
-         WHERE o.status = 'claimed' AND o.payment_mode = 'transfer' ${ticketScope}`
+         WHERE o.status = 'claimed' AND o.payment_mode = 'transfer'`
       )
-      .get(...scopeArgs) as { n: number }
+      .get() as { n: number }
   ).n;
 
   return {
@@ -891,7 +1131,7 @@ export function getStats(eventId?: string): Stats {
     ticketsSold,
     revenueCents: paid.revenue,
     checkedIn,
-    perTier,
+    perTier: [],
     awaitingTransferOrders: awaiting.n,
     awaitingTransferCents: awaiting.cents,
     awaitingTransferTickets: awaitingTickets,

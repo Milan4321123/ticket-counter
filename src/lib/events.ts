@@ -895,6 +895,32 @@ export function dismissEventQuestion(eventId: string, questionId: string): boole
   );
 }
 
+/**
+ * How many questions are still waiting on an answer, per event, in one
+ * statement — the badge on every row of the organizer's dashboard.
+ *
+ * A COUNT rather than listEventQuestions(...).length per event: that read the
+ * whole question row, asker name and email included, for a number the page
+ * prints next to the word "question". Fewer statements and less personal data
+ * off the disk for exactly the same badge.
+ *
+ * Events with nothing open are absent; callers default to 0.
+ */
+export function countOpenQuestionsByEvent(eventIds: string[]): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const batch of chunkIds(eventIds)) {
+    const rows = getDb()
+      .prepare(
+        `SELECT event_id AS eventId, COUNT(*) AS n FROM event_questions
+         WHERE status = 'open' AND event_id IN (${batch.map(() => '?').join(',')})
+         GROUP BY event_id`
+      )
+      .all(...batch) as { eventId: string; n: number }[];
+    for (const r of rows) out.set(r.eventId, r.n);
+  }
+  return out;
+}
+
 /** Count of open visitor questions across all of an organizer's events. */
 export function countOpenQuestionsForOrganizer(organizerId: string): number {
   return (

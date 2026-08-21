@@ -4,7 +4,7 @@ import CheckPaymentButton from '@/components/CheckPaymentButton';
 import OrganizerWhatsApp from '@/components/OrganizerWhatsApp';
 import CopyButton from '@/components/CopyButton';
 import PrintButton from '@/components/PrintButton';
-import { getCustomerCard, issueCustomerCard } from '@/lib/cards';
+import { buyerAccountForOrder, issueCardForOrder } from '@/lib/buyerAccount';
 import {
   cropTag,
   getEventById,
@@ -14,6 +14,7 @@ import {
   paypalMeUrl,
   paypalPayee,
 } from '@/lib/events';
+import { isEmailConfigured } from '@/lib/email';
 import { getOrganizer } from '@/lib/organizers';
 import { girocodePayload } from '@/lib/girocode';
 import { formatMoney } from '@/lib/money';
@@ -21,7 +22,7 @@ import { getBaseUrl } from '@/lib/config';
 import { getOrder, getOrderItems, getTicketsForOrder, paymentReference, referralCode } from '@/lib/orders';
 import { orderPayout } from '@/lib/payout';
 import { withAnonymizedBuyer } from '@/lib/retention';
-import { referralProgressFor, referralRewardsReachable } from '@/lib/referrals';
+import { getReferralRewardSettings, referralRewardsReachable } from '@/lib/referrals';
 import { paymentQrDataUrl } from '@/lib/paymentQr';
 import { machineDate } from '@/lib/seo';
 import { ticketQrDataUrl } from '@/lib/tickets';
@@ -36,10 +37,23 @@ export const metadata = { robots: { index: false, follow: false } };
 // Fixed-width labels keep the .copy-row values aligned.
 const rowLabelStyle = { minWidth: 130 } as const;
 
-export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function OrderPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { id } = await params;
   const order = getOrder(id);
   if (!order) notFound();
+
+  // The token from the buyer's own confirmation email, if this page was opened
+  // from it. It is the ONLY thing on this page that says anything about who is
+  // reading — the order id says only that somebody has the link — and it
+  // decides the two ACCOUNT-level panels far below. Nothing else uses it.
+  const sp = await searchParams;
+  const accessToken = (Array.isArray(sp.token) ? sp.token[0] : sp.token) ?? null;
 
   // What this page may PRINT about the buyer. `order` keeps the real columns
   // for the machinery below (the payment blocks, the card offer, the resend);
@@ -646,65 +660,66 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       ? await ticketQrDataUrl(shareEventUrl)
       : null;
 
-  // What the link above has actually earned this buyer, when the organizer has
-  // switched referral rewards on. Nothing new appears on the page when they
-  // have not — an unasked-for promise is worse than silence.
+  // ---- Everything below belongs to the ADDRESS, not to this order ---------
   //
-  // Only while the buyer's details still exist: once lib/retention has erased
-  // them, this order's address is a shared placeholder, and counting against
-  // it would credit one imaginary, very busy person. Vouchers already earned
-  // are unaffected — a voucher stands on its own code.
-  //
-  // And only where the promise can actually come true. This buyer's share link
-  // points at THIS listing, and a referral is counted on the order it brings
-  // here — so on a listing where nothing a buyer can buy costs money, no
-  // booking it brings can ever be "actually paid for" and the counter would sit
-  // at zero for good. Rewards are an ACCOUNT setting, so an organizer with one
-  // paid listing and one free one would otherwise promise every RSVP guest
-  // something the rules can never give them. Same function as the public
-  // listing page asks, so the offer somebody read before booking and the
-  // progress they read after it are decided by one rule.
-  const rewardsReachable = referralRewardsReachable(orderTiers);
-  const rewards =
-    event && !order.buyerErasedAt && rewardsReachable
-      ? referralProgressFor(event.organizerId, order.buyerEmail)
-      : null;
+  // The referral vouchers this buyer holds and the code of their customer card
+  // are keyed off orders.buyer_email — and that column is an unverified claim:
+  // POST /api/orders only format-checks the address and hands the new order id
+  // straight back, so anybody can mint an order carrying anybody's address and
+  // then open its page. So a page reached with nothing but the order id shows
+  // NONE of it; the one key is the token from the buyer's own confirmation
+  // email. See lib/buyerAccount.ts, which is the only door to these reads and
+  // holds the rest of the reasoning (including why an erased buyer, an unpaid
+  // order, or a listing where rewards can never be earned all come back shut).
+  const account = buyerAccountForOrder(order, accessToken);
+  const rewards = account.rewards;
+  const existingCard = account.card;
   const sellerName = organizer?.name?.trim() || 'The organizer';
 
-  // ---- The customer card: offered here, never assumed ---------------------
+  // The card is a card WITH somebody — no organizer row, nobody to hold it.
+  const cardOfferable = account.cardPossible && Boolean(organizer);
+
+  // Whether this seller thanks referrers at all, and whether the thank-you is
+  // reachable on this listing. Their own PUBLIC promise — the same thing the
+  // listing page shows every visitor before anybody buys — so reading it says
+  // nothing about the buyer. It decides only whether the explainer below
+  // mentions vouchers: telling somebody their codes are in their inbox, on a
+  // listing that hands out none, would be a worse lie than the missing panel.
+  const rewardsOffered =
+    event !== null &&
+    referralRewardsReachable(orderTiers) &&
+    getReferralRewardSettings(event.organizerId).enabled;
+
+  // Whether this deployment can post the mail that carries the access token at
+  // all. The token reaches a buyer by exactly one road (lib/orders.ts), so on a
+  // server with no SMTP the account panels are not "one tap away" — they are
+  // unreachable, and promising a message that will never be sent is the one
+  // thing this explainer must not do. The gate stays shut either way: an
+  // undeliverable email is not a reason to show one person's codes to another.
   //
-  // Offered only where it can honestly work: this buyer's details still exist
-  // (an erased order's address is a shared placeholder, so a card issued
-  // against it would be a card for nobody), and the listing still has an
-  // organizer to hold it with.
-  //
-  // Quiet on purpose. It is one paragraph and one button, it is never
-  // pre-ticked because there is nothing to tick, and once somebody holds a
-  // card the offer is replaced by a link to it — asking again next month is
-  // how a kindness turns into nagging.
-  const cardOfferable = Boolean(event && organizer && !order.buyerErasedAt && order.buyerEmail);
-  const existingCard =
-    cardOfferable && event ? getCustomerCard(event.organizerId, order.buyerEmail) : null;
+  // It answers the deployment question only. A configured server whose provider
+  // rejects the send (a dead From domain, a suspended account) still reads true
+  // here, which is why the wording below never claims a mail ARRIVED — it names
+  // the road the link travels and sends anyone who cannot find it to the seller.
+  const mailConfigured = isEmailConfigured();
 
   /**
    * Create the card, because the buyer pressed the button asking for one.
    *
-   * The order id in the form is transport, not authority: everything the card
-   * is made from is re-read here from the order itself, so a hand-made POST
-   * can only ever issue a card to the address that really owns the order it
-   * names — and only while that order is paid and its buyer not yet erased.
+   * Both fields are transport, not authority: issueCardForOrder re-reads the
+   * order and re-checks the token itself, so a hand-made POST issues nothing
+   * without proof of the mailbox on the order it names. See there for why the
+   * token — not the rendered form — has to be what decides it.
    */
   async function keepCard(formData: FormData) {
     'use server';
     const orderId = String(formData.get('orderId') ?? '');
-    const fresh = getOrder(orderId);
-    if (!fresh || fresh.status !== 'paid' || fresh.buyerErasedAt || !fresh.buyerEmail) return;
-    const freshEvent = getEventById(fresh.eventId);
-    if (!freshEvent) return;
-    issueCustomerCard({ organizerId: freshEvent.organizerId, email: fresh.buyerEmail });
+    const token = String(formData.get('token') ?? '');
+    if (!issueCardForOrder(orderId, token)) return;
     // Straight back to this page, which now shows the link to the card rather
-    // than the offer — one POST, one visible result.
-    redirect(`/order/${encodeURIComponent(orderId)}`);
+    // than the offer — one POST, one visible result. The token rides along, or
+    // the buyer would land back on a page that has shut its own panels.
+    redirect(`/order/${encodeURIComponent(orderId)}?token=${encodeURIComponent(token)}`);
   }
 
   return (
@@ -720,7 +735,12 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       </div>
       {shareUrl && (
         <p className="anim-fade-up anim-d1" style={{ margin: '0 0 16px' }}>
-          <a href={shareUrl} target="_blank" rel="noopener" className="btn btn-green">
+          {/* noreferrer as well as noopener now that this page's URL can carry
+              the order access token: browsers already trim the query string
+              out of a cross-origin Referer by default, and this makes the
+              token's confinement to the buyer's inbox not depend on that
+              default. The PayPal links above are spelled the same way. */}
+          <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="btn btn-green">
             {isFreeOrder ? "Tell your friends — I'm going →" : 'Tell your friends on WhatsApp →'}
           </a>
         </p>
@@ -819,10 +839,53 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         </div>
       ) : null}
 
+      {/* Said out loud, not hidden. A buyer who came straight from checkout
+          has proved nothing about the address they typed, so the two panels
+          that belong to that ADDRESS are not here — and they must understand
+          why, or the missing rewards read as a broken promise. The words are
+          warm on purpose: this is the normal path, not an error. */}
+      {cardOfferable && !account.mailboxProven ? (
+        <div className="card anim-fade-up anim-d1">
+          {/* "Travel by email", not "are in your email": this page is bookmarked
+              and reopened, so the copy has to stay true for the buyer reading it
+              weeks after the mail went out as well as the one reading it two
+              minutes later. Neither branch claims a message arrived. */}
+          <div className="card-title">
+            {rewardsOffered
+              ? 'Your rewards and your card travel by email'
+              : 'Your card travels by email'}
+          </div>
+          {mailConfigured ? (
+            <p className="muted small" style={{ marginTop: 0 }}>
+              Anything that belongs to your address rather than to this one order —{' '}
+              {rewardsOffered ? `any thank-you codes ${sellerName} has given you, and ` : ''}your
+              own card with {sellerName} — opens from the link we email to{' '}
+              <strong>{shown.buyerEmail}</strong>. That link rides in the confirmation for this
+              order: tap it, whether the message reached you minutes ago or seasons ago, and they
+              appear right here on this page. If it is not in that inbox, ask {sellerName}.
+            </p>
+          ) : (
+            <p className="muted small" style={{ marginTop: 0 }}>
+              Anything that belongs to your address rather than to this one order —{' '}
+              {rewardsOffered ? `any thank-you codes ${sellerName} has given you, and ` : ''}your
+              own card with {sellerName} — opens only from a link that travels by email to{' '}
+              <strong>{shown.buyerEmail}</strong>, and this site is not sending email at the moment.
+              So that link cannot reach you right now, and we would rather say so than promise you a
+              message. Nothing here is lost — your {v.codes} below are unaffected — and {sellerName}{' '}
+              can tell you directly what you are holding.
+            </p>
+          )}
+          <p className="muted small" style={{ margin: '8px 0 0' }}>
+            Why the extra step: anyone can type any address into a checkout, so this page will not
+            hand out what belongs to an address until the link from that inbox shows it is yours.
+          </p>
+        </div>
+      ) : null}
+
       {/* The card offer. Nobody gets one by buying something — this button is
           the only way a card comes into existence, which is exactly what lets
           it outlive the after-event erasure (see /privacy and lib/cards.ts). */}
-      {cardOfferable ? (
+      {cardOfferable && account.mailboxProven ? (
         existingCard ? (
           <p className="muted small anim-fade-up anim-d1" style={{ margin: '0 0 16px' }}>
             You keep a card with {sellerName} —{' '}
@@ -846,6 +909,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             </p>
             <form action={keepCard}>
               <input type="hidden" name="orderId" value={order.id} />
+              {/* The proof travels with the request, and is checked again on
+                  the other side — see keepCard. */}
+              <input type="hidden" name="token" value={accessToken ?? ''} />
               <button type="submit" className="btn btn-brand">
                 Yes, keep a card for me
               </button>

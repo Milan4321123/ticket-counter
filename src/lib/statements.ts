@@ -10,8 +10,8 @@
 // touches: amounts, payment references, dates, tier names and payment routes.
 // A statement printed today and one printed after erasure are identical.
 import { getDb } from './db';
-import { getEventById, getEventTier, type EventKind } from './events';
-import { getOrderItems, paymentReference } from './orders';
+import { asEventKind, getEventTiersBulk, type EventKind, type EventTierRow } from './events';
+import { getOrderItemsBulk, paymentReferenceOf } from './orders';
 
 /** 'YYYY-MM', the only shape a month travels in. */
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -108,6 +108,22 @@ export function defaultStatementMonth(months: string[]): string {
   return months.includes(lastFull) ? lastFull : months[0];
 }
 
+/**
+ * The month as a half-open [from, until) pair of stored-datetime prefixes.
+ *
+ * The predicate used to be strftime('%Y-%m', COALESCE(paid_at, created_at)) = ?,
+ * which SQLite cannot answer from an index or a range: it has to compute the
+ * function for every candidate row. Timestamps here are written by
+ * datetime('now') — 'YYYY-MM-DD HH:MM:SS', a format that sorts as text exactly
+ * as it does in time — so a plain string comparison selects the same rows, and
+ * a half-open upper bound needs no thought about month lengths or leap days.
+ */
+function monthRange(month: string): [string, string] {
+  const [y, m] = month.split('-').map(Number);
+  const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+  return [`${month}-01`, `${next}-01`];
+}
+
 /** '2026-08' -> 'August 2026', for headers and filenames' human twin. */
 export function formatStatementMonth(month: string): string {
   const [y, m] = month.split('-').map(Number);
@@ -129,50 +145,80 @@ export function formatStatementMonth(month: string): string {
  */
 export function monthlyStatement(organizerId: string, month: string): MonthlyStatement {
   if (!isStatementMonth(month)) return { month, sections: [], totals: [] };
+  const [from, until] = monthRange(month);
 
+  // CROSS JOIN is the optimizer hint, not a different join: SQLite honours the
+  // written order for one, and without it the planner drove this from `orders`
+  // — scanning every paid order on the PLATFORM to find one seller's month
+  // (EXPLAIN QUERY PLAN: "SEARCH o USING INDEX idx_orders_status_mode"). Driven
+  // from the organizer's own events it touches only their rows. The listing's
+  // name, kind and currency come back on the same rows, so a section no longer
+  // costs a lookup of an event this query already read.
   const rows = getDb()
     .prepare(
-      `SELECT o.id, o.event_id AS eventId,
+      `SELECT o.id, e.id AS eventId, e.name AS eventName, e.kind AS kind, e.currency AS currency,
               COALESCE(o.paid_at, o.created_at) AS confirmedAt,
               o.total_cents AS amountCents, o.payment_mode AS paymentRoute
-       FROM orders o JOIN events e ON e.id = o.event_id
+       FROM events e CROSS JOIN orders o ON o.event_id = e.id
        WHERE e.organizer_id = ?
          AND o.status = 'paid' AND o.payment_mode != 'mock'
-         AND strftime('%Y-%m', COALESCE(o.paid_at, o.created_at)) = ?
+         AND COALESCE(o.paid_at, o.created_at) >= ?
+         AND COALESCE(o.paid_at, o.created_at) < ?
        ORDER BY e.name COLLATE NOCASE, confirmedAt ASC`
     )
-    .all(organizerId, month) as {
+    .all(organizerId, from, until) as {
     id: string;
     eventId: string;
+    eventName: string;
+    kind: string | null;
+    currency: string;
     confirmedAt: string;
     amountCents: number;
     paymentRoute: StatementLine['paymentRoute'];
   }[];
 
+  // Two more statements for the whole month's item lines and ticket types,
+  // instead of four reads per line — each line needed its items, each item's
+  // tier for the name, and then the order, its items and its tiers AGAIN
+  // inside paymentReference() to decide on the student prefix.
+  const itemsByOrder = getOrderItemsBulk(rows.map((r) => r.id));
+  const tiersByEvent = getEventTiersBulk([...new Set(rows.map((r) => r.eventId))]);
+  // '<eventId>:<tierKey>' is unambiguous because an event id is a UUID and
+  // never contains a colon, while a tier key (organizer-typed) may.
+  const tiers = new Map<string, EventTierRow>();
+  for (const [eventId, list] of tiersByEvent) {
+    for (const t of list) tiers.set(`${eventId}:${t.tierKey}`, t);
+  }
+
   const sections: StatementSection[] = [];
   let current: StatementSection | null = null;
   for (const r of rows) {
     if (!current || current.eventId !== r.eventId) {
-      const event = getEventById(r.eventId);
-      if (!event) continue; // a listing deleted mid-query; its rows are gone with it
       current = {
-        eventId: event.id,
-        eventName: event.name,
-        kind: event.kind,
-        currency: event.currency,
+        eventId: r.eventId,
+        eventName: r.eventName,
+        // Normalized exactly as getEventById would: rows written before the
+        // column existed read NULL, and NULL has always meant an event.
+        kind: asEventKind(r.kind),
+        currency: r.currency,
         lines: [],
         subtotalCents: 0,
       };
       sections.push(current);
     }
+    const items = itemsByOrder.get(r.id) ?? [];
+    // A tier deleted since the sale is simply absent from the map — the same
+    // miss getEventTier() used to answer with null, and it still degrades the
+    // same way in both places below: the key stands in for the name, and the
+    // reference reads as a non-student one.
+    const tierOf = (tierId: string) => tiers.get(`${r.eventId}:${tierId}`);
     // Tier names, not buyers: the same "2× Table of 8" the orders list shows.
-    // A tier deleted since keeps its key as the honest leftover.
-    const itemsSummary = getOrderItems(r.id)
-      .map((it) => `${it.quantity}× ${getEventTier(r.eventId, it.tierId)?.name ?? it.tierId}`)
+    const itemsSummary = items
+      .map((it) => `${it.quantity}× ${tierOf(it.tierId)?.name ?? it.tierId}`)
       .join(', ');
     current.lines.push({
       orderId: r.id,
-      reference: paymentReference(r.id),
+      reference: paymentReferenceOf(r.id, items.some((it) => tierOf(it.tierId)?.studentOnly)),
       confirmedAt: r.confirmedAt,
       itemsSummary,
       amountCents: r.amountCents,

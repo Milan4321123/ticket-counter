@@ -160,6 +160,13 @@ CREATE TABLE IF NOT EXISTS event_tiers (
   UNIQUE (event_id, tier_key)
 );
 
+-- Every tier read is "this event's tiers, in the organizer's order". The
+-- UNIQUE index above finds the event's rows but says nothing about the sort
+-- column, so each read ended in a temp B-tree sort; this one hands them back
+-- already ordered. Measured on a 22-listing account: getEventTiersBulk -10%,
+-- getEventTiers per event -6%.
+CREATE INDEX IF NOT EXISTS idx_event_tiers_event_sort ON event_tiers(event_id, sort, tier_key);
+
 -- Uploaded photos for an event (files live under DATA_DIR/uploads/<event_id>/).
 CREATE TABLE IF NOT EXISTS event_media (
   id TEXT PRIMARY KEY,
@@ -171,6 +178,10 @@ CREATE TABLE IF NOT EXISTS event_media (
 );
 
 CREATE INDEX IF NOT EXISTS idx_event_media_event ON event_media(event_id);
+-- Same story as the tiers index above: photos are always read as "this
+-- event's, in gallery order", and (event_id) alone left the ordering to a
+-- temp B-tree. Measured -12% on getEventMediaBulk.
+CREATE INDEX IF NOT EXISTS idx_event_media_event_sort ON event_media(event_id, sort, created_at);
 
 -- Organizer-written FAQ entries shown on the event page.
 CREATE TABLE IF NOT EXISTS event_faqs (
@@ -608,6 +619,11 @@ function migrateToPlatform(db: Database.Database): void {
       body TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+    -- The only read of this table is "newest five", from the ROOT LAYOUT — so
+    -- it happens on every page of the site, and it was a full scan plus a sort
+    -- of everything the owner has ever announced. Measured -26% at 40 posts
+    -- and -94% at 5000; the table only ever grows.
+    CREATE INDEX IF NOT EXISTS idx_platform_posts_created ON platform_posts(created_at);
   `);
 
   // An optional picture on a platform announcement. Stored as the URL we serve
