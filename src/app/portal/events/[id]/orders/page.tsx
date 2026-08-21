@@ -9,7 +9,6 @@ import {
   getStats,
   listAwaitingTransferOrders,
   listOrders,
-  paymentReference,
   type OrderStatus,
 } from '@/lib/orders';
 import { organizerPlanActive } from '@/lib/organizers';
@@ -157,7 +156,7 @@ export default async function PortalOrdersPage({
           )}
           <div>
             {awaiting.map((o) => {
-              const reference = paymentReference(o.id);
+              const reference = o.paymentReference;
               return (
                 <div key={o.id} className="action-row">
                   <div className="action-row-who">
@@ -276,7 +275,7 @@ export default async function PortalOrdersPage({
               </thead>
               <tbody>
                 {orders.map((o) => {
-                  const reference = o.paymentMode === 'transfer' ? paymentReference(o.id) : null;
+                  const reference = o.paymentMode === 'transfer' ? o.paymentReference : null;
                   return (
                     <tr key={o.id}>
                       <td className="mono small">{o.createdAt.slice(0, 16)}</td>
@@ -308,7 +307,7 @@ export default async function PortalOrdersPage({
                             buyerName={o.buyerName}
                             payerName={o.payerName}
                             amountDisplay={formatMoney(o.totalCents, o.currency)}
-                            reference={paymentReference(o.id)}
+                            reference={o.paymentReference}
                           />
                         ) : o.paymentMode === 'transfer' && (o.status === 'cancelled' || o.status === 'failed') ? (
                           <TransferActions
@@ -317,7 +316,7 @@ export default async function PortalOrdersPage({
                             buyerName={o.buyerName}
                             payerName={o.payerName}
                             amountDisplay={formatMoney(o.totalCents, o.currency)}
-                            reference={paymentReference(o.id)}
+                            reference={o.paymentReference}
                           />
                         ) : null}
                       </td>

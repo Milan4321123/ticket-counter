@@ -5,7 +5,14 @@ import crypto from 'crypto';
 import { getSigningSecret } from './auth';
 import { getDb } from './db';
 import { getBaseUrl, getPaymentMode } from './config';
-import { getEventById, getEventTier, getEventTiers, seatsPerUnitSql } from './events';
+import {
+  getEventById,
+  getEventTier,
+  getEventTiers,
+  getEventTiersBulk,
+  seatsPerUnitSql,
+  type EventTierRow,
+} from './events';
 import { claimInventory } from './inventory';
 import { effectivePayout } from './payout';
 import {
@@ -626,9 +633,29 @@ export function setPaypalOrderId(orderId: string, paypalOrderId: string): void {
 
 const ORDER_ITEM_COLS = `order_id AS orderId, tier_id AS tierId, quantity, unit_price_cents AS unitPriceCents`;
 
+/**
+ * One order's lines, in (order_id, tier_id) order.
+ *
+ * The ORDER BY is not decoration and must not be dropped: getOrderItemsBulk()
+ * below sorts the same way, and withItemsSummary()'s `itemsSummary` — the
+ * "2× Table of 8, 1× Standard" line on every orders screen and in the CSV
+ * export — is built from the bulk map while the single-order page, the ticket
+ * and reservation emails and the support re-send build the same sentence from
+ * THIS reader. The two have to agree or one order prints its lines in two
+ * different sequences depending on which screen you are looking at, silently,
+ * with nothing failing.
+ *
+ * Left implicit, they agreed only by luck: SQLite happens to answer this
+ * lookup from sqlite_autoindex_order_items_1 (order_id, tier_id), and a later
+ * index or projection change that nudged the planner onto a rowid scan would
+ * have flipped the single-order path to insertion order with no other symptom.
+ * Spelling it out costs nothing — the sort is the index the query already
+ * walks — and pins the agreement in place. tests/orders.list.test.ts holds
+ * both readers to it.
+ */
 export function getOrderItems(orderId: string): OrderItemRow[] {
   return getDb()
-    .prepare(`SELECT ${ORDER_ITEM_COLS} FROM order_items WHERE order_id = ?`)
+    .prepare(`SELECT ${ORDER_ITEM_COLS} FROM order_items WHERE order_id = ? ORDER BY order_id, tier_id`)
     .all(orderId) as OrderItemRow[];
 }
 
@@ -637,11 +664,10 @@ export function getOrderItems(orderId: string): OrderItemRow[] {
  * companion to getOrderItems, for screens that already hold a page of orders
  * and used to ask for each one's lines separately.
  *
- * ORDER BY is spelled out rather than left to the planner: the single-order
- * reader above comes back in (order_id, tier_id) order because that is the
- * UNIQUE index it searches, and a summary line built from this map has to read
- * "2× Table, 1× Standard" in that same sequence or the same order would print
- * differently depending on which reader fetched it.
+ * ORDER BY is spelled out rather than left to the planner, and matches the
+ * single-order reader above line for line: a summary line built from this map
+ * has to read "2× Table, 1× Standard" in the same sequence that reader gives,
+ * or the same order prints differently depending on which one fetched it.
  *
  * Orders with no items are simply absent; callers default to an empty list.
  */
@@ -796,6 +822,18 @@ export function checkInTicket(rawCode: string, scope?: { eventId?: string }): Ch
 export interface OrderListRow extends OrderRow {
   itemsSummary: string; // e.g. "2× General Admission, 1× Student"
   ticketCount: number;
+  /**
+   * What paymentReference(o.id) would return, settled here.
+   *
+   * Carried on the row rather than derived on the page because deriving it
+   * costs three reads (the order, its items, each item's tier) that this
+   * function has already made — and the portal's orders screen asked for it up
+   * to FOUR times per rendered order (the action card, the Reference column,
+   * and each of the two TransferActions buttons). Present on every row, not
+   * just the transfer ones: which rows show it is a question about a SCREEN,
+   * and a read model that guessed would hand the next screen a blank.
+   */
+  paymentReference: string;
 }
 
 /**
@@ -804,21 +842,46 @@ export interface OrderListRow extends OrderRow {
  * the placeholder that keeps its columns non-null) — this is the choke point
  * both listOrders and listAwaitingTransferOrders already pass through, so a
  * new orders screen inherits the rule instead of having to remember it.
+ *
+ * Two statements for the whole list, however long it is, instead of five reads
+ * per order: the lines, then the tier behind each line TWICE (once for the
+ * name, once for seats_per_unit) — each of those a fresh getEventTiers() —
+ * and then the same three again inside paymentReference() on the page. At the
+ * default limit of 200 orders that was ~2,300 statements for one screen.
+ * Same shape as the month statement in lib/statements.ts, which had the same
+ * problem and fixed it with the same two batch readers.
  */
 function withItemsSummary(rows: OrderRow[]): OrderListRow[] {
+  const itemsByOrder = getOrderItemsBulk(rows.map((r) => r.id));
+  // Distinct event ids: one orders screen is usually one event, but the
+  // organizer-wide list spans their whole account, and the platform-wide
+  // awaiting list spans everybody's.
+  const tiersByEvent = getEventTiersBulk([...new Set(rows.map((r) => r.eventId))]);
+  // '<eventId>:<tierKey>' is unambiguous because an event id is a UUID and
+  // never contains a colon, while a tier key (organizer-typed) may.
+  const tiers = new Map<string, EventTierRow>();
+  for (const [eventId, list] of tiersByEvent) {
+    for (const t of list) tiers.set(`${eventId}:${t.tierKey}`, t);
+  }
+
   return rows.map((row) => {
     const o = withAnonymizedBuyer(row);
-    const items = getOrderItems(o.id);
-    const itemsSummary = items
-      .map((it) => `${it.quantity}× ${getEventTier(o.eventId, it.tierId)?.name ?? it.tierId}`)
-      .join(', ');
+    const items = itemsByOrder.get(o.id) ?? [];
+    // A tier deleted since the sale is simply absent from the map — the same
+    // miss getEventTier() used to answer with null, degrading the same way in
+    // all three places below: the key stands in for the name, the row weighs
+    // one seat, and the reference reads as a non-student one.
+    const tierOf = (tierId: string) => tiers.get(`${o.eventId}:${tierId}`);
+    const itemsSummary = items.map((it) => `${it.quantity}× ${tierOf(it.tierId)?.name ?? it.tierId}`).join(', ');
     // Counts QR TICKETS (people), not bookings — every surface showing this
     // labels it as codes/tickets, and a "2× Table of 8" order is 16 of them.
-    const ticketCount = items.reduce(
-      (s, it) => s + it.quantity * (getEventTier(o.eventId, it.tierId)?.seatsPerUnit ?? 1),
-      0
-    );
-    return { ...o, itemsSummary, ticketCount };
+    const ticketCount = items.reduce((s, it) => s + it.quantity * (tierOf(it.tierId)?.seatsPerUnit ?? 1), 0);
+    return {
+      ...o,
+      itemsSummary,
+      ticketCount,
+      paymentReference: paymentReferenceOf(o.id, items.some((it) => tierOf(it.tierId)?.studentOnly)),
+    };
   });
 }
 

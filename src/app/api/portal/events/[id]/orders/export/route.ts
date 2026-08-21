@@ -1,4 +1,4 @@
-import { listOrders, paymentReference } from '@/lib/orders';
+import { listOrders } from '@/lib/orders';
 import { requireOrganizerApi, requireOwnedEvent } from '../../../../auth';
 
 export const dynamic = 'force-dynamic';
@@ -76,7 +76,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       lines.push(
         [
           cell(o.id),
-          cell(paymentReference(o.id)),
+          cell(o.paymentReference),
           cell(o.createdAt),
           cell(o.status),
           cell(o.buyerName),
