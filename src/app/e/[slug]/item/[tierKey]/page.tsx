@@ -184,10 +184,16 @@ export default async function ItemPage({ params, searchParams }: Params) {
   // number it happened to hold ("photo 1, 2, 3, 5..."). Same running counter
   // the listing page's rail uses.
   let photoNo = 0;
+  // The 'gallery' variant, not the raw upload: the swiper paints these into a
+  // 253px-wide frame (and the lightbox into the screen), while the originals
+  // here are 1600x2000 product shots of ~220 KB — 90% of which the phone
+  // throws away before it can show anything. 'gallery' is the one uncropped
+  // render, so the rail still shows the whole picture, which is the promise
+  // `.mswipe-media`'s object-fit: contain makes.
   const addPhoto = (m: EventMediaRow, alt: string) => {
     if (seen.has(m.id)) return;
     seen.add(m.id);
-    galleryItems.push({ id: m.id, kind: 'photo', src: mediaUrl(m.id), alt });
+    galleryItems.push({ id: m.id, kind: 'photo', src: mediaUrl(m.id, 'gallery'), alt });
   };
   if (photo) addPhoto(photo, `${tier.name} — ${event.name}`);
   unclaimedPhotos(tiers, photos).forEach((m) => addPhoto(m, `${event.name} photo ${++photoNo}`));

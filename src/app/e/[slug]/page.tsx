@@ -40,6 +40,7 @@ import type { StallLinkRow } from '@/lib/stalls';
 import { listingStillUrl, socialImageUrl } from '@/lib/listing';
 import { BADGE_TONE, PLACEHOLDER_GRADIENTS } from '@/components/EventCard';
 import { vocabFor } from '@/lib/vocab';
+import { loadFeedSnapshot } from '@/lib/feedSnapshot';
 import { getAvailability } from '@/lib/inventory';
 import { runWaitlistNotifySweep } from '@/lib/waitlist';
 import WaitlistForm from '@/components/WaitlistForm';
@@ -343,12 +344,17 @@ export default async function EventPage({ params, searchParams }: Params) {
   const seenMedia = new Set<string>();
   let photoNo = 0;
   let videoNo = 0;
+  // Photos go through the 'gallery' variant — the one render that keeps the
+  // whole picture (see lib/imageVariants), because this rail is the one place
+  // that shows it whole. Without it a shop page shipped its untouched uploads
+  // into a 286px frame: 350 KB of the page's 520 KB of media was originals
+  // nobody could see the detail of. Videos have no derivative and pass through.
   const addMedia = (id: string | null, kind: 'photo' | 'video') => {
     if (!id || seenMedia.has(id)) return;
     seenMedia.add(id);
     const alt =
       kind === 'video' ? `${event.name} video ${++videoNo}` : `${event.name} photo ${++photoNo}`;
-    galleryItems.push({ id, kind, src: mediaUrl(id), alt });
+    galleryItems.push({ id, kind, src: kind === 'photo' ? mediaUrl(id, 'gallery') : mediaUrl(id), alt });
   };
   addMedia(coverId, coverIsVideo ? 'video' : 'photo');
   // NOT every photo: the ones a tier claimed as its item picture belong to that
@@ -417,6 +423,9 @@ export default async function EventPage({ params, searchParams }: Params) {
   // the shop's OWN page, and an order placed there pays the shop's own account
   // exactly like any other shop order.
   const stalls = isShop ? [] : listVisibleStallsForEvent(event.id);
+  // The stall cards below are feed tiles by another name, so they get the feed's
+  // one-shot read rather than five statements each. See lib/feedSnapshot.
+  const stallSnapshot = loadFeedSnapshot(stalls.map((st) => st.shop));
   // Same day arithmetic as stalls.ts itself: dates compare as ISO strings.
   const today = new Date().toISOString().slice(0, 10);
   const hostStalls = !isShop
@@ -1002,15 +1011,16 @@ export default async function EventPage({ params, searchParams }: Params) {
                 // does — what is it, can I order, from how much — through the
                 // same one source of truth, so a stall can never claim a state
                 // its own page would contradict one click later.
-                const shopTiers = getEventTiers(shop.id);
-                const shopAvailability = getAvailability(shop.id);
+                const shopTiers = stallSnapshot.tiers.get(shop.id) ?? [];
+                const shopAvailability =
+                  stallSnapshot.availability.get(shop.id) ?? getAvailability(shop.id);
                 const shopState = ticketState(shop, shopTiers, shopAvailability);
                 const shopPrice = fromPriceCents(shopTiers, shopAvailability);
                 // The one label ticketState words generically: a paused SHOP
                 // reads "Orders closed" to a buyer, not "Sales closed".
                 const chip = shopState.kind === 'closed' ? 'Orders closed' : shopState.badge;
                 const sellerName = getOrganizer(shop.organizerId)?.name?.trim() || 'the organizer';
-                const stillUrl = listingStillUrl(shop);
+                const stillUrl = listingStillUrl(shop, stallSnapshot.photos.get(shop.id) ?? []);
                 const accent = parsePageDesign(shop.pageDesign).accent ?? 'violet';
                 return (
                   <Link href={`/e/${shop.slug}`} className="event-card" key={link.id}>

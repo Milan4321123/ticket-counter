@@ -1,11 +1,13 @@
 // The tile one event gets in every listing on the site. Server component: it
 // reads tiers and live availability itself, so a caller only has to hand it an
-// event row.
+// event row — or, on a page showing many tiles, a snapshot the page already
+// read for all of them at once (see lib/feedSnapshot).
 import Link from 'next/link';
 import CardVideo from '@/components/CardVideo';
 import { categoryLabel } from '@/lib/categories';
 import { getEventTiers, parsePageDesign } from '@/lib/events';
 import type { EventRow, PageDesign } from '@/lib/events';
+import type { FeedSnapshot } from '@/lib/feedSnapshot';
 import { getAvailability } from '@/lib/inventory';
 import { ticketState, fromPriceCents, comingSoonLabel } from '@/lib/ticketState';
 import { listingTileMedia } from '@/lib/listing';
@@ -70,11 +72,25 @@ export interface EventCardProps {
   /** Dims the tile and drops the availability badge — for events already over. */
   past?: boolean;
   delayClass?: string;
+  /**
+   * The listing's one-shot read of tiers, photos and availability. Optional:
+   * without it the tile reads its own, which is right for a page showing one.
+   */
+  snapshot?: FeedSnapshot;
 }
 
-export default function EventCard({ event, past = false, delayClass = '' }: EventCardProps) {
-  const tiers = getEventTiers(event.id);
-  const availability = getAvailability(event.id);
+export default function EventCard({
+  event,
+  past = false,
+  delayClass = '',
+  snapshot,
+}: EventCardProps) {
+  // `?? []` inside the snapshot branch, not around it: an event with no tiers
+  // and no photos is a real state (a listing mid-setup), and falling through to
+  // the per-tile reader for it would put the query back exactly on the rows
+  // that have nothing to read.
+  const tiers = snapshot ? (snapshot.tiers.get(event.id) ?? []) : getEventTiers(event.id);
+  const availability = snapshot?.availability.get(event.id) ?? getAvailability(event.id);
   const minPrice = fromPriceCents(tiers, availability);
   /**
    * What can actually be bought, not what is left in the room.
@@ -86,7 +102,10 @@ export default function EventCard({ event, past = false, delayClass = '' }: Even
    * several are clamped to the same headroom; hence the min.
    */
   const state = ticketState(event, tiers, availability, { past });
-  const { videoUrl, stillUrl } = listingTileMedia(event);
+  const { videoUrl, stillUrl } = listingTileMedia(
+    event,
+    snapshot ? (snapshot.photos.get(event.id) ?? []) : undefined
+  );
   const accent = parsePageDesign(event.pageDesign).accent ?? 'violet';
   const location = [event.venueName, event.city].filter(Boolean).join(', ');
   // One line only — the tile is 216px wide and the full collection details are

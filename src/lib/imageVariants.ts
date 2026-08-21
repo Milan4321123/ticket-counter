@@ -24,9 +24,15 @@ export interface VariantSpec {
   height: number;
   /**
    * 'cover' — fill the box exactly, cropping the overflow. Output is always
-   * width x height, which is what every slot on the site needs.
+   * width x height, which is what every fixed-shape slot on the site needs.
+   *
+   * 'inside' — fit WITHIN the box, keeping the whole picture and its own shape.
+   * Output is at most width x height. Only the gallery wants this: it is the
+   * one place that shows a photo whole (see `.mswipe-media` in globals.css), so
+   * a cropped render there would quietly cut off what the visitor opened it to
+   * see. Everywhere else, cropping is the point.
    */
-  fit: 'cover';
+  fit: 'cover' | 'inside';
   /** Crop around the most visually interesting region instead of the centre. */
   smart: boolean;
 }
@@ -61,6 +67,17 @@ export const VARIANTS = {
    * tile with the poster reposition tool.
    */
   card: { width: 800, height: 1000, fit: 'cover', smart: false },
+  /**
+   * The media swiper / lightbox — the only slot that must not crop.
+   *
+   * A 1000px long edge is ~2x the largest gallery box the phone layout paints
+   * (measured 253x316 on the item page, 286x358 on a shop page), so it stays
+   * sharp at DPR 2 while costing a fraction of the upload: the untouched
+   * originals were arriving at 220 KB into a 253px-wide frame. Bounded on BOTH
+   * axes because 'inside' keeps the source's own shape — a tall portrait is
+   * limited by the height, a wide panorama by the width.
+   */
+  gallery: { width: 1000, height: 1250, fit: 'inside', smart: false },
 } satisfies Record<string, VariantSpec>;
 
 export type VariantName = keyof typeof VARIANTS;
@@ -238,11 +255,15 @@ export async function getVariant(
         // intermediate. Those shapes have no meaningful "subject" to find
         // anyway, so fall back to a centre crop well before it gets expensive.
         position: spec.smart && !extremeAspect ? sharp.strategy.attention : 'centre',
-        // Always scale to the slot, enlarging a small upload if need be. Letting
-        // it stay small does not avoid the blur — CSS would scale it up anyway,
-        // and worse — it just leaves the picture floating undersized in a frame
-        // it was supposed to fill.
-        withoutEnlargement: false,
+        // A cropping slot always scales to fill, enlarging a small upload if
+        // need be: letting it stay small does not avoid the blur — CSS would
+        // scale it up anyway, and worse — it just leaves the picture floating
+        // undersized in a frame it was supposed to fill.
+        //
+        // 'inside' is the opposite job. The gallery paints the photo whole on
+        // its own backdrop, so an upload smaller than the box has nothing to
+        // fill and upscaling it would only spend bytes inventing pixels.
+        withoutEnlargement: spec.fit === 'inside',
       })
       // A photo with transparency would otherwise composite onto black; event
       // posters are often PNGs with a transparent margin.

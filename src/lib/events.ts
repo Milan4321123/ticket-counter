@@ -7,6 +7,7 @@ import path from 'path';
 import { getDb } from './db';
 import { deleteVariants } from './imageVariants';
 import { paypalLinkFor } from './paypalLink';
+import { chunkIds } from './sqlIn';
 import { asEventKind, type EventKind } from './types';
 
 export type EventStatus = 'draft' | 'published' | 'archived';
@@ -437,22 +438,28 @@ export function seatsPerUnitSql(tierAlias: string): string {
   return `MIN(20, MAX(1, CAST(ROUND(COALESCE(${tierAlias}.seats_per_unit, 1)) AS INTEGER)))`;
 }
 
-export function getEventTiers(eventId: string): EventTierRow[] {
-  const rows = getDb()
-    .prepare(
-      `SELECT id, event_id AS eventId, tier_key AS tierKey, name, price_cents AS priceCents,
+const TIER_COLS = `id, event_id AS eventId, tier_key AS tierKey, name, price_cents AS priceCents,
               cap, unlimited, status, student_only AS studentOnly, description, details,
-              media_id AS mediaId, sort, seats_per_unit AS seatsPerUnit
-       FROM event_tiers WHERE event_id = ? ORDER BY sort, tier_key`
-    )
-    .all(eventId) as (Omit<EventTierRow, 'studentOnly' | 'unlimited' | 'details'> & {
-      studentOnly: number;
-      unlimited: number;
-      // NOT NULL with a default, but rows can predate the ALTER on a database
-      // restored from an older dump — typed as it really arrives.
-      details: string | null;
-    })[];
-  return rows.map((r) => ({
+              media_id AS mediaId, sort, seats_per_unit AS seatsPerUnit`;
+
+/** How a stored tier row arrives before normalization — see toTierRow. */
+type RawTierRow = Omit<EventTierRow, 'studentOnly' | 'unlimited' | 'details'> & {
+  studentOnly: number;
+  unlimited: number;
+  // NOT NULL with a default, but rows can predate the ALTER on a database
+  // restored from an older dump — typed as it really arrives.
+  details: string | null;
+};
+
+/**
+ * The single normalization every tier read goes through, whether it came from
+ * getEventTiers or the batch reader below. Shared rather than copied: these
+ * three defences (status whitelist, seats clamp, details default) decide what
+ * can be sold and how many seats it eats, so two readers of the same table must
+ * not be able to disagree about them.
+ */
+function toTierRow(r: RawTierRow): EventTierRow {
+  return {
     ...r,
     studentOnly: Boolean(r.studentOnly),
     unlimited: Boolean(r.unlimited),
@@ -470,7 +477,42 @@ export function getEventTiers(eventId: string): EventTierRow[] {
     // seatsPerUnitSql() above is this same clamp, for the counters that sum the
     // column in SQL rather than reading tiers through here.
     seatsPerUnit: Math.min(20, Math.max(1, Math.round(Number(r.seatsPerUnit) || 1))),
-  }));
+  };
+}
+
+export function getEventTiers(eventId: string): EventTierRow[] {
+  const rows = getDb()
+    .prepare(`SELECT ${TIER_COLS} FROM event_tiers WHERE event_id = ? ORDER BY sort, tier_key`)
+    .all(eventId) as RawTierRow[];
+  return rows.map(toTierRow);
+}
+
+/**
+ * Tiers for MANY events in one statement, keyed by event id.
+ *
+ * For listing pages, which hold every row they are about to render and used to
+ * ask for each one's tiers separately — twice per tile, once for the prices and
+ * once inside getAvailability. Same ordering per event as getEventTiers, so a
+ * tile built from this map lists its ticket types in the organizer's order.
+ * Events with no tiers are simply absent; callers default to an empty list.
+ */
+export function getEventTiersBulk(eventIds: string[]): Map<string, EventTierRow[]> {
+  const out = new Map<string, EventTierRow[]>();
+  for (const batch of chunkIds(eventIds)) {
+    const rows = getDb()
+      .prepare(
+        `SELECT ${TIER_COLS} FROM event_tiers
+         WHERE event_id IN (${batch.map(() => '?').join(',')})
+         ORDER BY event_id, sort, tier_key`
+      )
+      .all(...batch) as RawTierRow[];
+    for (const r of rows) {
+      const list = out.get(r.eventId);
+      if (list) list.push(toTierRow(r));
+      else out.set(r.eventId, [toTierRow(r)]);
+    }
+  }
+  return out;
 }
 
 export function getEventTier(eventId: string, tierKey: string): EventTierRow | null {
@@ -559,6 +601,31 @@ export function getEventMedia(eventId: string): EventMediaRow[] {
 }
 
 /**
+ * Photos for MANY events in one statement, keyed by event id — the batch
+ * companion to getEventMedia, with the same photos-only filter and the same
+ * ordering, for listing pages that resolve a tile picture per row.
+ */
+export function getEventMediaBulk(eventIds: string[]): Map<string, EventMediaRow[]> {
+  const out = new Map<string, EventMediaRow[]>();
+  for (const batch of chunkIds(eventIds)) {
+    const rows = getDb()
+      .prepare(
+        `SELECT id, event_id AS eventId, file_name AS fileName, mime, sort, created_at AS createdAt
+         FROM event_media
+         WHERE event_id IN (${batch.map(() => '?').join(',')}) AND mime NOT LIKE 'video/%'
+         ORDER BY event_id, sort, created_at`
+      )
+      .all(...batch) as EventMediaRow[];
+    for (const r of rows) {
+      const list = out.get(r.eventId);
+      if (list) list.push(r);
+      else out.set(r.eventId, [r]);
+    }
+  }
+  return out;
+}
+
+/**
  * Videos only — the mirror image of getEventMedia, ordered the same way. An
  * event can hold several; events.video_media_id just points at the first one
  * for the older single-video call sites.
@@ -601,7 +668,7 @@ export function mediaUrl(mediaId: string, variant?: VariantSlot, tag?: string | 
 // ---------------- Slot framing (the organizer's chosen crop) ----------------
 
 /** The rendered variants callers may ask for — see lib/imageVariants VARIANTS. */
-export type VariantSlot = 'cover' | 'avatar' | 'card';
+export type VariantSlot = 'cover' | 'avatar' | 'card' | 'gallery';
 
 /**
  * The part of a photo that stays visible inside a fixed-shape slot, as

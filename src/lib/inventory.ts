@@ -9,7 +9,9 @@
 //   failed / cancelled -> terminal, seats released
 import { getDb } from './db';
 import { getEventById, getEventTiers, getPrimaryEvent } from './events';
+import type { EventRow, EventTierRow } from './events';
 import { releaseDiscountCodeForOrder } from './promos';
+import { chunkIds } from './sqlIn';
 
 export interface TierAvailability {
   tierId: string;
@@ -96,7 +98,64 @@ export function getAvailability(eventId: string): Availability {
     )
     .all(eventId) as { tierId: string; sold: number }[];
 
-  const soldByTier = new Map(rows.map((r) => [r.tierId, r.sold]));
+  return composeAvailability(event, eventTiers, new Map(rows.map((r) => [r.tierId, r.sold])));
+}
+
+/**
+ * Seat availability for MANY events in ONE pass — for a listing page that has
+ * already loaded the event rows and their tiers.
+ *
+ * Costs a single GROUP BY for the whole feed instead of three statements per
+ * tile (getEventById + getEventTiers + the aggregate), which is what made the
+ * homepage's query count grow at 6.5 per published event. It is NOT a cache:
+ * every number is read live inside the same request, so a tile stays as fresh
+ * as the force-dynamic render it is part of.
+ *
+ * Events missing from `tiersByEvent` are treated as having no tiers, exactly
+ * as getAvailability treats an event whose tiers were all deleted.
+ */
+export function getAvailabilityBulk(
+  events: EventRow[],
+  tiersByEvent: Map<string, EventTierRow[]>
+): Map<string, Availability> {
+  const out = new Map<string, Availability>();
+  if (events.length === 0) return out;
+  const ids = events.map((e) => e.id);
+  const soldByEvent = new Map<string, Map<string, number>>();
+  for (const batch of chunkIds(ids)) {
+    const rows = getDb()
+      .prepare(
+        `SELECT o.event_id AS eventId, oi.tier_id AS tierId, COALESCE(SUM(oi.quantity), 0) AS sold
+         FROM order_items oi
+         JOIN orders o ON o.id = oi.order_id
+         WHERE o.status IN ${RESERVING_STATUSES} AND o.event_id IN (${batch.map(() => '?').join(',')})
+         GROUP BY o.event_id, oi.tier_id`
+      )
+      .all(...batch) as { eventId: string; tierId: string; sold: number }[];
+    for (const r of rows) {
+      let m = soldByEvent.get(r.eventId);
+      if (!m) soldByEvent.set(r.eventId, (m = new Map()));
+      m.set(r.tierId, r.sold);
+    }
+  }
+  for (const event of events) {
+    out.set(
+      event.id,
+      composeAvailability(event, tiersByEvent.get(event.id) ?? [], soldByEvent.get(event.id) ?? new Map())
+    );
+  }
+  return out;
+}
+
+/**
+ * The seat arithmetic itself, shared by the single-event and bulk readers so a
+ * feed tile and the event's own page can never disagree about what is left.
+ */
+function composeAvailability(
+  event: EventRow,
+  eventTiers: EventTierRow[],
+  soldByTier: Map<string, number>
+): Availability {
   const tiers: Record<string, TierAvailability> = {};
   // The tier's sold/cap/remaining stay in UNITS of that tier; the ROOM is
   // counted in SEATS, so each sold unit weighs seatsPerUnit against it — a

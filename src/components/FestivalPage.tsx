@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import EventCard from '@/components/EventCard';
 import { listPublishedEvents } from '@/lib/events';
+import { loadFeedSnapshot } from '@/lib/feedSnapshot';
 import { currentOccurrence, festivalMatch, type Festival } from '@/lib/festivals';
 
 // The evergreen festival page: /dashain, /tihar. One URL per festival,
@@ -41,6 +42,8 @@ export default function FestivalPage({ festival }: { festival: Festival }) {
   const nearby = occurrence
     ? candidates.filter((e) => festivalMatch(festival, occurrence, e) === 'nearby')
     : [];
+  // One read for both grids — see lib/feedSnapshot.
+  const snapshot = loadFeedSnapshot([...named, ...nearby]);
 
   return (
     <>
@@ -119,7 +122,7 @@ export default function FestivalPage({ festival }: { festival: Festival }) {
           {named.length > 0 ? (
             <div className="feed-grid" style={{ marginTop: 18 }}>
               {named.map((e) => (
-                <EventCard key={e.id} event={e} />
+                <EventCard key={e.id} event={e} snapshot={snapshot} />
               ))}
             </div>
           ) : (
@@ -138,7 +141,7 @@ export default function FestivalPage({ festival }: { festival: Festival }) {
               </h2>
               <div className="feed-grid" style={{ marginTop: 18 }}>
                 {nearby.map((e) => (
-                  <EventCard key={e.id} event={e} />
+                  <EventCard key={e.id} event={e} snapshot={snapshot} />
                 ))}
               </div>
             </>

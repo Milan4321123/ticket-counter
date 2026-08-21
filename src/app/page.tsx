@@ -7,6 +7,7 @@ import Logo from '@/components/Logo';
 import PlatformAssistant from '@/components/PlatformAssistant';
 import { listPublishedEvents, paypalPayee } from '@/lib/events';
 import type { EventRow } from '@/lib/events';
+import { loadFeedSnapshot } from '@/lib/feedSnapshot';
 import { BUYER_RETENTION_DAYS, runBuyerDataRetentionSweep } from '@/lib/retention';
 import { eventListJsonLd, faqJsonLd, jsonLdScript } from '@/lib/seo';
 import { listPlatformPosts } from '@/lib/platformPosts';
@@ -318,6 +319,10 @@ export default function HomePage() {
   // clock comparison on all but one render an hour. See lib/retention.ts.
   runBuyerDataRetentionSweep();
   const events = listPublishedEvents();
+  // Tiers, photos and availability for every tile on the page, in three
+  // statements rather than five per tile. See lib/feedSnapshot for why this is
+  // a per-request read and not a cache.
+  const snapshot = loadFeedSnapshot(events);
   const platformPosts = listPlatformPosts(3);
   const rows = buildRows(events);
   // Whether ANY live event actually takes PayPal. This page speaks for the whole
@@ -447,7 +452,7 @@ export default function HomePage() {
                       <div className="ecar-slide" data-index={i} key={event.id}>
                         {/* Only the first slide may call itself what is next, and
                             only if it actually knows when it is. */}
-                        <EventBillboard event={event} leading={i === 0} />
+                        <EventBillboard event={event} leading={i === 0} snapshot={snapshot} />
                       </div>
                     ))}
                   </EventCarousel>
@@ -477,6 +482,7 @@ export default function HomePage() {
                             event={event}
                             past={row.past}
                             delayClass={['', ' anim-d1', ' anim-d2', ' anim-d3'][i % 4]}
+                            snapshot={snapshot}
                           />
                         </div>
                       ))}

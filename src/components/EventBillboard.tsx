@@ -11,7 +11,8 @@ import {
   parseCropRect,
   parsePageDesign,
 } from '@/lib/events';
-import type { EventRow } from '@/lib/events';
+import type { EventMediaRow, EventRow } from '@/lib/events';
+import type { FeedSnapshot } from '@/lib/feedSnapshot';
 import { getAvailability } from '@/lib/inventory';
 import { ticketState, fromPriceCents, comingSoonLabel } from '@/lib/ticketState';
 import { formatMoney } from '@/lib/money';
@@ -45,12 +46,15 @@ const PLACEHOLDER_GRADIENTS: Record<string, string> = {
  * the phone box: nothing is cropped at all. No new variant, no new cache
  * entries — the tiles already generate it.
  */
-function billboardMedia(event: EventRow): {
+function billboardMedia(
+  event: EventRow,
+  preloaded?: EventMediaRow[]
+): {
   videoUrl: string | null;
   stillUrl: string | null;
   stillUrlNarrow: string | null;
 } {
-  const photos = getEventMedia(event.id); // photos only
+  const photos = preloaded ?? getEventMedia(event.id); // photos only
   const isPhoto = (id: string | null): id is string => !!id && photos.some((p) => p.id === id);
 
   const still = isPhoto(event.coverMediaId)
@@ -70,7 +74,7 @@ function billboardMedia(event: EventRow): {
     // tile is — so it takes the tile's picture, with the tile's framing. Reusing
     // that resolver rather than re-cropping the wide cover is the whole fix:
     // the cover's rectangle describes a landscape band and means nothing here.
-    stillUrlNarrow: listingStillUrl(event),
+    stillUrlNarrow: listingStillUrl(event, preloaded),
   };
 }
 
@@ -82,11 +86,18 @@ export interface EventBillboardProps {
    * other slide that phrase is either a guess or plainly false.
    */
   leading?: boolean;
+  /** The listing's one-shot read of tiers, photos and availability, when it has one. */
+  snapshot?: FeedSnapshot;
 }
 
-export default function EventBillboard({ event, leading = false }: EventBillboardProps) {
-  const tiers = getEventTiers(event.id);
-  const availability = getAvailability(event.id);
+export default function EventBillboard({
+  event,
+  leading = false,
+  snapshot,
+}: EventBillboardProps) {
+  // See EventCard for why the `?? []` sits inside the snapshot branch.
+  const tiers = snapshot ? (snapshot.tiers.get(event.id) ?? []) : getEventTiers(event.id);
+  const availability = snapshot?.availability.get(event.id) ?? getAvailability(event.id);
   const minPrice = fromPriceCents(tiers, availability);
   /**
    * The cheapest announced type's price, for the badge that names it.
@@ -102,7 +113,10 @@ export default function EventBillboard({ event, leading = false }: EventBillboar
   // One shared decision for badge, button and note — see lib/ticketState.ts for
   // why these three used to disagree with each other.
   const state = ticketState(event, tiers, availability);
-  const { videoUrl, stillUrl, stillUrlNarrow } = billboardMedia(event);
+  const { videoUrl, stillUrl, stillUrlNarrow } = billboardMedia(
+    event,
+    snapshot ? (snapshot.photos.get(event.id) ?? []) : undefined
+  );
   const accent = parsePageDesign(event.pageDesign).accent ?? 'violet';
   const design = parsePageDesign(event.pageDesign);
 
@@ -116,7 +130,23 @@ export default function EventBillboard({ event, leading = false }: EventBillboar
     <section className="billboard anim-fade-up" aria-labelledby={`billboard-title-${event.slug}`}>
       <div className="billboard-media" aria-hidden="true">
         {videoUrl ? (
-          <CardVideo src={videoUrl} label={event.name} className="billboard-shot" />
+          /* A poster here, unlike on a feed tile — the trade-off runs the other
+             way at this size. The tile withholds one because the poster is a
+             DIFFERENT photo from the clip's first frame and the swap reads as a
+             glitch. But this frame is the top of the homepage and the clip
+             behind it is the heaviest thing on the site: measured at 375px it
+             pulled 3.3 MB within 8 s of the slide appearing, and until those
+             bytes arrive the panel paints NOTHING. A brief flash of the tile's
+             own photo beats an empty hero on any connection slower than an
+             office — and it is the SAME url the feed tile below requests
+             (measured: 58 KB, one fetch serving both), so the flash costs one
+             render of a picture this page was going to download anyway. */
+          <CardVideo
+            src={videoUrl}
+            poster={stillUrlNarrow ?? stillUrl ?? undefined}
+            label={event.name}
+            className="billboard-shot"
+          />
         ) : stillUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           /* <picture> so the browser picks the render that matches the box it

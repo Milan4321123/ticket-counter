@@ -141,31 +141,42 @@ export function listBuyers(eventId: string): BuyerRow[] {
 
 /**
  * How many of this listing's buyers also bought from one of THIS organizer's
- * OTHER listings — the "came before" count. Scoped hard to the one organizer
- * on both sides of the match: the inner EXISTS joins through events on
- * organizer_id, so another organizer's buyer list can never leak into the
- * number. Erased rows are excluded on both sides — after erasure every old
- * buyer shares one placeholder address, which would match everyone.
+ * OTHER listings — the "came before" count. Scoped hard to the one organizer:
+ * the join through events on organizer_id is the only source of rows, so
+ * another organizer's buyer list can never reach the number. Erased rows are
+ * excluded — after erasure every old buyer shares one placeholder address,
+ * which would match everyone.
  *
  * Within the data that still exists, by design: buyers of long-past listings
  * have been erased, so this undercounts loyalty rather than over-keeping data.
+ *
+ * ONE grouped pass over this organizer's paid orders, not a correlated EXISTS
+ * per buyer. The EXISTS could only seek on `status`, so for every buyer of this
+ * listing who turned out NOT to be a returning one it walked every paid order
+ * on the whole platform before it could say no — quadratic in exactly the case
+ * that is most common. Measured on generated data: 16.4 ms -> 0.5 ms at 39k
+ * candidate pairs, 219 ms -> 2.0 ms at 693k, 1026 ms -> 5.1 ms at 3.2M. This
+ * runs on every insights render.
+ *
+ * `listings > 1` is what "another listing" means once `onThis` has already
+ * established that one of the listings counted IS this one. The mock exclusion
+ * stays on this listing's side only, exactly as the EXISTS had it: a test order
+ * cannot make someone a buyer here, but an old order of any mode is still
+ * evidence they came before.
  */
 export function returningBuyerCount(eventId: string, organizerId: string): number {
   const row = getDb()
     .prepare(
-      `SELECT COUNT(DISTINCT lower(o.buyer_email)) AS n
-       FROM orders o
-       WHERE o.event_id = ? AND o.status = 'paid' AND o.payment_mode != 'mock' AND o.buyer_erased_at IS NULL
-         AND EXISTS (
-           SELECT 1
-           FROM orders p
-           JOIN events e ON e.id = p.event_id
-           WHERE e.organizer_id = ?
-             AND p.event_id != o.event_id
-             AND p.status = 'paid'
-             AND p.buyer_erased_at IS NULL
-             AND lower(p.buyer_email) = lower(o.buyer_email)
-         )`
+      `SELECT COUNT(*) AS n FROM (
+         SELECT lower(o.buyer_email) AS email,
+                MAX(CASE WHEN o.event_id = ? AND o.payment_mode != 'mock' THEN 1 ELSE 0 END) AS onThis,
+                COUNT(DISTINCT o.event_id) AS listings
+         FROM orders o
+         JOIN events e ON e.id = o.event_id
+         WHERE e.organizer_id = ? AND o.status = 'paid' AND o.buyer_erased_at IS NULL
+         GROUP BY email
+       )
+       WHERE onThis = 1 AND listings > 1`
     )
     .get(eventId, organizerId) as { n: number };
   return row.n;

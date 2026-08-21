@@ -2,6 +2,7 @@ import Link from 'next/link';
 import EventCard from '@/components/EventCard';
 import { SHOP_CATEGORIES, isShopCategory } from '@/lib/categories';
 import { listPublishedEvents } from '@/lib/events';
+import { loadFeedSnapshot } from '@/lib/feedSnapshot';
 import { platformNameFromEnv } from '@/lib/platform';
 
 // The public bazaar: every published shop on the platform, grouped by the
@@ -30,6 +31,9 @@ export function generateMetadata() {
 
 export default function MarketPage() {
   const shops = listPublishedEvents().filter((e) => e.kind === 'shop');
+  // One read of tiers, photos and availability for every tile below — the same
+  // snapshot the homepage feed uses. See lib/feedSnapshot.
+  const snapshot = loadFeedSnapshot(shops);
 
   // The shelves, in the fixed order of the list — a shelf nobody stocks yet is
   // simply absent, not an empty heading apologising for itself.
@@ -104,7 +108,7 @@ export default function MarketPage() {
                   </p>
                   <div className="feed-grid" style={{ marginTop: 18 }}>
                     {shelf.shops.map((s) => (
-                      <EventCard key={s.id} event={s} />
+                      <EventCard key={s.id} event={s} snapshot={snapshot} />
                     ))}
                   </div>
                 </div>
@@ -114,7 +118,7 @@ export default function MarketPage() {
                   <h2 className="feed-section-title anim-fade-up">More from the bazaar</h2>
                   <div className="feed-grid" style={{ marginTop: 18 }}>
                     {uncategorised.map((s) => (
-                      <EventCard key={s.id} event={s} />
+                      <EventCard key={s.id} event={s} snapshot={snapshot} />
                     ))}
                   </div>
                 </div>

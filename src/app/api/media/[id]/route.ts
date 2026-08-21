@@ -11,10 +11,14 @@ export const dynamic = 'force-dynamic';
  * in the slot it actually fills, so the same photo can be a hand-positioned
  * cover and an automatically cropped card at the same time.
  */
-const SLOT_BY_VARIANT: Record<VariantName, CropSlot> = {
+const SLOT_BY_VARIANT: Record<VariantName, CropSlot | null> = {
   cover: 'cover',
   avatar: 'profile',
   card: 'poster',
+  // The gallery shows the picture WHOLE, so there is no rectangle to apply —
+  // a framing belongs to the fixed shape it was drawn for, and this slot has
+  // no fixed shape.
+  gallery: null,
 };
 
 /** Shared headers for video responses; videos are large, so let browsers cache. */
@@ -168,7 +172,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (requested && isVariantName(requested)) {
     // A framing that cannot be read (missing, malformed) resolves to null, and
     // the automatic crop takes over — the picture always renders.
-    const crop = getCropForSlot(media.id, SLOT_BY_VARIANT[requested]);
+    const slot = SLOT_BY_VARIANT[requested];
+    const crop = slot ? getCropForSlot(media.id, slot) : null;
     const variant = await getVariant(media, requested, crop);
     if (variant) {
       servePath = variant.filePath;

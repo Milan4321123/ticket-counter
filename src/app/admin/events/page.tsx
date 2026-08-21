@@ -2,8 +2,8 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { isAdminRequest } from '@/lib/auth';
 import { readCapacityLog } from '@/lib/capacity';
-import { getEventTiers, listAllEvents } from '@/lib/events';
-import { getAvailability } from '@/lib/inventory';
+import { getEventTiersBulk, listAllEvents } from '@/lib/events';
+import { getAvailabilityBulk } from '@/lib/inventory';
 import { listOrganizers } from '@/lib/organizers';
 import CapacityForm from './CapacityForm';
 
@@ -36,6 +36,10 @@ export default async function AdminEventsPage() {
   // Archived events are frozen by the platform and cannot sell, so a control
   // for releasing more of their tickets would be a button that does nothing.
   const events = listAllEvents().filter((e) => e.status !== 'archived');
+  // Every event on the platform is on this page, so read the tiers and the sold
+  // counts once for all of them rather than three statements per card.
+  const tiersByEvent = getEventTiersBulk(events.map((e) => e.id));
+  const availabilityByEvent = getAvailabilityBulk(events, tiersByEvent);
 
   return (
     <div className="container section">
@@ -75,8 +79,8 @@ export default async function AdminEventsPage() {
       ) : (
         <div style={{ display: 'grid', gap: 16, marginTop: 24 }}>
           {events.map((event) => {
-            const availability = getAvailability(event.id);
-            const tiers = getEventTiers(event.id).map((t) => ({
+            const availability = availabilityByEvent.get(event.id)!;
+            const tiers = (tiersByEvent.get(event.id) ?? []).map((t) => ({
               tierKey: t.tierKey,
               name: t.name,
               cap: t.cap,

@@ -25,15 +25,39 @@ export interface CardVideoProps {
  *
  *  - It only plays while the tile is actually on screen (IntersectionObserver),
  *    and pauses the moment it leaves. Ten autoplaying clips would otherwise all
- *    decode at once on a phone.
+ *    decode at once on a phone. It does not play at all on a metered or slow
+ *    connection — see `expensiveConnection` below.
  *  - `preload="metadata"` — the browser fetches enough to know the dimensions,
  *    not the whole file, so a feed does not pull tens of megabytes on load.
+ *    With a poster there is nothing to fetch early for at all: 'none' then,
+ *    because the frame is already painted and playback fetches what it needs.
  *  - `pointer-events: none`, so taps land on the card's link underneath. A video
  *    element swallows clicks otherwise and the tile stops being clickable.
  *
  * Falls back to the poster image when playback fails or the visitor asked for
  * reduced motion, so the tile always shows something.
  */
+/**
+ * True when this visitor should not be spending megabytes on decoration.
+ *
+ * Honours Data Saver first — that is an explicit "do not" from the person, not
+ * a guess — then the connection class the browser reports. A cover clip here is
+ * 10 MB for a 54-second loop, which is minutes of a 3G budget for something
+ * nobody asked to watch; the poster underneath says the same thing for 27 KB.
+ * Unknown or unsupported (Safari, Firefox) reads as fine, so the default stays
+ * today's behaviour.
+ */
+function expensiveConnection(): boolean {
+  const conn = (
+    navigator as Navigator & {
+      connection?: { saveData?: boolean; effectiveType?: string };
+    }
+  ).connection;
+  if (!conn) return false;
+  if (conn.saveData) return true;
+  return conn.effectiveType === 'slow-2g' || conn.effectiveType === '2g' || conn.effectiveType === '3g';
+}
+
 export default function CardVideo({
   src,
   poster,
@@ -55,6 +79,10 @@ export default function CardVideo({
   useEffect(() => {
     const el = ref.current;
     if (!el || reduced) return;
+    // Checked once per mount rather than per intersection: a connection that
+    // improves mid-scroll is not worth a re-render, and a clip that starts
+    // halfway down a feed is the case this exists to prevent.
+    if (expensiveConnection()) return;
 
     const io = new IntersectionObserver(
       (entries) => {
@@ -94,7 +122,7 @@ export default function CardVideo({
         poster={poster}
         muted
         playsInline
-        preload="metadata"
+        preload={poster ? 'none' : 'metadata'}
         aria-label={label}
         onError={() => setBroken(true)}
       />
@@ -110,7 +138,7 @@ export default function CardVideo({
       muted
       loop
       playsInline
-      preload="metadata"
+      preload={poster ? 'none' : 'metadata'}
       aria-label={label}
       onError={() => setBroken(true)}
     />

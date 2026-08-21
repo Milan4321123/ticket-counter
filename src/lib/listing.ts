@@ -15,7 +15,7 @@
 // page" is exactly what the slot exists for. The cover is the fallback, so an
 // organizer who never opens that control still gets a full, sensible tile.
 import { cropTag, getEventMedia, mediaUrl, parseCropRect } from './events';
-import type { EventRow } from './events';
+import type { EventMediaRow, EventRow } from './events';
 
 export interface ListingTileMedia {
   /** A looping video cover to play in the tile, or null for a still. */
@@ -55,8 +55,11 @@ function listingStill(event: EventRow, photos: { id: string }[]): { id: string; 
  * who deliberately picked a still for the browse page gets that still, and
  * their video still plays at the top of the event page where it was chosen for.
  */
-export function listingTileMedia(event: EventRow): ListingTileMedia {
-  const photos = getEventMedia(event.id); // photos only — videos are excluded
+export function listingTileMedia(event: EventRow, preloaded?: EventMediaRow[]): ListingTileMedia {
+  // A listing page has already read every row's photos in one query; anywhere
+  // else this falls back to reading them here, so a single-tile caller keeps
+  // its one-argument contract.
+  const photos = preloaded ?? getEventMedia(event.id); // photos only — videos are excluded
   const isPhoto = (id: string | null): id is string => !!id && photos.some((p) => p.id === id);
 
   const still = listingStill(event, photos);
@@ -75,8 +78,8 @@ export function listingTileMedia(event: EventRow): ListingTileMedia {
  * organizer's dashboard row. Sharing this with the feed is the point: the
  * organizer must see the tile buyers see, not a second guess at it.
  */
-export function listingStillUrl(event: EventRow): string | null {
-  const still = listingStill(event, getEventMedia(event.id));
+export function listingStillUrl(event: EventRow, preloaded?: EventMediaRow[]): string | null {
+  const still = listingStill(event, preloaded ?? getEventMedia(event.id));
   return still ? mediaUrl(still.id, 'card', still.crop) : null;
 }
 

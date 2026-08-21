@@ -788,8 +788,12 @@ summary {
 }
 
 .qty-stepper button {
-  width: 34px;
-  height: 34px;
+  /* 44px, the smallest target a thumb hits reliably. These two buttons decide
+     how many tickets someone buys, sit 4px apart, and a mis-tap on the wrong
+     one is a wrong order or an abandoned checkout — this is the last row on the
+     site that should be saving space. */
+  width: 44px;
+  height: 44px;
   border: none;
   background: transparent;
   color: var(--text);
@@ -976,6 +980,39 @@ summary {
   overflow-x: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
+}
+
+/* Portal tables are wider than a phone — measured at 375px, /portal/statements
+   is 758px of table inside a 329px window, so 57% of every row is out of sight.
+   The scroller absorbs that overflow, so the page itself never grows and
+   nothing on it signals that the row slides; on a platform whose scrollbars
+   are overlays, the row simply looks truncated.
+ *
+ * So the right edge fades while there is more to the right, and resolves to a
+ * hard edge once the reader reaches the last column — a plain gradient overlay
+ * would keep fading the final column after they had already arrived at it.
+ * Gated on support because that "while" is a scroll-driven animation: where it
+ * is unavailable there is no mask at all, which is exactly today's behaviour,
+ * rather than a fade that never resolves and lies about there being more.
+ *
+ * This is a CUE, not the fix — the row is still 57% off screen. Rendering each
+ * row as a stacked block below ~520px is the actual answer and is a rewrite of
+ * both tables, not a stylesheet rule. */
+@supports (animation-timeline: scroll(self inline)) {
+  .table-wrap {
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+    mask-size: calc(100% + 28px) 100%;
+    mask-repeat: no-repeat;
+    animation: table-edge-fade linear both;
+    animation-timeline: scroll(self inline);
+  }
+
+  /* Mask slid fully right: the last column at full opacity. */
+  @keyframes table-edge-fade {
+    to {
+      mask-position: -28px 0;
+    }
+  }
 }
 
 .table-wrap::-webkit-scrollbar {
@@ -1565,7 +1602,12 @@ summary {
 .feed-kicker {
   text-transform: uppercase;
   letter-spacing: 0.16em;
-  font-size: 0.74rem;
+  /* Floored at 12px (0.75rem): below that a label stops being small and starts
+     being unreadable, and this one carries Devanagari — the shirorekha and the
+     matras are sub-pixel features at 11px on a 375px screen, so Devanagari
+     loses more than Latin does. Every class floored here is a one-line label,
+     so the extra 0.2-1.4px costs no wrapped line anywhere. */
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--brand-text);
   margin: 0 0 4px;
@@ -1795,7 +1837,12 @@ summary {
 .section-kicker {
   text-transform: uppercase;
   letter-spacing: 0.16em;
-  font-size: 0.74rem;
+  /* Floored at 12px (0.75rem): below that a label stops being small and starts
+     being unreadable, and this one carries Devanagari — the shirorekha and the
+     matras are sub-pixel features at 11px on a 375px screen, so Devanagari
+     loses more than Latin does. Every class floored here is a one-line label,
+     so the extra 0.2-1.4px costs no wrapped line anywhere. */
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--accent-text);
   margin: 28px 0 0;
@@ -2211,7 +2258,8 @@ summary {
   border-bottom: 1px solid var(--border-soft);
 }
 
-/* Rows scroll sideways on small screens instead of wrapping. */
+/* Rows scroll sideways rather than wrapping — on a screen wide enough that
+   the scroll is a nicety. See the phone override below for why not on a phone. */
 
 .portal-nav-row {
   display: flex;
@@ -2228,6 +2276,42 @@ summary {
   display: none;
 }
 
+/* On a phone these rows wrap instead. Measured at 375px, the tab strip was
+   601px wide inside a 375px scroller: Check-in and View page sat entirely off
+   screen, and because the scroller absorbs the overflow the PAGE never grows,
+   so nothing on it hints that the strip slides. The door scanner — the one tab
+   an organizer needs while standing at a door, on a phone, in a hurry — was
+   reachable only by a swipe nobody was told about. Two short rows of tabs cost
+   about 30px of header and hide nothing. */
+@media (max-width: 420px) {
+  .portal-nav-row {
+    flex-wrap: wrap;
+    white-space: normal;
+    overflow-x: visible;
+    row-gap: 8px;
+  }
+
+  /* margin-left:auto pushes Sign out to the far right, which on a wrapped row
+     leaves it stranded alone at the end of a line of its own. On this width it
+     belongs under the links it wrapped from. Scoped through the row because
+     the `auto` it overrides is declared further down the file. */
+  .portal-nav-row .portal-nav-end {
+    margin-left: 0;
+  }
+
+  .portal-tabs,
+  .portal-nav-links {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  /* The name was ellipsised at a fixed 260px to protect a row that could not
+     grow. The row can grow now, so let the name use the width it has. */
+  .portal-nav-event {
+    max-width: 100%;
+  }
+}
+
 .portal-nav-home {
   display: inline-flex;
   align-items: center;
@@ -2236,7 +2320,12 @@ summary {
 }
 
 .portal-nav-tag {
-  font-size: 0.66rem;
+  /* Floored at 12px (0.75rem): below that a label stops being small and starts
+     being unreadable, and this one carries Devanagari — the shirorekha and the
+     matras are sub-pixel features at 11px on a 375px screen, so Devanagari
+     loses more than Latin does. Every class floored here is a one-line label,
+     so the extra 0.2-1.4px costs no wrapped line anywhere. */
+  font-size: 0.75rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.14em;
@@ -3852,6 +3941,24 @@ summary {
   overflow-wrap: anywhere;
 }
 
+/* The same rule for what organizers NAME things, which the prose rule above
+   missed. A product called "Zwiebelkuchengewuerzmischung", or a Devanagari name
+   with no space in it, is one unbreakable token in a heading — and a heading
+   sits in a grid column, so its min-content width is the column's floor. At
+   375px that pushed the whole item page sideways rather than merely spilling
+   out of the title. `anywhere` and not `break-word` for exactly that reason:
+   only `anywhere` lowers the min-content width the column is measured against.
+   Descenders of a broken word are still legible; a page you have to scroll
+   horizontally to read is not. */
+.page-title,
+.event-card-title,
+.billboard-title,
+.item-lede,
+.item-prose,
+.tier-name {
+  overflow-wrap: anywhere;
+}
+
 .event-prose {
   max-width: 68ch;
   white-space: pre-line;
@@ -4056,7 +4163,12 @@ summary {
 }
 
 .event-fact-label {
-  font-size: 0.72rem;
+  /* Floored at 12px (0.75rem): below that a label stops being small and starts
+     being unreadable, and this one carries Devanagari — the shirorekha and the
+     matras are sub-pixel features at 11px on a 375px screen, so Devanagari
+     loses more than Latin does. Every class floored here is a one-line label,
+     so the extra 0.2-1.4px costs no wrapped line anywhere. */
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -4425,7 +4537,8 @@ summary {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 7px;
+  /* Same bargain as .ecar-dots: the gap is what the hit area below can claim. */
+  gap: 22px;
   margin-top: 10px;
 }
 
@@ -4444,11 +4557,14 @@ summary {
 }
 
 /* A 7px dot is a 7px thumb target. Grow the hit area, not the dot — the
-   horizontal inset stays under half the 7px gap so neighbours never overlap. */
+   horizontal inset stays at half the gap so neighbours never overlap. It was
+   3px against a 7px gap, which left a 13px-wide target beside a 45px-tall one;
+   widening the gap to 22px is what lets this reach 29px without the targets
+   running into each other. */
 .mswipe-dot::after {
   content: '';
   position: absolute;
-  inset: -19px -3px;
+  inset: -19px -11px;
 }
 
 .mswipe-dot:hover {
@@ -5176,7 +5292,12 @@ html:has(.event-page.has-section-nav) {
   margin: 0 0 8px;
   text-transform: uppercase;
   letter-spacing: 0.16em;
-  font-size: 0.72rem;
+  /* Floored at 12px (0.75rem): below that a label stops being small and starts
+     being unreadable, and this one carries Devanagari — the shirorekha and the
+     matras are sub-pixel features at 11px on a 375px screen, so Devanagari
+     loses more than Latin does. Every class floored here is a one-line label,
+     so the extra 0.2-1.4px costs no wrapped line anywhere. */
+  font-size: 0.75rem;
   font-weight: 700;
   color: #fff;
 }
@@ -5766,7 +5887,12 @@ html:has(.event-page.has-section-nav) {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 8px;
+  /* The gap is the hit area's budget. Each dot's target below grows to fill
+     half the gap on each side, so raising this from 8px is what buys a real
+     thumb target — grown any wider on an 8px gap and neighbouring targets
+     overlap, which trades a too-small button for one that answers to the
+     wrong dot. */
+  gap: 22px;
   margin-top: 14px;
 }
 
@@ -5778,11 +5904,23 @@ html:has(.event-page.has-section-nav) {
   border: 0;
   background: rgba(255, 255, 255, 0.26);
   cursor: pointer;
+  position: relative;
   transition:
     width 0.25s var(--ease-out),
     background 0.25s ease;
-  /* The visible dot is small; the touch target around it is not. */
-  box-shadow: 0 0 0 8px transparent;
+}
+
+/* The visible dot is small; the touch target around it is not. This used to be
+   `box-shadow: 0 0 0 8px transparent`, which paints nothing and extends no hit
+   region at all — measured by walking elementFromPoint out from the centre, the
+   target really was 9x9. A pseudo-element does what the shadow was meant to,
+   the same way .mswipe-dot already does it: 45px tall, and 31px wide, which is
+   the dot plus the 22px gap and therefore exactly as wide as it can be without
+   stealing taps from the dot next door. */
+.ecar-dot::after {
+  content: '';
+  position: absolute;
+  inset: -18px -11px;
 }
 
 .ecar-dot:hover {
@@ -6446,7 +6584,12 @@ html:has(.event-page.has-section-nav) {
 
 .org-pitch-kicker {
   margin: 0 0 4px;
-  font-size: 0.74rem;
+  /* Floored at 12px (0.75rem): below that a label stops being small and starts
+     being unreadable, and this one carries Devanagari — the shirorekha and the
+     matras are sub-pixel features at 11px on a 375px screen, so Devanagari
+     loses more than Latin does. Every class floored here is a one-line label,
+     so the extra 0.2-1.4px costs no wrapped line anywhere. */
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
