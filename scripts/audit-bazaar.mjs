@@ -32,6 +32,7 @@
 //   css          every class the pages use is one the stylesheets define
 //   hostile      a hand-edited URL cannot crash a page or inject into it
 //   csp          the site's own policy allows the third parties its code loads
+//   assets       every picture, script and stylesheet a page asks for exists
 //   weight       a page arrives in a size and a time a phone can afford
 //
 // Run it against a dev server, a preview, or production:
@@ -755,11 +756,33 @@ async function checkCss(html) {
  * So both directions are failures, and the reference list is the pictures the
  * audited pages actually asked for.
  */
-async function checkCaching(imageUrls) {
-  for (const url of imageUrls) {
+async function checkCaching(assets) {
+  for (const [url, seenOn] of assets) {
     const res = await fetch(base + url).catch(() => null);
-    const cc = res?.headers.get('cache-control') ?? '';
-    if (!res || !res.ok) continue; // a broken image is the links check's job
+
+    // Does it exist at all?
+    //
+    // Nothing else in this audit asks. The link check deliberately skips
+    // /api/ and /_next/ — they are not pages — so a photo whose file has been
+    // deleted, or a JS chunk that did not deploy, was invisible here while
+    // being extremely visible to a visitor: a broken image on the bazaar's
+    // front page, or a page whose buttons do nothing at all.
+    //
+    // This is the same class of failure as the CSP one that cost a day: the
+    // HTML is perfect, and what it asks the browser to fetch is not there.
+    if (!res || !res.ok) {
+      fail(
+        'assets',
+        seenOn,
+        `${url} returns ${res ? `HTTP ${res.status}` : 'nothing'} — the page asks for it and it is not there`
+      );
+      continue;
+    }
+
+    // Photos are the only assets whose caching this audit has an opinion
+    // about; /_next/ files are content-hashed and Next sets their headers.
+    if (!url.startsWith('/api/media/')) continue;
+    const cc = res.headers.get('cache-control') ?? '';
     if (/no-store|no-cache/.test(cc)) {
       fail('caching', url, `a photo served \`${cc}\` — every visitor re-downloads it on every page`);
     }
@@ -922,16 +945,22 @@ async function main() {
     if (entry.status !== 200) fail('links', href, `linked from the bazaar, returns HTTP ${entry.status || entry.error}`);
   }
 
-  // Every distinct picture the audited pages referenced — the honest sample
-  // for the caching check, rather than a guess at what the site serves.
-  const imageUrls = new Set();
-  for (const [, entry] of seen) {
+  // Everything the audited pages actually ask the browser to fetch: photos,
+  // scripts, stylesheets and preloads. Kept as url -> the first page it was
+  // seen on, so a failure names somewhere a person can go and look.
+  const assets = new Map();
+  const note = (url, path) => {
+    const clean = decode(url).split('#')[0];
+    if (clean.startsWith('/') && !assets.has(clean)) assets.set(clean, path);
+  };
+  for (const [path, entry] of seen) {
     if (!entry.html) continue;
-    for (const m of entry.html.matchAll(/<img\b[^>]*\bsrc="(\/api\/media\/[^"]+)"/g)) {
-      imageUrls.add(decode(m[1]));
-    }
+    for (const m of entry.html.matchAll(/<img\b[^>]*\bsrc="([^"]+)"/g)) note(m[1], path);
+    for (const m of entry.html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)) note(m[1], path);
+    for (const m of entry.html.matchAll(/<link\b[^>]*\bhref="([^"]+)"[^>]*\brel="(?:stylesheet|preload)"/g)) note(m[1], path);
+    for (const m of entry.html.matchAll(/<link\b[^>]*\brel="(?:stylesheet|preload)"[^>]*\bhref="([^"]+)"/g)) note(m[1], path);
   }
-  await checkCaching(imageUrls);
+  await checkCaching(assets);
   await checkCss(seen.get('/market')?.html ?? '');
   await checkHostileUrls();
   await checkCsp(seen.get('/market')?.html ?? '');
