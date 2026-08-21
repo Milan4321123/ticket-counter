@@ -357,6 +357,22 @@ export default async function EventPage({ params, searchParams }: Params) {
       ? event.pickupInfo.trim() || event.venueName || event.address || event.city
       : event.dateDisplay || event.venueName || event.address || event.city
   );
+  // Where those details go, and it is the one place the two kinds diverge in
+  // this section.
+  //
+  // On an EVENT they stay in the sidebar. A date and a venue are two short
+  // lines, the tier list beside them is usually two or three rows, and the
+  // pair balances — which is what the large majority of this site's traffic
+  // looks at, so it does not move.
+  //
+  // On a SHOP the same layout is upside down. The goods ARE the page, and the
+  // 1.55fr column left a five-item grid wrapping into two narrow tiles while a
+  // tall column of pickup prose held the other 40% of the width — the least
+  // important thing in the most space. So a shop gives the goods the full
+  // width and the collection details become a band underneath them, laid out
+  // wide instead of tall. It is the same content in the same section, one
+  // scroll further down, and the hero already carries the first line of it.
+  const asideBesideGoods = hasWhereCard && !isShop;
   // Every checkout link on this page carries the referral code the visitor
   // arrived with, so it survives the hop to checkout and into the create-order
   // POST. refCode is already reduced to /^[A-Z0-9]{8}$/, so it is URL-safe.
@@ -465,6 +481,88 @@ export default async function EventPage({ params, searchParams }: Params) {
     images: ogImage ? [absoluteUrl(ogImage)] : [],
     organizerName: organizer?.name?.trim() || SITE_NAME,
   });
+
+  // ---------------- The logistics facts ----------------
+  //
+  // Written once, placed twice: an event stacks them in the sidebar card, a
+  // shop lays them side by side in the band under its goods (see
+  // asideBesideGoods). Two copies of this markup would drift, and the shop
+  // copy is the one nobody would remember to update.
+
+  // The one thing a shop's buyer came here to find, so it gets the top slot a
+  // date holds on an event — and it is shown WHOLE, line breaks and all,
+  // because "ring the bell marked Sharma" is exactly the kind of detail that
+  // gets lost when a paragraph is squeezed onto one line.
+  const whenFact = isShop ? (
+    event.pickupInfo.trim() ? (
+      <li className="event-fact">
+        <span className="event-fact-icon" aria-hidden="true">
+          <CalendarIcon />
+        </span>
+        <div>
+          <div className="event-fact-label">Collection</div>
+          <div className="event-fact-value" style={{ whiteSpace: 'pre-line' }}>
+            {event.pickupInfo.trim()}
+          </div>
+        </div>
+      </li>
+    ) : null
+  ) : event.dateDisplay ? (
+    <li className="event-fact">
+      <span className="event-fact-icon" aria-hidden="true">
+        <CalendarIcon />
+      </span>
+      <div>
+        <div className="event-fact-label">Date</div>
+        <div className="event-fact-value">{event.dateDisplay}</div>
+      </div>
+    </li>
+  ) : null;
+
+  const whereFact =
+    event.venueName || event.address || event.city ? (
+      <li className="event-fact">
+        <span className="event-fact-icon" aria-hidden="true">
+          <PinIcon />
+        </span>
+        <div>
+          <div className="event-fact-label">{isShop ? 'Where' : 'Venue'}</div>
+          <div className="event-fact-value">
+            {event.venueName || (isShop ? 'Collection point' : 'Venue')}
+          </div>
+          {event.address ? <div className="muted small">{event.address}</div> : null}
+          {event.city ? <div className="muted small">{event.city}</div> : null}
+        </div>
+      </li>
+    ) : null;
+
+  const mapsLink = maps ? (
+    <a href={maps} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-block">
+      Open in Maps
+    </a>
+  ) : null;
+
+  // Where this shop will be standing (its approved stall links), ABOVE the
+  // generic collection details: a buyer working out how to get their order
+  // should meet the event option first, while the shop's own pickup_info below
+  // stays untouched and true for everything bought outside the event.
+  // hostStalls is empty on an event, so this only ever renders on a shop.
+  const stallNotices = hostStalls.map(({ link, host }) => (
+    <div className="notice notice-success" key={link.id}>
+      <div>
+        Find us at{' '}
+        <Link href={`/e/${host.slug}`} style={{ fontWeight: 700, textDecoration: 'underline' }}>
+          {host.name}
+          {host.dateDisplay ? ` — ${host.dateDisplay}` : ''}
+        </Link>
+      </div>
+      {link.stallPickupInfo ? (
+        <div className="small" style={{ marginTop: 4 }}>
+          {link.stallPickupInfo}
+        </div>
+      ) : null}
+    </div>
+  ));
 
   return (
     <div
@@ -673,11 +771,15 @@ export default async function EventPage({ params, searchParams }: Params) {
 
       <section className="section event-section" id="tickets">
         <div className="container">
-          <div className={hasWhereCard ? 'event-split' : undefined}>
+          <div className={asideBesideGoods ? 'event-split' : undefined}>
             <div>
               <p className="section-kicker">{isShop ? 'Pick what you want' : 'Pick your spot'}</p>
               <h2 className="page-title">{v.Units}</h2>
-              <div className="tier-grid">
+              {/* A shop's grid is a shopfront, not a price list: it gets its
+                  own column counts and its own tile, both of which need the
+                  full width to be worth looking at. The event grid keeps the
+                  auto-fit it has always had. */}
+              <div className={isShop ? 'tier-grid goods-grid' : 'tier-grid'}>
                 {visibleTiers(tiers).map((tier) => {
                   const tierAvail = availability.tiers[tier.tierKey];
                   const remaining = tierAvail?.remaining ?? 0;
@@ -710,6 +812,45 @@ export default async function EventPage({ params, searchParams }: Params) {
                   // it encodes is order-dependent enough that two copies of it
                   // would eventually disagree about the same row.
                   const badge = tierBadge(state, tier, remaining, availability.showRemaining);
+                  // The availability chip and the student flag, hoisted because
+                  // a shop tile with a photo hangs them OVER the picture and
+                  // every other tile keeps them on their own row underneath it.
+                  // Same chips, same words, two positions.
+                  const chips = (
+                    <>
+                      <span className={badge.className}>{badge.label}</span>
+                      {tier.studentOnly && <span className="badge badge-student">Student</span>}
+                    </>
+                  );
+                  const photo = tierPic ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      className="tier-card-photo"
+                      src={mediaUrl(tierPic.id, 'card', null)}
+                      alt={tier.name}
+                      loading="lazy"
+                    />
+                  ) : null;
+                  // Read about it, or buy it now — a shopper who already knows
+                  // what they want must not be made to open a page to get at
+                  // the button that was there before this existed. Hoisted for
+                  // the same reason as the chips: on a shop the two share one
+                  // footer row, everywhere else they stack as they always have.
+                  const goLink = itemHref ? (
+                    <span className="tier-card-go">See this {v.unit} →</span>
+                  ) : tierBuyable ? (
+                    <span className="tier-card-go">{v.cta} →</span>
+                  ) : null;
+                  const buyBtn =
+                    itemHref && tierBuyable ? (
+                      <Link
+                        className="btn btn-primary btn-sm tier-card-buy"
+                        href={buyHref}
+                        aria-label={isShop ? `Order ${tier.name}` : `Get ${tier.name} tickets`}
+                      >
+                        {v.cta}
+                      </Link>
+                    ) : null;
                   const card = (
                     <>
                       {/* The photo, when there is one. Cards without one keep
@@ -717,19 +858,23 @@ export default async function EventPage({ params, searchParams }: Params) {
                           frame: most events will never set one, and a row of
                           grey placeholders would make a perfectly finished
                           event page look half-built. */}
-                      {tierPic && (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img
-                          className="tier-card-photo"
-                          src={mediaUrl(tierPic.id, 'card', null)}
-                          alt={tier.name}
-                          loading="lazy"
-                        />
+                      {photo && isShop ? (
+                        /* On a shop the picture is the product shot, so it
+                           carries the chip the way every shop grid on the web
+                           does — over the bottom of the image, on a scrim that
+                           keeps it readable whatever the photograph is. It also
+                           buys back a whole row of card height, which is what
+                           was pushing the price and the button apart. */
+                        <div className="tier-card-media">
+                          {photo}
+                          <span className="tier-card-chips">{chips}</span>
+                        </div>
+                      ) : (
+                        photo
                       )}
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <span className={badge.className}>{badge.label}</span>
-                        {tier.studentOnly && <span className="badge badge-student">Student</span>}
-                      </div>
+                      {(!isShop || !photo) && (
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{chips}</div>
+                      )}
                       <div className="tier-name">
                         {/* The name is the link to the item page, and its
                             ::after covers the whole card — so the card is
@@ -764,21 +909,23 @@ export default async function EventPage({ params, searchParams }: Params) {
                           Bring a valid student ID — it&rsquo;s checked at the entrance.
                         </p>
                       )}
-                      {/* Two ways out of a card that has both: read about it,
-                          or buy it now. A shopper who already knows what they
-                          want must not be made to open a page to get at the
-                          button that was there before this existed. */}
-                      {itemHref && <span className="tier-card-go">See this {v.unit} →</span>}
-                      {itemHref && tierBuyable && (
-                        <Link
-                          className="btn btn-primary btn-sm tier-card-buy"
-                          href={buyHref}
-                          aria-label={isShop ? `Order ${tier.name}` : `Get ${tier.name} tickets`}
-                        >
-                          {v.cta}
-                        </Link>
+                      {/* One footer row on a shop — button first, so the thing
+                          that takes the money is the anchored left edge of
+                          every tile in the row — and the same two elements
+                          stacked, unchanged, on everything else. */}
+                      {isShop ? (
+                        (buyBtn || goLink) && (
+                          <div className="tier-card-foot">
+                            {buyBtn}
+                            {goLink}
+                          </div>
+                        )
+                      ) : (
+                        <>
+                          {goLink}
+                          {buyBtn}
+                        </>
                       )}
-                      {!itemHref && tierBuyable && <span className="tier-card-go">{v.cta} →</span>}
                     </>
                   );
                   // With an item page the card is a plain box holding two links
@@ -849,97 +996,48 @@ export default async function EventPage({ params, searchParams }: Params) {
               )}
             </div>
 
-            {hasWhereCard && (
+            {asideBesideGoods && (
               <aside className="event-aside">
-                {/* Where this shop will be standing (its approved stall links),
-                    ABOVE the generic collection details: a buyer working out
-                    how to get their order should meet the event option first,
-                    while the shop's own pickup_info below stays untouched and
-                    true for everything bought outside the event. */}
-                {hostStalls.map(({ link, host }) => (
-                  <div className="notice notice-success" key={link.id}>
-                    <div>
-                      Find us at{' '}
-                      <Link
-                        href={`/e/${host.slug}`}
-                        style={{ fontWeight: 700, textDecoration: 'underline' }}
-                      >
-                        {host.name}
-                        {host.dateDisplay ? ` — ${host.dateDisplay}` : ''}
-                      </Link>
-                    </div>
-                    {link.stallPickupInfo ? (
-                      <div className="small" style={{ marginTop: 4 }}>
-                        {link.stallPickupInfo}
-                      </div>
-                    ) : null}
-                  </div>
-                ))}
                 <div className="card glow-card">
                   <div className="card-title">{v.logistics}</div>
                   <ul className="event-fact-list">
-                    {/* The one thing a shop's buyer came here to find, so it
-                        gets the top slot a date holds on an event — and it is
-                        shown WHOLE, line breaks and all, because "ring the bell
-                        marked Sharma" is exactly the kind of detail that gets
-                        lost when a paragraph is squeezed onto one line. */}
-                    {isShop ? (
-                      event.pickupInfo.trim() ? (
-                        <li className="event-fact">
-                          <span className="event-fact-icon" aria-hidden="true">
-                            <CalendarIcon />
-                          </span>
-                          <div>
-                            <div className="event-fact-label">Collection</div>
-                            <div className="event-fact-value" style={{ whiteSpace: 'pre-line' }}>
-                              {event.pickupInfo.trim()}
-                            </div>
-                          </div>
-                        </li>
-                      ) : null
-                    ) : event.dateDisplay ? (
-                      <li className="event-fact">
-                        <span className="event-fact-icon" aria-hidden="true">
-                          <CalendarIcon />
-                        </span>
-                        <div>
-                          <div className="event-fact-label">Date</div>
-                          <div className="event-fact-value">{event.dateDisplay}</div>
-                        </div>
-                      </li>
-                    ) : null}
-                    {event.venueName || event.address || event.city ? (
-                      <li className="event-fact">
-                        <span className="event-fact-icon" aria-hidden="true">
-                          <PinIcon />
-                        </span>
-                        <div>
-                          <div className="event-fact-label">{isShop ? 'Where' : 'Venue'}</div>
-                          <div className="event-fact-value">
-                            {event.venueName || (isShop ? 'Collection point' : 'Venue')}
-                          </div>
-                          {event.address ? (
-                            <div className="muted small">{event.address}</div>
-                          ) : null}
-                          {event.city ? <div className="muted small">{event.city}</div> : null}
-                        </div>
-                      </li>
-                    ) : null}
+                    {whenFact}
+                    {whereFact}
                   </ul>
-                  {maps ? (
-                    <a
-                      href={maps}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn btn-primary btn-block"
-                    >
-                      Open in Maps
-                    </a>
-                  ) : null}
+                  {mapsLink}
                 </div>
               </aside>
             )}
           </div>
+
+          {/* The shop's half of that same divergence (see asideBesideGoods):
+              the collection details as a wide band under the goods instead of
+              a tall column beside them. It sits AFTER the buying controls on
+              purpose — the seller line has to stay directly under those — and
+              after the goods, because "where do I pick this up" is the question
+              a buyer asks once something has caught their eye. The hero already
+              carries the first line of it for anyone who wants it sooner, and
+              the band is the full width of the page, which is harder to miss
+              than a sidebar. */}
+          {isShop && hasWhereCard && (
+            <div className="shop-collect">
+              {stallNotices}
+              <div className="card glow-card shop-collect-card">
+                <div className="card-title">{v.logistics}</div>
+                <div
+                  className={`shop-collect-body${whereFact || mapsLink ? ' shop-collect-cols' : ''}`}
+                >
+                  {whenFact ? <ul className="event-fact-list">{whenFact}</ul> : null}
+                  {whereFact || mapsLink ? (
+                    <div className="shop-collect-side">
+                      {whereFact ? <ul className="event-fact-list">{whereFact}</ul> : null}
+                      {mapsLink}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

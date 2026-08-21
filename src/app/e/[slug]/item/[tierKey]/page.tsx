@@ -245,6 +245,25 @@ export default async function ItemPage({ params, searchParams }: Params) {
     .map((p) => p.trim())
     .filter(Boolean);
 
+  // The opening of that write-up, for the jump control near the button. Cut
+  // here rather than left whole and clamped in CSS for two reasons: the whole
+  // first paragraph is ~300 characters that would then sit in the page twice,
+  // and a clamped block is still read out in full by a screen reader, so the
+  // link's own text would be a paragraph. 105 is about two lines at the width
+  // this sits in on a phone; the cut lands on a word boundary so it never
+  // breaks mid-word, and CSS clamps as a backstop for a narrower screen.
+  const TEASER_CHARS = 105;
+  const detailTeaser = (() => {
+    const first = detailParagraphs[0];
+    if (!first) return null;
+    // A one-line paragraph shorter than the cut is shown whole, with no ellipsis
+    // promising something that is not there.
+    if (first.length <= TEASER_CHARS) return first;
+    const cut = first.slice(0, TEASER_CHARS);
+    const lastSpace = cut.lastIndexOf(' ');
+    return `${(lastSpace > 60 ? cut.slice(0, lastSpace) : cut).replace(/[\s,.;:—-]+$/, '')}…`;
+  })();
+
   // The listing's own accent, on the listing's own item pages. This is the same
   // shop one tap further in, so its buttons, links and the blank-photo wash
   // have to be the colour the organizer chose — without this wrapper they fell
@@ -267,6 +286,14 @@ export default async function ItemPage({ params, searchParams }: Params) {
         <Link href={backHref}>← All {v.units} at {event.name}</Link>
       </p>
 
+      {/* Three children, not two: the gallery is a SIBLING of the picture and
+          the detail column rather than a child of the media column, because
+          the stacked phone layout has to be able to put it last. When it lived
+          inside .item-media a shopper on a phone met the hero, then 400px of
+          "more photos from the shop", and only then the item's own name and
+          price — the rail was outranking the thing the page is about. The grid
+          areas in globals.css order it photo / detail / gallery on a phone and
+          keep the desktop two-column shape. */}
       <div className="item-layout">
         <div className="item-media">
           {heroUrl ? (
@@ -280,30 +307,17 @@ export default async function ItemPage({ params, searchParams }: Params) {
               <span>{tier.name.trim().charAt(0).toUpperCase() || v.Unit.charAt(0)}</span>
             </div>
           )}
-          {galleryItems.length >= 2 && (
-            <div className="item-gallery">
-              <MediaSwiper items={galleryItems} label={`${tier.name} photos`} />
-              <p className="muted small" style={{ margin: '8px 0 0' }}>
-                More photos from {event.name} — tap any one to open it full screen.
-              </p>
-            </div>
-          )}
         </div>
 
         <div className="item-detail">
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+          <div className="item-badges">
             <span className={badge.className}>{badge.label}</span>
             {tier.studentOnly && <span className="badge badge-student">Student</span>}
           </div>
 
-          <h1 className="page-title" style={{ margin: '0 0 6px' }}>
-            {tier.name}
-          </h1>
-          <p className="muted" style={{ margin: '0 0 14px' }}>
-            {isShop ? 'From' : 'Part of'}{' '}
-            <Link href={backHref} style={{ fontWeight: 700 }}>
-              {event.name}
-            </Link>
+          <h1 className="page-title item-title">{tier.name}</h1>
+          <p className="item-seller-line">
+            {isShop ? 'From' : 'Part of'} <Link href={backHref}>{event.name}</Link>
           </p>
 
           <div className="tier-price">
@@ -335,7 +349,7 @@ export default async function ItemPage({ params, searchParams }: Params) {
             </p>
           )}
 
-          <p style={{ marginTop: 18 }}>
+          <p className="item-actions">
             {buyable ? (
               /* Short label, full name in the accessible one. The button sits
                  directly under the h1 that names the item, so repeating a name
@@ -354,7 +368,42 @@ export default async function ItemPage({ params, searchParams }: Params) {
               </span>
             )}
           </p>
-          <p className="muted small" style={{ marginTop: 8 }}>
+
+          {/* The way into the seller's own writing, and the reason it shows two
+              lines of that writing rather than only promising it.
+
+              "About this item" is where a spice nobody can smell through a
+              screen is actually sold — 600-800 characters of it on the seeded
+              shop — and it sits below the gallery, past the button. A shopper
+              met the CTA and either bought or left; the paragraphs were never
+              read. A bare "read more" link asks to be trusted. Two lines of the
+              real prose is the evidence, and it is what makes somebody who was
+              not going to scroll want to.
+
+              ONE control, not a link beside the button plus a teaser below it:
+              the page then has exactly two things to do — buy, or read — and
+              sitting UNDER the primary button is what keeps this one from
+              competing with it. Hidden entirely when tier.details is empty,
+              which is the normal case for an event ticket: a link to an absent
+              section is worse than no link. */}
+          {detailTeaser && (
+            <a className="item-jump" href="#about" aria-label={`Read about this ${v.unit}`}>
+              {/* Affordance first, evidence second — and the practical reason:
+                  on a 375x812 phone this card's top edge is the last thing on
+                  the first screen, so the line that says what it does has to be
+                  the line that lands there. */}
+              <span className="item-jump-more" aria-hidden="true">
+                Read about this {v.unit} <span className="item-jump-arrow">↓</span>
+              </span>
+              <span className="item-jump-text">{detailTeaser}</span>
+            </a>
+          )}
+
+          {/* Under the jump link rather than directly under the button, where it
+              used to sit: it is fine print about a limit nobody has hit yet, and
+              it was costing the one thing on this page that has to be reachable
+              without a scroll a place on the first screen. */}
+          <p className="muted small" style={{ marginTop: 10 }}>
             Up to {event.maxPerOrder} {v.units} per order.
           </p>
 
@@ -385,11 +434,26 @@ export default async function ItemPage({ params, searchParams }: Params) {
               : 'Tickets for this event are sold by them, and your payment goes straight to their own account — it never passes through us.'}
           </p>
         </div>
+
+        {galleryItems.length >= 2 && (
+          <div className="item-gallery">
+            {/* A quiet label ABOVE the rail instead of the sentence that used to
+                sit under it. The caption was the loudest text in the media
+                column — louder than the item's own picture — and it spent a
+                line explaining a gesture the swiper's own full-screen control
+                already offers. */}
+            <p className="item-gallery-label">More from {event.name}</p>
+            <MediaSwiper items={galleryItems} label={`${tier.name} photos`} />
+          </div>
+        )}
       </div>
 
       {detailParagraphs.length > 0 && (
-        <section className="section item-about">
-          <h2 className="page-title">About this {v.unit}</h2>
+        /* The target of .item-jump. scroll-margin-top in globals.css is what
+           lands this heading BELOW the sticky site header rather than behind
+           it. */
+        <section className="section item-about" id="about">
+          <h2 className="page-title item-about-title">About this {v.unit}</h2>
           {detailParagraphs.map((p, i) => (
             <p key={i} className="item-prose">
               {p}

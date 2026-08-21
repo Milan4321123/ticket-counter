@@ -615,6 +615,70 @@ summary {
   margin: 24px 0;
 }
 
+/* A SHOP's grid, which gets the whole width of the page (see .shop-collect for
+   why) and so has to decide its own columns. auto-fit above is the right
+   answer for a ticket list of unknown length in a column of unknown width;
+   here the container is a known 1000px at its widest and the tiles are product
+   shots, so the counts are stated:
+
+     phone   1 tile  — the photograph is the point, so it gets the full width
+     520px+  2 tiles — two still leave room for a price and a button
+     760px+  3 tiles — 232px a tile at 768, 320px at 1280
+
+   Not four. Four fits the 1000px container arithmetically, at 236px a tile,
+   which is NARROWER than the two squeezed columns this replaced — more columns
+   was never the goal, more room per tile was. Three also lands the seeded
+   five-item shop as three then two, which is a better-looking short row than
+   four then one. */
+.goods-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+@media (min-width: 520px) {
+  .goods-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 760px) {
+  .goods-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 22px;
+  }
+}
+
+/* Inside a shop tile the rows sit closer than a ticket card's. The picture
+   already carries most of the height, and 8px of air between six stacked
+   blocks made the tile read as a list of fields rather than as one product. */
+.goods-grid .tier-card {
+  gap: 6px;
+}
+
+.goods-grid .tier-name {
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+/* Still the loudest thing under the photo, just no longer the tallest: 1.9rem
+   over a 232px tile pushed the description and the button apart. */
+.goods-grid .tier-price {
+  font-size: 1.6rem;
+  line-height: 1.15;
+}
+
+/* Three lines, then an ellipsis. Sellers write these one-liners themselves and
+   one long one set the height of every tile in its row. It is a ceiling, not a
+   crop: the seeded shop's longest runs to three lines even in the narrowest
+   column, and the whole text is on the item page the tile already links to. */
+.goods-grid .tier-desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
 .tier-card {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 45%),
@@ -4226,6 +4290,76 @@ summary {
   }
 }
 
+/* ---------- The same details on a shop, laid out wide ---------- */
+
+/* Why a shop does not use the split above. On an EVENT the aside is a date and
+   a venue — two short lines that balance a short list of ticket tiers, and
+   that is what most of this site's traffic looks at, so it stays exactly as it
+   is. On a SHOP the same layout is upside down: a paragraph of pickup prose
+   held 40% of the width while the goods, which are the entire reason the page
+   exists, wrapped into two narrow tiles beside it.
+
+   So the goods take the full width and this card lies on its side beneath
+   them: the collection prose in the wide column, the address and the maps
+   button in the narrow one, split by a rule. Turning a tall sticky card
+   sideways without re-laying it out would just be the same card in a worse
+   place — the two-column body is what makes it a band. */
+.shop-collect {
+  margin-top: 34px;
+  display: grid;
+  gap: 14px;
+}
+
+/* No .glow-card here on purpose: the hover lift that suits a hand-sized card
+   looks like a glitch on something a thousand pixels wide. The accent rule
+   along the top edge does the finding-it job instead — this band is the answer
+   to the one question every shop buyer has, and it has to catch the eye of
+   someone scrolling past photographs. */
+.shop-collect-card {
+  padding: 24px 24px 26px;
+  background:
+    radial-gradient(ellipse 55% 130% at 0% 0%, var(--accent-soft), transparent 72%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 45%),
+    var(--bg-card);
+  box-shadow:
+    var(--shadow-card),
+    inset 0 2px 0 0 var(--accent);
+}
+
+.shop-collect-body {
+  display: grid;
+  gap: 18px;
+}
+
+/* Zeroed because in the band each list is one fact in its own grid cell, and
+   the 18px the list reserves for the button that used to follow it now shows
+   up as a hole in the middle of the row. */
+.shop-collect-body .event-fact-list {
+  margin: 0;
+}
+
+@media (min-width: 760px) {
+  .shop-collect-card {
+    padding: 28px 30px 30px;
+  }
+
+  /* 1.45fr, not 2fr: it lands the prose at roughly 60 characters a line, which
+     is a comfortable measure, while still leaving the address column wide
+     enough that "Open in Maps" is a real button and not a sliver. */
+  .shop-collect-cols {
+    grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+    gap: 40px;
+  }
+
+  /* Stretched, not start-aligned: the rule below is what makes the two halves
+     read as one band, and a rule that stops after the four short lines of an
+     address looks like a stub rather than a divider. */
+  .shop-collect-side {
+    border-left: 1px solid var(--border);
+    padding-left: 34px;
+  }
+}
+
 .event-fact-list {
   list-style: none;
   margin: 0 0 18px;
@@ -6804,6 +6938,62 @@ html:has(.event-page.has-section-nav) {
   background: var(--bg-elevated);
 }
 
+/* The frame a SHOP tile puts round that photo, so the availability chip can
+   sit ON the picture the way every product grid on the web puts it there. That
+   buys back a whole row of tile height — the chip used to have its own line
+   between the photo and the name — and it is what makes the tile read as a
+   product rather than as a ticket type with a picture attached.
+
+   The bleed that .tier-card-photo does with its own negative margins moves up
+   here, because the wrapper now has to be the box the chip is measured against
+   AND the box that clips the hover zoom. The numbers are .tier-card's 22px of
+   padding, doubled for the width; they have to stay in step with it. */
+.tier-card-media {
+  position: relative;
+  width: calc(100% + 44px);
+  margin: -22px -22px 4px;
+  border-radius: var(--radius) var(--radius) 0 0;
+  overflow: hidden;
+}
+
+.tier-card-media .tier-card-photo {
+  width: 100%;
+  margin: 0;
+  transition: transform 0.5s var(--ease-out);
+}
+
+/* The photograph leans in when the tile is hovered. Only on the goods grid:
+   an event's ticket card is a price list and does not want a shop's manners.
+   The reduced-motion block near the top of this file already flattens every
+   transition, so this needs no guard of its own. */
+.goods-grid .tier-card:hover .tier-card-photo {
+  transform: scale(1.05);
+}
+
+/* A wash under the chip. The badge backgrounds are 14%-alpha tints, which
+   disappear over a pale product shot — this guarantees the contrast whatever
+   the seller photographed. */
+.tier-card-media::after {
+  content: '';
+  position: absolute;
+  inset: 42% 0 0;
+  background: linear-gradient(180deg, transparent, rgba(6, 6, 12, 0.62));
+  pointer-events: none;
+}
+
+/* z-index because the ::after above is the wrapper's last child and would
+   otherwise paint over the very chip it exists to make readable. */
+.tier-card-chips {
+  position: absolute;
+  z-index: 1;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 /* The stand-in when an item has no picture of its own, on a grid where every
    tile beside it does — /market/items, which lays goods from every shop side
    by side. On an event page a photo-less ticket type simply has no frame,
@@ -6887,25 +7077,90 @@ html:has(.event-page.has-section-nav) {
   margin-top: 4px;
 }
 
+/* On a shop tile the buy button and the read-link share one line instead of
+   stacking. Stacked they cost about 40px of height and left a small button
+   sitting alone under a full-width line of text, which looked like an
+   afterthought; side by side they are a footer, with the thing that takes the
+   money anchored to the same left edge on every tile in the row.
+
+   margin-top: auto is what keeps that footer on the tile's floor when two
+   descriptions in a row are different lengths — .tier-desc's flex: 1 does the
+   same job today, and this holds the line if a tile ever has no description. */
+.tier-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+
+.tier-card-foot .tier-card-buy,
+.tier-card-foot .tier-card-go {
+  align-self: center;
+  margin-top: 0;
+}
+
+.tier-card-foot .tier-card-go {
+  font-size: 0.86rem;
+}
+
 .item-page {
-  padding-top: 18px;
+  padding-top: 14px;
 }
 
 .item-back {
-  margin: 0 0 16px;
+  margin: 0 0 12px;
   font-size: 0.92rem;
 }
 
+/* One line, always. This is a "get me out of here" link, and a shop with a long
+   name ("Taplejung Alaichi Ghar (example shop)") wrapped it to two — 24px of the
+   first screen spent on the way back before the shopper has seen the thing they
+   came for. Truncated rather than shortened, because the shop's name is what
+   tells someone which page the arrow leads to. */
+.item-back a {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Three areas, because the phone order and the desktop order are not the same
+   one. Stacked, the shop's photo rail has to come LAST — under the name, the
+   price and the button — or a shopper meets 400px of other photographs before
+   the item's own heading. Side by side there is no such conflict: the rail
+   tucks under the picture in the left column and the detail column spans both
+   rows beside it, which is the shape this page already had. */
 .item-layout {
   display: grid;
-  gap: 24px;
+  gap: 22px;
   align-items: start;
+  grid-template-areas:
+    'media'
+    'detail'
+    'gallery';
+}
+
+.item-detail {
+  grid-area: detail;
+}
+
+.item-gallery {
+  grid-area: gallery;
 }
 
 @media (min-width: 900px) {
   .item-layout {
     grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-    gap: 40px;
+    grid-template-areas:
+      'media detail'
+      'gallery detail';
+    column-gap: 40px;
+    /* Not the column gap: this one only ever separates the picture from the
+       rail beneath it, where 40px reads as a hole. */
+    row-gap: 18px;
   }
 }
 
@@ -6913,17 +7168,99 @@ html:has(.event-page.has-section-nav) {
    shows the whole picture rather than a slice of it. Capped in width because a
    full-column 4:5 on a wide desktop is a photo the height of the screen. */
 .item-media {
+  grid-area: media;
+  /* width, and not only the cap: a grid item with auto margins and no stated
+     width stops stretching and shrinks to fit its contents — which for the
+     photo-less panel below (whose own width is a percentage of this box) meant
+     collapsing to the width of a single letter. Stating 100% keeps the box
+     definite, and the auto margins then only centre the 520px cap, which is
+     what stops the picture hanging off the left edge of a tablet-width screen
+     with nothing beside it. */
+  width: 100%;
   max-width: 520px;
+  margin-inline: auto;
+  position: relative;
 }
 
+/* Once the picture is capped against the viewport it no longer fills the column
+   on a phone, and a small plate floating on flat black reads as an image that
+   failed rather than as a framed one. This is the listing's own accent, blurred
+   out behind it, so the space around the photograph is lit instead of empty.
+   Behind the photo (z-index) and unclickable; ::before rather than a wrapper so
+   nothing in the markup exists purely to be decorated. */
+.item-media::before {
+  content: '';
+  position: absolute;
+  inset: 6% -6% 12%;
+  z-index: 0;
+  border-radius: 999px;
+  background: radial-gradient(ellipse at 50% 45%, var(--accent-soft), transparent 70%);
+  filter: blur(34px);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.item-media > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* The cap that matters on a phone is on HEIGHT, not width.
+
+   A 4:5 at full column width is ~470px of photograph on a 375px screen, and
+   with the header and the back link above it that was the entire first screen:
+   no name, no price, no button. The shopper's first screen now has to hold the
+   picture AND what it costs AND how to buy it.
+
+   Shrunk rather than cropped. object-fit: cover in a shorter box would keep the
+   width and cut the top and bottom off the picture, and product shots are
+   framed with the goods centred and the seller's name along the bottom — the
+   seeded cardamom photos lose their own shop name that way. Letting the height
+   cap drive the WIDTH (width: auto on a replaced element with both maxima set
+   keeps the 4:5) shows the whole photograph, just smaller, centred in the
+   column. object-fit stays cover only for the case where a source is not
+   exactly 4:5.
+
+   svh, not vh: on mobile Safari vh is the tall viewport measured with the URL
+   bar hidden, so a vh-based cap is bigger than the screen a shopper is actually
+   looking at. The vh line above it is the fallback for anything that has not
+   got svh. */
 .item-photo {
   display: block;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
+  margin-inline: auto;
   aspect-ratio: 4 / 5;
+  max-height: min(38vh, 380px);
+  max-height: min(38svh, 380px);
   object-fit: cover;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--bg-elevated);
+}
+
+/* A tablet is still stacked but has a screen half as tall again as a phone's,
+   and a 380px picture centred in a 700px column reads as a thumbnail somebody
+   forgot to finish. Same rule, more room. */
+@media (min-width: 640px) {
+  .item-photo {
+    max-height: min(52vh, 520px);
+    max-height: min(52svh, 520px);
+  }
+}
+
+@media (min-width: 900px) {
+  /* Side by side there is nothing below the picture to push off the screen —
+     the price and the button sit beside it — so the wide layout keeps the full
+     4:5 at the column's 520px cap, exactly as before. */
+  .item-photo {
+    width: 100%;
+    max-height: none;
+  }
+
+  .item-media {
+    margin-inline: 0;
+  }
 }
 
 /* Most event tickets will never have a photo, so "no photo" has to look like a
@@ -6933,31 +7270,170 @@ html:has(.event-page.has-section-nav) {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* A panel, not a portrait. There is no picture to preserve the shape of, and
+     an event ticket's first screen is better spent on the name, the date line
+     and the button than on a large letter — so this one takes the full column
+     width and a shallower cap than a real photo gets. */
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  max-height: min(21vh, 190px);
+  max-height: min(21svh, 190px);
   background:
     radial-gradient(ellipse 70% 70% at 30% 10%, var(--accent-soft), transparent),
     var(--bg-elevated);
 }
 
+@media (min-width: 900px) {
+  .item-photo-blank {
+    aspect-ratio: 4 / 5;
+    max-height: none;
+  }
+}
+
 .item-photo-blank span {
   font-family: var(--font-display, var(--font));
-  font-size: clamp(3rem, 12vw, 6rem);
+  /* Sized against the PANEL, not the page: a letter set for a full 4:5
+     portrait sat marooned in the middle of the shallow plate the phone layout
+     gives it. */
+  font-size: clamp(3.2rem, 14vw, 6rem);
   font-weight: 800;
+  line-height: 1;
   color: var(--accent-text);
   opacity: 0.7;
 }
 
-.item-gallery {
-  margin-top: 16px;
+/* A label, not a caption. The old sentence sat under the rail and was the
+   loudest type in the media column; this is a small overline that says what
+   the rail is and gets out of the way. */
+.item-gallery-label {
+  margin: 0 0 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* ---- The stack above the button: badges, name, seller, price, lede ---- */
+
+.item-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+/* The name is the biggest thing on the page and sits directly under a badge
+   row, so it gets neither the .page-title top margin nor its default size. */
+.item-title {
+  margin: 0 0 4px;
+  font-size: clamp(1.6rem, 6vw, 2.15rem);
+  line-height: 1.15;
+}
+
+/* Bound to the title above it rather than floating between title and price:
+   this line finishes the heading ("Whole pods · 100g, from Taplejung Alaichi
+   Ghar"), and the gap that means something is the one before the price. */
+.item-seller-line {
+  margin: 0 0 16px;
+  font-size: 0.95rem;
+  color: var(--text-dim);
+}
+
+.item-seller-line a {
+  font-weight: 700;
 }
 
 .item-lede {
-  margin: 14px 0 0;
+  margin: 12px 0 0;
   font-size: 1.02rem;
+  line-height: 1.6;
   color: var(--text-dim);
+}
+
+.item-actions {
+  margin: 18px 0 0;
+}
+
+/* ---- The way into the seller's write-up ---- */
+
+/* Deliberately quieter than the button above it: no fill, one hairline, dim
+   prose. It has to be findable without competing — the order button stays the
+   only thing on this page with a colour. */
+.item-jump {
+  display: block;
+  margin-top: 14px;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.item-jump:hover,
+.item-jump:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.item-jump-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  /* The server already cuts the teaser to about two lines; this is the backstop
+     for a screen narrow enough to wrap it to three. */
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.item-jump-more {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent-text);
+}
+
+.item-jump-arrow {
+  display: inline-block;
+  transition: transform 0.18s var(--ease-out);
+}
+
+.item-jump:hover .item-jump-arrow {
+  transform: translateY(2px);
+}
+
+/* Only on this page, same posture as the event page's section nav above: the
+   jump is the one in-page link here, and an instant teleport from the button to
+   the write-up reads as a page change rather than as "the text is down there".
+   The global reduced-motion block forces this back to auto with !important. */
+html:has(.item-page) {
+  scroll-behavior: smooth;
 }
 
 .item-about {
   max-width: 68ch;
+  /* Less than .section's 32px because this one follows the photo rail directly
+     with no divider between them, and 32px there reads as a gap rather than as
+     a new section starting. */
+  padding-top: 26px;
+  /* The jump link's landing. The heading, not the section's top edge: the
+     section's own padding passes behind the header, so 60 + 26 puts the h2
+     about 19px clear of the 67px sticky site header. If that header ever
+     changes height, this number moves with it — same contract as #events at
+     the top of this file. */
+  scroll-margin-top: 60px;
+}
+
+.item-about-title {
+  margin: 0 0 14px;
 }
 
 .item-prose {
