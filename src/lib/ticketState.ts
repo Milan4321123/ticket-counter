@@ -90,6 +90,45 @@ export function visibleTiers(tiers: EventTierRow[]): EventTierRow[] {
 }
 
 /**
+ * The ticket types in the order a buyer should meet them: what they can buy
+ * first, then what is coming, then what has gone.
+ *
+ * The rows are stored in the order the organizer created them, which is the
+ * order they were PRICED in — early bird, then standard, then door. That is the
+ * right order on day one and the wrong one by the time the early bird sells
+ * out: the page then opens with a red "Sold out" pill on the first card, and a
+ * visitor scrolling a grid of them decides the event is gone before reaching
+ * the row that is still selling.
+ *
+ * Within each group the organizer's own order is kept, so the cheap ticket
+ * still comes before the expensive one. Only the sold-out rows move, and they
+ * move to the end rather than off the page — a sold-out early bird is proof
+ * the event is worth going to, and it explains why the price went up.
+ *
+ * Without `availability` nothing can be known about stock, so the list comes
+ * back in stored order minus the hidden rows.
+ */
+export function tiersInSaleOrder(
+  tiers: EventTierRow[],
+  availability?: Availability
+): EventTierRow[] {
+  const rank = (t: EventTierRow) => {
+    const remaining = availability ? availability.tiers[t.tierKey]?.remaining ?? 0 : 1;
+    if (t.status === 'on-sale' && remaining > 0) return 0;
+    // Announced sits between the two: it is not buyable, but unlike a sold-out
+    // row it is something a visitor can still act on by coming back.
+    if (t.status === 'coming-soon') return 1;
+    return 2;
+  };
+  // Decorated with the stored index rather than leaning on sort stability, so
+  // the tie-break is stated where the next reader can see it.
+  return visibleTiers(tiers)
+    .map((tier, index) => ({ tier, index, rank: rank(tier) }))
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .map((x) => x.tier);
+}
+
+/**
  * Nothing is on sale, but something has been announced.
  *
  * Read from the TICKETS and nothing else. It used to also consult an event-wide

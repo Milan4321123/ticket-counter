@@ -47,7 +47,14 @@ import { loadFeedSnapshot } from '@/lib/feedSnapshot';
 import { getAvailability } from '@/lib/inventory';
 import { runWaitlistNotifySweep } from '@/lib/waitlist';
 import WaitlistForm from '@/components/WaitlistForm';
-import { ticketState, fromPriceCents, tierBadge, visibleTiers, comingSoonLabel } from '@/lib/ticketState';
+import {
+  ticketState,
+  fromPriceCents,
+  tierBadge,
+  visibleTiers,
+  tiersInSaleOrder,
+  comingSoonLabel,
+} from '@/lib/ticketState';
 import { platformName } from '@/lib/platform';
 import { currentOrganizer, getOrganizer } from '@/lib/organizers';
 import {
@@ -828,7 +835,10 @@ export default async function EventPage({ params, searchParams }: Params) {
                   full width to be worth looking at. The event grid keeps the
                   auto-fit it has always had. */}
               <div className={isShop ? 'tier-grid goods-grid' : 'tier-grid'}>
-                {visibleTiers(tiers).map((tier) => {
+                {/* Sold-out rows sink to the bottom of the grid: see
+                    tiersInSaleOrder. The organizer's own order survives inside
+                    each group. */}
+                {tiersInSaleOrder(tiers, availability).map((tier) => {
                   const tierAvail = availability.tiers[tier.tierKey];
                   const remaining = tierAvail?.remaining ?? 0;
                   // The card is the button when this type can actually be

@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { getPaymentMode } from '@/lib/config';
 import { getEventBySlug, getEventTiers, paypalPayee } from '@/lib/events';
 import { getAvailability } from '@/lib/inventory';
-import { ticketState } from '@/lib/ticketState';
+import { ticketState, tiersInSaleOrder } from '@/lib/ticketState';
 import { vocabFor } from '@/lib/vocab';
 import { expireOverdueTransferReservations } from '@/lib/orders';
 import { getOrganizer } from '@/lib/organizers';
@@ -132,7 +132,9 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
         kind: event.kind,
         // Coming-soon types are not offered at checkout at all: a stepper that
         // cannot go above zero is a worse answer than not showing the row.
-        tiers: getEventTiers(event.id)
+        // Same order as the grid the buyer just tapped through — what is
+        // still available first, what has gone underneath it.
+        tiers: tiersInSaleOrder(getEventTiers(event.id), availability)
           .filter((t) => t.status === 'on-sale')
           .map((t) => ({
             id: t.tierKey,

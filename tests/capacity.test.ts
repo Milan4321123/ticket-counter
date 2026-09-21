@@ -36,7 +36,7 @@ import {
   getOrder,
   heldUnpaidTicketsForEmail,
 } from '../src/lib/orders.ts';
-import { ticketState } from '../src/lib/ticketState.ts';
+import { ticketState, tiersInSaleOrder } from '../src/lib/ticketState.ts';
 
 /**
  * An order that has NOT claimed anything yet.
@@ -759,4 +759,77 @@ test('a tier’s seats-per-booking is re-clamped wherever it is read, so the sea
     20,
     'so the ceiling must count twenty — 100 refuses buyers over seats the room never sold'
   );
+});
+
+// ---------------------------------------------------------------------------
+// tiersInSaleOrder — what a buyer meets first
+// ---------------------------------------------------------------------------
+
+test('sold-out types sink below the ones still selling', () => {
+  const event = makeEvent({
+    totalCapacity: 100,
+    tiers: [
+      { tierKey: 'early', cap: 1 },
+      { tierKey: 'standard', cap: 50 },
+      { tierKey: 'door', cap: 50 },
+    ],
+  });
+  // The early bird — created FIRST, so stored first — sells out.
+  makePaidOrder({ eventId: event.id, items: [{ tierId: 'early', quantity: 1 }] });
+
+  const order = tiersInSaleOrder(getEventTiers(event.id), getAvailability(event.id)).map(
+    (t) => t.tierKey
+  );
+  assert.deepEqual(order, ['standard', 'door', 'early']);
+});
+
+test('the organizer’s own order survives inside each group', () => {
+  const event = makeEvent({
+    totalCapacity: 100,
+    tiers: [
+      { tierKey: 'early', cap: 1 },
+      { tierKey: 'standard', cap: 50 },
+      { tierKey: 'vip', cap: 1 },
+      { tierKey: 'door', cap: 50 },
+    ],
+  });
+  makePaidOrder({ eventId: event.id, items: [{ tierId: 'early', quantity: 1 }] });
+  makePaidOrder({ eventId: event.id, items: [{ tierId: 'vip', quantity: 1 }] });
+
+  const order = tiersInSaleOrder(getEventTiers(event.id), getAvailability(event.id)).map(
+    (t) => t.tierKey
+  );
+  // Available in stored order, then the two gone ones in stored order.
+  assert.deepEqual(order, ['standard', 'door', 'early', 'vip']);
+});
+
+test('announced types sit between what is buyable and what has gone', () => {
+  const event = makeEvent({
+    totalCapacity: 100,
+    tiers: [
+      { tierKey: 'early', cap: 1 },
+      { tierKey: 'later', cap: 20, status: 'coming-soon' },
+      { tierKey: 'standard', cap: 50 },
+      { tierKey: 'secret', cap: 10, status: 'hidden' },
+    ],
+  });
+  makePaidOrder({ eventId: event.id, items: [{ tierId: 'early', quantity: 1 }] });
+
+  const order = tiersInSaleOrder(getEventTiers(event.id), getAvailability(event.id)).map(
+    (t) => t.tierKey
+  );
+  assert.deepEqual(order, ['standard', 'later', 'early'], 'hidden types stay off the page');
+});
+
+test('without availability the list is stored order minus the hidden rows', () => {
+  const event = makeEvent({
+    totalCapacity: 100,
+    tiers: [
+      { tierKey: 'early', cap: 10 },
+      { tierKey: 'secret', cap: 10, status: 'hidden' },
+      { tierKey: 'standard', cap: 10 },
+    ],
+  });
+  const order = tiersInSaleOrder(getEventTiers(event.id)).map((t) => t.tierKey);
+  assert.deepEqual(order, ['early', 'standard']);
 });
