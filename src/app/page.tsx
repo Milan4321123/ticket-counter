@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import Link from 'next/link';
 import EventBillboard from '@/components/EventBillboard';
 import EventCard from '@/components/EventCard';
@@ -351,6 +352,28 @@ export default function HomePage() {
 
   const cities = new Set(events.map((e) => e.city.trim()).filter(Boolean));
 
+  /**
+   * The swipeable billboard, built once here so the feed can place it BETWEEN
+   * shelves rather than only at the top — see where it is rendered for why
+   * that order changed.
+   */
+  const billboard =
+    featured.length > 0 ? (
+      <section className="section billboard-section">
+        <div className="container">
+          <EventCarousel label="Featured events" count={featured.length}>
+            {featured.map((event, i) => (
+              <div className="ecar-slide" data-index={i} key={event.id}>
+                {/* Only the first slide may call itself what is next, and only
+                    if it actually knows when it is. */}
+                <EventBillboard event={event} leading={i === 0} snapshot={snapshot} />
+              </div>
+            ))}
+          </EventCarousel>
+        </div>
+      </section>
+    ) : null;
+
   return (
     <>
       {/* Tells Google this page is a LIST of these specific events. Without it a
@@ -444,24 +467,9 @@ export default function HomePage() {
           </section>
         ) : (
           <>
-            {featured.length > 0 && (
-              <section className="section billboard-section">
-                <div className="container">
-                  <EventCarousel label="Featured events" count={featured.length}>
-                    {featured.map((event, i) => (
-                      <div className="ecar-slide" data-index={i} key={event.id}>
-                        {/* Only the first slide may call itself what is next, and
-                            only if it actually knows when it is. */}
-                        <EventBillboard event={event} leading={i === 0} snapshot={snapshot} />
-                      </div>
-                    ))}
-                  </EventCarousel>
-                </div>
-              </section>
-            )}
-
-            {rows.map((row) => (
-              <section className="section rail-section" key={row.key}>
+            {rows.map((row, rowIndex) => (
+              <Fragment key={row.key}>
+              <section className="section rail-section">
                 <div className="container">
                   <div className="rail-head anim-fade-up">
                     <p className="feed-kicker">{row.kicker}</p>
@@ -490,7 +498,17 @@ export default function HomePage() {
                   </div>
                 </div>
               </section>
+              {/* The billboard comes AFTER the first shelf, not before it.
+                  It used to open the feed, and what a visitor met first was one
+                  event filling the screen with no way of knowing whether the
+                  site held two more or two hundred — the swipe is invisible
+                  until you try it, and most people never do. The shelf answers
+                  "what is on" in one glance, and the billboard then does what a
+                  billboard is for: dwelling on one of them. */}
+              {rowIndex === 0 ? billboard : null}
+              </Fragment>
             ))}
+            {rows.length === 0 ? billboard : null}
           </>
         )}
       </div>
