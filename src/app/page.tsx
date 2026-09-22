@@ -1,8 +1,5 @@
-import { Fragment } from 'react';
 import Link from 'next/link';
-import EventBillboard from '@/components/EventBillboard';
 import EventCard from '@/components/EventCard';
-import EventCarousel from '@/components/EventCarousel';
 import EventRail from '@/components/EventRail';
 import Logo from '@/components/Logo';
 import PlatformAssistant from '@/components/PlatformAssistant';
@@ -334,45 +331,7 @@ export default function HomePage() {
   const assuranceCards = assurances(anyPaypal);
   const faqItems = faqs(anyPaypal);
 
-  // Everything still to come gets a turn in the billboard, dated or not.
-  //
-  // This used to require a machine date, on the reasoning that calling an
-  // undated event "next up" is a guess. The reasoning was right and the filter
-  // was wrong: an organizer who never set the calendar field — the event
-  // imported from event.config.json has no event_date at all — vanished from
-  // the feature entirely rather than merely losing the claim about timing. The
-  // claim is what gets dropped now (see `leading` below), not the event.
-  //
-  // listPublishedEvents already orders these soonest-first with the undated
-  // last, so the front of this list is genuinely the front. Capped at five:
-  // past that it stops being a feature and becomes a second listing nobody
-  // swipes to the end of.
-  const today = todayIso();
-  const featured = events.filter((e) => !isPast(e, today)).slice(0, 5);
-
   const cities = new Set(events.map((e) => e.city.trim()).filter(Boolean));
-
-  /**
-   * The swipeable billboard, built once here so the feed can place it BETWEEN
-   * shelves rather than only at the top — see where it is rendered for why
-   * that order changed.
-   */
-  const billboard =
-    featured.length > 0 ? (
-      <section className="section billboard-section">
-        <div className="container">
-          <EventCarousel label="Featured events" count={featured.length}>
-            {featured.map((event, i) => (
-              <div className="ecar-slide" data-index={i} key={event.id}>
-                {/* Only the first slide may call itself what is next, and only
-                    if it actually knows when it is. */}
-                <EventBillboard event={event} leading={i === 0} snapshot={snapshot} />
-              </div>
-            ))}
-          </EventCarousel>
-        </div>
-      </section>
-    ) : null;
 
   return (
     <>
@@ -467,9 +426,8 @@ export default function HomePage() {
           </section>
         ) : (
           <>
-            {rows.map((row, rowIndex) => (
-              <Fragment key={row.key}>
-              <section className="section rail-section">
+            {rows.map((row) => (
+              <section className="section rail-section" key={row.key}>
                 <div className="container">
                   <div className="rail-head anim-fade-up">
                     <p className="feed-kicker">{row.kicker}</p>
@@ -498,17 +456,7 @@ export default function HomePage() {
                   </div>
                 </div>
               </section>
-              {/* The billboard comes AFTER the first shelf, not before it.
-                  It used to open the feed, and what a visitor met first was one
-                  event filling the screen with no way of knowing whether the
-                  site held two more or two hundred — the swipe is invisible
-                  until you try it, and most people never do. The shelf answers
-                  "what is on" in one glance, and the billboard then does what a
-                  billboard is for: dwelling on one of them. */}
-              {rowIndex === 0 ? billboard : null}
-              </Fragment>
             ))}
-            {rows.length === 0 ? billboard : null}
           </>
         )}
       </div>

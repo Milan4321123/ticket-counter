@@ -4277,7 +4277,6 @@ summary {
    horizontally to read is not. */
 .page-title,
 .event-card-title,
-.billboard-title,
 .item-lede,
 .item-prose,
 .tier-name {
@@ -4932,7 +4931,8 @@ summary {
   display: flex;
   justify-content: center;
   align-items: center;
-  /* Same bargain as .ecar-dots: the gap is what the hit area below can claim. */
+  /* The gap is what the hit area below can claim: the dots themselves are
+     tiny, and the tappable square around each one lives in this space. */
   gap: 22px;
   margin-top: 10px;
 }
@@ -5556,7 +5556,7 @@ html:has(.event-page.has-section-nav) {
 }
 
 /* ==========================================================================
-   Browse page (home) — billboard, horizontal rails, and the buyer's
+   Browse page (home) — horizontal rails, and the buyer's
    explanation of how a ticket here actually works.
 
    Additive layer: nothing above is modified. The rails deliberately reuse
@@ -5615,160 +5615,7 @@ html:has(.event-page.has-section-nav) {
 
 /* ---------- Billboard: one event, given the room a poster deserves ---------- */
 
-.billboard-section {
-  padding-top: 8px;
-}
-
-.billboard {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  display: flex;
-  align-items: flex-end;
-  min-height: clamp(330px, 44vw, 440px);
-  border: 1px solid var(--border);
-  border-radius: 22px;
-  box-shadow: var(--shadow-lift);
-}
-
-.billboard-media {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-}
-
-.billboard-shot {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  /* A video billboard is decoration behind text — taps belong to the buttons. */
-  pointer-events: none;
-}
-
-/* Two scrims doing two different jobs. The vertical one seats the panel on the
-   page background so it does not end in a hard line; the horizontal one buys
-   contrast for the text WITHOUT dimming the whole photograph, which is the
-   difference between a poster and a grey rectangle. */
-.billboard-scrim {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    180deg,
-    rgba(6, 7, 12, 0.1) 0%,
-    rgba(6, 7, 12, 0.5) 52%,
-    rgba(6, 7, 12, 0.92) 100%
-  );
-}
-
-.billboard-scrim-side {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    rgba(6, 7, 12, 0.88) 0%,
-    rgba(6, 7, 12, 0.42) 48%,
-    rgba(6, 7, 12, 0) 82%
-  );
-}
-
-.billboard-body {
-  position: relative;
-  padding: clamp(20px, 3.6vw, 40px);
-  max-width: 640px;
-}
-
-.billboard-kicker {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin: 0 0 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  /* Floored at 12px (0.75rem): below that a label stops being small and starts
-     being unreadable, and this one carries Devanagari — the shirorekha and the
-     matras are sub-pixel features at 11px on a 375px screen, so Devanagari
-     loses more than Latin does. Every class floored here is a one-line label,
-     so the extra 0.2-1.4px costs no wrapped line anywhere. */
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #fff;
-}
-
-.billboard-title {
-  font-family: var(--font-display, var(--font));
-  font-size: clamp(1.9rem, 5vw, 3.1rem);
-  font-weight: 800;
-  letter-spacing: -0.025em;
-  line-height: 1.05;
-  margin: 0 0 10px;
-  color: #fff;
-  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.5);
-}
-
-.billboard-tagline {
-  margin: 0 0 8px;
-  font-size: 1.02rem;
-  color: rgba(255, 255, 255, 0.86);
-  max-width: 46ch;
-}
-
-.billboard-meta {
-  margin: 0 0 20px;
-  color: rgba(255, 255, 255, 0.74);
-  font-size: 0.95rem;
-}
-
-.billboard-dot {
-  color: rgba(255, 255, 255, 0.4);
-}
-
-.billboard-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin: 0;
-}
-
-/* Glass, not a second solid button: on top of a photograph a bordered button
-   disappears, and a filled one competes with the real call to action. */
-.billboard-secondary {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.28);
-  color: #fff;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.billboard-secondary:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.45);
-}
-
-.billboard-note {
-  margin: 12px 0 0;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--amber);
-}
-
 @media (max-width: 560px) {
-  /* On a phone the picture cannot be both a backdrop and legible, so the text
-     takes the bottom half outright and the side scrim stops fighting it. */
-  .billboard {
-    min-height: 420px;
-  }
-
-  .billboard-scrim-side {
-    background: linear-gradient(90deg, rgba(6, 7, 12, 0.6), rgba(6, 7, 12, 0.2));
-  }
-
-  .billboard-actions .btn {
-    flex: 1 1 100%;
-    justify-content: center;
-  }
 }
 
 /* ---------- Rails: one horizontal row of events, scrolled sideways ---------- */
@@ -6151,214 +5998,6 @@ html:has(.event-page.has-section-nav) {
 }
 
 
-/* ---------- Featured billboard carousel (browse page) ----------
-   The hero, swiped rather than clicked. Same construction as the event page's
-   gallery rail: the browser's own scroll-snapping does the moving, so a thumb
-   swipe gets native momentum and it still works with scripts off. */
-
-.ecar {
-  position: relative;
-}
-
-.ecar-viewport {
-  position: relative;
-}
-
-.ecar-track {
-  display: flex;
-  gap: 16px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  overscroll-behavior-x: contain;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  /* Room for the billboard's own lift shadow — overflow-x forces the vertical
-     axis to scroll too, so without this the shadow is sheared off. */
-  padding-bottom: 6px;
-}
-
-.ecar-track::-webkit-scrollbar {
-  display: none;
-}
-
-.ecar-track:focus-visible {
-  outline: 2px solid var(--brand);
-  outline-offset: 4px;
-  border-radius: 24px;
-}
-
-.ecar-slide {
-  /* Not 100%: the edge of the next event stays on screen.
-     A rail of full-width slides looks exactly like a static picture, and the
-     line of text under it asking people to swipe was not moving them — a
-     billboard is judged in about a second, and in that second nothing on the
-     page said "there is more". A sliver of the neighbour does what the
-     sentence could not, and it does it on the first glance rather than the
-     second read. */
-  flex: 0 0 92%;
-  scroll-snap-align: center;
-  /* One event per swipe. A hero that skims past two at a time on a fast flick
-     is a hero nobody actually sees. */
-  scroll-snap-stop: always;
-}
-
-/* "1 / 3" beside the dots: the dots say where you are only to somebody who
-   already counted them. */
-.ecar-count {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-  margin-left: 4px;
-}
-
-/* Arrows sit ON the artwork, vertically centred, and only appear where there
-   is a pointer to hover with — a phone swipes. */
-.ecar-nav {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 3;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 100%;
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-  color: #fff;
-  transition: opacity 0.2s ease;
-}
-
-.ecar-nav-prev {
-  left: 0;
-}
-
-.ecar-nav-next {
-  right: 0;
-}
-
-.ecar-nav-disc {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 999px;
-  background: rgba(10, 11, 16, 0.68);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 8px 24px -10px rgba(0, 0, 0, 0.9);
-  transition:
-    transform 0.2s var(--ease-out),
-    background 0.2s ease,
-    border-color 0.2s ease;
-}
-
-.ecar-nav:hover .ecar-nav-disc {
-  transform: scale(1.1);
-  background: rgba(10, 11, 16, 0.9);
-  border-color: rgba(255, 255, 255, 0.45);
-}
-
-.ecar-nav:focus-visible {
-  outline: none;
-}
-
-.ecar-nav:focus-visible .ecar-nav-disc {
-  border-color: var(--brand);
-  box-shadow: 0 0 0 3px var(--brand-soft);
-}
-
-.ecar-nav:disabled {
-  opacity: 0;
-  pointer-events: none;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .ecar-nav {
-    display: flex;
-  }
-
-  /* The arrows only exist where there is a pointer, so the headline only has to
-     make room for them there. Without this the prev arrow sits on top of the
-     first letter of the event's name. */
-  .ecar .billboard-body {
-    padding-left: 76px;
-  }
-}
-
-/* Dots: position AND controls. Wide enough to be a real tap target on a
-   phone, where they are the only handle besides the swipe itself. */
-.ecar-dots {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  /* The gap is the hit area's budget. Each dot's target below grows to fill
-     half the gap on each side, so raising this from 8px is what buys a real
-     thumb target — grown any wider on an 8px gap and neighbouring targets
-     overlap, which trades a too-small button for one that answers to the
-     wrong dot. */
-  gap: 22px;
-  margin-top: 14px;
-}
-
-.ecar-dot {
-  width: 9px;
-  height: 9px;
-  padding: 0;
-  border-radius: 999px;
-  border: 0;
-  background: rgba(255, 255, 255, 0.26);
-  cursor: pointer;
-  position: relative;
-  transition:
-    width 0.25s var(--ease-out),
-    background 0.25s ease;
-}
-
-/* The visible dot is small; the touch target around it is not. This used to be
-   `box-shadow: 0 0 0 8px transparent`, which paints nothing and extends no hit
-   region at all — measured by walking elementFromPoint out from the centre, the
-   target really was 9x9. A pseudo-element does what the shadow was meant to,
-   the same way .mswipe-dot already does it: 45px tall, and 31px wide, which is
-   the dot plus the 22px gap and therefore exactly as wide as it can be without
-   stealing taps from the dot next door. */
-.ecar-dot::after {
-  content: '';
-  position: absolute;
-  inset: -18px -11px;
-}
-
-.ecar-dot:hover {
-  background: rgba(255, 255, 255, 0.5);
-}
-
-.ecar-dot.is-active {
-  width: 26px;
-  background: var(--brand);
-}
-
-.ecar-dot:focus-visible {
-  outline: 2px solid var(--brand);
-  outline-offset: 3px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ecar-nav:hover .ecar-nav-disc {
-    transform: translateY(0) scale(1);
-  }
-
-  .ecar-dot {
-    transition: none;
-  }
-}
-
 /* ---------- Pre-publish preview bar ----------
    Sits above the hero on an unpublished event that only its own organizer can
    open. Deliberately loud: someone looking at their own draft must never be in
@@ -6415,14 +6054,6 @@ html:has(.event-page.has-section-nav) {
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.03);
   font-size: 0.88rem;
-}
-
-/* <picture> is an inline box that would otherwise sit between .billboard-media
-   and the absolutely-positioned .billboard-shot inside it, leaving the image
-   with no positioned parent to fill. display: contents removes it from layout
-   and keeps the img's inset:0 anchored to .billboard-media as before. */
-.billboard-media picture {
-  display: contents;
 }
 
 /* ---------- Phone hero: the whole cover, and nothing but the cover ----------
@@ -6785,15 +6416,6 @@ html:has(.event-page.has-section-nav) {
   font-size: 0.72rem;
 }
 
-/* Sits inside the billboard kicker, which is uppercase and letter-spaced —
-   the badge opts out of both so it reads as a badge and not as more kicker. */
-.billboard-kicker-badge {
-  margin-left: 10px;
-  text-transform: none;
-  letter-spacing: 0;
-  vertical-align: middle;
-}
-
 /* ---- The organizer's WhatsApp bubble -------------------------------------
    Built ON .contact-fab rather than beside it, so the rules that keep that
    bubble clear of the assistant and lift it above the sticky checkout bar
@@ -6977,42 +6599,6 @@ html:has(.event-page.has-section-nav) {
 @media (max-width: 640px) {
   body:has(.event-cta-bar.is-on) .contact-fab {
     bottom: calc(84px + 56px + 12px + env(safe-area-inset-bottom, 0px));
-  }
-}
-
-/* "Swipe sideways for more" under the carousel dots. Quiet, but present: the
-   dots alone never told anyone the rail moves. */
-.ecar-hint {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin: 2px 0 0;
-  color: var(--text-dim);
-  font-size: 0.82rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-/* The arrows drift out and back, so the eye catches the movement and reads it
-   as "this goes sideways" without anything having to shout. */
-.ecar-hint span {
-  animation: ecar-nudge 2.4s ease-in-out infinite;
-}
-
-.ecar-hint span:last-child {
-  animation-delay: 1.2s;
-}
-
-@keyframes ecar-nudge {
-  0%, 100% { transform: translateX(0); opacity: 0.55; }
-  50% { transform: translateX(3px); opacity: 1; }
-}
-
-/* A hint that moves is a hint that distracts, for anyone who asked us not to. */
-@media (prefers-reduced-motion: reduce) {
-  .ecar-hint span {
-    animation: none;
   }
 }
 
