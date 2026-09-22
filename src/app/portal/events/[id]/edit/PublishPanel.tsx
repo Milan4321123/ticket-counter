@@ -33,6 +33,23 @@ interface Props {
   quality?: { key: string; label: string; why: string; tab: string }[];
   /** One line above them, or the praise line when there are none. */
   qualityLine?: string;
+  /**
+   * Another live listing bills the same act in a different city.
+   *
+   * Advice, like `quality` — publishing is never blocked by it. It is here
+   * because the organizer is the only person who can fix the root cause: two
+   * shows of one act, in two countries, titled so alike that buyers pick the
+   * wrong one. Undefined for the overwhelming majority of listings; see
+   * lib/sameAct.ts for how narrow the match is.
+   */
+  sameAct?: {
+    /** This listing's own city, already de-postcoded. */
+    city: string;
+    /** "Lisbon on Mon 19 Oct", one per other show. */
+    others: string[];
+    /** False when the title already carries the city, so the advice is dropped. */
+    suggestTitle: boolean;
+  };
 }
 
 // There used to be a fee card here — the per-event platform fee, its bank
@@ -49,6 +66,7 @@ export default function PublishPanel({
   announceAudience,
   quality = [],
   qualityLine = '',
+  sameAct,
 }: Props) {
   const router = useRouter();
   const v = vocabFor(kind);
@@ -127,6 +145,24 @@ export default function PublishPanel({
   return (
     <div>
       {error && <div className="notice notice-error">{error}</div>}
+
+      {/* Before the checklist and before the buttons, because it is about the
+          one thing the organizer cannot change later without confusing the
+          people who already bought: what this listing is CALLED. */}
+      {sameAct && sameAct.others.length > 0 && (
+        <div className="notice notice-warn">
+          <strong>The same act is playing elsewhere.</strong> {sameAct.others.join(' and ')} — by
+          another organizer, on their own page. Your page and theirs each link to the other, so
+          nobody buys the wrong city by accident.
+          {sameAct.suggestTitle ? (
+            <>
+              {' '}
+              Putting <strong>{sameAct.city}</strong> in your title helps even more: it is the one
+              thing buyers see in the feed, in search results and in their inbox.
+            </>
+          ) : null}
+        </div>
+      )}
 
       {status === 'published' ? (
         <div>

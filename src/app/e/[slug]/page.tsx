@@ -15,6 +15,7 @@ import HeroCoverVideo from './HeroCoverVideo';
 import SectionNav from './SectionNav';
 import type { EventSectionLink } from './SectionNav';
 import StickyCtaBar from './StickyCtaBar';
+import OtherCityNotice from '@/components/OtherCityNotice';
 import {
   cropTag,
   getEventById,
@@ -47,6 +48,7 @@ import { loadFeedSnapshot } from '@/lib/feedSnapshot';
 import { getAvailability } from '@/lib/inventory';
 import { runWaitlistNotifySweep } from '@/lib/waitlist';
 import WaitlistForm from '@/components/WaitlistForm';
+import { cityLabel, otherShowsByAct, shortDateLabel } from '@/lib/sameAct';
 import {
   ticketState,
   fromPriceCents,
@@ -368,6 +370,26 @@ export default async function EventPage({ params, searchParams }: Params) {
 
   const maps = mapsUrl(event);
   const location = [event.venueName, event.city].filter(Boolean).join(', ');
+  /**
+   * Where and when, in the two words a buyer is actually checking.
+   *
+   * The venue line above is an address; this is the answer to "is this my
+   * city, and is it the night I think it is". It goes directly under the title
+   * because an act touring two countries publishes the SAME poster for both
+   * dates — the title and the picture cannot tell those pages apart, and until
+   * now nothing above the fold could either.
+   */
+  const heroCity = event.kind === 'shop' ? '' : cityLabel(event.city);
+  const heroWhen = event.kind === 'shop' ? '' : shortDateLabel(event);
+  /**
+   * The same act, published elsewhere, in another city. Empty for all but a
+   * handful of listings — see lib/sameAct.ts for how narrow the match is.
+   */
+  const otherCities = otherShowsByAct(event).map((other) => ({
+    slug: other.slug,
+    city: cityLabel(other.city),
+    dateLabel: shortDateLabel(other),
+  }));
   // The words this page speaks. A shop sells items to collect, not tickets to
   // a night out, and every noun below comes from here rather than a literal.
   const v = vocabFor(event.kind);
@@ -677,6 +699,13 @@ export default async function EventPage({ params, searchParams }: Params) {
           >
             {headline}
           </h1>
+          {heroCity || heroWhen ? (
+            <p className="event-hero-where anim-fade-up anim-d1">
+              {heroCity ? <span className="event-hero-city">{heroCity}</span> : null}
+              {heroCity && heroWhen ? <span aria-hidden="true"> · </span> : null}
+              {heroWhen ? <span>{heroWhen}</span> : null}
+            </p>
+          ) : null}
           {/* What this shop's buyers have said, taken together — under the
               name, where somebody deciding whether to trust a stranger with a
               bank transfer is already looking.
@@ -798,6 +827,9 @@ export default async function EventPage({ params, searchParams }: Params) {
               ) : null}
             </div>
           )}
+          {/* Under the button, not buried in the body: this is the last thing
+              between a visitor and a checkout for the wrong country. */}
+          <OtherCityNotice city={heroCity} shows={otherCities} />
         </div>
       </section>
 
@@ -1460,6 +1492,7 @@ export default async function EventPage({ params, searchParams }: Params) {
         <StickyCtaBar
           href={checkoutHref}
           name={event.name}
+          place={[heroCity, heroWhen].filter(Boolean).join(' · ')}
           buyable={state.buyable}
           cta={state.cta}
           priceLabel={

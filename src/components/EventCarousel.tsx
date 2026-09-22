@@ -170,6 +170,9 @@ export default function EventCarousel({ label, count, children }: EventCarouselP
               onClick={() => goTo(i)}
             />
           ))}
+          <span className="ecar-count" aria-hidden="true">
+            {active + 1} / {count}
+          </span>
         </div>
       )}
 

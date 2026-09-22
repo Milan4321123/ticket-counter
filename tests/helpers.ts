@@ -126,6 +126,9 @@ export interface EventSpec {
   maxPerOrder?: number;
   payWithinDays?: number;
   eventDate?: string | null;
+  /** The billed act — what lib/sameAct.ts matches two listings on. */
+  artist?: string;
+  city?: string;
   payout?: PayoutSpec;
   tiers?: TierSpec[];
 }
@@ -145,9 +148,9 @@ export function makeEvent(spec: EventSpec = {}): EventRow {
   db()
     .prepare(
       `INSERT INTO events (id, organizer_id, slug, status, kind, name, currency, total_capacity, sales_open,
-         max_per_order, pay_within_days, event_date,
+         max_per_order, pay_within_days, event_date, artist, city,
          bank_account_holder, bank_iban, bank_bic, bank_name, paypal_account)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       id,
@@ -162,6 +165,8 @@ export function makeEvent(spec: EventSpec = {}): EventRow {
       spec.maxPerOrder ?? 8,
       spec.payWithinDays ?? 5,
       spec.eventDate ?? null,
+      spec.artist ?? '',
+      spec.city ?? '',
       spec.payout?.bankAccountHolder ?? 'Test Organizer',
       spec.payout?.bankIban ?? 'DE02120300000000202051',
       spec.payout?.bankBic ?? 'BYLADEM1001',

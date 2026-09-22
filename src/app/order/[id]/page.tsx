@@ -29,6 +29,7 @@ import { MAX_REVIEW_CHARS, reviewableItems } from '@/lib/reviews';
 import { machineDate } from '@/lib/seo';
 import { ticketQrDataUrl } from '@/lib/tickets';
 import { vocabFor } from '@/lib/vocab';
+import { cityLabel, shortDateLabel } from '@/lib/sameAct';
 import { whatsappShareUrl } from '@/lib/whatsapp';
 
 export const dynamic = 'force-dynamic';
@@ -67,6 +68,19 @@ export default async function OrderPage({
   // come from there.
   const event = getEventById(order.eventId);
   const eventVenue = event ? [event.venueName, event.city].filter(Boolean).join(', ') : '';
+  /**
+   * "Heidelberg · Sat 10 Oct" — the two facts a buyer has to carry with them.
+   *
+   * This page is what somebody reopens on the night, and what they scroll back
+   * to when a friend asks which show they got. Both were previously only
+   * available inside a grey line built out of the organizer's free-text date
+   * and the full postal address.
+   */
+  const eventPlace = event
+    ? [event.kind === 'shop' ? '' : cityLabel(event.city), shortDateLabel(event)]
+        .filter(Boolean)
+        .join(' · ')
+    : '';
   const checkoutHref = event ? `/e/${event.slug}/checkout` : '/';
   const v = vocabFor(event?.kind ?? 'event');
 
@@ -193,9 +207,13 @@ export default async function OrderPage({
       <div className="container container-narrow section">
         <h1 className="page-title anim-fade-up">Your reservation</h1>
         {event ? (
-          <p className="muted anim-fade-up" style={{ margin: '-8px 0 16px' }}>
-            {[event.name, event.dateDisplay, eventVenue].filter(Boolean).join(' · ')}
-          </p>
+          <div className="checkout-for anim-fade-up" style={{ marginTop: -8 }}>
+            <div className="checkout-for-name">{event.name}</div>
+            {eventPlace ? <div className="checkout-for-place">{eventPlace}</div> : null}
+            <div className="muted small">
+              {[event.dateDisplay, eventVenue].filter(Boolean).join(' · ')}
+            </div>
+          </div>
         ) : null}
         {itemsLine ? (
           <p className="muted small anim-fade-up" style={{ margin: '-8px 0 16px' }}>
@@ -749,6 +767,17 @@ export default async function OrderPage({
   return (
     <div className="container section">
       <h1 className="page-title anim-fade-up">Your tickets</h1>
+      {/* Where and when, above the QR codes rather than below them: this is the
+          page somebody reopens on the night. */}
+      {event ? (
+        <div className="checkout-for anim-fade-up" style={{ marginTop: -8 }}>
+          <div className="checkout-for-name">{event.name}</div>
+          {eventPlace ? <div className="checkout-for-place">{eventPlace}</div> : null}
+          <div className="muted small">
+            {[event.dateDisplay, eventVenue].filter(Boolean).join(' · ')}
+          </div>
+        </div>
+      ) : null}
       <div className="notice notice-success anim-fade-up anim-d1">
         {/* "confirmed", not "received": the money went to the organizer, and the
             organizer confirming it is the event this banner reports — the ticket
@@ -950,6 +979,15 @@ export default async function OrderPage({
           <div className="summary-row">
             <span className="muted">Event</span>
             <span>{[event.name, event.dateDisplay].filter(Boolean).join(' · ')}</span>
+          </div>
+        ) : null}
+        {event && eventVenue ? (
+          /* The address on its own row. It was only ever on this page inside
+             the ticket cards further up, which is the one part of it a buyer
+             screenshots and sends to somebody else. */
+          <div className="summary-row">
+            <span className="muted">Where</span>
+            <span>{eventVenue}</span>
           </div>
         ) : null}
         <div className="summary-row">

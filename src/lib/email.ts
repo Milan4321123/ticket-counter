@@ -27,6 +27,7 @@ import {
   referralCode,
 } from './orders';
 import { orderPayout } from './payout';
+import { cityLabel, shortDateLabel } from './sameAct';
 import { getVoucher, organizerCurrency } from './referrals';
 import {
   bareAddress,
@@ -208,6 +209,26 @@ function firstLineOf(text: string): string {
 
 function venueDisplay(event: EventRow): string {
   return [event.venueName, event.city].filter(Boolean).join(', ');
+}
+
+/**
+ * ", Heidelberg, Sat 10 Oct" — the place and day, for a SUBJECT line.
+ *
+ * A subject is what a buyer sees in a list of forty other subjects, on a phone,
+ * weeks after buying. It used to carry the listing's name and nothing else,
+ * which is fine right up until one act plays two countries in one month and
+ * two near-identical emails sit in the same inbox. The city goes in the
+ * subject so the right email is findable without opening either.
+ *
+ * Shops are left alone: a shop has a collection point, not a night out, and
+ * its own free-text pickup line is already in the body.
+ */
+function subjectPlace(event: EventRow): string {
+  if (event.kind === 'shop') return '';
+  const city = cityLabel(event.city);
+  const when = shortDateLabel(event);
+  const parts = [city, when].filter(Boolean);
+  return parts.length ? `, ${parts.join(', ')}` : '';
 }
 
 /**
@@ -908,7 +929,7 @@ export async function sendTicketEmail(
     const mailed = await sendMailAs('buyers', {
       replyTo: replyToBuyers(),
       to: order.buyerEmail,
-      subject: `Your ${one ? v.code : `${tickets.length} ${v.codes}`} for ${event.name}`,
+      subject: `Your ${one ? v.code : `${tickets.length} ${v.codes}`} for ${event.name}${subjectPlace(event)}`,
       text,
       html,
       attachments,
@@ -1273,7 +1294,7 @@ export async function sendTransferInstructionsEmail(
     const mailed = await sendMailAs('buyers', {
       replyTo: replyToBuyers(),
       to: order.buyerEmail,
-      subject: `Reserved: your ${v.units} for ${event.name} — payment details inside`,
+      subject: `Reserved: your ${v.units} for ${event.name}${subjectPlace(event)} — payment details inside`,
       text,
       html,
       ...(paymentQrAttachment ? { attachments: [paymentQrAttachment] } : {}),
@@ -1693,7 +1714,7 @@ export async function sendBuyerPaymentReminderEmail(
     const mailed = await sendMailAs('buyers', {
       replyTo: replyToBuyers(),
       to: order.buyerEmail,
-      subject: `Reminder: your ${v.units} for ${event.name} are still reserved`,
+      subject: `Reminder: your ${v.units} for ${event.name}${subjectPlace(event)} are still reserved`,
       text,
       html,
     });

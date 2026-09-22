@@ -12,6 +12,7 @@ import type {
   VoucherCheckResponse,
 } from '@/lib/types';
 import { vocabFor, type Vocab } from '@/lib/vocab';
+import OtherCityNotice, { type OtherShow } from '@/components/OtherCityNotice';
 import styles from './checkout.module.css';
 
 declare global {
@@ -42,6 +43,14 @@ export interface CheckoutConfig {
   artist: string;
   dateDisplay: string;
   venue: string;
+  /**
+   * The city on its own, without the postcode — the word a buyer is checking
+   * this page against. Separate from `venue` because the venue line is an
+   * address, and an address is read, not scanned.
+   */
+  city: string;
+  /** "Sat 10 Oct", built from the machine date only. '' when there is none. */
+  whenLabel: string;
   currency: string;
   maxTicketsPerOrder: number;
   /** Event or shop — decides every noun on this page. See lib/vocab. */
@@ -102,6 +111,12 @@ interface Props {
    * again — the tap WAS the choice.
    */
   preselectTier?: string | null;
+  /**
+   * Other published shows by the same act, in other cities. Almost always
+   * empty; when it is not, this page is the last place the mistake can still
+   * be caught for free. See lib/sameAct.ts.
+   */
+  otherCities: OtherShow[];
 }
 
 /** POST /api/orders body — matches the platform orders API contract. */
@@ -255,6 +270,7 @@ export default function CheckoutClient({
   organizerName,
   refCode,
   preselectTier = null,
+  otherCities,
 }: Props) {
   const router = useRouter();
   // Identical checkout either way — same stepper, same reservation, same
@@ -795,18 +811,31 @@ export default function CheckoutClient({
   // ---------------- Render ----------------
 
   const selectedTiers = config.tiers.filter((t) => (qty[t.id] ?? 0) > 0);
-  const eventSummary = [config.eventName, config.dateDisplay, config.venue]
-    .filter(Boolean)
-    .join(' · ');
+  /**
+   * Where and when, as the buyer will have to remember it.
+   *
+   * This used to be one grey line — "Name · Saturday, 10 October 2026 · Venue,
+   * 69126 Heidelberg" — set in the same muted type as every other caption on
+   * the page. That is fine until one act is booked into two countries inside
+   * ten days with the same poster on both listings, which is exactly what
+   * happened: the only thing separating a ticket you can use from one you
+   * cannot was a word in the middle of a grey sentence.
+   */
+  const placeLine = [config.city, config.whenLabel].filter(Boolean).join(' · ');
 
   return (
     <div className="container container-narrow">
       <h1 className="page-title anim-fade-up" style={{ marginBottom: 8 }}>
         Checkout
       </h1>
-      <p className="muted anim-fade-up" style={{ margin: '0 0 20px' }}>
-        {eventSummary}
-      </p>
+      <div className="checkout-for anim-fade-up">
+        <div className="checkout-for-name">{config.eventName}</div>
+        {placeLine ? <div className="checkout-for-place">{placeLine}</div> : null}
+        <div className="muted small">
+          {[config.dateDisplay, config.venue].filter(Boolean).join(' · ')}
+        </div>
+      </div>
+      <OtherCityNotice city={config.city} shows={otherCities} variant="checkout" />
 
       <div className="card anim-fade-up anim-d1">
         <h2 className="card-title">{isShop ? 'Your order' : 'Your tickets'}</h2>
@@ -1315,6 +1344,20 @@ export default function CheckoutClient({
 
       <div className="card anim-fade-up anim-d3">
         <h2 className="card-title">{isFreeOrder ? 'Reserve your spot' : 'Payment'}</h2>
+
+        {/* The one fact worth repeating directly above the button: a buyer who
+            has scrolled this far has not seen the top of the page for several
+            screens, and what they are about to commit to is a night in a
+            particular city. Shown for every listing, not only the ones with a
+            twin — the twin is what taught us to say it, not the only case
+            where somebody buys for the wrong weekend. */}
+        {placeLine ? (
+          <p className="checkout-place-confirm">
+            {isShop ? 'Collect in' : `These ${v.units} are for`}{' '}
+            <strong>{config.city}</strong>
+            {config.whenLabel ? <> · {config.whenLabel}</> : null}
+          </p>
+        ) : null}
 
         {message && (
           <div

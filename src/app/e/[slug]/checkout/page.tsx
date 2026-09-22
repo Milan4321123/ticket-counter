@@ -5,6 +5,7 @@ import { getPaymentMode } from '@/lib/config';
 import { getEventBySlug, getEventTiers, paypalPayee } from '@/lib/events';
 import { getAvailability } from '@/lib/inventory';
 import { ticketState, tiersInSaleOrder } from '@/lib/ticketState';
+import { cityLabel, otherShowsByAct, shortDateLabel } from '@/lib/sameAct';
 import { vocabFor } from '@/lib/vocab';
 import { expireOverdueTransferReservations } from '@/lib/orders';
 import { getOrganizer } from '@/lib/organizers';
@@ -127,6 +128,11 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
         artist: event.artist,
         dateDisplay: event.dateDisplay,
         venue: [event.venueName, event.city].filter(Boolean).join(', '),
+        // The city alone, and the date in four words: the two things a buyer
+        // checks a ticket against, given to the page separately from the
+        // address line so it can print them where they will be read.
+        city: cityLabel(event.city),
+        whenLabel: shortDateLabel(event),
         currency: event.currency,
         maxTicketsPerOrder: event.maxPerOrder,
         kind: event.kind,
@@ -153,6 +159,11 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
       retentionDays={BUYER_RETENTION_DAYS}
       organizerName={organizerName}
       refCode={refCode}
+      otherCities={otherShowsByAct(event).map((other) => ({
+        slug: other.slug,
+        city: cityLabel(other.city),
+        dateLabel: shortDateLabel(other),
+      }))}
     />
   );
 }

@@ -62,6 +62,8 @@ import {
   shareImages,
 } from '@/lib/seo';
 import { tierBadge, ticketState, visibleTiers } from '@/lib/ticketState';
+import { cityLabel, otherShowsByAct, shortDateLabel } from '@/lib/sameAct';
+import OtherCityNotice from '@/components/OtherCityNotice';
 import { vocabFor } from '@/lib/vocab';
 
 // Availability comes from the database — always render fresh, exactly like the
@@ -290,6 +292,15 @@ export default async function ItemPage({ params, searchParams }: Params) {
   // truthful.
   const buyHref = `${checkoutBase}?tier=${encodeURIComponent(tier.tierKey)}${refCode ? `&ref=${refCode}` : ''}`;
   const backHref = `/e/${event.slug}${refCode ? `?ref=${refCode}` : ''}#tickets`;
+  /** "Heidelberg · Sat 10 Oct" — events only; a shop collects, it does not travel. */
+  const itemPlace = isShop
+    ? ''
+    : [cityLabel(event.city), shortDateLabel(event)].filter(Boolean).join(' · ');
+  const itemOtherCities = otherShowsByAct(event).map((other) => ({
+    slug: other.slug,
+    city: cityLabel(other.city),
+    dateLabel: shortDateLabel(other),
+  }));
 
   const organizer = getOrganizer(event.organizerId);
   const sellerName = organizer?.name?.trim() || 'the organizer';
@@ -546,6 +557,12 @@ export default async function ItemPage({ params, searchParams }: Params) {
             {isShop ? 'From' : 'Part of'} <Link href={backHref}>{event.name}</Link>
           </p>
 
+          {/* Where and when, on the page a shared link most often opens.
+              An item link is what gets forwarded in a group chat — it skips
+              the listing page entirely, so everything the hero over there says
+              about the city has to be said again here. */}
+          {itemPlace ? <p className="item-place-line">{itemPlace}</p> : null}
+
           <div className="tier-price">
             {tier.priceCents === 0 ? 'Free' : formatMoney(tier.priceCents, event.currency)}
           </div>
@@ -576,6 +593,11 @@ export default async function ItemPage({ params, searchParams }: Params) {
               Bring a valid student ID — it&rsquo;s checked at the entrance.
             </p>
           )}
+
+          {/* Same warning as the listing page and the checkout, because this
+              page has its own buy button and a shared item link can reach it
+              without passing either of them. */}
+          <OtherCityNotice city={cityLabel(event.city)} shows={itemOtherCities} />
 
           {/* A flex row rather than the inline flow these two would otherwise
               fall into. The buy control is btn-lg and the save toggle is a

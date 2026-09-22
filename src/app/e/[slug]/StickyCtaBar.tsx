@@ -13,6 +13,12 @@ interface Props {
   buyable?: boolean;
   /** What the button says — "Get tickets", "Coming soon", "Sold out". */
   cta?: string;
+  /**
+   * "Heidelberg · Sat 10 Oct". The bar is the only thing on screen for most of
+   * a phone visit, and an act playing two countries in one month makes the
+   * city part of the identity of the page, not a detail on it.
+   */
+  place?: string;
 }
 
 /**
@@ -23,7 +29,14 @@ interface Props {
  * where the bar sits, so the two would cover each other. Once that button
  * scrolls away the bar takes over.
  */
-export default function StickyCtaBar({ href, name, priceLabel, buyable = true, cta = 'Get tickets' }: Props) {
+export default function StickyCtaBar({
+  href,
+  name,
+  priceLabel,
+  buyable = true,
+  cta = 'Get tickets',
+  place = '',
+}: Props) {
   const [armed, setArmed] = useState(false);
 
   useEffect(() => {
@@ -45,7 +58,10 @@ export default function StickyCtaBar({ href, name, priceLabel, buyable = true, c
     <div className={`event-cta-bar no-print${armed ? ' is-on' : ''}`}>
       <div className="event-cta-info">
         <div className="event-cta-name">{name}</div>
-        <div className="event-cta-price">{priceLabel}</div>
+        <div className="event-cta-price">
+          {priceLabel}
+          {place ? <span className="event-cta-place"> · {place}</span> : null}
+        </div>
       </div>
       {/* The bar used to be dropped entirely whenever nothing was on sale, so
           the one control a phone always had in reach disappeared exactly when

@@ -1866,6 +1866,39 @@ summary {
   color: #fff;
 }
 
+/* The place, along the BOTTOM of the poster where the scrim already darkens
+   the picture — the top corners are taken by the date and by up to two
+   availability badges, and a long city name slid underneath them. Accent
+   coloured rather than the date chip's neutral dark: two facts, two colours,
+   so a buyer comparing two tiles of the same act sees the difference before
+   reading either one. */
+.event-city-chip {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: calc(100% - 24px);
+  padding: 4px 10px;
+  border-radius: 9px;
+  background: rgba(124, 58, 237, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  font-weight: 700;
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-city-chip svg {
+  flex: none;
+}
+
 .event-card-body {
   display: flex;
   flex-direction: column;
@@ -1949,6 +1982,113 @@ summary {
 
 .section-kicker + .page-title {
   margin-top: 6px;
+}
+
+/* ---------- Checkout: what you are buying, and for where ---------- */
+
+.checkout-for {
+  margin: 0 0 16px;
+}
+
+.checkout-for-name {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+/* The city is the fact a wrong purchase turns on, so it is set like a price,
+   not like a caption. */
+.checkout-for-place {
+  margin: 2px 0 3px;
+  font-size: 1.12rem;
+  font-weight: 700;
+  color: var(--accent-text);
+}
+
+.item-place-line {
+  margin: 0 0 4px;
+  font-weight: 700;
+  color: var(--accent-text);
+}
+
+.checkout-place-confirm {
+  margin: 0 0 14px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  font-size: 0.93rem;
+}
+
+/* ---------- Where this show is (event page hero + the other-city notice) ---------- */
+
+/* Directly under the title, at a size the eye reaches before the chips: an act
+   touring two countries publishes the same poster for both dates, so the city
+   is part of what identifies this page, not a detail on it. */
+.event-hero-where {
+  margin: 4px 0 14px;
+  font-size: clamp(1.02rem, 2.4vw, 1.35rem);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.event-hero-city {
+  color: var(--accent-text);
+}
+
+/* The other show by the same act. Calm on the event page, amber at checkout —
+   one is information, the other is the last thing before money moves. */
+.other-city-notice {
+  /* inline-block so the hero's own text-align places it: this block sits under
+     heroes that are centred and heroes that are left-aligned, and a fixed
+     `margin: auto` centred it under both — which under a left-aligned hero
+     left it floating in from the edge, attached to nothing. */
+  display: inline-block;
+  margin: 18px 0 0;
+  max-width: min(640px, 100%);
+  text-align: left;
+  padding: 13px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-text);
+  background: rgba(10, 11, 16, 0.55);
+}
+
+.other-city-notice-warn {
+  border-color: rgba(251, 191, 36, 0.3);
+  border-left-color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.other-city-lead {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.other-city-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 8px 0 0;
+}
+
+.other-city-link {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--accent-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.other-city-notice-warn .other-city-link {
+  color: var(--amber);
+}
+
+/* The phone bar's second line carries the city, so it must not be the dimmest
+   thing in the bar. */
+.event-cta-place {
+  color: var(--text);
+  font-weight: 600;
 }
 
 /* ---------- Hero info chips (event page) ---------- */
@@ -6050,11 +6190,28 @@ html:has(.event-page.has-section-nav) {
 }
 
 .ecar-slide {
-  flex: 0 0 100%;
+  /* Not 100%: the edge of the next event stays on screen.
+     A rail of full-width slides looks exactly like a static picture, and the
+     line of text under it asking people to swipe was not moving them — a
+     billboard is judged in about a second, and in that second nothing on the
+     page said "there is more". A sliver of the neighbour does what the
+     sentence could not, and it does it on the first glance rather than the
+     second read. */
+  flex: 0 0 92%;
   scroll-snap-align: center;
   /* One event per swipe. A hero that skims past two at a time on a fast flick
      is a hero nobody actually sees. */
   scroll-snap-stop: always;
+}
+
+/* "1 / 3" beside the dots: the dots say where you are only to somebody who
+   already counted them. */
+.ecar-count {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  margin-left: 4px;
 }
 
 /* Arrows sit ON the artwork, vertically centred, and only appear where there

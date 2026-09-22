@@ -12,6 +12,7 @@ import type { FeedSnapshot } from '@/lib/feedSnapshot';
 import { getAvailability } from '@/lib/inventory';
 import { ticketState, fromPriceCents, comingSoonLabel } from '@/lib/ticketState';
 import { listingTileMedia } from '@/lib/listing';
+import { cityLabel } from '@/lib/sameAct';
 import { formatMoney } from '@/lib/money';
 
 type AccentName = NonNullable<PageDesign['accent']>;
@@ -122,6 +123,17 @@ export default function EventCard({
   const isShop = event.kind === 'shop';
   const chip = isShop ? 'Shop' : dateChipLabel(event);
   /**
+   * The city, ON the poster, beside the date.
+   *
+   * It is already printed in the card body, and that was not enough: one act
+   * played Heidelberg and Lisbon nine days apart with the same publicity
+   * photo, and on both tiles the only thing distinguishing them was the fourth
+   * grey line of the body text. Date and place are the two facts that decide
+   * whether a ticket is usable at all, so they now sit together in the one
+   * part of the tile the eye actually lands on — the picture.
+   */
+  const cityChip = cityLabel(event.city);
+  /**
    * The example mark, moved out of the title and into a pill of its own.
    *
    * The mark lives in the listing NAME — "Taplejung Alaichi Ghar (example
@@ -176,6 +188,19 @@ export default function EventCard({
           </div>
         )}
         {chip ? <span className="event-date-chip">{chip}</span> : null}
+        {cityChip ? (
+          <span className="event-city-chip">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M12 21s7-5.1 7-11a7 7 0 1 0-14 0c0 5.9 7 11 7 11Z"
+                stroke="currentColor"
+                strokeWidth="2.4"
+                strokeLinejoin="round"
+              />
+            </svg>
+            {cityChip}
+          </span>
+        ) : null}
         <span className="event-card-status">
           {/* First in the pile, before availability: the badges wrap on a
               narrow tile, and the one fact a buyer must not miss cannot be the

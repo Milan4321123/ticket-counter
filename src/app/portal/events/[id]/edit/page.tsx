@@ -38,6 +38,7 @@ import DangerZone from './DangerZone';
 import DesignPanel from './DesignPanel';
 import EditorSection, { EditorSectionGroup } from './EditorSection';
 import { vocabFor } from '@/lib/vocab';
+import { cityLabel, otherShowsByAct, shortDateLabel } from '@/lib/sameAct';
 import GoToTab from './GoToTab';
 import EditorTabs from './EditorTabs';
 import DetailsForm from './DetailsForm';
@@ -572,6 +573,24 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
             // The same query the announce route walks — the count promised on
             // the button is the count the route would email.
             announceAudience={listAnnouncementAudience(organizer.id, event.id).length}
+            // Another live listing billing the same act in another city. The
+            // organizer is the only one who can fix the root cause — a title
+            // that does not say which city it is — so they are told here, in
+            // the panel they are already looking at when they publish.
+            sameAct={(() => {
+              const others = otherShowsByAct(event);
+              if (others.length === 0) return undefined;
+              const city = cityLabel(event.city);
+              return {
+                city,
+                others: others.map((other) => {
+                  const when = shortDateLabel(other);
+                  return `${cityLabel(other.city)}${when ? ` on ${when}` : ''}`;
+                }),
+                suggestTitle:
+                  city.length > 0 && !event.name.toLowerCase().includes(city.toLowerCase()),
+              };
+            })()}
           />
         </EditorSection>
 
