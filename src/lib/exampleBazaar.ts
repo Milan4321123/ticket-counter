@@ -65,6 +65,9 @@ export function startExampleBazaarJob(action: 'seed' | 'clean', onDone?: (ok: bo
 
 const AUTO_KEY = 'example_bazaar_autoseed';
 
+/** When this server process started — a run recorded before it was cut off by the restart. */
+const PROCESS_STARTED_AT = Date.now();
+
 /**
  * Put the example bazaar up ONCE on a site that has never had it — so a fresh
  * hosted site shows a stocked /market without anyone opening a terminal.
@@ -87,7 +90,9 @@ export function ensureExampleBazaarOnce(): void {
       const [state, ts] = row.value.split(':');
       const age = Date.now() - Number(ts || 0);
       const running = global.__exampleBazaarJob && global.__exampleBazaarJob.finishedAt === null;
-      const stale = (state === 'started' && age > 20 * 60_000 && !running) || (state === 'failed' && age > 6 * 3_600_000);
+      // Started before THIS server process existed = certainly cut off.
+      const cutOff = state === 'started' && !running && (Number(ts || 0) < PROCESS_STARTED_AT || age > 20 * 60_000);
+      const stale = cutOff || (state === 'failed' && age > 6 * 3_600_000);
       if (!stale || exampleShopCount() > 0) return;
       db.prepare(`DELETE FROM kv WHERE key = ? AND value = ?`).run(AUTO_KEY, row.value);
     }
