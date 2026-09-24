@@ -1850,8 +1850,12 @@ function ground(w, h, p) {
       <stop offset="0" stop-color="${p.bg2}" stop-opacity="0"/>
       <stop offset="1" stop-color="${p.bg2}" stop-opacity="0.85"/>
     </linearGradient>
-    <pattern id="hatch" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(38)">
-      <line x1="0" y1="0" x2="0" y2="16" stroke="${p.ink}" stroke-opacity="0.045" stroke-width="1.4"/>
+    <!-- Diagonal lines drawn INTO the tile rather than a rotated pattern:
+         librsvg renders a patternTransform rotate() tile by tile and it cost
+         ~5 s per 1600x2000 picture (six minutes for the bazaar, far longer on
+         a small server). This looks the same and takes ~0.1 s. -->
+    <pattern id="hatch" width="16" height="16" patternUnits="userSpaceOnUse">
+      <path d="M-4 20 L20 -4 M-4 4 L4 -4 M12 20 L20 12" stroke="${p.ink}" stroke-opacity="0.045" stroke-width="1.4"/>
     </pattern>
   </defs>
   <rect width="${w}" height="${h}" fill="url(#field)"/>

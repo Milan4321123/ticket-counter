@@ -79,7 +79,18 @@ export function ensureExampleBazaarOnce(): void {
     if (process.env.EXAMPLE_BAZAAR_AUTOSEED === 'off') return;
     const db = getDb();
     const row = db.prepare(`SELECT value FROM kv WHERE key = ?`).get(AUTO_KEY) as { value: string } | undefined;
-    if (row) return;
+    if (row) {
+      // A run that started but never finished was cut off by a restart (a
+      // deploy kills the child process) — after 20 minutes, try again. A run
+      // that failed gets one more try after six hours. Anything else — done,
+      // already present, or taken down by the owner — stays as it is.
+      const [state, ts] = row.value.split(':');
+      const age = Date.now() - Number(ts || 0);
+      const running = global.__exampleBazaarJob && global.__exampleBazaarJob.finishedAt === null;
+      const stale = (state === 'started' && age > 20 * 60_000 && !running) || (state === 'failed' && age > 6 * 3_600_000);
+      if (!stale || exampleShopCount() > 0) return;
+      db.prepare(`DELETE FROM kv WHERE key = ? AND value = ?`).run(AUTO_KEY, row.value);
+    }
     if (exampleShopCount() > 0) {
       db.prepare(`INSERT OR IGNORE INTO kv (key, value) VALUES (?, ?)`).run(AUTO_KEY, 'already-present');
       return;
