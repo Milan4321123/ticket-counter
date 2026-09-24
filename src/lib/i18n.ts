@@ -42,6 +42,12 @@ const D = {
   'home.shop': { en: 'Shop the bazaar →', de: 'Zum Basar →', ne: 'बजार हेर्नुहोस् →' },
   'home.organizers': { en: 'For organizers', de: 'Für Veranstalter', ne: 'आयोजकहरूका लागि' },
   'home.demo': { en: 'Try the demo', de: 'Demo testen', ne: 'डेमो हेर्नुहोस्' },
+  'bb.event': { en: 'Event', de: 'Event', ne: 'कार्यक्रम' },
+  'bb.bazaar': { en: 'From the bazaar', de: 'Aus dem Basar', ne: 'बजारबाट' },
+  'bb.free': { en: 'Free', de: 'Kostenlos', ne: 'निःशुल्क' },
+  'bb.from': { en: 'from {price}', de: 'ab {price}', ne: '{price} देखि' },
+  'bb.tickets': { en: 'Get tickets', de: 'Tickets holen', ne: 'टिकट लिनुहोस्' },
+  'bb.order': { en: 'Order now', de: 'Jetzt bestellen', ne: 'अहिले अर्डर गर्नुहोस्' },
 
   // bazaar
   'bz.kicker': { en: 'The bazaar', de: 'Der Basar', ne: 'बजार' },

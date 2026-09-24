@@ -83,6 +83,12 @@ export function listingStillUrl(event: EventRow, preloaded?: EventMediaRow[]): s
   return still ? mediaUrl(still.id, 'card', still.crop) : null;
 }
 
+/** The same still at the wide 'cover' size — the homepage billboard. */
+export function listingCoverUrl(event: EventRow, preloaded?: EventMediaRow[]): string | null {
+  const still = listingStill(event, preloaded ?? getEventMedia(event.id));
+  return still ? mediaUrl(still.id, 'cover', still.crop) : null;
+}
+
 /**
  * The picture that represents this listing everywhere OFF-site: Google,
  * WhatsApp, Facebook, Viber. Uses the SAME cover the page itself opens with,
