@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { demoTargetPath, isDemoTarget, type DemoTarget } from '@/lib/demo';
 import { currentOrganizer } from '@/lib/organizers';
+import DemoSubmit from './DemoSubmit';
 import { platformNameFromEnv } from '@/lib/platform';
 
 export const dynamic = 'force-dynamic';
@@ -108,9 +109,7 @@ export default async function DemoPage({
         <form action="/api/demo/start" method="post" style={{ margin: '18px 0 8px' }}>
           <input type="hidden" name="to" value={to} />
           {(realSession || error === 'signed-in') && <input type="hidden" name="confirm" value="1" />}
-          <button className="btn btn-brand btn-lg" type="submit">
-            {to === 'portal' ? 'Start the demo' : `Start the demo and open ${TARGET_LABEL[to]}`}
-          </button>
+          <DemoSubmit label={to === 'portal' ? 'Start the demo' : `Start the demo and open ${TARGET_LABEL[to]}`} />
         </form>
       )}
 
@@ -137,9 +136,7 @@ export default async function DemoPage({
               <form action="/api/demo/start" method="post">
                 <input type="hidden" name="to" value={step.to} />
                 {realSession && <input type="hidden" name="confirm" value="1" />}
-                <button type="submit" className="btn btn-sm">
-                  Start here →
-                </button>
+                <DemoSubmit label="Start here →" className="btn btn-sm" />
               </form>
             )}
           </div>

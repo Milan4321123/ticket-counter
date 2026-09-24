@@ -116,12 +116,14 @@ export default async function PortalInsightsPage({ params }: { params: Promise<{
             <div className="stat-label">{v.Units} sold</div>
             <div className="stat-value">
               {stats.ticketsSold}
-              <span className="muted small">/ {event.totalCapacity}</span>
+              {!isShop && <span className="muted small">/ {event.totalCapacity}</span>}
             </div>
             <div className="stat-sub">
-              {event.totalCapacity > 0
-                ? `${Math.min(100, Math.round((stats.ticketsSold / event.totalCapacity) * 100))}% of ${v.capacity}`
-                : `of stated ${v.capacity}`}
+              {isShop
+                ? `across ${stats.perTier.filter((t) => t.sold > 0).length} ${stats.perTier.filter((t) => t.sold > 0).length === 1 ? 'item' : 'items'}`
+                : event.totalCapacity > 0
+                  ? `${Math.min(100, Math.round((stats.ticketsSold / event.totalCapacity) * 100))}% of ${v.capacity}`
+                  : `of stated ${v.capacity}`}
             </div>
           </div>
           <div className="stat-card anim-fade-up anim-d4">

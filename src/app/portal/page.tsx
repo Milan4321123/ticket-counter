@@ -321,12 +321,27 @@ export default async function PortalDashboardPage({
                               event.venueName ? ` · ${event.venueName}` : ''
                             }`}
                       </p>
-                      <div className="meter" style={{ margin: 0 }}>
-                        <span className="meter-track">
-                          <span className="meter-fill meter-fill-brand" style={{ width: `${pct}%` }} />
-                        </span>
-                        <span className="meter-num">{`${stats.ticketsSold} / ${event.totalCapacity} ${v.units} sold`}</span>
-                      </div>
+                      {event.kind === 'shop' ? (
+                        // A shop has no room to fill — its "capacity" is only a
+                        // ceiling. What an owner reads is how much went out of
+                        // the door, and how much is still waiting to be collected.
+                        <div className="meter" style={{ margin: 0 }}>
+                          <span className="meter-track">
+                            <span
+                              className="meter-fill meter-fill-brand"
+                              style={{ width: `${stats.ticketsSold ? Math.round((stats.checkedIn / stats.ticketsSold) * 100) : 0}%` }}
+                            />
+                          </span>
+                          <span className="meter-num">{`${stats.ticketsSold} ${v.units} sold · ${stats.checkedIn} collected`}</span>
+                        </div>
+                      ) : (
+                        <div className="meter" style={{ margin: 0 }}>
+                          <span className="meter-track">
+                            <span className="meter-fill meter-fill-brand" style={{ width: `${pct}%` }} />
+                          </span>
+                          <span className="meter-num">{`${stats.ticketsSold} / ${event.totalCapacity} ${v.units} sold`}</span>
+                        </div>
+                      )}
                       <div className="hub-card-money">
                         <div>
                           <strong>{formatMoney(stats.revenueCents, event.currency)}</strong>
