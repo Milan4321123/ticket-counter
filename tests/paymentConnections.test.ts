@@ -33,8 +33,10 @@ describe('secretBox', () => {
     assert.notEqual(sealed, 'sk_test_abc123');
     assert.equal(openSecret(sealed), 'sk_test_abc123');
     const [v, iv, enc, tag] = sealed.split('.');
-    // Flip one character of the authentication tag — always a real change.
-    const flipped = tag.slice(0, -1) + (tag.endsWith('A') ? 'B' : 'A');
+    // Change the FIRST character of the authentication tag. Not the last: in
+    // base64url the final character of a 16-byte tag carries padding bits the
+    // decoder ignores, so swapping it can decode to the very same bytes.
+    const flipped = (tag.startsWith('A') ? 'B' : 'A') + tag.slice(1);
     assert.equal(openSecret([v, iv, enc, flipped].join('.')), null);
     assert.equal(openSecret('garbage'), null);
   });
