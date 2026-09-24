@@ -16,6 +16,9 @@ import { organizerPlanActive } from '@/lib/organizers';
 import { organizerTotpEnabled } from '@/lib/organizerTotp';
 import { runTransferReminderSweep } from '@/lib/reminders';
 import CreateEventForm from './CreateEventForm';
+import { serverT } from '@/lib/i18nServer';
+import InstallAppButton from '@/components/AppInstall';
+import { IconCheck, IconEdit, IconGear, IconInbox, IconMessage, IconReceipt, IconScan, IconShield, IconStar, IconTag, IconTicket } from './HubIcons';
 import PlanExpired from './PlanExpired';
 import PortalNav from './PortalNav';
 import { requirePortalOrganizer } from './guard';
@@ -63,6 +66,7 @@ export default async function PortalDashboardPage({
   const deletedName = (Array.isArray(deletedParam) ? deletedParam[0] : deletedParam)?.trim().slice(0, 140) ?? '';
 
   const organizer = await requirePortalOrganizer();
+  const tr = await serverT();
   if (!organizerPlanActive(organizer)) return <PlanExpired organizer={organizer} />;
 
   // Lazy trigger: visiting the dashboard also nudges the reminder sweep, so
@@ -91,272 +95,288 @@ export default async function PortalDashboardPage({
   }));
   const firstName = organizer.name.trim().split(/\s+/)[0] || organizer.name;
 
+  // Account-wide numbers for the tiles. Money is summed in the currency of the
+  // listings (all EUR today); a mixed-currency account shows the first one's.
+  const currency = events[0]?.currency ?? 'EUR';
+  const sum = (pick: (t: ReturnType<typeof totalsFor>) => number) =>
+    cards.reduce((n, c) => n + pick(c.stats), 0);
+  const received = sum((t) => t.revenueCents);
+  const onItsWay = sum((t) => t.awaitingTransferCents);
+  const toConfirm = sum((t) => t.awaitingTransferOrders);
+  const sold = sum((t) => t.ticketsSold);
+  const redeemed = sum((t) => t.checkedIn);
+  const questions = cards.reduce((n, c) => n + c.openQuestions, 0);
+  const live = cards.filter((c) => c.event.status === 'published').length;
+
+  // What needs doing, most urgent first: money waiting to be matched, people
+  // waiting for an answer, drafts that are not selling yet, account safety.
+  type Todo = { href: string; title: string; line: string; tone: 'amber' | 'green' | 'brand'; icon: React.ReactNode };
+  const todos: Todo[] = [];
+  for (const c of cards) {
+    if (c.stats.awaitingTransferOrders > 0) {
+      todos.push({
+        href: `/portal/events/${c.event.id}/orders`,
+        title: `Confirm ${c.stats.awaitingTransferOrders} payment${c.stats.awaitingTransferOrders === 1 ? '' : 's'}`,
+        line: `${c.event.name} · ${formatMoney(c.stats.awaitingTransferCents, c.event.currency)} on its way`,
+        tone: 'amber',
+        icon: <IconInbox />,
+      });
+    }
+  }
+  for (const c of cards) {
+    if (c.openQuestions > 0) {
+      todos.push({
+        href: `/portal/events/${c.event.id}/edit?tab=questions`,
+        title: `Answer ${c.openQuestions} question${c.openQuestions === 1 ? '' : 's'}`,
+        line: `From visitors to ${c.event.name}`,
+        tone: 'green',
+        icon: <IconMessage />,
+      });
+    }
+  }
+  for (const c of cards) {
+    if (c.event.status === 'draft') {
+      todos.push({
+        href: `/portal/events/${c.event.id}/edit?tab=publish`,
+        title: 'Finish and publish',
+        line: `${c.event.name} is still a private draft`,
+        tone: 'brand',
+        icon: <IconEdit />,
+      });
+    }
+  }
+  if (!hasAuthenticator && !organizer.isDemo) {
+    todos.push({
+      href: '/portal/settings',
+      title: 'Protect your account',
+      line: 'Set up the free authenticator app — needed before you publish',
+      tone: 'brand',
+      icon: <IconShield />,
+    });
+  }
+
+  const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+
   return (
     <>
       <PortalNav active="events" />
-      <div className="container section">
-        <div className="anim-fade-up" style={{ marginBottom: 20 }}>
-          <h1 className="page-title" style={{ margin: 0 }}>
-            Namaste, {firstName}
-          </h1>
-          <p className="muted small" style={{ margin: '4px 0 0' }}>
-            {cards.length === 0
-              ? 'Welcome to your organizer portal — this is where your events and shops live.'
-              : `Here is how your ${cards.length === 1 ? 'listing is' : 'listings are'} doing.`}{' '}
-            Signed in as {organizer.email}.
-          </p>
-        </div>
+      <div className="container hub-home">
+        <header className="hub-hello anim-fade-up">
+          <div>
+            <h1>
+              {tr('hub.namaste')}, {firstName} 🙏
+            </h1>
+            <p>
+              {today} ·{' '}
+              {cards.length === 0
+                ? 'Welcome — this is where your events and shops live.'
+                : `${live} of your ${cards.length} ${cards.length === 1 ? 'listing is' : 'listings are'} live.`}
+            </p>
+          </div>
+          <div className="hub-hello-actions">
+            {/* Only appears where the browser can install, or on iPhone with the how-to. */}
+            <InstallAppButton label="Install the seller app" />
+            <a href="#new" className="btn btn-brand">
+              {tr('hub.new')}
+            </a>
+          </div>
+        </header>
 
         {deletedName && (
-          <div className="notice notice-success anim-fade-up" role="status">
+          <div className="notice notice-success anim-fade-up" role="status" style={{ margin: 0 }}>
             <strong>{deletedName}</strong> is gone — its page, photos, prices, orders and codes have all been
             removed. Nothing about it is left on the platform.
           </div>
         )}
 
-        <p className="muted small anim-fade-up" style={{ marginTop: -6 }}>
-          Your account is free, and so is publishing — no fees, and never a cut of your ticket
-          sales.
-        </p>
-
-        {/* Said here, not only at the moment publishing is refused. An organizer
-            who meets this as a blocked button on launch day reads it as the
-            platform getting in the way; the same sentence a week earlier reads
-            as the platform looking after their money. */}
-        {!hasAuthenticator && (
-          <div className="notice notice-warn anim-fade-up" style={{ marginTop: 12 }}>
-            <strong>Set up your authenticator app.</strong>
-            <p className="small" style={{ margin: '6px 0 0' }}>
-              It is a free app on your phone that shows a 6-digit code. Once it is on, your password
-              alone is not enough to get into your account — and not enough to change the bank
-              account your ticket money is paid into, which is the one thing nobody can undo for
-              you. It works offline, so it keeps working even when email does not.
-            </p>
-            <p className="small" style={{ margin: '8px 0 0' }}>
-              <strong>You will need it before you can publish an event</strong>, so it is worth doing
-              now rather than on the day you want to go live.{' '}
-              <a href="/portal/settings">Set it up in Settings</a> — it takes a minute.
-            </p>
-          </div>
+        {cards.length > 0 && (
+          <section className="hub-stats anim-fade-up anim-d1" aria-label="Your numbers">
+            <div className="hub-stat hub-stat-green">
+              <div className="hub-stat-label">
+                <IconCheck /> {tr('hub.received')}
+              </div>
+              <div className="hub-stat-value">{formatMoney(received, currency)}</div>
+              <div className="hub-stat-note">Paid straight into your account</div>
+            </div>
+            <div className="hub-stat hub-stat-amber">
+              <div className="hub-stat-label">
+                <IconInbox /> {tr('hub.onItsWay')}
+              </div>
+              <div className="hub-stat-value">{formatMoney(onItsWay, currency)}</div>
+              <div className="hub-stat-note">
+                {toConfirm > 0 ? `${toConfirm} payment${toConfirm === 1 ? '' : 's'} to confirm` : 'Nothing waiting'}
+              </div>
+            </div>
+            <div className="hub-stat hub-stat-brand">
+              <div className="hub-stat-label">
+                <IconTicket /> {tr('hub.sold')}
+              </div>
+              <div className="hub-stat-value">{sold}</div>
+              <div className="hub-stat-note">Tickets and items, all listings</div>
+            </div>
+            <div className="hub-stat">
+              <div className="hub-stat-label">
+                <IconScan /> {tr('hub.scanned')}
+              </div>
+              <div className="hub-stat-value">{redeemed}</div>
+              <div className="hub-stat-note">Checked in at the door or collected</div>
+            </div>
+          </section>
         )}
 
-        {cards.length === 0 ? (
-          <div className="card glow-card anim-fade-up anim-d1">
-            <div className="card-title">Create your first listing</div>
-            <p className="muted small" style={{ marginTop: 0 }}>
-              From idea to selling in three steps:
-            </p>
-            <ol className="step-list">
-              <li className="step-item">
-                <span className="step-num step-num-brand" aria-hidden>
-                  1
-                </span>
-                <div>
-                  <strong>Name it</strong>
-                  <p className="muted small" style={{ margin: 0 }}>
-                    Pick what you are setting up and name it below — it starts as a private draft
-                    only you can see.
-                  </p>
+        {cards.length > 0 && (
+          <section className="hub-band anim-fade-up anim-d2">
+            <div className="hub-panel">
+              <h2 className="hub-panel-title">{tr('hub.attention')}</h2>
+              {todos.length === 0 ? (
+                <div className="hub-allclear">
+                  <IconCheck /> {tr('hub.allClear')}
                 </div>
-              </li>
-              <li className="step-item">
-                <span className="step-num step-num-brand" aria-hidden>
-                  2
-                </span>
-                <div>
-                  <strong>Fill it in</strong>
-                  <p className="muted small" style={{ margin: 0 }}>
-                    An event wants a date and venue; a shop wants collection details. Both want
-                    prices, photos — and the bank account the money goes to.
-                  </p>
-                </div>
-              </li>
-              <li className="step-item">
-                <span className="step-num step-num-brand" aria-hidden>
-                  3
-                </span>
-                <div>
-                  <strong>Publish</strong>
-                  <p className="muted small" style={{ margin: 0 }}>
-                    Your page goes live and buyers can start ordering right away.
-                  </p>
-                </div>
-              </li>
-            </ol>
-            <CreateEventForm />
-          </div>
-        ) : (
+              ) : (
+                <ul className="hub-todo">
+                  {todos.slice(0, 6).map((t) => (
+                    <li key={t.href + t.title}>
+                      <Link href={t.href} className="hub-todo-item">
+                        <span className={`hub-todo-icon${t.tone === 'green' ? ' hub-todo-icon-green' : t.tone === 'brand' ? ' hub-todo-icon-brand' : ''}`}>
+                          {t.icon}
+                        </span>
+                        <span className="hub-todo-text">
+                          <strong>{t.title}</strong>
+                          <span>{t.line}</span>
+                        </span>
+                        <span className="hub-todo-go" aria-hidden="true">
+                          →
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="hub-panel">
+              <h2 className="hub-panel-title">{tr('hub.tools')}</h2>
+              <div className="hub-tools">
+                <Link href="/portal/promos" className="hub-tool">
+                  <IconTag />
+                  <strong>Discount codes</strong>
+                  <span>Early-bird, sponsor or WhatsApp-group codes</span>
+                </Link>
+                <Link href="/portal/reviews" className="hub-tool">
+                  <IconStar />
+                  <strong>Reviews</strong>
+                  <span>What buyers say, and your replies</span>
+                </Link>
+                <Link href="/portal/statements" className="hub-tool">
+                  <IconReceipt />
+                  <strong>Statements</strong>
+                  <span>Monthly bookkeeping for your tax advisor</span>
+                </Link>
+                <Link href="/portal/settings" className="hub-tool">
+                  <IconGear />
+                  <strong>Get paid instantly</strong>
+                  <span>Card and PayPal on your own account</span>
+                </Link>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {cards.length > 0 && (
           <>
-            {cards.map(({ event, stats, openQuestions, thumb }, i) => {
-              // Every event states a capacity now, so the bar always has an
-              // end to fill toward.
-              const pct =
-                event.totalCapacity > 0
-                  ? Math.min(100, Math.round((stats.ticketsSold / event.totalCapacity) * 100))
-                  : 0;
-              return (
-                <div
-                  key={event.id}
-                  className={`card anim-fade-up${i < 4 ? ` anim-d${i + 1}` : ''}`}
-                  style={{ display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'center' }}
-                >
-                  {thumb ? (
-                    // Poster thumbnails are served by our own /api/media route — next/image is not needed.
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={thumb}
-                      alt={`Poster for ${event.name}`}
-                      width={104}
-                      height={130}
-                      // PORTRAIT, matching the public tile exactly (4:5). It was
-                      // a 132x92 landscape box, so once the tile went portrait
-                      // this showed a different — and much worse — slice of the
-                      // same photo than the organizer sees on their live page.
-                      style={{
-                        width: 104,
-                        height: 130,
-                        objectFit: 'cover',
-                        borderRadius: 10,
-                        flex: 'none',
-                        background: 'var(--bg-elevated)',
-                      }}
-                    />
-                  ) : (
-                    <div
-                      aria-hidden
-                      style={{
-                        width: 104,
-                        height: 130,
-                        borderRadius: 10,
-                        flex: 'none',
-                        background: 'linear-gradient(135deg, var(--brand-soft), rgba(0, 56, 147, 0.18))',
-                        border: '1px solid var(--border)',
-                      }}
-                    />
-                  )}
-                  <div style={{ flex: '1 1 220px', minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                      <strong style={{ fontSize: '1.08rem' }}>{event.name}</strong>
-                      <StatusBadge status={event.status} />
-                      {/* Events and shops share this list, and they behave
-                          differently enough — no date, different checklist,
-                          different words on the page — that which one you are
-                          looking at should never be a guess. */}
-                      {event.kind === 'shop' && <span className="badge">Shop</span>}
-                      {openQuestions > 0 && (
-                        // Straight into the Questions tab, which is now its own
-                        // tab rather than a section buried in Page & content.
-                        <Link
-                          href={`/portal/events/${event.id}/edit?tab=questions`}
-                          className="badge badge-green"
-                          style={{ textDecoration: 'none' }}
-                        >
-                          {openQuestions} question{openQuestions === 1 ? '' : 's'}
-                        </Link>
-                      )}
-                    </div>
-                    <div className="muted small" style={{ marginTop: 4 }}>
-                      {/* A shop has no date to show here, so it shows the line
-                          that actually tells its organizer whether it is ready:
-                          the collection details, which are what publishing asks
-                          for in place of a date and a venue. */}
-                      {event.kind === 'shop'
-                        ? firstLine(event.pickupInfo) || 'Collection details not set'
-                        : `${event.dateDisplay || event.eventDate || 'Date not set'}${
-                            event.venueName ? ` · ${event.venueName}` : ''
-                          }`}
-                    </div>
-                    <div className="meter" style={{ maxWidth: 320 }}>
-                      <span className="meter-track">
-                        <span className="meter-fill meter-fill-brand" style={{ width: `${pct}%` }} />
-                      </span>
-                      <span className="meter-num">
-                        {`${stats.ticketsSold} / ${event.totalCapacity} sold`}
-                      </span>
-                    </div>
-                    <div className="small" style={{ marginTop: 8, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                      <span>
-                        <strong>{formatMoney(stats.revenueCents, event.currency)}</strong>
-                        <span className="muted"> received</span>
-                      </span>
-                      <span>
-                        <strong>{formatMoney(stats.awaitingTransferCents, event.currency)}</strong>
-                        <span className="muted"> on its way</span>
-                        {stats.awaitingTransferOrders > 0 && (
-                          <span className="badge badge-amber" style={{ marginLeft: 8 }}>
-                            {stats.awaitingTransferOrders} to confirm
+            <div className="hub-section-title">
+              <h2>{tr('hub.yourListings')}</h2>
+              <span className="muted small">
+                {questions > 0 ? `${questions} open question${questions === 1 ? '' : 's'}` : ''}
+              </span>
+            </div>
+            <section className="hub-cards">
+              {cards.map(({ event, stats, openQuestions, thumb }, i) => {
+                const v = vocabFor(event.kind);
+                const pct =
+                  event.totalCapacity > 0 ? Math.min(100, Math.round((stats.ticketsSold / event.totalCapacity) * 100)) : 0;
+                return (
+                  <article key={event.id} className={`hub-card anim-fade-up${i < 4 ? ` anim-d${i + 1}` : ''}`}>
+                    <Link href={`/portal/events/${event.id}/edit`} className="hub-card-media" aria-label={`Edit ${event.name}`}>
+                      {thumb ? (
+                        // Served by our own /api/media route — next/image is not needed.
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={thumb} alt="" loading="lazy" />
+                      ) : null}
+                      <span className="hub-card-badges">
+                        <StatusBadge status={event.status} />
+                        <span className="badge">{event.kind === 'shop' ? 'Shop' : 'Event'}</span>
+                        {openQuestions > 0 && (
+                          <span className="badge badge-green">
+                            {openQuestions} question{openQuestions === 1 ? '' : 's'}
                           </span>
                         )}
                       </span>
+                    </Link>
+                    <div className="hub-card-body">
+                      <h3 className="hub-card-name">{event.name}</h3>
+                      <p className="hub-card-sub">
+                        {event.kind === 'shop'
+                          ? firstLine(event.pickupInfo) || 'Collection details not set'
+                          : `${event.dateDisplay || event.eventDate || 'Date not set'}${
+                              event.venueName ? ` · ${event.venueName}` : ''
+                            }`}
+                      </p>
+                      <div className="meter" style={{ margin: 0 }}>
+                        <span className="meter-track">
+                          <span className="meter-fill meter-fill-brand" style={{ width: `${pct}%` }} />
+                        </span>
+                        <span className="meter-num">{`${stats.ticketsSold} / ${event.totalCapacity} ${v.units} sold`}</span>
+                      </div>
+                      <div className="hub-card-money">
+                        <div>
+                          <strong>{formatMoney(stats.revenueCents, event.currency)}</strong>
+                          <span>received</span>
+                        </div>
+                        <div>
+                          <strong>{formatMoney(stats.awaitingTransferCents, event.currency)}</strong>
+                          <span>
+                            {stats.awaitingTransferOrders > 0
+                              ? `${stats.awaitingTransferOrders} to confirm`
+                              : 'on its way'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="hub-card-actions">
+                        <Link href={`/portal/events/${event.id}/edit`} className="btn btn-brand btn-sm">
+                          {tr('hub.edit')}
+                        </Link>
+                        <Link href={`/portal/events/${event.id}/orders`} className="btn btn-sm">
+                          {tr('hub.orders')}
+                        </Link>
+                        <Link href={`/portal/events/${event.id}/checkin`} className="btn btn-sm">
+                          {v.Redeem}
+                        </Link>
+                        <Link href={`/e/${event.slug}`} className="btn btn-sm">
+                          {event.status === 'published' ? 'View' : 'Preview'}
+                        </Link>
+                      </div>
                     </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <Link href={`/portal/events/${event.id}/edit`} className="btn btn-brand btn-sm">
-                      Edit
-                    </Link>
-                    {openQuestions > 0 && (
-                      // Its own green button among the actions. The badge in
-                      // the title row says a number; this says what to do about
-                      // it, in the row an organizer actually clicks from.
-                      <Link
-                        href={`/portal/events/${event.id}/edit?tab=questions`}
-                        className="btn btn-sm btn-green"
-                      >
-                        Answer {openQuestions} message{openQuestions === 1 ? '' : 's'}
-                      </Link>
-                    )}
-                    <Link href={`/portal/events/${event.id}/orders`} className="btn btn-sm">
-                      Orders
-                    </Link>
-                    <Link href={`/portal/events/${event.id}/checkin`} className="btn btn-sm">
-                      {vocabFor(event.kind).Redeem}
-                    </Link>
-                    {/* Draft events get the same link, named for what it does.
-                        Seeing your own page is how you decide it is ready — it
-                        should not be something you only earn after paying. */}
-                    <Link href={`/e/${event.slug}`} className="btn btn-sm">
-                      {event.status === 'published' ? 'View page' : 'Preview page'}
-                    </Link>
-                  </div>
-                </div>
-              );
-            })}
-
-            <div className="card glow-card anim-fade-up anim-d4" style={{ marginTop: 16 }}>
-              <div className="card-title">Create something new</div>
-              <CreateEventForm />
-            </div>
-
-            {/* Alongside statements, and shown on the same condition: a code
-                is something you hand out for a listing, so it means nothing on
-                an account that has none yet. */}
-            <div className="card anim-fade-up anim-d4" style={{ marginTop: 16 }}>
-              <div className="card-title">Discount codes</div>
-              <p className="muted small" style={{ marginTop: 0 }}>
-                Make a code to hand out — an early-bird code, one for a sponsor, one for a WhatsApp
-                group. It is your own discount on your own prices: the buyer simply transfers you
-                less.
-              </p>
-              <Link href="/portal/promos" className="btn btn-sm">
-                Open discount codes
-              </Link>
-            </div>
-
-            {/* Only shown once there are listings: a statements card on an
-                account that has never sold anything is a promise with nothing
-                behind it yet. */}
-            <div className="card anim-fade-up anim-d4" style={{ marginTop: 16 }}>
-              <div className="card-title">Monthly statements</div>
-              <p className="muted small" style={{ marginTop: 0 }}>
-                Simple monthly bookkeeping you can hand to your tax advisor — every euro on it
-                arrived in your own account, and it stays valid after buyer details are erased.
-              </p>
-              <Link href="/portal/statements" className="btn btn-sm">
-                Open statements
-              </Link>
-            </div>
+                  </article>
+                );
+              })}
+            </section>
           </>
         )}
+
+        <section id="new" className="hub-new anim-fade-up">
+          <h2>{cards.length === 0 ? 'Create your first listing' : 'Create something new'}</h2>
+          <p>
+            {cards.length === 0
+              ? 'Name it, fill it in, publish — it starts as a private draft only you can see.'
+              : 'Another event, or a shop for food and goods people order ahead and collect.'}
+          </p>
+          <CreateEventForm />
+        </section>
+
+        <p className="hub-note">
+          Your account is free, and so is publishing — no fees, and never a cut of your sales. Signed in as{' '}
+          {organizer.email}.
+        </p>
       </div>
 
       <PlatformAssistant brand={platformNameFromEnv()} />

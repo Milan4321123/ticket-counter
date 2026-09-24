@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { listingOpenTo } from '@/lib/demo';
 import { getPaymentMode } from '@/lib/config';
 import { getEventBySlug, getEventTiers, getPrimaryEvent, type EventRow } from '@/lib/events';
 import { getAvailabilityCached } from '@/lib/inventory';
@@ -40,7 +41,7 @@ export async function GET(req: Request) {
     const event = slug ? getEventBySlug(slug) : getPrimaryEvent();
     // Only published events are ever exposed — including via the no-slug
     // legacy fallback (a draft/archived primary event must stay private).
-    if (!event || event.status !== 'published') {
+    if (!event || !(await listingOpenTo(event))) {
       return NextResponse.json<ApiErrorResponse>(
         { error: 'We could not find that event — it may no longer be available.', code: 'NOT_FOUND' },
         { status: 404 }

@@ -65,6 +65,16 @@ export interface CreateOrderRequest {
    * not offer; absent means the listing's default.
    */
   payVia?: 'transfer' | 'paypal' | 'stripe' | 'mock';
+  /** Shops with collection slots: the chosen 'YYYY-MM-DDTHH:MM' (lib/kitchen). */
+  pickupSlot?: string;
+  /** Order-from-the-table: the table from the QR code's ?table=. */
+  table?: string;
+  /** Free item choices: { tierKey: { groupName: option } }. Never changes the price. */
+  choices?: Record<string, Record<string, string>>;
+  /** A short note for the kitchen or seller. */
+  note?: string;
+  /** Reserved seating: the exact seat ids picked on the map (lib/seats). */
+  seats?: string[];
   /**
    * The total the checkout DISPLAYED, in cents. Purely a guard: the server
    * always prices from its own tiers, and refuses (409) when the two disagree

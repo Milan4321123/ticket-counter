@@ -35,6 +35,10 @@ import { organizerTotpEnabled } from '@/lib/organizerTotp';
 import { effectivePayout, queuedPayoutChange } from '@/lib/payout';
 import { anyPaymentRoute, listConnections, paymentOptionsFor } from '@/lib/paymentConnections';
 import BankForm from './BankForm';
+import KitchenSetupPanel from './KitchenSetupPanel';
+import SeatingPanel from './SeatingPanel';
+import { parseSeatMap, takenSeats } from '@/lib/seats';
+import { choicesToText, parseChoices, parseSlotConfig } from '@/lib/kitchen';
 import DangerZone from './DangerZone';
 import DesignPanel from './DesignPanel';
 import EditorSection, { EditorSectionGroup } from './EditorSection';
@@ -286,10 +290,31 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
       // waiting on this organizer's decision.
       badge: !isShop && pendingStalls.length > 0 ? `${pendingStalls.length} new` : undefined,
     },
+    // The restaurant pack (lib/kitchen): shops only.
+    ...(isShop ? [{ key: 'kitchen', label: 'Kitchen & collection', status: 'neutral' as const }] : []),
+    // Reserved seating (lib/seats): events only.
+    ...(!isShop ? [{ key: 'seating', label: 'Seating', status: 'neutral' as const }] : []),
     { key: 'publish', label: 'Publish', status: publishDone ? ('done' as const) : ('todo' as const) },
   ];
 
   const panels = {
+    seating: !isShop ? (
+      <SeatingPanel
+        eventId={event.id}
+        initial={parseSeatMap(event.seatMap)}
+        tiers={tiers.map((t) => ({ tierKey: t.tierKey, name: t.name, seatsPerUnit: t.seatsPerUnit }))}
+        taken={Object.fromEntries(takenSeats(event.id))}
+      />
+    ) : null,
+    kitchen: isShop ? (
+      <KitchenSetupPanel
+        eventId={event.id}
+        slug={event.slug}
+        initialSlots={parseSlotConfig(event.pickupSlots)}
+        initialTables={event.tableCount}
+        items={tiers.map((t) => ({ tierKey: t.tierKey, name: t.name, choicesText: choicesToText(parseChoices(t.choices)) }))}
+      />
+    ) : null,
     basics: (
       <EditorSectionGroup
         initialOpen={firstTodo([

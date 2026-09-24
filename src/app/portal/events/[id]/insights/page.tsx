@@ -14,6 +14,8 @@ import PlanExpired from '../../../PlanExpired';
 import PortalNav from '../../../PortalNav';
 import { requirePortalOrganizer } from '../../../guard';
 import { PaymentSplitBar, SalesOverTimeChart, TierBarsChart } from './charts';
+import ShopInsightsPanel from './ShopInsightsPanel';
+import { shopInsights } from '@/lib/shopInsights';
 
 export const dynamic = 'force-dynamic';
 
@@ -146,6 +148,9 @@ export default async function PortalInsightsPage({ params }: { params: Promise<{
           </div>
         </div>
 
+        {/* ---- The shop's own questions: what, when, what together (lib/shopInsights) ---- */}
+        {isShop && hasSales && <ShopInsightsPanel data={shopInsights(event.id)} currency={event.currency} />}
+
         {/* ---- Sales over time ---- */}
         <div className="card anim-fade-up anim-d2">
           <div className="card-title">Sales over time</div>
@@ -154,7 +159,7 @@ export default async function PortalInsightsPage({ params }: { params: Promise<{
               <p className="muted small" style={{ marginTop: 0 }}>
                 Confirmed money, adding up day by day. Hover a day for its detail.
               </p>
-              <SalesOverTimeChart days={days} currency={event.currency} unitsWord="booking" />
+              <SalesOverTimeChart days={days} currency={event.currency} unitsWord={isShop ? "order" : "booking"} />
             </>
           ) : (
             <p className="muted" style={{ margin: 0 }}>

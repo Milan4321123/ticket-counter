@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { demoAddress, listingOpenTo } from '@/lib/demo';
 import { getBaseUrl } from '@/lib/config';
 import { getEventById, getEventTier, getEventTiers, type EventRow } from '@/lib/events';
 import { readsAsComingSoon } from '@/lib/ticketState';
@@ -12,6 +13,15 @@ import {
   stripeCredentialsFor,
 } from '@/lib/paymentConnections';
 import { createStripeCheckoutSession } from '@/lib/stripe';
+import {
+  cleanTableLabel,
+  parseSlotConfig,
+  setOrderKitchenDetails,
+  slotIsBookable,
+  validatePicks,
+  type KitchenDetails,
+} from '@/lib/kitchen';
+import { holdSeats, parseSeatMap, SeatTakenError, validateSeatPicks } from '@/lib/seats';
 import { armStripeSweep } from '@/lib/stripeOrders';
 import {
   createOrder,
@@ -142,7 +152,7 @@ export async function POST(req: Request) {
         ? (raw as CreateOrderRequest).eventId
         : '';
     const event = eventId ? getEventById(eventId) : null;
-    if (!event || event.status !== 'published') {
+    if (!event || !(await listingOpenTo(event))) {
       return apiError(404, 'NOT_FOUND', 'We could not find that event — it may no longer be available.');
     }
     if (!event.salesOpen) {
@@ -162,6 +172,10 @@ export async function POST(req: Request) {
     if (typeof validated === 'string') {
       return apiError(400, 'VALIDATION', validated);
     }
+    // A try-it-yourself demo listing (lib/demo.ts): whatever address was typed,
+    // the order gets one nobody can receive mail at, so a demo can never be
+    // used to send tickets, reminders or confirmations to a real inbox.
+    if (event.isDemo) validated.buyerEmail = demoAddress('buyer');
 
     // Per-ADDRESS throttle, independent of IP. The free path sends a branded
     // email with QR attachments to whatever address is typed, instantly and
@@ -420,6 +434,52 @@ export async function POST(req: Request) {
     // the buyer's bank transfer takes days, and the reservation must hold
     // until the organizer confirms the money (or it expires via
     // expireOverdueTransferReservations).
+    // ---- Restaurant pack (lib/kitchen): slot, table, choices, note ---------
+    //
+    // Checked BEFORE the order is written, so a full slot or a missing choice
+    // is refused with nothing reserved. None of it changes the price.
+    let kitchen: KitchenDetails | null = null;
+    if (event.kind === 'shop') {
+      const body = raw as Partial<CreateOrderRequest>;
+      const tableLabel = event.tableCount > 0 ? cleanTableLabel(body.table) : '';
+      const slotsOn = parseSlotConfig(event.pickupSlots).enabled;
+      let pickupSlot: string | null = null;
+      if (slotsOn && !tableLabel) {
+        const wanted = typeof body.pickupSlot === 'string' ? body.pickupSlot : '';
+        if (!wanted) {
+          return apiError(
+            400,
+            'VALIDATION',
+            parseSlotConfig(event.pickupSlots).purpose === 'appointment'
+              ? 'Please choose a time for your appointment.'
+              : 'Please choose when you will collect your order.'
+          );
+        }
+        if (!slotIsBookable(event, wanted)) {
+          return apiError(409, 'VALIDATION', 'That time has just been taken — please choose another one.');
+        }
+        pickupSlot = wanted;
+      }
+      const picks = validatePicks(event.id, validated.items.map((it) => it.tierId), body.choices);
+      if (typeof picks === 'string') return apiError(400, 'VALIDATION', picks);
+      const note =
+        typeof body.note === 'string'
+          ? body.note.replace(/[\u0000-\u0009\u000B-\u001F\u007F]+/g, ' ').trim().slice(0, 300)
+          : '';
+      kitchen = { pickupSlot, tableLabel, note, choices: picks };
+    }
+
+    // ---- Reserved seating (lib/seats) ------------------------------------
+    // The seats must match the quantities exactly and be free right now; the
+    // hold itself happens just after the order is written, atomically.
+    let seatPicks: string[] = [];
+    const seatMap = event.kind === 'event' ? parseSeatMap(event.seatMap) : null;
+    if (seatMap?.enabled) {
+      const checked = validateSeatPicks(event.id, seatMap, validated.items, (raw as Partial<CreateOrderRequest>).seats);
+      if (typeof checked === 'string') return apiError(409, 'VALIDATION', checked);
+      seatPicks = checked;
+    }
+
     let order;
     try {
       order = createOrder({
@@ -441,6 +501,19 @@ export async function POST(req: Request) {
       // was shown. Say so plainly instead of silently charging full price.
       if (e instanceof VoucherError) return apiError(409, 'VALIDATION', e.message);
       throw e;
+    }
+
+    if (kitchen) setOrderKitchenDetails(order.id, kitchen);
+    if (seatPicks.length > 0) {
+      try {
+        holdSeats(event.id, order.id, seatPicks);
+      } catch (e) {
+        // Somebody else's order took one of these seats in the last moment.
+        // Nothing has been paid: end this order, give its places back.
+        markOrderFailed(order.id, 'cancelled');
+        if (e instanceof SeatTakenError) return apiError(409, 'SOLD_OUT', e.message);
+        throw e;
+      }
     }
 
     // The OPTIONAL "keep me posted" tick. Strictly `=== true`: absence, null,

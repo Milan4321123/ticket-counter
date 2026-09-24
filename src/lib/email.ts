@@ -103,10 +103,28 @@ type MailMessage = Omit<Mail.Options, 'from'>;
  * So each send asks for the address it actually needs, and an absent one is
  * reported as the configuration problem it is, before anything touches SMTP.
  */
+/**
+ * True for an address in the reserved `.invalid` top-level domain (RFC 2606).
+ * Demo accounts and every buyer, waitlist or question address typed into a
+ * demo listing are rewritten to one (lib/demo.ts), so this single check is
+ * what keeps a demo from emailing a real person — whatever the demo visitor
+ * typed. It also covers the example sellers' @seed.invalid addresses.
+ */
+export function isUndeliverableAddress(to: string): boolean {
+  return /\.invalid\s*>?\s*$/i.test(to.trim());
+}
+
 async function sendMailAs(
   audience: Audience,
   message: MailMessage
 ): Promise<{ sent: boolean; reason?: string }> {
+  const recipients = String(message.to ?? '')
+    .split(',')
+    .map((r) => r.trim())
+    .filter(Boolean);
+  const deliverable = recipients.filter((r) => !isUndeliverableAddress(r));
+  if (deliverable.length === 0) return { sent: false, reason: 'demo-address' };
+  if (deliverable.length !== recipients.length) message = { ...message, to: deliverable.join(', ') };
   const from = (audience === 'buyers' ? emailFromBuyers() : emailFromOrganizers()).trim();
   if (!from) {
     console.error(
@@ -3268,6 +3286,58 @@ export async function sendPaymentConnectionChangedEmail(
     return mailed;
   } catch (e) {
     console.error('sendPaymentConnectionChangedEmail failed:', e);
+    return { sent: false, reason: 'error' };
+  }
+}
+
+// ---------------- "Your order is ready" (restaurant pack) ----------------
+
+/**
+ * The kitchen marked an order Ready (lib/kitchen). One short email so the
+ * buyer knows to come to the counter — or, for a table order, that it is on
+ * its way. Never throws; an erased or undeliverable buyer is simply skipped.
+ */
+export async function sendOrderReadyEmail(orderId: string): Promise<{ sent: boolean; reason?: string }> {
+  try {
+    if (!isEmailConfigured()) return { sent: false, reason: 'email-not-configured' };
+    const order = getOrder(orderId);
+    if (!order || order.status !== 'paid' || order.buyerErasedAt) return { sent: false, reason: 'not-applicable' };
+    const event = getEventById(order.eventId);
+    if (!event) return { sent: false, reason: 'not-applicable' };
+    const seller = organizerDisplayName(event.organizerId) || event.name;
+    const details = getDb()
+      .prepare(`SELECT pickup_slot AS slot, table_label AS tableLabel FROM orders WHERE id = ?`)
+      .get(orderId) as { slot: string | null; tableLabel: string } | undefined;
+    const atTable = Boolean(details?.tableLabel);
+    const orderUrl = orderUrlForBuyerEmail(orderId);
+    const headline = atTable ? `Your order is on its way to table ${details?.tableLabel}` : 'Your order is ready to collect';
+    const line = atTable
+      ? `${seller} has finished your order and is bringing it to table ${details?.tableLabel}.`
+      : `${seller} has your order ready. Show the QR code on your order page at the counter and it is handed over.`;
+    const bodyHtml =
+      pHtml(`Hi ${escapeHtml(order.buyerName)},`) +
+      pHtml(escapeHtml(line), 20) +
+      (atTable ? '' : buttonHtml(orderUrl, 'Open my collection code')) +
+      pHtml(`${escapeHtml(event.name)}${event.pickupInfo ? ` · ${escapeHtml(event.pickupInfo.split('\n')[0])}` : ''}`, 0);
+    return await sendMailAs('buyers', {
+      replyTo: replyToBuyers(),
+      to: order.buyerEmail,
+      subject: headline,
+      text: renderText({
+        headline,
+        lines: [`Hi ${order.buyerName},`, '', wrapText(line), '', ...(atTable ? [] : [`Your code: ${orderUrl}`])],
+      }),
+      html: renderEmail({
+        title: headline,
+        preheader: line,
+        kicker: atTable ? 'On its way' : 'Ready to collect',
+        headline,
+        bodyHtml,
+        footerLines: [`Sold by ${escapeHtml(seller)} · ${escapeHtml(platformName())}`],
+      }),
+    });
+  } catch (e) {
+    console.error('sendOrderReadyEmail failed:', e);
     return { sent: false, reason: 'error' };
   }
 }

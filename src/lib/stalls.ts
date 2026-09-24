@@ -147,6 +147,13 @@ export function requestStallLink(
   if (!host || host.kind !== 'event' || host.status !== 'published') {
     throw new StallActionError('We could not find that event.');
   }
+  // A try-it-yourself demo (lib/demo.ts) may only link its OWN listings: a
+  // demo shop asking a real host would email a real organizer, and a real shop
+  // asking a demo event would be reaching into a sandbox nobody else can see.
+  // Same wording as a missing event, for the same no-enumeration reason.
+  if ((shop.isDemo || host.isDemo) && shop.organizerId !== host.organizerId) {
+    throw new StallActionError('We could not find that event.');
+  }
   if (host.eventDate === null || host.eventDate < todayIso()) {
     throw new StallActionError('That event has already happened.');
   }

@@ -1,3 +1,5 @@
+import { kitchenDetailsBulk, parseSlotConfig } from '@/lib/kitchen';
+import { parseSeatMap, seatSummary, seatsForOrders } from '@/lib/seats';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getEventById } from '@/lib/events';
@@ -72,6 +74,15 @@ export default async function PortalOrdersPage({
   // both. That makes "bank transfer" the wrong word here whenever PayPal is on.
   const takesPaypal = effectivePayout(event).paypal.trim() !== '';
   const orders = listOrders({ eventId: event.id, query });
+  // Restaurant pack: collection time / table / choices per order (shops only).
+  const kitchenLines = event.kind === 'shop' ? kitchenDetailsBulk(orders.map((o) => o.id), parseSlotConfig(event.pickupSlots).purpose) : new Map<string, { line: string }>();
+  // Reserved seating: the seats each order holds, as its extra line.
+  const seatMap = event.kind === 'event' ? parseSeatMap(event.seatMap) : null;
+  if (seatMap) {
+    for (const [orderId, seatIds] of seatsForOrders(orders.map((o) => o.id))) {
+      kitchenLines.set(orderId, { line: `Seats: ${seatSummary(seatIds, seatMap)}` });
+    }
+  }
   const stats = getStats(event.id);
   // A shop with an approved stall will meet buyers face to face at someone
   // else's event — the one place a transfer sent that morning may not have
@@ -164,6 +175,7 @@ export default async function PortalOrdersPage({
                     <div className="muted small">
                       {o.itemsSummary} · reserved {o.createdAt.slice(0, 10)}
                     </div>
+                    {kitchenLines.get(o.id) && <div className="small" style={{ color: 'var(--amber)' }}>{kitchenLines.get(o.id)!.line}</div>}
                     {/* The buyer told us the money would come from someone
                         else. Worth its own line: an organizer scanning a
                         statement for "Ramesh Thapa" will never find the
@@ -281,7 +293,14 @@ export default async function PortalOrdersPage({
                       <td className="mono small">{o.createdAt.slice(0, 16)}</td>
                       <td>{o.buyerName}</td>
                       <td className="small">{o.buyerEmail}</td>
-                      <td>{o.itemsSummary}</td>
+                      <td>
+                        {o.itemsSummary}
+                        {kitchenLines.get(o.id) && (
+                          <div className="small" style={{ color: 'var(--amber)' }}>
+                            {kitchenLines.get(o.id)!.line}
+                          </div>
+                        )}
+                      </td>
                       <td>{formatMoney(o.totalCents, o.currency)}</td>
                       <td>
                         {o.paymentMode === 'transfer' && o.status === 'claimed' ? (

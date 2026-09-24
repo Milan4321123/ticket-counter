@@ -9,7 +9,7 @@ import {
   MAX_VIDEOS_PER_EVENT,
 } from '@/lib/media';
 import type { ApiErrorResponse } from '@/lib/types';
-import { planGate, requireOrganizerApi, requireOwnedEvent } from '../../../auth';
+import { planGate, requireOrganizerApi, requireOwnedEvent, demoGate } from '../../../auth';
 
 const TOO_BIG = 'Videos can be at most 60 MB — compress it and try again.';
 
@@ -45,6 +45,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const blocked = planGate(organizer);
     if (blocked) return blocked;
+    const demoBlocked = demoGate(organizer, 'uploading videos');
+    if (demoBlocked) return demoBlocked;
 
     const owned = requireOwnedEvent(organizer, id);
     if (owned.failure) return owned.failure;

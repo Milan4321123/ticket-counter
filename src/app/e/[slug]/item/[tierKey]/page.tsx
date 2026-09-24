@@ -18,6 +18,7 @@
 // JSX, and the reads are counted deliberately — a page of related goods is the
 // classic place a site starts asking the database a question per tile, and
 // this one asks four questions no matter how many tiles come back.
+import { listingOpenTo } from '@/lib/demo';
 import { MixedScript } from '@/components/Np';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -88,9 +89,10 @@ interface Params {
  * visibleTiers rather than re-testing `status` is what keeps that true if the
  * definition of visible ever gains a case.
  */
-function load(slug: string, tierKey: string): { event: EventRow; tier: EventTierRow } | null {
+async function load(slug: string, tierKey: string): Promise<{ event: EventRow; tier: EventTierRow } | null> {
   const event = getEventBySlug(slug);
-  if (!event || event.status !== 'published') return null;
+  // Published — and, for a try-it-yourself demo shop, only for its own account.
+  if (!event || !(await listingOpenTo(event))) return null;
   const tier = visibleTiers(getEventTiers(event.id)).find((t) => t.tierKey === tierKey);
   return tier ? { event, tier } : null;
 }
@@ -143,7 +145,7 @@ function pairedItems(
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug, tierKey } = await params;
-  const found = load(slug, decodeURIComponent(tierKey));
+  const found = await load(slug, decodeURIComponent(tierKey));
   // Same posture as the listing page: a page that is not public must not leak
   // its name into a title tag, and must never be indexed.
   if (!found) return { title: 'Not found', robots: { index: false, follow: false } };
@@ -213,7 +215,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 export default async function ItemPage({ params, searchParams }: Params) {
   const { slug, tierKey } = await params;
-  const found = load(slug, decodeURIComponent(tierKey));
+  const found = await load(slug, decodeURIComponent(tierKey));
   if (!found) notFound();
   const { event, tier } = found;
 

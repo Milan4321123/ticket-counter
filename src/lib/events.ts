@@ -99,6 +99,20 @@ export interface EventRow {
   payTransfer: boolean;
   payPaypal: boolean;
   payStripe: boolean;
+  /**
+   * Owned by a try-it-yourself demo account (lib/demo.ts). DERIVED from the
+   * owner on every read rather than stored on the listing, so a listing a demo
+   * account creates later can never forget to carry it. A demo listing is
+   * never public: it is left out of every list, and only its owner's session
+   * may open its pages (lib/demo listingOpenTo).
+   */
+  isDemo: boolean;
+  /** Collection time slots, raw JSON — read with parseSlotConfig() in lib/kitchen. NULL = never set. */
+  pickupSlots: string | null;
+  /** How many tables have an order-from-the-table QR code (lib/kitchen). 0 = none. */
+  tableCount: number;
+  /** Reserved seating map, raw JSON — read with parseSeatMap() in lib/seats. NULL = unreserved. */
+  seatMap: string | null;
   posterMediaId: string | null;
   profileMediaId: string | null;
   /** First/legacy uploaded video — an event can now hold several. */
@@ -186,6 +200,12 @@ export interface EventTierRow {
    */
   details: string;
   /**
+   * Free choices a buyer makes for this item — "Spice: Mild, Medium, Hot" —
+   * as raw JSON; read with parseChoices() in lib/kitchen. NULL = none. Never a
+   * price: choosing never changes what is paid.
+   */
+  choices: string | null;
+  /**
    * This item's photo: the id of one of the SAME listing's event_media rows,
    * or null. Never trust it raw — a photo can be deleted after a tier points at
    * it, and a hand-written row could name another listing's photo. tierPhoto()
@@ -261,6 +281,10 @@ const EVENT_COLS = `
   pay_transfer AS payTransfer,
   pay_paypal AS payPaypal,
   pay_stripe AS payStripe,
+  (SELECT is_demo FROM organizers o WHERE o.id = events.organizer_id) AS isDemo,
+  pickup_slots AS pickupSlots,
+  table_count AS tableCount,
+  seat_map AS seatMap,
   poster_media_id AS posterMediaId,
   profile_media_id AS profileMediaId,
   video_media_id AS videoMediaId,
@@ -312,6 +336,10 @@ function rowToEvent(row: Record<string, unknown> | undefined): EventRow | null {
     payTransfer: row.payTransfer === null || row.payTransfer === undefined ? true : Boolean(row.payTransfer),
     payPaypal: Boolean(row.payPaypal),
     payStripe: Boolean(row.payStripe),
+    isDemo: Boolean(row.isDemo),
+    pickupSlots: (row.pickupSlots as string | null) ?? null,
+    tableCount: Number(row.tableCount ?? 0),
+    seatMap: (row.seatMap as string | null) ?? null,
   };
 }
 
@@ -406,6 +434,7 @@ export function listPublishedEvents(): EventRow[] {
   const rows = getDb()
     .prepare(
       `SELECT ${EVENT_COLS} FROM events WHERE status = 'published'
+       AND organizer_id NOT IN (SELECT id FROM organizers WHERE is_demo = 1)
        ORDER BY event_date IS NULL, event_date ASC, created_at DESC`
     )
     .all() as Record<string, unknown>[];
@@ -457,7 +486,7 @@ export function seatsPerUnitSql(tierAlias: string): string {
 
 const TIER_COLS = `id, event_id AS eventId, tier_key AS tierKey, name, price_cents AS priceCents,
               cap, unlimited, status, student_only AS studentOnly, description, details,
-              media_id AS mediaId, sort, seats_per_unit AS seatsPerUnit`;
+              media_id AS mediaId, sort, seats_per_unit AS seatsPerUnit, choices`;
 
 /** How a stored tier row arrives before normalization — see toTierRow. */
 type RawTierRow = Omit<EventTierRow, 'studentOnly' | 'unlimited' | 'details'> & {
@@ -485,6 +514,7 @@ function toTierRow(r: RawTierRow): EventTierRow {
     // to spell `?? ''` before measuring or rendering it.
     details: r.details ?? '',
     mediaId: r.mediaId ?? null,
+    choices: r.choices ?? null,
     // Whitelisted on the way out as well as in: an unrecognised value must not
     // silently hide a ticket type an organizer is trying to sell.
     status: r.status === 'coming-soon' || r.status === 'hidden' ? r.status : 'on-sale',
@@ -1022,6 +1052,7 @@ export function deleteEventCompletely(eventId: string): DeletedEventSummary {
 
   const tx = db.transaction(() => {
     // Sales: tickets and items hang off orders, so they go first.
+    db.prepare(`DELETE FROM seat_holds WHERE event_id = ?`).run(eventId);
     db.prepare(`DELETE FROM tickets WHERE order_id IN (SELECT id FROM orders WHERE event_id = ?)`).run(eventId);
     db.prepare(`DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE event_id = ?)`).run(eventId);
     db.prepare(`DELETE FROM orders WHERE event_id = ?`).run(eventId);

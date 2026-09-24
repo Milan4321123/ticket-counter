@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { serverT } from '@/lib/i18nServer';
 import EventCard from '@/components/EventCard';
 import EventRail from '@/components/EventRail';
 import ItemRail from '@/components/ItemRail';
@@ -308,7 +309,8 @@ function departmentRails(all: ShopItem[]): DepartmentRail[] {
 
 // ---------------------------------------------------------------------------
 
-export default function HomePage() {
+export default async function HomePage() {
+  const tr = await serverT();
   // The feed is the busiest page on the site, so it is where the erasure sweep
   // is armed: it self-throttles and swallows its own errors, so this costs a
   // clock comparison on all but one render an hour. See lib/retention.ts.
@@ -354,27 +356,30 @@ export default function HomePage() {
           Saturday's concert should see it on the first screen, not a paragraph. */}
       <section className="feed-hero home-hero">
         <div className="container">
-          <h1 className="anim-fade-up">Nepali events &amp; bazaar, near you</h1>
+          <h1 className="anim-fade-up">{tr('home.title')}</h1>
           <p className="home-hero-sub anim-fade-up anim-d1">
-            Tickets from Nepali organizers, goods from Nepali sellers — pay them directly, get a QR
-            code by email.
+            {tr('home.sub')}
             {events.length > 0 && (
               <>
                 {' '}
                 <span className="home-hero-count">
-                  {events.length} on sale{cities.size > 1 ? ` in ${cities.size} cities` : ''}.
+                  {events.length} {tr('home.onSale')}
+                  {cities.size > 1 ? ` ${tr('home.inCities', { n: cities.size })}` : ''}.
                 </span>
               </>
             )}
           </p>
           <p className="home-hero-actions anim-fade-up anim-d1">
             <Link href="/market" className="btn btn-brand btn-sm">
-              Shop the bazaar →
+              {tr('home.shop')}
             </Link>
             {/* The pitch, not the sign-in door: someone without an account
                 needs the explanation first. */}
             <Link href="/organizers" className="btn btn-green btn-sm">
-              For organizers
+              {tr('home.organizers')}
+            </Link>
+            <Link href="/demo" className="btn btn-sm">
+              {tr('home.demo')}
             </Link>
           </p>
         </div>

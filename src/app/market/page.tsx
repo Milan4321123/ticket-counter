@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import LiveSearchInput from './LiveSearchInput';
+import { serverT } from '@/lib/i18nServer';
 import ItemTile from '@/components/ItemTile';
 import { expansionsFor } from '@/lib/bazaarWords';
 import { SHOP_CATEGORIES, categoryLabel } from '@/lib/categories';
@@ -224,6 +225,7 @@ function Chip({
 }
 
 export default async function MarketPage({ searchParams }: Props) {
+  const tr = await serverT();
   const query = readQuery(await searchParams);
   const v = vocabFor('shop');
   const f = filtersOf(query);
@@ -409,10 +411,10 @@ export default async function MarketPage({ searchParams }: Props) {
         <div className="container bz-hero-row">
           <div className="bz-hero-text">
             <p className="feed-kicker anim-fade-up">
-              <Np>नेपाली बजार</Np> · The bazaar
+              <Np>नेपाली बजार</Np> · {tr('bz.kicker')}
             </p>
             <h1 className="bz-hero-title anim-fade-up anim-d1">
-              Nepali shops across Germany — order direct, collect with a QR code
+              {tr('bz.title')}
             </h1>
           </div>
           {all.length > 0 && (
@@ -427,10 +429,10 @@ export default async function MarketPage({ searchParams }: Props) {
                 listId={suggestions.length > 0 ? 'bz-market-hints' : undefined}
                 ariaLabel={`Search every ${v.unit} on sale in the bazaar`}
                 defaultValue={query.q}
-                placeholder="momo, timur, dhaka topi, Berlin…"
+                placeholder={tr('bz.placeholder')}
               />
               <button className="btn btn-brand bz-search-btn" type="submit">
-                Search
+                {tr('bz.search')}
               </button>
               {carried('q')}
             </form>
@@ -500,7 +502,7 @@ export default async function MarketPage({ searchParams }: Props) {
                   shopper recognises first; the English label is the translation. */}
               <nav className="bz-chips" aria-label="Departments">
                 <Chip href={hrefFor(query, { category: '' })} on={!query.category}>
-                  <span>All</span>
+                  <span>{tr('bz.all')}</span>
                   <span className="bz-chip-count">{forShelf.length}</span>
                 </Chip>
                 {SHOP_CATEGORIES.map((shelf) => {
@@ -572,15 +574,15 @@ export default async function MarketPage({ searchParams }: Props) {
                   select that silently does nothing is worse than no sort. */}
               <div className="bz-toolbar bz-bar">
                 <p className="bz-toolbar-count">
-                  {total} {noun}
+                  {total} {total === 1 ? tr('bz.item') : tr('bz.items')}
                 </p>
                 <div className="bz-chips bz-chips-inline" role="group" aria-label="Filters">
                   {/* Held to the same rule as every other facet: a toggle that
                       would empty the page is not offered, and the one the
                       visitor is standing on is offered even at zero. */}
                   {(inStockCount > 0 || query.inStock) && (
-                    <Chip href={hrefFor(query, { inStock: !query.inStock })} on={query.inStock} label="In stock only">
-                      <span>In stock only</span>
+                    <Chip href={hrefFor(query, { inStock: !query.inStock })} on={query.inStock} label={tr('bz.inStock')}>
+                      <span>{tr('bz.inStock')}</span>
                       <span className="bz-chip-count">{inStockCount}</span>
                     </Chip>
                   )}
@@ -608,7 +610,7 @@ export default async function MarketPage({ searchParams }: Props) {
                     })}
                 </div>
                 <form action="/market" method="get" className="bz-sort" aria-label="Sort">
-                  <label htmlFor="bz-sort-by">Sort</label>
+                  <label htmlFor="bz-sort-by">{tr('bz.sort')}</label>
                   <select id="bz-sort-by" name="sort" aria-label="Sort by" defaultValue={query.sort}>
                     {SORTS.map((s) => (
                       <option key={s.key} value={s.key}>
@@ -617,7 +619,7 @@ export default async function MarketPage({ searchParams }: Props) {
                     ))}
                   </select>
                   <button className="btn btn-sm" type="submit">
-                    Apply
+                    {tr('bz.apply')}
                   </button>
                   {carried('sort')}
                 </form>

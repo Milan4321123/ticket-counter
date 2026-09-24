@@ -65,6 +65,23 @@ export function planGate(organizer: OrganizerRow): NextResponse | null {
 }
 
 /**
+ * Non-null 403 when a try-it-yourself demo account (lib/demo.ts) tries
+ * something a demo may not do: upload files (media URLs are public), set real
+ * payment details, or connect a PayPal/Stripe account. The wording says it is
+ * the demo, not a fault, so the visitor is not left thinking the feature is
+ * broken.
+ */
+export function demoGate(organizer: OrganizerRow, what: string): NextResponse | null {
+  if (!organizer.isDemo) return null;
+  return NextResponse.json(
+    {
+      error: `This is a demo account, so ${what} is switched off here. In a real account it works exactly as shown.`,
+    } satisfies ApiErrorResponse,
+    { status: 403 }
+  );
+}
+
+/**
  * Look up an event and verify it belongs to this organizer. A miss returns
  * 404 whether the event does not exist or belongs to someone else.
  */

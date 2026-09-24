@@ -1420,8 +1420,14 @@ summary {
 
 /* ---------- Sections / misc ---------- */
 
+/* Vertical rhythm only. It used to be `padding: 32px 0`, and the 0 wiped out
+   .container's side padding wherever the two classes share an element
+   ("container section") — every such page sat flush against the edge of a
+   phone. Nothing relied on the zero: a bare <section className="section">
+   has no side padding to begin with. */
 .section {
-  padding: 32px 0;
+  padding-top: 32px;
+  padding-bottom: 32px;
 }
 
 .page-title {
@@ -7317,5 +7323,285 @@ html:has(.item-page) {
   .home-hero-sub {
     font-size: 0.88rem;
     margin-bottom: 10px;
+  }
+}
+
+/* ---------- Try-it-yourself demo account strip (portal) ---------- */
+
+.demo-banner {
+  background: linear-gradient(90deg, rgba(251, 191, 36, 0.14), rgba(251, 191, 36, 0.05));
+  border-bottom: 1px solid rgba(251, 191, 36, 0.35);
+  font-size: 0.84rem;
+}
+
+.demo-banner-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.demo-banner-text {
+  flex: 1 1 280px;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+
+.demo-banner-links {
+  display: flex;
+  gap: 14px;
+  font-weight: 600;
+}
+
+.demo-banner-links a {
+  color: var(--amber, #fbbf24);
+  text-decoration: underline;
+}
+
+.demo-tour {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.demo-tour-card {
+  margin: 0;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.demo-tour-card form,
+.demo-tour-card .inline-link {
+  margin-top: auto;
+}
+
+.demo-banner-short {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .demo-banner-long {
+    display: none;
+  }
+  .demo-banner-short {
+    display: inline;
+  }
+  .demo-banner-inner {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+}
+
+/* ---------- Reserved seating map (components/SeatMapView) ---------- */
+
+.seatmap {
+  display: grid;
+  gap: 12px;
+}
+
+.seatmap-stage {
+  margin: 0 auto;
+  width: min(80%, 460px);
+  padding: 8px;
+  border-radius: 0 0 40px 40px;
+  background: linear-gradient(180deg, var(--brand-soft), transparent);
+  border: 1px solid rgba(220, 20, 60, 0.35);
+  border-top: 0;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--brand-text);
+}
+
+.seatmap-scroll {
+  display: grid;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  justify-items: center;
+}
+
+.seatmap-section {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+}
+
+.seatmap-section-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--seat-hue);
+  margin-bottom: 2px;
+}
+
+.seatmap-section-name span {
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.seatmap-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.seatmap-rowlabel {
+  width: 16px;
+  text-align: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.seatmap-cell {
+  display: inline-flex;
+}
+
+.seat {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 6px 6px 4px 4px;
+  border: 1.5px solid var(--seat-hue, var(--accent));
+  background: color-mix(in srgb, var(--seat-hue, var(--accent)) 16%, transparent);
+  color: var(--text);
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+
+.seat:hover:not(:disabled) {
+  transform: translateY(-2px);
+  background: color-mix(in srgb, var(--seat-hue, var(--accent)) 38%, transparent);
+}
+
+.seat:disabled {
+  cursor: default;
+}
+
+.seat-mine,
+.seat-blocked {
+  background: var(--green);
+  border-color: var(--green);
+  color: #06291c;
+}
+
+.seat-blocked {
+  background: var(--text-dim);
+  border-color: var(--text-dim);
+  color: var(--bg);
+}
+
+.seat-sold,
+.seat-held {
+  background: var(--bg-elevated);
+  border-color: var(--border);
+  color: transparent;
+  opacity: 0.55;
+}
+
+.seat-gap {
+  display: inline-block;
+  border-color: transparent;
+  background: transparent;
+  cursor: default;
+}
+
+.seatmap-key {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 16px;
+  font-size: 0.76rem;
+  color: var(--text-dim);
+}
+
+.seatmap-key-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.seat-key {
+  width: 14px;
+  height: 14px;
+  cursor: default;
+}
+
+@media (max-width: 480px) {
+  .seat {
+    width: 19px;
+    height: 19px;
+    font-size: 0.55rem;
+  }
+}
+
+/* ---------- Language switch (header) ---------- */
+
+.lang-switch {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 8px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-card);
+  flex: none;
+}
+
+.lang-link {
+  min-width: 30px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  text-align: center;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.lang-link:hover {
+  color: var(--text);
+}
+
+.lang-link-on {
+  background: var(--brand);
+  color: #fff;
+}
+
+@media (max-width: 520px) {
+  .lang-switch {
+    margin-left: 4px;
+  }
+  .lang-link {
+    min-width: 24px;
+    padding: 3px 5px;
+    font-size: 0.68rem;
+  }
+}
+
+.lang-switch-header {
+  display: inline-flex;
+}
+
+.lang-footer {
+  margin-top: 14px;
+}
+
+.lang-footer .lang-switch {
+  margin-left: 0;
+}
+
+@media (max-width: 720px) {
+  .lang-switch-header {
+    display: none;
   }
 }

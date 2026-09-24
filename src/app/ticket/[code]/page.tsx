@@ -5,6 +5,7 @@ import { getOrganizer } from '@/lib/organizers';
 import { getOrder, getTicketByCode } from '@/lib/orders';
 import { ticketQrDataUrl } from '@/lib/tickets';
 import { vocabFor } from '@/lib/vocab';
+import { parseSeatMap, seatForTicket, seatLabel } from '@/lib/seats';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +38,8 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
   const tierName =
     (order ? getEventTier(order.eventId, ticket.tierId)?.name : undefined) ?? ticket.tierId;
   const qr = await ticketQrDataUrl(ticket.code);
+  // Reserved seating: the one seat this ticket stands for (lib/seats).
+  const seat = order && event ? seatForTicket(order.id, ticket.tierId, ticket.code, parseSeatMap(event.seatMap)) : null;
   // Same code, same scan — what changes is what the holder is being told they
   // hold. An event admits a person; a shop hands over goods.
   const v = vocabFor(event?.kind ?? 'event');
@@ -74,6 +77,9 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
         </div>
         <div className="ticket-code">{ticket.code}</div>
         <div className="ticket-tier">{tierName}</div>
+        {seat ? (
+          <div style={{ fontWeight: 800, fontSize: '1.05rem', marginTop: 4 }}>{seatLabel(seat)}</div>
+        ) : null}
         <div style={{ color: '#555', fontSize: '0.85rem', marginTop: 8 }}>
           {isShop ? 'Ordered by' : 'Ticket holder'}: {ticket.buyerName}
         </div>
@@ -86,7 +92,18 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
         </div>
       </div>
       <div className="anim-fade-up anim-d1">
-        <PrintButton label={`Print or save this ${v.code}`} />
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }} className="no-print">
+          {/* A phone-sized picture of this ticket, for the photo library — works
+              on every phone, with no wallet account needed. */}
+          <a
+            className="btn btn-brand"
+            href={`/api/tickets/${encodeURIComponent(ticket.code)}/pass`}
+            download={`${isShop ? 'order' : 'ticket'}-${ticket.code}.png`}
+          >
+            Save to phone
+          </a>
+          <PrintButton label={`Print this ${v.code}`} />
+        </div>
         <p className="muted small no-print" style={{ marginTop: 12 }}>
           {isShop
             ? 'This QR code covers one item and can only be scanned once.'

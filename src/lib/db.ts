@@ -276,6 +276,9 @@ function createDb(): Database.Database {
 
   migrateToPlatform(db);
   migratePayments(db);
+  migrateDemo(db);
+  migrateKitchen(db);
+  migrateSeats(db);
   return db;
 }
 
@@ -1320,4 +1323,62 @@ function migratePayments(db: Database.Database): void {
   if (!orderCols.includes('stripe_session_url')) {
     db.exec(`ALTER TABLE orders ADD COLUMN stripe_session_url TEXT`);
   }
+}
+
+/**
+ * Try-it-yourself demo accounts (lib/demo.ts). A demo organizer is a real row
+ * with real listings, so every portal feature works on it — but it is walled
+ * off: its listings never reach any public list, only its own session can open
+ * them, its payments are simulated and its emails are never sent. It deletes
+ * itself when demo_expires_at passes.
+ */
+function migrateDemo(db: Database.Database): void {
+  const cols = (db.pragma(`table_info(organizers)`) as { name: string }[]).map((c) => c.name);
+  if (!cols.includes('is_demo')) {
+    db.exec(`ALTER TABLE organizers ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0`);
+  }
+  if (!cols.includes('demo_expires_at')) {
+    db.exec(`ALTER TABLE organizers ADD COLUMN demo_expires_at TEXT`);
+  }
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_organizers_demo ON organizers(is_demo, demo_expires_at)`);
+}
+
+/**
+ * The restaurant pack (lib/kitchen.ts): collection time slots on a shop,
+ * per-item choices (spice level, dip…), table ordering, and the live kitchen
+ * board's status per order. None of it touches prices or money — choices are
+ * free, and the kitchen status is a display state beside the order.
+ */
+function migrateKitchen(db: Database.Database): void {
+  const eventCols = (db.pragma(`table_info(events)`) as { name: string }[]).map((c) => c.name);
+  if (!eventCols.includes('pickup_slots')) db.exec(`ALTER TABLE events ADD COLUMN pickup_slots TEXT`);
+  if (!eventCols.includes('table_count')) db.exec(`ALTER TABLE events ADD COLUMN table_count INTEGER NOT NULL DEFAULT 0`);
+
+  const tierCols = (db.pragma(`table_info(event_tiers)`) as { name: string }[]).map((c) => c.name);
+  if (!tierCols.includes('choices')) db.exec(`ALTER TABLE event_tiers ADD COLUMN choices TEXT`);
+
+  const orderCols = (db.pragma(`table_info(orders)`) as { name: string }[]).map((c) => c.name);
+  if (!orderCols.includes('pickup_slot')) db.exec(`ALTER TABLE orders ADD COLUMN pickup_slot TEXT`);
+  if (!orderCols.includes('table_label')) db.exec(`ALTER TABLE orders ADD COLUMN table_label TEXT NOT NULL DEFAULT ''`);
+  if (!orderCols.includes('order_note')) db.exec(`ALTER TABLE orders ADD COLUMN order_note TEXT NOT NULL DEFAULT ''`);
+  if (!orderCols.includes('item_choices')) db.exec(`ALTER TABLE orders ADD COLUMN item_choices TEXT`);
+  if (!orderCols.includes('kitchen_status')) db.exec(`ALTER TABLE orders ADD COLUMN kitchen_status TEXT NOT NULL DEFAULT ''`);
+  if (!orderCols.includes('kitchen_updated_at')) db.exec(`ALTER TABLE orders ADD COLUMN kitchen_updated_at TEXT`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_orders_event_slot ON orders(event_id, pickup_slot)`);
+}
+
+/** Reserved seating (lib/seats.ts): a map on the event, and who holds which seat. */
+function migrateSeats(db: Database.Database): void {
+  const eventCols = (db.pragma(`table_info(events)`) as { name: string }[]).map((c) => c.name);
+  if (!eventCols.includes('seat_map')) db.exec(`ALTER TABLE events ADD COLUMN seat_map TEXT`);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS seat_holds (
+      event_id TEXT NOT NULL,
+      seat_id TEXT NOT NULL,
+      order_id TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (event_id, seat_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_seat_holds_order ON seat_holds(order_id);
+  `);
 }

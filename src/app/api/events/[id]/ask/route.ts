@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { demoAddress, listingOpenTo } from '@/lib/demo';
 import { answerVisitorQuestion, type AssistantContext } from '@/lib/ai';
 import {
   createEventQuestion,
@@ -93,7 +94,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // Only published events take questions; drafts/archived look like 404s.
     const event = getEventById(id);
-    if (!event || event.status !== 'published') {
+    if (!event || !(await listingOpenTo(event))) {
       return apiError(404, 'We could not find that event — it may no longer be available.');
     }
 
@@ -160,7 +161,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
       createEventQuestion(event.id, question.slice(0, MAX_QUESTION), {
         name: askerName,
-        email: askerEmail,
+        // Demo listings keep nothing deliverable (lib/demo.ts).
+        email: event.isDemo && askerEmail ? demoAddress('asker') : askerEmail,
       });
       return NextResponse.json({
         kind: 'escalated',

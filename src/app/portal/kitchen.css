@@ -1,0 +1,241 @@
+/* The live kitchen board (portal/events/[id]/kitchen). Built for a tablet on
+   the pass: big type, three columns, colour per stage. */
+
+.kb {
+  background: var(--bg);
+  border-radius: 18px;
+}
+
+.kb:fullscreen {
+  padding: 18px;
+  overflow: auto;
+}
+
+.kb-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.kb-bar-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.1rem;
+}
+
+.kb-live {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 0 var(--green);
+  animation: kb-pulse 2s infinite;
+}
+
+@keyframes kb-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.6); }
+  70% { box-shadow: 0 0 0 10px rgba(52, 211, 153, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+}
+
+.kb-clock {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+  font-weight: 700;
+}
+
+.kb-bar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.kb-cols {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .kb-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.kb-col {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  border-top: 4px solid var(--kb-accent, var(--border));
+}
+
+.kb-col-new {
+  --kb-accent: var(--amber);
+}
+
+.kb-col-cooking {
+  --kb-accent: var(--brand);
+}
+
+.kb-col-ready {
+  --kb-accent: var(--green);
+}
+
+.kb-col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.95rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.kb-count {
+  min-width: 30px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  text-align: center;
+  background: var(--bg-card);
+  font-variant-numeric: tabular-nums;
+}
+
+.kb-empty {
+  margin: 6px 0;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+.kb-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+
+.kb-card-fresh {
+  animation: kb-fresh 1.2s ease-in-out 3;
+  border-color: var(--amber);
+}
+
+@keyframes kb-fresh {
+  50% { box-shadow: 0 0 0 4px var(--amber-soft); }
+}
+
+.kb-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.kb-when {
+  font-family: var(--font-display, var(--font));
+  font-size: 1.25rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.kb-ref {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.kb-name {
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.kb-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 1.05rem;
+}
+
+.kb-items li {
+  display: flex;
+  gap: 8px;
+}
+
+.kb-qty {
+  flex: none;
+  min-width: 32px;
+  font-weight: 800;
+  color: var(--brand-text);
+}
+
+.kb-items em {
+  display: block;
+  font-style: normal;
+  font-size: 0.85rem;
+  color: var(--amber);
+}
+
+.kb-note {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--amber-soft);
+  color: var(--amber);
+  font-size: 0.9rem;
+}
+
+.kb-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.kb-go {
+  flex: 1;
+  justify-content: center;
+  padding: 12px;
+  font-size: 1rem;
+}
+
+.kb-back {
+  flex: none;
+}
+
+.kb-done {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+
+.kb-done summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.kb-done ul {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 0.88rem;
+  color: var(--text-dim);
+}
+
+.kb-done li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}

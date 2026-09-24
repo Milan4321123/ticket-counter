@@ -1,6 +1,7 @@
 // Server-only: page-level guard for the organizer portal.
 import { redirect } from 'next/navigation';
 import { currentOrganizer, type OrganizerRow } from '@/lib/organizers';
+import { sweepExpiredDemos } from '@/lib/demo';
 
 /**
  * The signed-in organizer for this request; anyone without a valid session is
@@ -14,6 +15,9 @@ import { currentOrganizer, type OrganizerRow } from '@/lib/organizers';
  * looping.
  */
 export async function requirePortalOrganizer(): Promise<OrganizerRow> {
+  // Expired try-it-yourself demos are cleared whenever anyone uses the portal
+  // (throttled to once every ten minutes; see lib/demo.ts).
+  sweepExpiredDemos();
   const organizer = await currentOrganizer();
   if (!organizer) redirect('/portal/login');
   if (organizer.mustChangePassword) redirect('/portal/change-password');

@@ -1,0 +1,184 @@
+/* /showcase — the feature catalog. Also styles the shared ContactBand used by
+   /built. Only CSS variables from globals.css; no new colours. */
+
+.hero {
+  padding: 60px 0 40px;
+}
+
+/* ---- Group chips: sticky under the site header, scrolls sideways on its own
+   so a phone never gets a horizontal page scroll. ---- */
+.chipBar {
+  position: sticky;
+  top: 66px;
+  z-index: 20;
+  background: rgba(10, 11, 16, 0.86);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.chipRow {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chipRow::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.chip:hover,
+.chip:focus-visible {
+  border-color: var(--brand);
+  color: var(--brand-text);
+}
+
+.chipCount {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.legend {
+  margin: 20px 0 0;
+}
+
+.legendLive,
+.legendDemo {
+  font-weight: 700;
+}
+
+.legendLive {
+  color: var(--green);
+}
+
+.legendDemo {
+  color: var(--brand-text);
+}
+
+/* ---- Groups ---- */
+.group {
+  padding: 36px 0 8px;
+  /* Clears the sticky header + chip bar when jumped to by anchor. */
+  scroll-margin-top: 120px;
+}
+
+.groupHead {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 12px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 16px 16px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
+
+.cardTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+
+.cardBody {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0 0 12px;
+  flex: 1;
+}
+
+.cardLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.linkLive {
+  color: var(--green);
+}
+
+.linkDemo {
+  color: var(--brand-text);
+}
+
+.linkLive:hover,
+.linkDemo:hover {
+  text-decoration: underline;
+}
+
+/* ---- Closing band (shared with /built) ---- */
+.contactBand {
+  margin-top: 48px;
+  padding: 40px 0 56px;
+  border-top: 1px solid var(--border-soft);
+  background: radial-gradient(ellipse 70% 80% at 50% 0%, var(--brand-soft), transparent);
+}
+
+.contactInner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px 24px;
+}
+
+.contactTitle {
+  font-size: clamp(1.25rem, 3vw, 1.6rem);
+  font-weight: 800;
+  margin: 0 0 6px;
+}
+
+.contactActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+@media (max-width: 480px) {
+  .hero {
+    padding: 40px 0 28px;
+  }
+
+  .group {
+    padding-top: 28px;
+  }
+}

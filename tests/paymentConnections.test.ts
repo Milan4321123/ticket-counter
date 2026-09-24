@@ -33,7 +33,9 @@ describe('secretBox', () => {
     assert.notEqual(sealed, 'sk_test_abc123');
     assert.equal(openSecret(sealed), 'sk_test_abc123');
     const [v, iv, enc, tag] = sealed.split('.');
-    assert.equal(openSecret([v, iv, enc, tag.slice(0, -2) + 'AA'].join('.')), null);
+    // Flip one character of the authentication tag — always a real change.
+    const flipped = tag.slice(0, -1) + (tag.endsWith('A') ? 'B' : 'A');
+    assert.equal(openSecret([v, iv, enc, flipped].join('.')), null);
     assert.equal(openSecret('garbage'), null);
   });
 });

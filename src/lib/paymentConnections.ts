@@ -197,6 +197,11 @@ export interface PaymentOptions {
 
 /** The single answer to "how can somebody pay for this listing right now?". */
 export function paymentOptionsFor(event: EventRow): PaymentOptions {
+  // A try-it-yourself demo listing (lib/demo.ts) takes NO real money, ever:
+  // its one route is the simulated payment, whatever its settings say.
+  if (event.isDemo) {
+    return { transfer: false, paypalMe: false, bank: false, paypal: null, stripe: null, mock: true };
+  }
   const payout = effectivePayout(event);
   const bank = Boolean(payout.iban.trim() && payout.holder.trim());
   const paypalMe = paypalPayee({ paypalAccount: payout.paypal }) !== null;

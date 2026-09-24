@@ -28,6 +28,11 @@ export interface OrganizerRow {
    * until the organizer replaces it with one only they know.
    */
   mustChangePassword: boolean;
+  /**
+   * A try-it-yourself demo account (lib/demo.ts): walled off from the public
+   * site, simulated payments, no emails, deleted after a day.
+   */
+  isDemo: boolean;
 }
 
 const ORG_COLS = `
@@ -36,7 +41,8 @@ const ORG_COLS = `
   notes,
   created_at AS createdAt,
   (password_hash != '') AS hasPassword,
-  must_change_password AS mustChangePassword
+  must_change_password AS mustChangePassword,
+  is_demo AS isDemo
 `;
 
 function toRow(r: Record<string, unknown> | undefined): OrganizerRow | null {
@@ -45,6 +51,7 @@ function toRow(r: Record<string, unknown> | undefined): OrganizerRow | null {
     ...(r as unknown as OrganizerRow),
     hasPassword: Boolean(r.hasPassword),
     mustChangePassword: Boolean(r.mustChangePassword),
+    isDemo: Boolean(r.isDemo),
   };
 }
 
@@ -66,8 +73,9 @@ export function verifyPassword(password: string, stored: string): boolean {
 
 // ---------------- CRUD (platform-admin operations) ----------------
 
+/** Every real organizer — demo sandboxes (lib/demo.ts) are left out of the admin's lists. */
 export function listOrganizers(): OrganizerRow[] {
-  const rows = getDb().prepare(`SELECT ${ORG_COLS} FROM organizers ORDER BY created_at DESC`).all() as Record<
+  const rows = getDb().prepare(`SELECT ${ORG_COLS} FROM organizers WHERE is_demo = 0 ORDER BY created_at DESC`).all() as Record<
     string,
     unknown
   >[];

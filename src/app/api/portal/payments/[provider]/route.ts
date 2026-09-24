@@ -14,7 +14,7 @@ import { StripeError, verifyStripeKey } from '@/lib/stripe';
 import { PAYOUT_STEP_UP_COOKIE, verifyStepUpToken } from '@/lib/payoutStepUp';
 import { clientIp, rateLimit } from '@/lib/ratelimit';
 import type { ApiErrorResponse } from '@/lib/types';
-import { planGate, requireOrganizerApi } from '../../auth';
+import { planGate, requireOrganizerApi, demoGate } from '../../auth';
 import { payoutStepUpChallenge } from '../../payout/method';
 
 export const dynamic = 'force-dynamic';
@@ -44,6 +44,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
     const { organizer } = auth;
     const blocked = planGate(organizer);
     if (blocked) return blocked;
+    const demoBlocked = demoGate(organizer, 'connecting a real PayPal or Stripe account');
+    if (demoBlocked) return demoBlocked;
 
     // Every attempt costs a call to the provider; keep a script from turning
     // this into a credential-stuffing tool against PayPal or Stripe.

@@ -17,6 +17,11 @@ import './globals.css';
 // `btn bz-search-btn`), and the bazaar's denser version is meant to win those
 // ties. Its own header comment explains why it is a separate file at all.
 import './bazaar.css';
+import { ServiceWorkerRegistrar } from '@/components/AppInstall';
+import { Suspense } from 'react';
+import LangSwitch from '@/components/LangSwitch';
+import { translator } from '@/lib/i18n';
+import { currentLang } from '@/lib/i18nServer';
 
 const sora = Sora({
   subsets: ['latin'],
@@ -36,6 +41,10 @@ export const metadata: Metadata = {
    * origin from NEXT_PUBLIC_BASE_URL, so this must be set correctly in Render.
    */
   metadataBase: new URL(getBaseUrl()),
+  // Installable app: the manifest comes from app/manifest.ts; iPhones read the
+  // touch icon and these two tags instead.
+  appleWebApp: { capable: true, title: PLATFORM_NAME, statusBarStyle: 'black-translucent' },
+  icons: { apple: '/icons/apple-touch-icon.png' },
   title: {
     default: `${PLATFORM_NAME} — Nepali events, tickets & bazaar`,
     // Every page supplies its own short title and gets the brand appended, so a
@@ -100,11 +109,14 @@ export const viewport: Viewport = {
   themeColor: '#0a0b10',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const lang = await currentLang();
+  const tr = translator(lang);
   const contact = getPlatformContact();
   return (
-    <html lang="en" className={sora.variable}>
+    <html lang={lang} className={sora.variable}>
       <body>
+        <ServiceWorkerRegistrar />
         {/* Who publishes this site. Site-wide rather than home-page-only so that
             an event page arriving cold from a search result still identifies its
             publisher — that is the link Google needs to attribute a rich result
@@ -120,7 +132,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             invisible until focused (see .skip-link in bazaar.css), so it costs
             a mouse user nothing and gives everyone else back four tab stops. */}
         <a href="#main" className="skip-link">
-          Skip to the page
+          {tr('skip')}
         </a>
         <header className="site-header">
           <div className="container header-inner">
@@ -138,10 +150,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   Three of them no longer fit beside the wordmark on a phone —
                   measured, not assumed — so below 480px the header keeps the
                   pennant mark and drops the word. See globals.css. */}
-              <Link href="/" className="btn btn-sm btn-green" aria-label="Browse events">
-                <span className="header-label-long">Browse events</span>
+              <Link href="/" className="btn btn-sm btn-green" aria-label={tr('nav.browse')}>
+                <span className="header-label-long">{tr('nav.browse')}</span>
                 <span className="header-label-short" aria-hidden="true">
-                  Browse
+                  {tr('nav.browse.short')}
                 </span>
               </Link>
               {/* The bazaar had exactly one link in the whole site — the
@@ -153,10 +165,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   sign-in stays last because it is a utility for the few. The
                   warm tint puts it between the two in weight — clearly a place
                   to go, clearly not competing with the green button. */}
-              <Link href="/market" className="btn btn-sm header-bazaar" aria-label="The bazaar">
-                <span className="header-label-long">The bazaar</span>
+              <Link href="/market" className="btn btn-sm header-bazaar" aria-label={tr('nav.bazaar')}>
+                <span className="header-label-long">{tr('nav.bazaar')}</span>
                 <span className="header-label-short" aria-hidden="true">
-                  Bazaar
+                  {tr('nav.bazaar.short')}
                 </span>
               </Link>
               {/* Named for what it does. The home page's "For organizers"
@@ -167,17 +179,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   Deliberately the quieter button too: signing in is a utility,
                   while the brand-coloured call to action belongs to the thing we
                   actually want visitors doing — browsing events. */}
-              <Link href="/portal" className="btn btn-sm header-signin" aria-label="Organizer sign in">
-                <span className="header-label-long">Organizer sign in</span>
+              <Link href="/portal" className="btn btn-sm header-signin" aria-label={tr('nav.organizer')}>
+                <span className="header-label-long">{tr('nav.organizer')}</span>
                 <span className="header-label-short" aria-hidden="true">
                   {/* NOT "Sign in". Shortened to that, it read as an invitation
                       to whoever was looking — and ticket buyers need no account
                       at all here, so the one thing this label must never do is
                       suggest they do. The audience is the whole message. */}
-                  Organizer
+                  {tr('nav.organizer.short')}
                 </span>
               </Link>
             </nav>
+            <div className="lang-switch-header">
+              <Suspense fallback={null}>
+                <LangSwitch lang={lang} label={tr('nav.language')} />
+              </Suspense>
+            </div>
           </div>
         </header>
         <main id="main" className="anim-fade-up">
@@ -202,6 +219,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 seller directly, and your QR tickets and collection codes come straight
                 to your inbox.
               </p>
+              {/* The language switch lives here on phones, where the header has
+                  no room for it (see .lang-switch-header in globals.css). */}
+              <div className="lang-footer">
+                <Suspense fallback={null}>
+                  <LangSwitch lang={lang} label={tr('nav.language')} />
+                </Suspense>
+              </div>
             </div>
             <nav aria-label="Footer">
               <p className="footer-heading">Explore</p>
@@ -225,6 +249,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </li>
                 <li>
                   <Link href="/organizers">For organizers</Link>
+                </li>
+                <li>
+                  <Link href="/showcase">Features</Link>
+                </li>
+                <li>
+                  <Link href="/built">How it&rsquo;s built</Link>
                 </li>
                 <li>
                   <Link href="/contact">Custom page design</Link>

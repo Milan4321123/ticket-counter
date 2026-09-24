@@ -18,6 +18,8 @@ import { isTotpEnrolled } from '@/lib/totp';
 import EmailConfigPanel from './EmailConfigPanel';
 import EraseConsentPanel from './EraseConsentPanel';
 import MaintenancePanel from './MaintenancePanel';
+import ExampleBazaarPanel from './ExampleBazaarPanel';
+import { getDb } from '@/lib/db';
 import PlatformPostsPanel from './PlatformPostsPanel';
 import { getPlatformContact, listPlatformPosts } from '@/lib/platformPosts';
 import ScanLinkPanel from './ScanLinkPanel';
@@ -189,6 +191,10 @@ export default async function AdminDashboardPage() {
         stuckCount={stuckCount}
         mockPaidOrders={stats.mockPaidOrders}
         mockTicketsSold={stats.mockTicketsSold}
+      />
+
+      <ExampleBazaarPanel
+        initialShops={(getDb().prepare(`SELECT COUNT(*) AS n FROM events WHERE id LIKE 'seed-bazaar-%'`).get() as { n: number }).n}
       />
 
       <div className="card anim-fade-up">

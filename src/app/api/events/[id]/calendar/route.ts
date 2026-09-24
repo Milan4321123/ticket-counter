@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { listingOpenTo } from '@/lib/demo';
 import { getEventById } from '@/lib/events';
 import { platformNameFromEnv } from '@/lib/platform';
 import { absoluteUrl, machineDate } from '@/lib/seo';
@@ -70,7 +71,7 @@ function foldLine(line: string): string {
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const event = getEventById(id);
-  if (!event || event.status !== 'published' || event.kind !== 'event') {
+  if (!event || !(await listingOpenTo(event)) || event.kind !== 'event') {
     return new NextResponse('Not found', { status: 404 });
   }
   const date = machineDate(event);

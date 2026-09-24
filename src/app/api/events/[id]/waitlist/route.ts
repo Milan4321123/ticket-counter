@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { demoAddress, listingOpenTo } from '@/lib/demo';
 import { getEventById, getEventTiers } from '@/lib/events';
 import { BodyTooLargeError, readJsonLimited } from '@/lib/http';
 import { getAvailability } from '@/lib/inventory';
@@ -70,7 +71,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // Drafts and archived events look like 404s, exactly as their pages do.
     const event = getEventById(id);
-    if (!event || event.status !== 'published') {
+    if (!event || !(await listingOpenTo(event))) {
       return apiError(404, 'We could not find that event — it may no longer be available.');
     }
     const v = vocabFor(event.kind);
@@ -113,7 +114,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // A duplicate address is a silent success inside joinWaitlist (INSERT OR
     // IGNORE), and deliberately indistinguishable out here: the response must
     // never confirm whether an address was already on the list.
-    joinWaitlist(event.id, email);
+    // Demo listings keep nothing deliverable (lib/demo.ts).
+    joinWaitlist(event.id, event.isDemo ? demoAddress('waitlist') : email);
     return NextResponse.json({ ok: true, onSale: false });
   } catch (e) {
     console.error(`POST /api/events/${id}/waitlist failed:`, e);

@@ -14,6 +14,8 @@ import type {
 import { vocabFor, type Vocab } from '@/lib/vocab';
 import OtherCityNotice, { type OtherShow } from '@/components/OtherCityNotice';
 import styles from './checkout.module.css';
+import SeatMapView, { type SeatMapData } from '@/components/SeatMapView';
+import { translator, type Lang } from '@/lib/i18n';
 
 declare global {
   interface Window {
@@ -146,6 +148,36 @@ interface Props {
    * be caught for free. See lib/sameAct.ts.
    */
   otherCities: OtherShow[];
+  /**
+   * The restaurant pack (lib/kitchen), for shops only: collection time slots,
+   * the table from an order-from-the-table QR code, and each item's free
+   * choices. Null for events and for shops that use none of it.
+   */
+  kitchen?: CheckoutKitchen | null;
+  /**
+   * Reserved seating (lib/seats): the hall, and which seats are already taken.
+   * Null for unreserved events. Seated ticket types are bought by picking seats.
+   */
+  seating?: { map: SeatMapData; taken: Record<string, 'held' | 'sold'> } | null;
+  /** Which language the page's headings and buttons are in (lib/i18n). */
+  lang?: Lang;
+}
+
+export interface CheckoutSlot {
+  value: string;
+  time: string;
+  open: boolean;
+}
+
+export interface CheckoutKitchen {
+  /** What the times are for — picking up an order, or an appointment. */
+  purpose?: 'collection' | 'appointment';
+  /** Bookable days, empty when the shop has no slots. */
+  slots: { date: string; label: string; slots: CheckoutSlot[] }[];
+  /** '' unless the buyer came from a table's QR code. */
+  table: string;
+  /** tierKey -> the item's choice groups. */
+  choices: Record<string, { name: string; options: string[] }[]>;
 }
 
 /** POST /api/orders body — matches the platform orders API contract. */
@@ -170,6 +202,11 @@ interface CreateOrderBody {
   voucherCode: string;
   /** Which of the listing's offered routes this order pays by. */
   payVia: PayMethod;
+  pickupSlot?: string;
+  table?: string;
+  choices?: Record<string, Record<string, string>>;
+  note?: string;
+  seats?: string[];
 }
 
 type ApiCode = NonNullable<ApiErrorResponse['code']>;
@@ -299,7 +336,11 @@ export default function CheckoutClient({
   refCode,
   preselectTier = null,
   otherCities,
+  kitchen = null,
+  seating = null,
+  lang = 'en',
 }: Props) {
+  const tr = translator(lang);
   const router = useRouter();
   // Identical checkout either way — same stepper, same reservation, same
   // transfer. Only the nouns change: seats and tickets, or items to collect.
@@ -307,10 +348,29 @@ export default function CheckoutClient({
   const isShop = config.kind === 'shop';
 
   const [qty, setQty] = useState<Record<string, number>>(() =>
-    Object.fromEntries(config.tiers.map((t) => [t.id, t.id === preselectTier ? 1 : 0]))
+    Object.fromEntries(
+      config.tiers.map((t) => [
+        t.id,
+        // A seated type is bought by picking seats on the map, never preset.
+        t.id === preselectTier && !seating?.map.sections.some((sec) => sec.tierKey === t.id) ? 1 : 0,
+      ])
+    )
   );
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  // ---- Restaurant pack: slot, choices, note (shops only) ----
+  const slotsRequired = Boolean(kitchen && kitchen.slots.length > 0 && !kitchen.table);
+  const firstOpenDay = kitchen?.slots.find((d) => d.slots.some((sl) => sl.open))?.date ?? kitchen?.slots[0]?.date ?? '';
+  const [slotDay, setSlotDay] = useState(firstOpenDay);
+  const [pickupSlot, setPickupSlot] = useState('');
+  const [picks, setPicks] = useState<Record<string, Record<string, string>>>({});
+  const [orderNote, setOrderNote] = useState('');
+  // ---- Reserved seating ----
+  const seatedTiers = new Set((seating?.map.sections ?? []).map((sec) => sec.tierKey));
+  const [seats, setSeats] = useState<string[]>([]);
+  const [seatMsg, setSeatMsg] = useState<string | null>(null);
+  const tierOfSeat = (id: string) =>
+    seating?.map.sections.find((sec) => id.startsWith(`${sec.id}-`))?.tierKey ?? '';
   // Whose name the money will arrive under. Optional, and collapsed behind a
   // link by default: the great majority pay from an account in their own name,
   // and a field everybody has to read past is a worse checkout for all of them
@@ -432,7 +492,23 @@ export default function CheckoutClient({
   const nameOk = name.trim().length >= 2;
   const emailOk = EMAIL_RE.test(email.trim());
   const ackOk = !needsStudentAck || studentAck;
-  const formReady = totalQty > 0 && nameOk && emailOk && ackOk && privacyAck;
+  // Every choice of every selected item made, and a slot when one is required.
+  const choicesMissing = config.tiers.find(
+    (t) => (qty[t.id] ?? 0) > 0 && (kitchen?.choices[t.id] ?? []).some((g) => !picks[t.id]?.[g.name])
+  );
+  const slotMissing = slotsRequired && !pickupSlot;
+  const formReady =
+    totalQty > 0 && nameOk && emailOk && ackOk && privacyAck && !choicesMissing && !slotMissing;
+  /** The restaurant fields every order request carries (ignored by the server for events). */
+  const kitchenFields = () => ({
+    pickupSlot: slotsRequired ? pickupSlot : undefined,
+    table: kitchen?.table || undefined,
+    choices: Object.fromEntries(
+      Object.entries(picks).filter(([k]) => (latestRef.current.qty[k] ?? 0) > 0)
+    ),
+    note: orderNote.trim() || undefined,
+    seats: seats.length ? seats : undefined,
+  });
 
   /**
    * WHY the pay buttons are off, in the buyer's words. One flat "fill in your
@@ -443,6 +519,12 @@ export default function CheckoutClient({
   const blockedReason =
     totalQty === 0
       ? `Choose at least one ${v.unit} to continue.`
+      : choicesMissing
+        ? `Choose the options for “${choicesMissing.name}” to continue.`
+        : slotMissing
+          ? kitchen?.purpose === 'appointment'
+            ? 'Pick an appointment time to continue.'
+            : 'Pick a collection time to continue.'
       : !nameOk || !emailOk
         ? 'Fill in your name and email to continue.'
         : !ackOk
@@ -458,13 +540,44 @@ export default function CheckoutClient({
 
   // Latest state snapshot for PayPal callbacks (they are registered once and
   // would otherwise close over stale state).
-  const latestRef = useRef({ qty, name, email, payerName, marketingOptIn, formReady, totalQty, applied, sentRefCode });
-  latestRef.current = { qty, name, email, payerName, marketingOptIn, formReady, totalQty, applied, sentRefCode };
+  const latestRef = useRef({ qty, name, email, payerName, marketingOptIn, formReady, totalQty, applied, sentRefCode, kitchenFields });
+  latestRef.current = { qty, name, email, payerName, marketingOptIn, formReady, totalQty, applied, sentRefCode, kitchenFields };
 
   const localOrderIdRef = useRef<string | null>(null);
   const suppressPaypalErrorRef = useRef(false);
   const buttonsRenderedRef = useRef(false);
   const paypalBoxRef = useRef<HTMLDivElement | null>(null);
+
+  /** Pick or drop a seat on the map. The seated types' quantities follow the picks (effect below). */
+  function toggleSeat(id: string, tierKey: string) {
+    setSeatMsg(null);
+    setMessage(null);
+    setSeats((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      const unseated = config.tiers.reduce((n, t) => (seatedTiers.has(t.id) ? n : n + (qty[t.id] ?? 0)), 0);
+      if (prev.length + unseated >= config.maxTicketsPerOrder) {
+        setSeatMsg(`Up to ${config.maxTicketsPerOrder} tickets per order.`);
+        return prev;
+      }
+      if (prev.filter((x) => tierOfSeat(x) === tierKey).length >= (availability.tiers[tierKey]?.remaining ?? 0)) {
+        setSeatMsg('No more of these seats are available.');
+        return prev;
+      }
+      return [...prev, id];
+    });
+  }
+
+  // The count of each seated type IS the number of its seats picked — derived,
+  // never tracked separately, so the two can never drift apart.
+  useEffect(() => {
+    if (!seating) return;
+    setQty((prev) => {
+      const next = { ...prev };
+      for (const key of seatedTiers) next[key] = seats.filter((x) => tierOfSeat(x) === key).length;
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seats]);
 
   function changeQty(tierId: string, delta: number) {
     setQty((prev) => {
@@ -638,6 +751,7 @@ export default function CheckoutClient({
         ref: sentRefCode,
         voucherCode: sentCode,
         payVia: 'mock',
+        ...kitchenFields(),
       };
       const created = await postJson<CreateOrderResponse>('/api/orders', req);
       await postJson<CaptureOrderResponse>(`/api/orders/${created.orderId}/capture`, {});
@@ -675,6 +789,7 @@ export default function CheckoutClient({
         voucherCode: sentCode,
         // A free order pays by no route; the server ignores this for it.
         payVia: 'transfer',
+        ...kitchenFields(),
       };
       const created = await postJson<CreateOrderResponse>('/api/orders', req);
       // The order page shows the bank details, amount, and reference.
@@ -717,6 +832,7 @@ export default function CheckoutClient({
         ref: sentRefCode,
         voucherCode: sentCode,
         payVia: 'stripe',
+        ...kitchenFields(),
       };
       const created = await postJson<CreateOrderResponse>('/api/orders', req);
       if (!created.redirectUrl) throw new ApiError(GENERIC_ERROR, undefined, 500);
@@ -818,6 +934,7 @@ export default function CheckoutClient({
               // code is never spent on a basket that costs nothing.
               voucherCode: snapshotTotalCents > 0 ? (s.applied?.code ?? '') : '',
               payVia: 'paypal',
+              ...s.kitchenFields(),
             };
             const created = await postJson<CreateOrderResponse>('/api/orders', req);
             localOrderIdRef.current = created.orderId;
@@ -917,7 +1034,7 @@ export default function CheckoutClient({
   return (
     <div className="container container-narrow">
       <h1 className="page-title anim-fade-up" style={{ marginBottom: 8 }}>
-        Checkout
+        {tr('co.title')}
       </h1>
       <div className="checkout-for anim-fade-up">
         <div className="checkout-for-name">{config.eventName}</div>
@@ -928,8 +1045,53 @@ export default function CheckoutClient({
       </div>
       <OtherCityNotice city={config.city} shows={otherCities} variant="checkout" />
 
+      {seating && (
+        <div className="card anim-fade-up">
+          <h2 className="card-title">{tr('co.seats')}</h2>
+          <p className="muted small" style={{ marginTop: 0 }}>
+            {tr('co.seatsHint')}
+          </p>
+          <SeatMapView
+            map={seating.map}
+            taken={seating.taken}
+            selected={new Set(seats)}
+            mode="pick"
+            onToggle={toggleSeat}
+            disabled={working}
+            legend={Object.fromEntries(
+              config.tiers
+                .filter((t) => seatedTiers.has(t.id))
+                .map((t) => [t.id, { label: t.name, price: t.priceCents === 0 ? 'Free' : formatMoney(t.priceCents, config.currency) }])
+            )}
+          />
+          {seatMsg && (
+            <p className={styles.fieldError} role="alert" style={{ marginTop: 8 }}>
+              {seatMsg}
+            </p>
+          )}
+          {seats.length > 0 && (
+            <p className="small" style={{ margin: '10px 0 0' }}>
+              <strong>Your seats:</strong>{' '}
+              {[...seats]
+                .map((id) => id.split('-').slice(-2))
+                .sort((a, b) => a[0].localeCompare(b[0]) || Number(a[1]) - Number(b[1]))
+                .map(([row, n]) => `${row}${n}`)
+                .join(', ')}{' '}
+              <button
+                type="button"
+                className="link-button small"
+                style={{ background: 'none', border: 0, padding: 0, color: 'var(--brand-text)', fontWeight: 600, cursor: 'pointer' }}
+                onClick={() => setSeats([])}
+              >
+                Clear
+              </button>
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="card anim-fade-up anim-d1">
-        <h2 className="card-title">{isShop ? 'Your order' : 'Your tickets'}</h2>
+        <h2 className="card-title">{isShop ? tr('co.yourOrder') : tr('co.yourTickets')}</h2>
         <div className={styles.qtyList}>
           {config.tiers.map((tier) => {
             const remaining = availability.tiers[tier.id]?.remaining ?? 0;
@@ -970,6 +1132,11 @@ export default function CheckoutClient({
                     </div>
                   )}
                 </div>
+                {seatedTiers.has(tier.id) ? (
+                  <span className="badge badge-accent" style={{ whiteSpace: 'nowrap' }}>
+                    {q} {q === 1 ? 'seat' : 'seats'} picked
+                  </span>
+                ) : (
                 <div className="qty-stepper">
                   <button
                     type="button"
@@ -989,6 +1156,7 @@ export default function CheckoutClient({
                     +
                   </button>
                 </div>
+                )}
               </div>
             );
           })}
@@ -1001,9 +1169,110 @@ export default function CheckoutClient({
           {config.tiers.some((t) => t.seatsPerUnit > 1) ? 'bookings' : v.units} per order.
         </p>
 
+        {/* ---- Item choices (restaurant pack) ---- */}
+        {kitchen &&
+          config.tiers
+            .filter((t) => (qty[t.id] ?? 0) > 0 && (kitchen.choices[t.id] ?? []).length > 0)
+            .map((t) => (
+              <div key={t.id} className={styles.choiceBlock}>
+                <div className="tier-name">{t.name}</div>
+                {kitchen.choices[t.id].map((g) => (
+                  <div key={g.name} className={styles.choiceRow} role="radiogroup" aria-label={`${g.name} for ${t.name}`}>
+                    <span className={styles.choiceName}>{g.name}</span>
+                    <div className={styles.choiceOptions}>
+                      {g.options.map((o) => {
+                        const on = picks[t.id]?.[g.name] === o;
+                        return (
+                          <button
+                            type="button"
+                            key={o}
+                            role="radio"
+                            aria-checked={on}
+                            className={`${styles.choiceChip}${on ? ` ${styles.choiceChipOn}` : ''}`}
+                            onClick={() =>
+                              setPicks((prev) => ({ ...prev, [t.id]: { ...(prev[t.id] ?? {}), [g.name]: o } }))
+                            }
+                            disabled={working}
+                          >
+                            {o}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+                {(qty[t.id] ?? 0) > 1 && (
+                  <p className="muted small" style={{ margin: '4px 0 0' }}>
+                    Applies to all {qty[t.id]} — want them different? Say so in the note below.
+                  </p>
+                )}
+              </div>
+            ))}
+
+        {/* ---- Collection time, or the table (restaurant pack) ---- */}
+        {kitchen?.table ? (
+          <div className={styles.tableNotice}>
+            <strong>Table {kitchen.table}</strong>
+            <span>Your order goes straight to the kitchen and is brought to your table.</span>
+          </div>
+        ) : slotsRequired && kitchen ? (
+          <div className={styles.slotBlock}>
+            <div className="tier-name">
+              {kitchen.purpose === 'appointment' ? 'Choose your appointment time' : tr('co.when')}
+            </div>
+            <div className={styles.slotDays} role="tablist" aria-label="Collection day">
+              {kitchen.slots.map((d) => (
+                <button
+                  type="button"
+                  key={d.date}
+                  role="tab"
+                  aria-selected={slotDay === d.date}
+                  className={`${styles.slotDay}${slotDay === d.date ? ` ${styles.slotDayOn}` : ''}`}
+                  onClick={() => setSlotDay(d.date)}
+                  disabled={working}
+                >
+                  {d.label}
+                </button>
+              ))}
+            </div>
+            <div className={styles.slotGrid}>
+              {(kitchen.slots.find((d) => d.date === slotDay)?.slots ?? []).map((sl) => (
+                <button
+                  type="button"
+                  key={sl.value}
+                  className={`${styles.slot}${pickupSlot === sl.value ? ` ${styles.slotOn}` : ''}`}
+                  onClick={() => setPickupSlot(sl.value)}
+                  disabled={!sl.open || working}
+                  aria-pressed={pickupSlot === sl.value}
+                  title={sl.open ? `Collect at ${sl.time}` : 'Full'}
+                >
+                  {sl.time}
+                  {!sl.open && <small>full</small>}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {kitchen && (
+          <div className="field" style={{ marginTop: 12, marginBottom: 0 }}>
+            <label htmlFor="order-note">Note for the {kitchen.table ? 'kitchen' : 'seller'} (optional)</label>
+            <textarea
+              id="order-note"
+              className="input"
+              rows={2}
+              maxLength={300}
+              value={orderNote}
+              onChange={(e) => setOrderNote(e.target.value)}
+              placeholder={kitchen.table ? 'e.g. one without onion, please' : 'e.g. I will be 10 minutes late'}
+              disabled={working}
+            />
+          </div>
+        )}
+
         <div className={styles.summaryBlock}>
           {totalQty === 0 ? (
-            <p className="muted small">Nothing selected yet.</p>
+            <p className="muted small">{tr('co.nothing')}</p>
           ) : (
             <>
               {selectedTiers.map((tier) => (
@@ -1028,7 +1297,7 @@ export default function CheckoutClient({
                 </div>
               )}
               <div className="summary-row total">
-                <span>Total</span>
+                <span>{tr('co.total')}</span>
                 <span>{payableCents === 0 ? 'Free' : formatMoney(payableCents, config.currency)}</span>
               </div>
               {discountCents > 0 && (
@@ -1242,9 +1511,9 @@ export default function CheckoutClient({
       </div>
 
       <div className="card anim-fade-up anim-d2">
-        <h2 className="card-title">Your details</h2>
+        <h2 className="card-title">{tr('co.details')}</h2>
         <div className="field">
-          <label htmlFor="buyer-name">Full name</label>
+          <label htmlFor="buyer-name">{tr('co.fullName')}</label>
           <input
             id="buyer-name"
             className="input"
@@ -1259,7 +1528,7 @@ export default function CheckoutClient({
           )}
         </div>
         <div className="field">
-          <label htmlFor="buyer-email">Email address</label>
+          <label htmlFor="buyer-email">{tr('co.email')}</label>
           <input
             id="buyer-email"
             type="email"
@@ -1436,7 +1705,7 @@ export default function CheckoutClient({
       </div>
 
       <div className="card anim-fade-up anim-d3">
-        <h2 className="card-title">{isFreeOrder ? 'Reserve your spot' : 'Payment'}</h2>
+        <h2 className="card-title">{isFreeOrder ? tr('co.reserveSpot') : tr('co.payment')}</h2>
 
         {/* The one fact worth repeating directly above the button: a buyer who
             has scrolled this far has not seen the top of the page for several

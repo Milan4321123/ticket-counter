@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { listingOpenTo } from '@/lib/demo';
 import { getEventById } from '@/lib/events';
 import { BodyTooLargeError, readJsonLimited } from '@/lib/http';
 import { getOrganizer } from '@/lib/organizers';
@@ -52,7 +53,7 @@ export async function POST(req: Request) {
     const eventId = typeof body.eventId === 'string' ? body.eventId : '';
     const code = typeof body.code === 'string' ? body.code : '';
     const event = eventId ? getEventById(eventId) : null;
-    if (!event || event.status !== 'published') {
+    if (!event || !(await listingOpenTo(event))) {
       return apiError(404, 'NOT_FOUND', 'We could not find that listing — it may no longer be available.');
     }
     // Nothing can be bought here, so nothing needs previewing — and an

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPaymentMode } from '@/lib/config';
+import { getEventById } from '@/lib/events';
 import { beginCapture, claimInventory, releaseClaim, SoldOutError } from '@/lib/inventory';
 import { finalizePaidOrder, getOrder, getTicketsForOrder, markOrderFailed } from '@/lib/orders';
 import {
@@ -148,8 +149,11 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     }
 
     if (order.paymentMode === 'mock') {
-      // Mock orders must never finalize once real payments are switched on.
-      if (getPaymentMode() !== 'mock') {
+      // Mock orders must never finalize once real payments are switched on —
+      // except on a try-it-yourself demo listing (lib/demo.ts), whose ONLY
+      // route is the simulated payment and which cannot take real money.
+      const listing = getEventById(order.eventId);
+      if (getPaymentMode() !== 'mock' && !listing?.isDemo) {
         releaseClaim(id, 'cancelled');
         return apiError(409, 'PAYMENT_FAILED', 'Test-mode orders can no longer be completed — please start a new order.');
       }

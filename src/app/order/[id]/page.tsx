@@ -16,7 +16,7 @@ import {
   paypalPayee,
 } from '@/lib/events';
 import { isEmailConfigured } from '@/lib/email';
-import { getOrganizer } from '@/lib/organizers';
+import { currentOrganizer, getOrganizer } from '@/lib/organizers';
 import { girocodePayload } from '@/lib/girocode';
 import { formatMoney } from '@/lib/money';
 import { getBaseUrl } from '@/lib/config';
@@ -32,6 +32,8 @@ import { vocabFor } from '@/lib/vocab';
 import { cityLabel, shortDateLabel } from '@/lib/sameAct';
 import { whatsappShareUrl } from '@/lib/whatsapp';
 import { armStripeSweep } from '@/lib/stripeOrders';
+import { getOrderKitchenDetails, parseSlotConfig, picksLine, slotLabel } from '@/lib/kitchen';
+import { parseSeatMap, seatSummary, seatsForOrder } from '@/lib/seats';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,6 +70,12 @@ export default async function OrderPage({
   // Every order belongs to an event — its name, venue, and bank details all
   // come from there.
   const event = getEventById(order.eventId);
+  // An order on a try-it-yourself demo listing (lib/demo.ts) is visible only
+  // to the demo account that owns the listing — the same wall as its pages.
+  if (event?.isDemo) {
+    const viewer = await currentOrganizer();
+    if (!viewer || viewer.id !== event.organizerId) notFound();
+  }
   const eventVenue = event ? [event.venueName, event.city].filter(Boolean).join(', ') : '';
   /**
    * "Heidelberg · Sat 10 Oct" — the two facts a buyer has to carry with them.
@@ -97,9 +105,47 @@ export default async function OrderPage({
     0
   );
   const hasBundle = orderItems.some((it) => (tierFor(it.tierId)?.seatsPerUnit ?? 1) > 1);
+  // Restaurant pack (lib/kitchen): the collection time or table, and the
+  // choices made for each item, shown back exactly as the kitchen sees them.
+  const kitchenInfo = getOrderKitchenDetails(order.id);
   const itemsLine = orderItems
-    .map((it) => `${it.quantity}× ${tierFor(it.tierId)?.name ?? it.tierId}`)
+    .map((it) => {
+      const picks = picksLine(kitchenInfo.choices, it.tierId);
+      return `${it.quantity}× ${tierFor(it.tierId)?.name ?? it.tierId}${picks ? ` (${picks})` : ''}`;
+    })
     .join(', ');
+  // Reserved seating (lib/seats): which seats this order holds.
+  const orderSeats = seatsForOrder(order.id);
+  const seatMapForOrder = event ? parseSeatMap(event.seatMap) : null;
+  const seatsBlock =
+    orderSeats.length > 0 ? (
+      <div className="notice anim-fade-up" style={{ marginTop: 0 }}>
+        <strong>Your seats:</strong> {seatSummary(orderSeats, seatMapForOrder)}
+      </div>
+    ) : null;
+  const kitchenBlock =
+    kitchenInfo.tableLabel || kitchenInfo.pickupSlot || kitchenInfo.note ? (
+      <div className="notice anim-fade-up" style={{ marginTop: 0 }}>
+        {kitchenInfo.tableLabel ? (
+          <strong>Table {kitchenInfo.tableLabel} — we bring it to you.</strong>
+        ) : kitchenInfo.pickupSlot ? (
+          <strong>
+            {event && parseSlotConfig(event.pickupSlots).purpose === 'appointment' ? 'Appointment' : 'Collect'}:{' '}
+            {slotLabel(kitchenInfo.pickupSlot)}
+          </strong>
+        ) : null}
+        {kitchenInfo.kitchenStatus === 'ready' && order.status === 'paid' ? (
+          <span className="badge badge-green" style={{ marginLeft: 8 }}>
+            Ready now
+          </span>
+        ) : kitchenInfo.kitchenStatus === 'cooking' && order.status === 'paid' ? (
+          <span className="badge badge-amber" style={{ marginLeft: 8 }}>
+            Being prepared
+          </span>
+        ) : null}
+        {kitchenInfo.note ? <div className="small muted">Your note: “{kitchenInfo.note}”</div> : null}
+      </div>
+    ) : null;
 
   // Reaching the organizer matters most on THIS page: it is where a buyer is
   // looking at a stranger's IBAN and deciding whether to send real money to it.
@@ -267,6 +313,8 @@ export default async function OrderPage({
             </div>
           </div>
         ) : null}
+        {kitchenBlock}
+        {seatsBlock}
         {itemsLine ? (
           <p className="muted small anim-fade-up" style={{ margin: '-8px 0 16px' }}>
             {itemsLine}
@@ -818,7 +866,7 @@ export default async function OrderPage({
 
   return (
     <div className="container section">
-      <h1 className="page-title anim-fade-up">Your tickets</h1>
+      <h1 className="page-title anim-fade-up">{event?.kind === 'shop' ? 'Your order' : 'Your tickets'}</h1>
       {/* Where and when, above the QR codes rather than below them: this is the
           page somebody reopens on the night. */}
       {event ? (
@@ -836,8 +884,13 @@ export default async function OrderPage({
             email says it the same way. */}
         {isFreeOrder
           ? "You're on the list — reservation confirmed. See you there!"
-          : 'Payment confirmed — you’re all set. See you at the show!'}
+          : event?.kind === 'shop'
+            ? 'Payment confirmed — you’re all set. Show the code below when you collect.'
+            : 'Payment confirmed — you’re all set. See you at the show!'}
       </div>
+      {kitchenBlock}
+      {seatsBlock}
+      {event?.kind === 'shop' && itemsLine ? <p className="muted small anim-fade-up">{itemsLine}</p> : null}
       {shareUrl && (
         <p className="anim-fade-up anim-d1" style={{ margin: '0 0 16px' }}>
           {/* noreferrer as well as noopener now that this page's URL can carry
@@ -1087,6 +1140,10 @@ export default async function OrderPage({
         </p>
       </div>
 
+      <p className="muted small anim-fade-up anim-d3 no-print" style={{ margin: '0 0 10px' }}>
+        Tap a {v.code} to open it on its own — &ldquo;Save to phone&rdquo; there keeps it in your photos, so it
+        opens even without signal.
+      </p>
       <div className="ticket-grid anim-fade-up anim-d3">
         {tickets.map((t) => (
           <Link

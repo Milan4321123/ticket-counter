@@ -130,6 +130,34 @@ export default function OrganizersPage() {
         </div>
       </section>
 
+      {/* ---- See it before applying: the catalog and the sandbox ---- */}
+      <section className="container" style={{ marginTop: 8 }}>
+        <div
+          className="card"
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            padding: '14px 18px',
+          }}
+        >
+          <p style={{ margin: 0 }}>
+            <strong>Want to look around first?</strong>{' '}
+            <span className="muted small">Browse every feature, or open a private demo account for 24 hours.</span>
+          </p>
+          <p style={{ margin: 0, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <Link href="/showcase" className="btn btn-sm btn-green">
+              See every feature
+            </Link>
+            <Link href="/demo" className="btn btn-sm">
+              Try the organizer demo
+            </Link>
+          </p>
+        </div>
+      </section>
+
       {/* ---- Feature rows: mockup + three punchy points each ---- */}
       <section className="section">
         <div className="container">

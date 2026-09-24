@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { listingOpenTo } from '@/lib/demo';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getEventBySlug, getEventTiers } from '@/lib/events';
@@ -9,6 +10,9 @@ import { vocabFor } from '@/lib/vocab';
 import { expireOverdueTransferReservations } from '@/lib/orders';
 import { getOrganizer } from '@/lib/organizers';
 import { paymentOptionsFor } from '@/lib/paymentConnections';
+import { availableSlots, cleanTableLabel, parseChoices, parseSlotConfig } from '@/lib/kitchen';
+import { parseSeatMap, takenSeats } from '@/lib/seats';
+import { currentLang } from '@/lib/i18nServer';
 import { BUYER_RETENTION_DAYS } from '@/lib/retention';
 import CheckoutClient from './CheckoutClient';
 
@@ -35,7 +39,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 export default async function EventCheckoutPage({ params, searchParams }: Params) {
   const { slug } = await params;
   const event = getEventBySlug(slug);
-  if (!event || event.status !== 'published') notFound();
+  if (!event || !(await listingOpenTo(event))) notFound();
 
   // Overdue transfer reservations release their seats before we count stock.
   expireOverdueTransferReservations(event.id);
@@ -113,6 +117,30 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
   // order page, after someone has actually reserved.
   const options = paymentOptionsFor(event);
 
+  // The restaurant pack, shops only: slots, the table from ?table=, choices.
+  const tableFromQr = event.kind === 'shop' && event.tableCount > 0 ? cleanTableLabel(sp.table) : '';
+  const shopTiers = event.kind === 'shop' ? getEventTiers(event.id) : [];
+  const kitchenChoices = Object.fromEntries(
+    shopTiers.map((t) => [t.tierKey, parseChoices(t.choices)]).filter(([, g]) => (g as unknown[]).length > 0)
+  );
+  const kitchenSlots = event.kind === 'shop' ? availableSlots(event) : [];
+  // Reserved seating: the hall and what is taken right now (lib/seats).
+  const seatMap = event.kind === 'event' ? parseSeatMap(event.seatMap) : null;
+  const seating = seatMap?.enabled ? { map: seatMap, taken: Object.fromEntries(takenSeats(event.id)) } : null;
+  const kitchen =
+    event.kind === 'shop' && (kitchenSlots.length > 0 || tableFromQr || Object.keys(kitchenChoices).length > 0)
+      ? {
+          purpose: parseSlotConfig(event.pickupSlots).purpose,
+          table: tableFromQr,
+          choices: kitchenChoices,
+          slots: kitchenSlots.map((d) => ({
+            date: d.date,
+            label: d.label,
+            slots: d.slots.map((sl) => ({ value: sl.value, time: sl.time, open: sl.open })),
+          })),
+        }
+      : null;
+
   return (
     <CheckoutClient
       eventId={event.id}
@@ -146,6 +174,9 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
           })),
       }}
       availability={availability}
+      kitchen={kitchen}
+      lang={await currentLang()}
+      seating={seating}
       payment={{
         transfer: options.transfer,
         bank: options.bank,

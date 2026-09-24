@@ -287,6 +287,11 @@ At the door:
 - **Rotating `APP_SECRET` invalidates every stored PayPal/Stripe credential** (they are encrypted with a key derived from it). Organizers then have to paste theirs in again — say so before you rotate.
 - After each event, the organizer's bank/PayPal/Stripe statements plus your database backup are the complete, auditable record of the sale.
 
+### Showing the platform off: the try-it demo and the example bazaar
+
+- **Try-it demo (`/demo`) — nothing to set up.** Every visitor who presses "Start the demo" gets their own private organizer account on the live site, already full: an event with a seat map and orders, a momo shop with a live kitchen board and collection times, a beauty studio with appointments, reviews, insights and statements. Only that visitor can see it, payments are simulated, no email is sent, and it deletes itself after 24 hours. It never appears in the public feed or bazaar.
+- **Example bazaar — one button.** In **/admin**, the *Example bazaar* card puts up (or takes down) the clearly marked example shops on `/market` — about 55 items with pictures. It runs `scripts/seed-bazaar.mjs` on the server in the background (a few minutes; you can leave the page), with all of that script's safety refusals.
+
 ### The example bazaar: take it down before you change how payments work
 
 The site can publish an **example shop** — one invented Nepali storefront, with an invented seller and an invented collection address — so that a seller being shown `/market` can see what their own shop here would look like instead of an empty room. It is created and removed by one script:

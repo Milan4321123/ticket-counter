@@ -233,6 +233,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       paypalAccount: payoutNow.paypal,
     };
     const payoutChange = summarisePayoutChange(payoutBefore, body);
+    // A try-it-yourself demo (lib/demo.ts) keeps the example account it was
+    // given: a demo listing takes no real money, and a real IBAN typed here
+    // would only be a way to put somebody's bank details on a page.
+    if (organizer.isDemo) {
+      const moved =
+        payoutChange.changed.length > 0 ||
+        ('bankBic' in body && String(body.bankBic ?? '').trim() !== payoutNow.bic.trim()) ||
+        ('bankName' in body && String(body.bankName ?? '').trim() !== payoutNow.bankName.trim());
+      if (moved) {
+        return NextResponse.json(
+          {
+            error:
+              'This is a demo account, so its payment details are fixed. In a real account you enter your own IBAN or PayPal here.',
+          } satisfies ApiErrorResponse,
+          { status: 403 }
+        );
+      }
+    }
     const stepUpMethod = payoutStepUpChallenge(organizer).method;
     if (payoutChange.changed.length > 0 && !payoutChange.firstTimeOnly) {
       const store = await cookies();

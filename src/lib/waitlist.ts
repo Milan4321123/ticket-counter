@@ -117,6 +117,7 @@ export async function runWaitlistNotifySweep(force = false): Promise<{ notified:
          JOIN events e ON e.id = w.event_id
          WHERE w.notified_at IS NULL
            AND e.status = 'published'
+           AND e.organizer_id NOT IN (SELECT id FROM organizers WHERE is_demo = 1)
            AND e.sales_open = 1
            AND (e.event_date IS NULL OR date(e.event_date) >= date('now'))`
       )

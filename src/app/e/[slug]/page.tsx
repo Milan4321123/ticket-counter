@@ -60,6 +60,8 @@ import {
 } from '@/lib/ticketState';
 import { platformName } from '@/lib/platform';
 import { currentOrganizer, getOrganizer } from '@/lib/organizers';
+import { listingOpenTo } from '@/lib/demo';
+import { cleanTableLabel } from '@/lib/kitchen';
 import {
   getReferralRewardSettings,
   organizerCurrency,
@@ -166,8 +168,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   // og:image, or a canonical. Metadata is public even when the page body is
   // not: a crawler that fetches this URL without the session cookie is served
   // exactly this, so the noindex has to live here and not only in the body.
-  if (event.status !== 'published') {
-    return { title: `${event.name} — preview`, robots: { index: false, follow: false } };
+  if (event.status !== 'published' || event.isDemo) {
+    return { title: `${event.name} — ${event.isDemo ? 'demo' : 'preview'}`, robots: { index: false, follow: false } };
   }
 
   const description = eventDescription(event);
@@ -256,6 +258,11 @@ export default async function EventPage({ params, searchParams }: Params) {
     if (!viewer || viewer.id !== event.organizerId) notFound();
     preview = true;
   }
+  // A try-it-yourself demo listing (lib/demo.ts) behaves like a live page —
+  // it can be bought from, with a simulated payment — but only for the demo
+  // account that owns it. Everyone else gets the same 404 a draft gives them.
+  const demo = event.isDemo && isPublished;
+  if (demo && !(await listingOpenTo(event))) notFound();
 
   const design = parsePageDesign(event.pageDesign);
   const theme = ACCENT_THEMES[design.accent ?? 'violet'];
@@ -443,7 +450,12 @@ export default async function EventPage({ params, searchParams }: Params) {
   // arrived with, so it survives the hop to checkout and into the create-order
   // POST. refCode is already reduced to /^[A-Z0-9]{8}$/, so it is URL-safe.
   const checkoutBase = `/e/${event.slug}/checkout`;
-  const checkoutHref = refCode ? `${checkoutBase}?ref=${refCode}` : checkoutBase;
+  // Order-from-the-table (lib/kitchen): a printed QR code opens this page with
+  // ?table=5, and every checkout link carries it on. cleanTableLabel keeps it
+  // to a short plain label, so it is URL-safe too.
+  const tableLabel = isShop && event.tableCount > 0 ? cleanTableLabel(sp.table) : '';
+  const extraQs = `${refCode ? `&ref=${refCode}` : ''}${tableLabel ? `&table=${encodeURIComponent(tableLabel)}` : ''}`;
+  const checkoutHref = extraQs ? `${checkoutBase}?${extraQs.slice(1)}` : checkoutBase;
   const headline = design.headline || event.name;
 
   // ---------------- Stalls (slice 2) ----------------
@@ -641,7 +653,7 @@ export default async function EventPage({ params, searchParams }: Params) {
           cannot be bought, and telling Google about an event that does not exist
           yet is the kind of claim that costs rich results on the events that
           DO. The page is noindex besides — this is the second lock. */}
-      {!preview && (
+      {!preview && !demo && (
         <>
           <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(eventLd)} />
           <script
@@ -649,6 +661,21 @@ export default async function EventPage({ params, searchParams }: Params) {
             dangerouslySetInnerHTML={jsonLdScript(eventBreadcrumbJsonLd(event))}
           />
         </>
+      )}
+
+      {demo && (
+        <div className="preview-bar" role="status">
+          <div className="container preview-bar-inner">
+            <span className="badge badge-amber">Demo</span>
+            <span className="preview-bar-text">
+              This is your demo {isShop ? 'shop' : 'event'} as a buyer sees it. <strong>Only you can open it.</strong>{' '}
+              Try buying — payment is simulated and no email is sent.
+            </span>
+            <Link href={`/portal/events/${event.id}/edit`} className="btn btn-sm">
+              Back to the portal
+            </Link>
+          </div>
+        </div>
       )}
 
       {preview && (
@@ -901,7 +928,7 @@ export default async function EventPage({ params, searchParams }: Params) {
                     !preview && tierHasItemPage(event.kind, tier, tierPic)
                       ? `/e/${event.slug}/item/${encodeURIComponent(tier.tierKey)}${refCode ? `?ref=${refCode}` : ''}`
                       : null;
-                  const buyHref = `${checkoutBase}?tier=${encodeURIComponent(tier.tierKey)}${refCode ? `&ref=${refCode}` : ''}`;
+                  const buyHref = `${checkoutBase}?tier=${encodeURIComponent(tier.tierKey)}${extraQs}`;
                   // One badge function, shared with the item page — the chain
                   // it encodes is order-dependent enough that two copies of it
                   // would eventually disagree about the same row.

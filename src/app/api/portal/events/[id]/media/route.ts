@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { mediaUrl } from '@/lib/events';
 import { allowedImageMime, saveEventPhoto, MAX_IMAGE_BYTES } from '@/lib/media';
 import type { ApiErrorResponse } from '@/lib/types';
-import { planGate, requireOrganizerApi, requireOwnedEvent } from '../../../auth';
+import { planGate, requireOrganizerApi, requireOwnedEvent, demoGate } from '../../../auth';
 
 /**
  * Upload one event photo (multipart form, field name "file"). Ownership is
@@ -18,6 +18,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const blocked = planGate(organizer);
     if (blocked) return blocked;
+    const demoBlocked = demoGate(organizer, 'uploading photos');
+    if (demoBlocked) return demoBlocked;
 
     const owned = requireOwnedEvent(organizer, id);
     if (owned.failure) return owned.failure;
