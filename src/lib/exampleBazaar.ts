@@ -103,10 +103,27 @@ export function ensureExampleBazaarOnce(): void {
     const claimed = db.prepare(`INSERT OR IGNORE INTO kv (key, value) VALUES (?, ?)`).run(AUTO_KEY, `started:${Date.now()}`).changes;
     if (claimed === 0) return; // another request got there first
     const job = startExampleBazaarJob('seed', (ok) => {
-      db.prepare(`UPDATE kv SET value = ? WHERE key = ?`).run(ok ? `done:${Date.now()}` : `failed:${Date.now()}`, AUTO_KEY);
+      const note = (global.__exampleBazaarJob?.note ?? '').replace(/[:\n]/g, ' ').slice(0, 300);
+      db.prepare(`UPDATE kv SET value = ? WHERE key = ?`).run(ok ? `done:${Date.now()}` : `failed:${Date.now()}:${note}`, AUTO_KEY);
     });
     if (!job) db.prepare(`UPDATE kv SET value = ? WHERE key = ?`).run('busy', AUTO_KEY);
   } catch (e) {
     console.error('ensureExampleBazaarOnce failed:', e);
   }
+}
+
+/**
+ * A one-line, data-free status for the automatic run: "done", "started",
+ * "failed: <the script's reason>" — so a failed seed on the hosted site can be
+ * diagnosed without server logs. Exposes no rows, only the script's own words.
+ */
+export function autoSeedStatus(): { state: string; shops: number; note: string } {
+  const row = getDb().prepare(`SELECT value FROM kv WHERE key = ?`).get(AUTO_KEY) as { value: string } | undefined;
+  const [state = 'never', , ...rest] = (row?.value ?? 'never').split(':');
+  const job = currentSeedJob();
+  return {
+    state: job && job.finishedAt === null ? 'running' : state,
+    shops: exampleShopCount(),
+    note: (rest.join(':') || job?.note || '').replace(/\/[^\s]*\//g, '…/').slice(0, 300),
+  };
 }
