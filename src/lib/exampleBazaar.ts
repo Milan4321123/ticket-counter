@@ -82,16 +82,30 @@ export function ensureExampleBazaarOnce(): void {
     if (process.env.EXAMPLE_BAZAAR_AUTOSEED === 'off') return;
     const db = getDb();
     const row = db.prepare(`SELECT value FROM kv WHERE key = ?`).get(AUTO_KEY) as { value: string } | undefined;
+    let tries = 0;
     if (row) {
       // A run that started but never finished was cut off by a restart (a
       // deploy kills the child process) — after 20 minutes, try again. A run
       // that failed gets one more try after six hours. Anything else — done,
       // already present, or taken down by the owner — stays as it is.
-      const [state, ts] = row.value.split(':');
+      const [state, ts, triesText] = row.value.split(':');
       const age = Date.now() - Number(ts || 0);
       const running = global.__exampleBazaarJob && global.__exampleBazaarJob.finishedAt === null;
       // Started before THIS server process existed = certainly cut off.
       const cutOff = state === 'started' && !running && (Number(ts || 0) < PROCESS_STARTED_AT || age > 20 * 60_000);
+      tries = cutOff ? Number(triesText || 1) : 0;
+      // Cut off twice in a row is not bad luck with a deploy: the run itself is
+      // taking the server down (on Render it was OOM-killed, the restart served a
+      // request, and that request started it again — a crash loop). Stop, and
+      // say so; the six-hour retry below still applies.
+      if (cutOff && tries >= 2) {
+        db.prepare(`UPDATE kv SET value = ? WHERE key = ? AND value = ?`).run(
+          `failed:${Date.now()}:cut off ${tries} times in a row (restart or out of memory)`,
+          AUTO_KEY,
+          row.value
+        );
+        return;
+      }
       const stale = cutOff || (state === 'failed' && age > 6 * 3_600_000);
       if (!stale || exampleShopCount() > 0) return;
       db.prepare(`DELETE FROM kv WHERE key = ? AND value = ?`).run(AUTO_KEY, row.value);
@@ -100,7 +114,7 @@ export function ensureExampleBazaarOnce(): void {
       db.prepare(`INSERT OR IGNORE INTO kv (key, value) VALUES (?, ?)`).run(AUTO_KEY, 'already-present');
       return;
     }
-    const claimed = db.prepare(`INSERT OR IGNORE INTO kv (key, value) VALUES (?, ?)`).run(AUTO_KEY, `started:${Date.now()}`).changes;
+    const claimed = db.prepare(`INSERT OR IGNORE INTO kv (key, value) VALUES (?, ?)`).run(AUTO_KEY, `started:${Date.now()}:${tries + 1}`).changes;
     if (claimed === 0) return; // another request got there first
     const job = startExampleBazaarJob('seed', (ok) => {
       const note = (global.__exampleBazaarJob?.note ?? '').replace(/[:\n]/g, ' ').slice(0, 300);

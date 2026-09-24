@@ -290,8 +290,8 @@
 import { randomBytes, scryptSync } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
-import sharp from 'sharp';
 
 // ---------------------------------------------------------------------------
 // Paths, resolved exactly as scripts/backup.mjs resolves them — but only
@@ -2098,8 +2098,30 @@ function productSvg(shop, tier, index) {
  * Deliberately not straight to disk: see the render loop below, where every
  * picture is produced before anything existing is removed.
  */
-async function renderImage(svg) {
-  return sharp(Buffer.from(svg)).jpeg({ quality: 88, chromaSubsampling: '4:4:4' }).toBuffer();
+// The pictures ship PRE-RENDERED in scripts/seed-bazaar-art/ (made with
+// `--prerender` on a developer machine). Drawing ~80 SVGs with sharp takes more
+// memory than a small hosted instance has: on Render the run was OOM-killed,
+// the whole site restarted with it, and the next request started it again. So a
+// hosted seed only READS those files; sharp is loaded only for a picture that
+// has no pre-rendered file (or when --prerender redraws them all).
+const ART_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'seed-bazaar-art');
+const prerenderOnly = process.argv.includes('--prerender');
+let sharpModule = null;
+
+async function renderImage(id, makeSvg) {
+  const file = path.join(ART_DIR, `${id}.jpg`);
+  if (!prerenderOnly && fs.existsSync(file)) return fs.readFileSync(file);
+  if (!sharpModule) {
+    sharpModule = (await import('sharp')).default;
+    sharpModule.cache(false);
+    sharpModule.concurrency(1);
+  }
+  const buffer = await sharpModule(Buffer.from(makeSvg())).jpeg({ quality: 84, mozjpeg: true }).toBuffer();
+  if (prerenderOnly) {
+    fs.mkdirSync(ART_DIR, { recursive: true });
+    fs.writeFileSync(file, buffer);
+  }
+  return buffer;
 }
 
 /**
@@ -2541,9 +2563,9 @@ for (const shop of SHOPS) {
     avatar: `${shop.id}-avatar`,
   };
   const images = {
-    cover: await renderImage(coverSvg(shop)),
-    tile: await renderImage(tileSvg(shop)),
-    avatar: await renderImage(avatarSvg(shop)),
+    cover: await renderImage(ids.cover, () => coverSvg(shop)),
+    tile: await renderImage(ids.tile, () => tileSvg(shop)),
+    avatar: await renderImage(ids.avatar, () => avatarSvg(shop)),
   };
   // One picture per PRODUCT as well, because a shop whose items have no
   // photographs is exactly the ticket-picker look this feature exists to
@@ -2557,10 +2579,14 @@ for (const shop of SHOPS) {
     items.push({
       tier,
       id: `${shop.id}-item-${tier.key}`,
-      image: await renderImage(productSvg(shop, tier, index)),
+      image: await renderImage(`${shop.id}-item-${tier.key}`, () => productSvg(shop, tier, index)),
     });
   }
   rendered.push({ shop, ids, images, items });
+}
+if (prerenderOnly) {
+  console.log(`Pre-rendered ${rendered.reduce((n, r) => n + 3 + r.items.length, 0)} pictures into ${ART_DIR}. Nothing was seeded.`);
+  process.exit(0);
 }
 
 // ---------------------------------------------------------------------------
