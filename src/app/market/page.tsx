@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import LiveSearchInput from './LiveSearchInput';
 import { serverT } from '@/lib/i18nServer';
+import { ensureExampleBazaarOnce } from '@/lib/exampleBazaar';
 import ItemTile from '@/components/ItemTile';
 import { expansionsFor } from '@/lib/bazaarWords';
 import { SHOP_CATEGORIES, categoryLabel } from '@/lib/categories';
@@ -225,6 +226,9 @@ function Chip({
 }
 
 export default async function MarketPage({ searchParams }: Props) {
+  // A hosted site that has never had the example shops gets them once, in the
+  // background (lib/exampleBazaar). One indexed read on every later visit.
+  ensureExampleBazaarOnce();
   const tr = await serverT();
   const query = readQuery(await searchParams);
   const v = vocabFor('shop');

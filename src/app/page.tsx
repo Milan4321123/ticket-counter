@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { serverT } from '@/lib/i18nServer';
+import { ensureExampleBazaarOnce } from '@/lib/exampleBazaar';
 import EventCard from '@/components/EventCard';
 import EventRail from '@/components/EventRail';
 import ItemRail from '@/components/ItemRail';
@@ -310,6 +311,8 @@ function departmentRails(all: ShopItem[]): DepartmentRail[] {
 // ---------------------------------------------------------------------------
 
 export default async function HomePage() {
+  // Example shops for a fresh hosted site, once, in the background (lib/exampleBazaar).
+  ensureExampleBazaarOnce();
   const tr = await serverT();
   // The feed is the busiest page on the site, so it is where the erasure sweep
   // is armed: it self-throttles and swallows its own errors, so this costs a
