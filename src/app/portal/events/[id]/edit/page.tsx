@@ -36,6 +36,8 @@ import { effectivePayout, queuedPayoutChange } from '@/lib/payout';
 import { anyPaymentRoute, listConnections, paymentOptionsFor } from '@/lib/paymentConnections';
 import BankForm from './BankForm';
 import KitchenSetupPanel from './KitchenSetupPanel';
+import SubscribeSavePanel from './SubscribeSavePanel';
+import { everyLabel, listSubscriptionsForEvent } from '@/lib/subscriptions';
 import SeatingPanel from './SeatingPanel';
 import { parseSeatMap, takenSeats } from '@/lib/seats';
 import { choicesToText, parseChoices, parseSlotConfig } from '@/lib/kitchen';
@@ -292,6 +294,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
     },
     // The restaurant pack (lib/kitchen): shops only.
     ...(isShop ? [{ key: 'kitchen', label: 'Kitchen & collection', status: 'neutral' as const }] : []),
+    ...(isShop ? [{ key: 'subscribe', label: 'Subscribe & save', status: event.subscribePct > 0 ? ('done' as const) : ('neutral' as const) }] : []),
     // Reserved seating (lib/seats): events only.
     ...(!isShop ? [{ key: 'seating', label: 'Seating', status: 'neutral' as const }] : []),
     { key: 'publish', label: 'Publish', status: publishDone ? ('done' as const) : ('todo' as const) },
@@ -313,6 +316,28 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
         initialSlots={parseSlotConfig(event.pickupSlots)}
         initialTables={event.tableCount}
         items={tiers.map((t) => ({ tierKey: t.tierKey, name: t.name, choicesText: choicesToText(parseChoices(t.choices)) }))}
+      />
+    ) : null,
+    subscribe: isShop ? (
+      <SubscribeSavePanel
+        eventId={event.id}
+        initialPct={event.subscribePct}
+        blockedBy={
+          parseSlotConfig(event.pickupSlots).enabled
+            ? 'this shop books collection times, and a repeat order cannot pick a time.'
+            : !paymentOptionsFor(event).transfer
+              ? 'repeats are paid by bank transfer or PayPal.me — switch that on under Payments.'
+              : ''
+        }
+        subscribers={listSubscriptionsForEvent(event.id).map((s) => ({
+          id: s.id,
+          name: s.buyerName,
+          items: s.items.map((it) => `${it.quantity}× ${tiers.find((t) => t.tierKey === it.tierId)?.name ?? it.tierId}`).join(', '),
+          every: everyLabel(s.everyDays),
+          next: s.nextOn,
+          status: s.status,
+          orders: s.ordersMade,
+        }))}
       />
     ) : null,
     basics: (

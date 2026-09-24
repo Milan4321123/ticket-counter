@@ -34,6 +34,7 @@ import { whatsappShareUrl } from '@/lib/whatsapp';
 import { armStripeSweep } from '@/lib/stripeOrders';
 import { getOrderKitchenDetails, parseSlotConfig, picksLine, slotLabel } from '@/lib/kitchen';
 import { parseSeatMap, seatSummary, seatsForOrder } from '@/lib/seats';
+import { everyLabel, getSubscription } from '@/lib/subscriptions';
 
 export const dynamic = 'force-dynamic';
 
@@ -123,6 +124,17 @@ export default async function OrderPage({
         <strong>Your seats:</strong> {seatSummary(orderSeats, seatMapForOrder)}
       </div>
     ) : null;
+  // Subscribe & save (lib/subscriptions): this order is part of a standing order.
+  const sub = order.subscriptionId ? getSubscription(order.subscriptionId) : null;
+  const subscriptionBlock = sub ? (
+    <div className="notice anim-fade-up" style={{ marginBottom: 14 }}>
+      <strong>Subscribe &amp; save {sub.discountPct}%</strong> — this order repeats {everyLabel(sub.everyDays)}
+      {sub.status === 'active' ? `, next on ${sub.nextOn}` : ` (${sub.status})`}.{' '}
+      <Link href={`/subscription/${sub.token}`} className="inline-link">
+        Skip, pause or cancel →
+      </Link>
+    </div>
+  ) : null;
   const kitchenBlock =
     kitchenInfo.tableLabel || kitchenInfo.pickupSlot || kitchenInfo.note ? (
       <div className="notice anim-fade-up" style={{ marginTop: 0 }}>
@@ -313,7 +325,9 @@ export default async function OrderPage({
             </div>
           </div>
         ) : null}
-        {kitchenBlock}
+        {subscriptionBlock}
+        {subscriptionBlock}
+      {kitchenBlock}
         {seatsBlock}
         {itemsLine ? (
           <p className="muted small anim-fade-up" style={{ margin: '-8px 0 16px' }}>
@@ -458,7 +472,13 @@ export default async function OrderPage({
                 never read as something still to subtract. */}
             {order.discountCents > 0 ? (
               <p className="muted small" style={{ margin: '0 0 10px' }}>
-                Code <span className="mono">{order.voucherCode}</span> applied —{' '}
+                {order.subscriptionId ? (
+                  <>Subscribe &amp; save — </>
+                ) : (
+                  <>
+                    Code <span className="mono">{order.voucherCode}</span> applied —{' '}
+                  </>
+                )}
                 {formatMoney(order.discountCents, order.currency)} off the organizer&rsquo;s own price.
                 Transfer the amount above and nothing else.
               </p>
@@ -576,7 +596,13 @@ export default async function OrderPage({
                 never read as something still to subtract. */}
             {order.discountCents > 0 ? (
               <p className="muted small" style={{ margin: '0 0 10px' }}>
-                Code <span className="mono">{order.voucherCode}</span> applied —{' '}
+                {order.subscriptionId ? (
+                  <>Subscribe &amp; save — </>
+                ) : (
+                  <>
+                    Code <span className="mono">{order.voucherCode}</span> applied —{' '}
+                  </>
+                )}
                 {formatMoney(order.discountCents, order.currency)} off the organizer&rsquo;s own price.
                 Transfer the amount above and nothing else.
               </p>

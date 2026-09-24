@@ -14,6 +14,8 @@ import {
   type EventTierRow,
 } from './events';
 import { claimInventory } from './inventory';
+import { subscribeDiscountCents } from './money';
+import { VoucherError } from './referrals';
 import { effectivePayout } from './payout';
 import {
   claimDiscountCodeForOrder,
@@ -109,6 +111,8 @@ export interface OrderRow {
    * below is already the final amount owed.
    */
   discountCents: number;
+  /** The standing order (lib/subscriptions) this order belongs to, or null. */
+  subscriptionId: string | null;
 }
 
 /**
@@ -415,7 +419,8 @@ const ORDER_COLS = `
   referred_by AS referredBy,
   share_code AS shareCode,
   voucher_code AS voucherCode,
-  discount_cents AS discountCents
+  discount_cents AS discountCents,
+  subscription_id AS subscriptionId
 `;
 
 const TICKET_COLS = `
@@ -529,6 +534,15 @@ export function createOrder(params: {
   voucherCode?: string;
   items: { tierId: string; quantity: number }[];
   paymentMode: PaymentMethod;
+  /**
+   * Subscribe & save: the % off this order gets for being (or starting) a
+   * standing order — the shop's own offer, checked by the caller against
+   * events.subscribe_pct. Recorded in discount_cents like a code's discount;
+   * never combined with a code (only one discount may part-pay an order).
+   */
+  subscriptionPct?: number;
+  /** The standing order this is a repeat of, when it is one. */
+  subscriptionId?: string;
 }): OrderRow {
   const db = getDb();
   const id = crypto.randomUUID();
@@ -564,6 +578,11 @@ export function createOrder(params: {
     // committed to anything.
     let voucherCode = '';
     let discountCents = 0;
+    const subscriptionPct = Math.max(0, Math.min(50, Math.floor(params.subscriptionPct ?? 0)));
+    if (subscriptionPct > 0 && wantsVoucher) {
+      throw new VoucherError('A discount code cannot be combined with Subscribe & save — please use one or the other.');
+    }
+    if (subscriptionPct > 0) discountCents = subscribeDiscountCents(subscriptionPct, itemsTotalCents);
     if (wantsVoucher) {
       const claimed = claimDiscountCodeForOrder(
         { id: event.id, organizerId: event.organizerId },
@@ -582,8 +601,8 @@ export function createOrder(params: {
     db.prepare(
       `INSERT INTO orders (id, event_id, status, buyer_name, buyer_email, payer_name, total_cents, currency,
                            payment_mode, payout_holder, payout_iban, payout_bic, payout_bank_name, payout_paypal,
-                           referred_by, share_code, voucher_code, discount_cents)
-       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                           referred_by, share_code, voucher_code, discount_cents, subscription_id)
+       VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       id,
       event.id,
@@ -603,7 +622,8 @@ export function createOrder(params: {
       // be derived from anything a payment or support flow also relies on.
       generateShareCode(),
       voucherCode,
-      discountCents
+      discountCents,
+      params.subscriptionId ?? null
     );
     const ins = db.prepare(
       `INSERT INTO order_items (order_id, tier_id, quantity, unit_price_cents) VALUES (?, ?, ?, ?)`

@@ -56,6 +56,8 @@ export interface CreateOrderRequest {
    * readable message rather than quietly charging full price.
    */
   voucherCode?: string;
+  /** Subscribe & save: repeat this order every N days (7, 14 or 28) at the shop's discount. */
+  subscribeEvery?: number;
   items: { tierId: string; quantity: number }[];
   /**
    * Optional: which of the listing's offered routes the buyer picked —

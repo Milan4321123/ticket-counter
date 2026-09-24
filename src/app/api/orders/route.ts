@@ -42,7 +42,9 @@ import { discountCentsFor } from '@/lib/money';
 import { previewDiscountCode, PROMO_NOTHING_TO_DISCOUNT } from '@/lib/promos';
 import { VOUCHER_NOTHING_TO_DISCOUNT, VoucherError } from '@/lib/referrals';
 import { createPaypalOrder } from '@/lib/paypal';
-import { sendMarketingConfirmationEmail, sendTicketEmail, sendTransferInstructionsEmail } from '@/lib/email';
+import { sendMarketingConfirmationEmail, sendSubscriptionEmail, sendTicketEmail, sendTransferInstructionsEmail } from '@/lib/email';
+import { createSubscription, isValidEvery, subscriptionOffer } from '@/lib/subscriptions';
+import { subscribeDiscountCents } from '@/lib/money';
 import { clientIp, rateLimit } from '@/lib/ratelimit';
 import { BodyTooLargeError, readJsonLimited } from '@/lib/http';
 import type { ApiErrorResponse, CreateOrderRequest, CreateOrderResponse } from '@/lib/types';
@@ -239,6 +241,24 @@ export async function POST(req: Request) {
       } catch (e) {
         if (e instanceof VoucherError) return apiError(400, 'VALIDATION', e.message);
         throw e;
+      }
+    }
+    // Subscribe & save (lib/subscriptions): the shop's own repeat discount, in
+    // place of a code — only one discount may part-pay an order.
+    let subscribe: { everyDays: number; pct: number } | null = null;
+    const rawEvery = (raw as Partial<CreateOrderRequest>).subscribeEvery;
+    if (rawEvery !== undefined && rawEvery !== null && rawEvery !== 0) {
+      const offer = subscriptionOffer(event);
+      const body = raw as Partial<CreateOrderRequest>;
+      if (!offer || !isValidEvery(rawEvery) || (typeof body.table === 'string' && body.table.trim())) {
+        return apiError(400, 'VALIDATION', 'Subscribe & save is not offered for this order.');
+      }
+      if (typedCode) {
+        return apiError(400, 'VALIDATION', 'A discount code cannot be combined with Subscribe & save — please use one or the other.');
+      }
+      if (orderTotalCents > 0) {
+        subscribe = { everyDays: rawEvery, pct: offer.pct };
+        discountCents = subscribeDiscountCents(offer.pct, orderTotalCents);
       }
     }
     // What the buyer will actually owe once the discount is off.
@@ -491,6 +511,7 @@ export async function POST(req: Request) {
         voucherCode,
         items: validated.items,
         paymentMode: mode,
+        subscriptionPct: subscribe?.pct,
       });
     } catch (e) {
       if (e instanceof SoldOutError) {
@@ -638,6 +659,30 @@ export async function POST(req: Request) {
           'PAYMENT_FAILED',
           'We could not start the card payment. You have not been charged — please try again in a moment.'
         );
+      }
+    }
+
+    // The standing order starts once its first order exists and its payment
+    // could be started. A first order that is then never paid pauses it on
+    // the first repeat (lib/subscriptions placeRepeat), so nothing piles up.
+    if (subscribe) {
+      try {
+        const sub = createSubscription({
+          eventId: event.id,
+          buyerName: validated.buyerName,
+          buyerEmail: validated.buyerEmail,
+          items: validated.items,
+          choices: kitchen?.choices ?? null,
+          note: kitchen?.note ?? '',
+          everyDays: subscribe.everyDays,
+          discountPct: subscribe.pct,
+          firstOrderId: order.id,
+        });
+        void sendSubscriptionEmail(sub.id, 'started')
+          .then((r) => console.log(`Subscription email for order ${order.id}:`, r))
+          .catch((e) => console.error(`Subscription email for order ${order.id} threw unexpectedly:`, e));
+      } catch (e) {
+        console.error(`Starting the subscription for order ${order.id} failed:`, e);
       }
     }
 

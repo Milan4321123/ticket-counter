@@ -16,7 +16,7 @@ import Link from 'next/link';
 import Stars, { ratingLabel } from '@/components/Stars';
 import { mediaUrl } from '@/lib/events';
 import type { ShopItem } from '@/lib/marketItems';
-import { formatMoney } from '@/lib/money';
+import { formatMoney, subscribeDiscountCents } from '@/lib/money';
 import { vocabFor } from '@/lib/vocab';
 
 export interface ItemTileProps {
@@ -83,6 +83,7 @@ export default function ItemTile({ item, compact = false }: ItemTileProps) {
     .filter(Boolean)
     .join(' — ');
 
+  const subscribePct = item.shop.kind === 'shop' && !item.shop.isDemo ? item.shop.subscribePct || 0 : 0;
   return (
     <Link href={item.href} className="bz-tile" aria-label={spoken}>
       <div className="bz-tile-media">
@@ -130,6 +131,15 @@ export default function ItemTile({ item, compact = false }: ItemTileProps) {
             written on the card, and a shopper comparing twelve tiles is
             comparing prices before they are reading names. */}
         <div className="bz-tile-price">{priceLabel}</div>
+        {/* Subscribe & save (lib/subscriptions): the repeat price, right under
+            the one-off price it is compared with. */}
+        {subscribePct > 0 && item.priceCents > 0 && (
+          <div className="bz-tile-sub">
+            <span aria-hidden="true">↻</span>{' '}
+            {formatMoney(item.priceCents - subscribeDiscountCents(subscribePct, item.priceCents), item.currency)} with
+            Subscribe &amp; save
+          </div>
+        )}
         {/* Same sentence the shop's own card prints: the price above is per
             bundle, not per item, and a shopper comparing tiles must know that
             before they compare anything. Hence directly under the figure. */}

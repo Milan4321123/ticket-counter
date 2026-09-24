@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { discountCentsFor, formatMoney } from '@/lib/money';
+import { discountCentsFor, formatMoney, subscribeDiscountCents } from '@/lib/money';
 import type {
   ApiErrorResponse,
   CaptureOrderResponse,
@@ -161,6 +161,8 @@ interface Props {
   seating?: { map: SeatMapData; taken: Record<string, 'held' | 'sold'> } | null;
   /** Which language the page's headings and buttons are in (lib/i18n). */
   lang?: Lang;
+  /** Subscribe & save (lib/subscriptions): the shop's repeat discount, or null when it offers none. */
+  subscribe?: { pct: number } | null;
 }
 
 export interface CheckoutSlot {
@@ -207,6 +209,7 @@ interface CreateOrderBody {
   choices?: Record<string, Record<string, string>>;
   note?: string;
   seats?: string[];
+  subscribeEvery?: number;
 }
 
 type ApiCode = NonNullable<ApiErrorResponse['code']>;
@@ -339,6 +342,7 @@ export default function CheckoutClient({
   kitchen = null,
   seating = null,
   lang = 'en',
+  subscribe = null,
 }: Props) {
   const tr = translator(lang);
   const router = useRouter();
@@ -429,6 +433,8 @@ export default function CheckoutClient({
   const [codeOpen, setCodeOpen] = useState(false);
   const [codeInput, setCodeInput] = useState('');
   const [applied, setApplied] = useState<AppliedCode | null>(null);
+  /** Subscribe & save: 0 = a one-off order, else repeat every N days. */
+  const [subscribeEvery, setSubscribeEvery] = useState(0);
   const [codeBusy, setCodeBusy] = useState(false);
   const [codeError, setCodeError] = useState<string | null>(null);
   /** Said out loud when a second code replaced the first — see applyCode. */
@@ -462,11 +468,17 @@ export default function CheckoutClient({
    * not sent with the order; the server refuses the same case in the same
    * words if anything sends it regardless.
    */
-  const codeApplies = Boolean(applied) && totalCents > 0;
+  // Subscribe & save replaces a code: only one discount may part-pay an order.
+  const subscribing = Boolean(subscribe) && subscribeEvery > 0 && totalCents > 0;
+  const codeApplies = Boolean(applied) && totalCents > 0 && !subscribing;
   // The SAME function the server discounts with: never more than the basket is
   // worth, and a percentage rounded in the buyer's favour. One implementation,
   // so this page can never promise a number the order then contradicts.
-  const discountCents = codeApplies ? discountCentsFor(applied!, totalCents) : 0;
+  const discountCents = subscribing
+    ? subscribeDiscountCents(subscribe!.pct, totalCents)
+    : codeApplies
+      ? discountCentsFor(applied!, totalCents)
+      : 0;
   const payableCents = Math.max(0, totalCents - discountCents);
   /** What actually goes to the server with this order — '' when it does not apply. */
   const sentCode = codeApplies ? applied!.code : '';
@@ -508,6 +520,7 @@ export default function CheckoutClient({
     ),
     note: orderNote.trim() || undefined,
     seats: seats.length ? seats : undefined,
+    subscribeEvery: subscribing ? subscribeEvery : undefined,
   });
 
   /**
@@ -1286,7 +1299,13 @@ export default function CheckoutClient({
               {/* The discount and the new total, shown BEFORE the buyer
                   commits — nobody should discover what a code was worth after
                   they have already agreed to pay. */}
-              {discountCents > 0 && (
+              {discountCents > 0 && subscribing && (
+                <div className="summary-row">
+                  <span>Subscribe &amp; save ({subscribe!.pct}%)</span>
+                  <span>−{formatMoney(discountCents, config.currency)}</span>
+                </div>
+              )}
+              {discountCents > 0 && !subscribing && (
                 <div className="summary-row">
                   <span>
                     {applied?.source === 'promo' ? 'Code' : 'Voucher'}{' '}
@@ -1300,7 +1319,7 @@ export default function CheckoutClient({
                 <span>{tr('co.total')}</span>
                 <span>{payableCents === 0 ? 'Free' : formatMoney(payableCents, config.currency)}</span>
               </div>
-              {discountCents > 0 && (
+              {discountCents > 0 && !subscribing && (
                 <p className="muted small" style={{ margin: '8px 0 0' }}>
                   {applied?.sellerName || 'The seller'} is taking{' '}
                   {formatMoney(discountCents, config.currency)} off their own price — you simply pay
@@ -1319,6 +1338,46 @@ export default function CheckoutClient({
                 </p>
               )}
             </>
+          )}
+
+          {/* Subscribe & save: one tap to make this a standing order. */}
+          {subscribe && totalCents > 0 && (
+            <div className={styles.subscribeBox}>
+              <label className={styles.subscribeToggle}>
+                <input
+                  type="checkbox"
+                  checked={subscribeEvery > 0}
+                  onChange={(e) => setSubscribeEvery(e.target.checked ? 14 : 0)}
+                />
+                <span>
+                  <strong>Subscribe &amp; save {subscribe.pct}%</strong>
+                  <span className="muted small"> — repeat this order and pay less every time</span>
+                </span>
+              </label>
+              {subscribeEvery > 0 && (
+                <>
+                  <div className={styles.subscribeEvery} role="radiogroup" aria-label="How often">
+                    {[7, 14, 28].map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        role="radio"
+                        aria-checked={subscribeEvery === d}
+                        className={subscribeEvery === d ? styles.subscribeOn : undefined}
+                        onClick={() => setSubscribeEvery(d)}
+                      >
+                        {d === 7 ? 'Every week' : d === 14 ? 'Every 2 weeks' : 'Every 4 weeks'}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="muted small" style={{ margin: '6px 0 0' }}>
+                    Each repeat holds your items and emails you the seller&rsquo;s payment details — nothing is
+                    charged automatically. Skip, pause or cancel any time from the link in the email.
+                    {applied ? ' Your discount code is not used on a subscription.' : ''}
+                  </p>
+                </>
+              )}
+            </div>
           )}
 
           {/* "Have a discount code?" — collapsed behind a link like the payer

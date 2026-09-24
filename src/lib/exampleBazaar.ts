@@ -65,6 +65,15 @@ export function startExampleBazaarJob(action: 'seed' | 'clean', onDone?: (ok: bo
 
 const AUTO_KEY = 'example_bazaar_autoseed';
 
+/**
+ * Bump when the example shops themselves change (new pictures, new offers):
+ * a site that already has them re-seeds ONCE, in the background, on the next
+ * visit. The seed replaces only its own marker-named rows. Recorded before the
+ * run starts, so a failing re-seed cannot loop.
+ */
+const SEED_VERSION = '2026-09-25-subscribe';
+const VERSION_KEY = 'example_bazaar_version';
+
 /** When this server process started — a run recorded before it was cut off by the restart. */
 const PROCESS_STARTED_AT = Date.now();
 
@@ -83,6 +92,14 @@ export function ensureExampleBazaarOnce(): void {
     const db = getDb();
     const row = db.prepare(`SELECT value FROM kv WHERE key = ?`).get(AUTO_KEY) as { value: string } | undefined;
     let tries = 0;
+    if (row && exampleShopCount() > 0 && !(global.__exampleBazaarJob && global.__exampleBazaarJob.finishedAt === null)) {
+      const version = db.prepare(`SELECT value FROM kv WHERE key = ?`).get(VERSION_KEY) as { value: string } | undefined;
+      if (version?.value !== SEED_VERSION) {
+        db.prepare(`INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(VERSION_KEY, SEED_VERSION);
+        startExampleBazaarJob('seed');
+        return;
+      }
+    }
     if (row) {
       // A run that started but never finished was cut off by a restart (a
       // deploy kills the child process) — after 20 minutes, try again. A run
@@ -119,6 +136,9 @@ export function ensureExampleBazaarOnce(): void {
     const job = startExampleBazaarJob('seed', (ok) => {
       const note = (global.__exampleBazaarJob?.note ?? '').replace(/[:\n]/g, ' ').slice(0, 300);
       db.prepare(`UPDATE kv SET value = ? WHERE key = ?`).run(ok ? `done:${Date.now()}` : `failed:${Date.now()}:${note}`, AUTO_KEY);
+      if (ok) {
+        db.prepare(`INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(VERSION_KEY, SEED_VERSION);
+      }
     });
     if (!job) db.prepare(`UPDATE kv SET value = ? WHERE key = ?`).run('busy', AUTO_KEY);
   } catch (e) {

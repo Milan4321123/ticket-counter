@@ -2520,6 +2520,22 @@ const insertEvent = db.prepare(`
   )
 `);
 
+// Subscribe & save (src/lib/subscriptions.ts): the everyday-shopping shops
+// offer a repeat discount, so a visitor sees what that looks like on a tile.
+// Guarded by the column, for a database the app has not migrated yet.
+const SUBSCRIBE_PCT = {
+  'seed-bazaar-kirana': 10,
+  'seed-bazaar-ilam-tea': 10,
+  'seed-bazaar-alaichi': 10,
+  'seed-bazaar-achar': 5,
+  'seed-bazaar-mithai': 5,
+};
+const setSubscribePct = db
+  .prepare(`SELECT 1 FROM pragma_table_info('events') WHERE name = 'subscribe_pct'`)
+  .get()
+  ? db.prepare(`UPDATE events SET subscribe_pct = ? WHERE id = ?`)
+  : null;
+
 const insertTier = db.prepare(`
   INSERT INTO event_tiers (id, event_id, tier_key, name, price_cents, cap, unlimited, status, student_only, description, details, media_id, sort, seats_per_unit)
   VALUES (?, ?, ?, ?, ?, ?, 0, 'on-sale', 0, ?, ?, ?, ?, 1)
@@ -2653,6 +2669,7 @@ const seedAll = db.transaction(() => {
       payWithinDays: shop.payWithinDays,
       assistantContext: `${EXAMPLE_ASSISTANT_NOTE}\n\n${shop.assistantContext}`,
     });
+    if (setSubscribePct && SUBSCRIBE_PCT[shop.id]) setSubscribePct.run(SUBSCRIBE_PCT[shop.id], shop.id);
 
     // sort 0 is the wide cover, 1 the portrait tile, 2 the round mark — the
     // order they appear in the shop's photo strip — then the products in shelf

@@ -43,6 +43,7 @@ import { confirmSubscriptionUrl, oneClickUnsubscribeUrl, unsubscribeUrl } from '
 import { WAITLIST_NOTIFIED_RETENTION_DAYS } from './retention';
 import { whatsappShareUrl } from './whatsapp';
 import type { ContactRequestRow } from './contact';
+import { everyLabel, getSubscription, subscriptionManageUrl } from './subscriptions';
 
 export function isEmailConfigured(): boolean {
   // ANY of the three From addresses counts, not EMAIL_FROM specifically.
@@ -3338,6 +3339,58 @@ export async function sendOrderReadyEmail(orderId: string): Promise<{ sent: bool
     });
   } catch (e) {
     console.error('sendOrderReadyEmail failed:', e);
+    return { sent: false, reason: 'error' };
+  }
+}
+
+/**
+ * Subscribe & save (lib/subscriptions): the buyer's note when a standing order
+ * starts, when it had to pause, or when a repeat could not be placed because
+ * the shop had sold out. Every one carries the manage link (skip, pause,
+ * cancel) — the buyer must always be one click from stopping it.
+ */
+export async function sendSubscriptionEmail(
+  subscriptionId: string,
+  kind: 'started' | 'paused' | 'sold-out'
+): Promise<{ sent: boolean; reason?: string }> {
+  try {
+    if (!isEmailConfigured()) return { sent: false, reason: 'email-not-configured' };
+    const sub = getSubscription(subscriptionId);
+    if (!sub) return { sent: false, reason: 'not-found' };
+    const event = getEventById(sub.eventId);
+    if (!event) return { sent: false, reason: 'not-found' };
+    const seller = organizerDisplayName(event.organizerId) || event.name;
+    const manage = subscriptionManageUrl(sub);
+    const headline =
+      kind === 'started'
+        ? `You save ${sub.discountPct}% — ${event.name} repeats ${everyLabel(sub.everyDays)}`
+        : kind === 'paused'
+          ? `Your subscription with ${event.name} is paused`
+          : `${event.name} was sold out for this delivery`;
+    const line =
+      kind === 'started'
+        ? `Your order repeats ${everyLabel(sub.everyDays)} at ${sub.discountPct}% off. Next one: ${sub.nextOn}. Each time we hold your items and email you ${seller}'s payment details — nothing is charged automatically, and you can skip, pause or cancel whenever you like.`
+        : kind === 'paused'
+          ? `${sub.statusNote || 'It was paused.'} No new order will be placed until you resume it.`
+          : `This time's repeat could not be placed because the items were sold out. Your subscription carries on; the next one is due ${sub.nextOn}.`;
+    const bodyHtml =
+      pHtml(`Hi ${escapeHtml(sub.buyerName)},`) + pHtml(escapeHtml(line), 20) + buttonHtml(manage, 'Manage my subscription');
+    return await sendMailAs('buyers', {
+      replyTo: replyToBuyers(),
+      to: sub.buyerEmail,
+      subject: headline,
+      text: renderText({ headline, lines: [`Hi ${sub.buyerName},`, '', wrapText(line), '', `Manage: ${manage}`] }),
+      html: renderEmail({
+        title: headline,
+        preheader: line,
+        kicker: 'Subscribe & save',
+        headline,
+        bodyHtml,
+        footerLines: [`Sold by ${escapeHtml(seller)} · ${escapeHtml(platformName())}`],
+      }),
+    });
+  } catch (e) {
+    console.error('sendSubscriptionEmail failed:', e);
     return { sent: false, reason: 'error' };
   }
 }

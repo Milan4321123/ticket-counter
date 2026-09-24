@@ -10,6 +10,7 @@ import { vocabFor } from '@/lib/vocab';
 import { expireOverdueTransferReservations } from '@/lib/orders';
 import { getOrganizer } from '@/lib/organizers';
 import { paymentOptionsFor } from '@/lib/paymentConnections';
+import { subscriptionOffer } from '@/lib/subscriptions';
 import { availableSlots, cleanTableLabel, parseChoices, parseSlotConfig } from '@/lib/kitchen';
 import { parseSeatMap, takenSeats } from '@/lib/seats';
 import { currentLang } from '@/lib/i18nServer';
@@ -175,6 +176,7 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
       }}
       availability={availability}
       kitchen={kitchen}
+      subscribe={tableFromQr ? null : subscriptionOffer(event)}
       lang={await currentLang()}
       seating={seating}
       payment={{

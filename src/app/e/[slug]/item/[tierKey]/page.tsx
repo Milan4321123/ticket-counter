@@ -47,7 +47,8 @@ import { readListingName } from '@/lib/exampleShop';
 import { getAvailability } from '@/lib/inventory';
 import { socialImageUrl } from '@/lib/listing';
 import { listShopItems } from '@/lib/marketItems';
-import { formatMoney } from '@/lib/money';
+import { formatMoney, subscribeDiscountCents } from '@/lib/money';
+import { subscriptionOffer } from '@/lib/subscriptions';
 import { getOrganizer } from '@/lib/organizers';
 import { boughtTogether, moreFromShop, othersOnShelf } from '@/lib/relatedItems';
 import { listReviewsForItem, ratingForItem } from '@/lib/reviews';
@@ -232,6 +233,7 @@ export default async function ItemPage({ params, searchParams }: Params) {
 
   const v = vocabFor(event.kind);
   const isShop = event.kind === 'shop';
+  const subscribe = subscriptionOffer(event);
   const tiers = getEventTiers(event.id);
   const availability = getAvailability(event.id);
   const state = ticketState(event, tiers, availability);
@@ -568,6 +570,13 @@ export default async function ItemPage({ params, searchParams }: Params) {
           <div className="tier-price">
             {tier.priceCents === 0 ? 'Free' : formatMoney(tier.priceCents, event.currency)}
           </div>
+          {subscribe && tier.priceCents > 0 && (
+            <p className="item-subscribe">
+              <span aria-hidden="true">↻</span> <strong>Subscribe &amp; save {subscribe.pct}%</strong> —{' '}
+              {formatMoney(tier.priceCents - subscribeDiscountCents(subscribe.pct, tier.priceCents), event.currency)} each
+              time, repeating every 1, 2 or 4 weeks. Tick it at checkout; skip or cancel any time.
+            </p>
+          )}
 
           {/* Same sentence as the listing card, for the same reason: the price
               above is per bundle, not per person, and a buyer must know that

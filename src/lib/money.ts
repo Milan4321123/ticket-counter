@@ -30,3 +30,12 @@ export function discountCentsFor(
       : Math.max(0, code.amountCents);
   return Math.max(0, Math.min(raw, subtotalCents));
 }
+
+/**
+ * Subscribe & save: what a shop's repeat-order percentage takes off a basket.
+ * The same rounding as a percent code (up, in the buyer's favour), shared by
+ * the checkout's preview and the order it creates.
+ */
+export function subscribeDiscountCents(percent: number, subtotalCents: number): number {
+  return discountCentsFor({ kind: 'percent', amountCents: 0, percent }, subtotalCents);
+}

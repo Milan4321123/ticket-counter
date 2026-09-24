@@ -113,6 +113,8 @@ export interface EventRow {
   tableCount: number;
   /** Reserved seating map, raw JSON — read with parseSeatMap() in lib/seats. NULL = unreserved. */
   seatMap: string | null;
+  /** Subscribe & save: % off every repeat order of this shop (lib/subscriptions). 0 = not offered. */
+  subscribePct: number;
   posterMediaId: string | null;
   profileMediaId: string | null;
   /** First/legacy uploaded video — an event can now hold several. */
@@ -285,6 +287,7 @@ const EVENT_COLS = `
   pickup_slots AS pickupSlots,
   table_count AS tableCount,
   seat_map AS seatMap,
+  subscribe_pct AS subscribePct,
   poster_media_id AS posterMediaId,
   profile_media_id AS profileMediaId,
   video_media_id AS videoMediaId,
@@ -340,6 +343,7 @@ function rowToEvent(row: Record<string, unknown> | undefined): EventRow | null {
     pickupSlots: (row.pickupSlots as string | null) ?? null,
     tableCount: Number(row.tableCount ?? 0),
     seatMap: (row.seatMap as string | null) ?? null,
+    subscribePct: Number(row.subscribePct ?? 0),
   };
 }
 

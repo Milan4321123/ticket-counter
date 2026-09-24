@@ -279,6 +279,7 @@ function createDb(): Database.Database {
   migrateDemo(db);
   migrateKitchen(db);
   migrateSeats(db);
+  migrateSubscriptions(db);
   return db;
 }
 
@@ -1365,6 +1366,41 @@ function migrateKitchen(db: Database.Database): void {
   if (!orderCols.includes('kitchen_status')) db.exec(`ALTER TABLE orders ADD COLUMN kitchen_status TEXT NOT NULL DEFAULT ''`);
   if (!orderCols.includes('kitchen_updated_at')) db.exec(`ALTER TABLE orders ADD COLUMN kitchen_updated_at TEXT`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_orders_event_slot ON orders(event_id, pickup_slot)`);
+}
+
+/**
+ * Subscribe & save (lib/subscriptions.ts): a shop's repeat-order discount, the
+ * standing orders buyers set up, and which order each repeat created. No money
+ * moves through any of it — every repeat is an ordinary order paid to the seller.
+ */
+function migrateSubscriptions(db: Database.Database): void {
+  const eventCols = (db.pragma(`table_info(events)`) as { name: string }[]).map((c) => c.name);
+  if (!eventCols.includes('subscribe_pct')) db.exec(`ALTER TABLE events ADD COLUMN subscribe_pct INTEGER NOT NULL DEFAULT 0`);
+  const orderCols = (db.pragma(`table_info(orders)`) as { name: string }[]).map((c) => c.name);
+  if (!orderCols.includes('subscription_id')) db.exec(`ALTER TABLE orders ADD COLUMN subscription_id TEXT`);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id TEXT PRIMARY KEY,
+      token TEXT NOT NULL UNIQUE,
+      event_id TEXT NOT NULL,
+      buyer_name TEXT NOT NULL,
+      buyer_email TEXT NOT NULL,
+      items TEXT NOT NULL,
+      choices TEXT,
+      note TEXT NOT NULL DEFAULT '',
+      every_days INTEGER NOT NULL,
+      discount_pct INTEGER NOT NULL,
+      next_on TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      status_note TEXT NOT NULL DEFAULT '',
+      last_order_id TEXT,
+      orders_made INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_subscriptions_due ON subscriptions(status, next_on);
+    CREATE INDEX IF NOT EXISTS idx_subscriptions_event ON subscriptions(event_id);
+  `);
 }
 
 /** Reserved seating (lib/seats.ts): a map on the event, and who holds which seat. */

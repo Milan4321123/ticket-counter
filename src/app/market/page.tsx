@@ -6,6 +6,7 @@ import Link from 'next/link';
 import LiveSearchInput from './LiveSearchInput';
 import { serverT } from '@/lib/i18nServer';
 import { ensureExampleBazaarOnce } from '@/lib/exampleBazaar';
+import { runSubscriptionSweep } from '@/lib/subscriptions';
 import ItemTile from '@/components/ItemTile';
 import { expansionsFor } from '@/lib/bazaarWords';
 import { SHOP_CATEGORIES, categoryLabel } from '@/lib/categories';
@@ -229,6 +230,8 @@ export default async function MarketPage({ searchParams }: Props) {
   // A hosted site that has never had the example shops gets them once, in the
   // background (lib/exampleBazaar). One indexed read on every later visit.
   ensureExampleBazaarOnce();
+  // Places any Subscribe & save repeats that are due (self-throttled).
+  void runSubscriptionSweep().catch((e) => console.error('Subscription sweep failed:', e));
   const tr = await serverT();
   const query = readQuery(await searchParams);
   const v = vocabFor('shop');
