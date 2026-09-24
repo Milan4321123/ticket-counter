@@ -1,9 +1,9 @@
 'use client';
 
 // The homepage's opening carousel: the next events and some bazaar goods as
-// big cards in a row. The card in the middle is lit; its neighbours peek in
-// from both sides, dimmed and slightly smaller, and brighten as a swipe brings
-// them to the middle — the dimming follows the finger, not a timer. Native
+// cards in a row, two at once. The cards in view are lit; the next one peeks
+// in from the edge, dimmed and slightly smaller, and brightens as a swipe
+// brings it in — the dimming follows the finger, not a timer. Native
 // scroll-snap does the swiping (so it feels like the phone's own scrolling);
 // arrows and dots do the same for a mouse, and it advances by itself until
 // somebody touches it. Reduced motion: no auto-advance, no scaling.
@@ -33,25 +33,25 @@ export default function HomeBillboard({ slides }: { slides: BillboardSlide[] }) 
   const touched = useRef(0);
   const n = slides.length;
 
-  // Dim and shrink each card by its distance from the middle, every frame the
-  // track scrolls. Written straight to style — no React render per frame.
+  // Dim and shrink each card by how far it hangs outside the visible window:
+  // fully in view = lit, peeking in from an edge = dimmed. Works for one or
+  // two cards in view alike. Written straight to style — no React render per
+  // scroll frame.
   const paint = useCallback(() => {
     const el = track.current;
     if (!el) return;
-    const mid = el.scrollLeft + el.clientWidth / 2;
-    let best = 0;
-    let bestD = Infinity;
+    const pad = parseFloat(getComputedStyle(el).paddingLeft) || 0;
+    const left = el.scrollLeft + pad - 2;
+    const right = el.scrollLeft + el.clientWidth - pad + 2;
+    let first = -1;
     Array.from(el.children).forEach((child, k) => {
       const c = child as HTMLElement;
-      const center = c.offsetLeft + c.offsetWidth / 2;
-      const d = Math.min(1, Math.abs(center - mid) / c.offsetWidth);
+      const out = Math.max(0, left - c.offsetLeft, c.offsetLeft + c.offsetWidth - right);
+      const d = Math.min(1, out / (c.offsetWidth * 0.6));
       c.style.setProperty('--d', d.toFixed(3));
-      if (d < bestD) {
-        bestD = d;
-        best = k;
-      }
+      if (first < 0 && d < 0.5) first = k;
     });
-    setCurrent(best);
+    setCurrent(Math.max(0, first));
   }, []);
 
   useEffect(() => {
@@ -78,10 +78,18 @@ export default function HomeBillboard({ slides }: { slides: BillboardSlide[] }) 
       if (!el) return;
       const target = el.children[((k % n) + n) % n] as HTMLElement | undefined;
       if (!target) return;
-      el.scrollTo({ left: target.offsetLeft - (el.clientWidth - target.offsetWidth) / 2, behavior: 'smooth' });
+      const pad = parseFloat(getComputedStyle(el).paddingLeft) || 0;
+      el.scrollTo({ left: target.offsetLeft - pad, behavior: 'smooth' });
     },
     [n]
   );
+
+  /** One card along — or back to the start once the last one is in view. */
+  const next = useCallback(() => {
+    const el = track.current;
+    if (el && el.scrollLeft + el.clientWidth >= el.scrollWidth - 4) goTo(0);
+    else goTo(current + 1);
+  }, [current, goTo]);
 
   // Advance by itself, but never within a few seconds of the visitor's own touch.
   useEffect(() => {
@@ -90,10 +98,10 @@ export default function HomeBillboard({ slides }: { slides: BillboardSlide[] }) 
     const t = setInterval(() => {
       if (Date.now() - touched.current < 8000) return;
       if (document.hidden) return;
-      goTo(current + 1);
+      next();
     }, INTERVAL_MS);
     return () => clearInterval(t);
-  }, [current, n, goTo]);
+  }, [n, next]);
 
   if (n === 0) return null;
   const hold = () => {
@@ -159,7 +167,7 @@ export default function HomeBillboard({ slides }: { slides: BillboardSlide[] }) 
             aria-label="Next"
             onClick={() => {
               hold();
-              goTo(current + 1);
+              next();
             }}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
