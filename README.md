@@ -113,7 +113,7 @@ Locally these go in `.env.local`; on a hosting service, into its environment-var
 | `ADMIN_GATE_PATH` | No | A secret word that hides `/admin` behind a 404 until you visit `https://yourdomain.com/<gate-path>` once per device. |
 | `ADMIN_PHONE` + `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM` | No | Also text the admin sign-in code to your phone via Twilio. |
 | `ADMIN_MASTER_OTP` | No | A fixed code accepted in place of the emailed one — for testing only. Leave unset in production. |
-| `PAYPAL_ENV` / `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` | No | Legacy PayPal checkout support from the single-event version. Not used in the bank-transfer platform model. |
+| `PAYPAL_ENV` / `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` | No | Not used. Instant PayPal/Stripe payments run on each seller's OWN account, connected under Portal → Settings (see GO-LIVE.md §8). `PAYPAL_ENV=live` only still blocks mock mode. |
 | `ALLOW_MOCK_PAYMENTS` | No | Safety latch: a production build only allows `PAYMENT_MODE=mock` if this is also `true`. Leave unset. |
 
 ## 8. Where the data lives

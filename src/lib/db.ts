@@ -275,6 +275,7 @@ function createDb(): Database.Database {
   `);
 
   migrateToPlatform(db);
+  migratePayments(db);
   return db;
 }
 
@@ -1257,4 +1258,66 @@ function migrateToPlatform(db: Database.Database): void {
 export function getDb(): Database.Database {
   if (!global.__ticketDb) global.__ticketDb = createDb();
   return global.__ticketDb;
+}
+
+/**
+ * Seller-connected instant payments (PayPal Checkout / Stripe Checkout).
+ *
+ * The platform never holds money, and that stays true here: a connection is
+ * the SELLER'S OWN PayPal or Stripe account, and the API calls made with it
+ * move the buyer's money straight into that account. What this migration adds
+ * is where those credentials live (encrypted at rest — lib/secretBox), which
+ * routes each listing offers its buyers, and the two ids an order needs to be
+ * settled against the provider afterwards.
+ *
+ * Idempotent, like migrateToPlatform above: every column is guarded by a
+ * table_info() check so a restart is harmless.
+ */
+function migratePayments(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS organizer_payment_connections (
+      id TEXT PRIMARY KEY,
+      organizer_id TEXT NOT NULL,
+      provider TEXT NOT NULL,              -- 'paypal' | 'stripe'
+      public_id TEXT NOT NULL DEFAULT '',  -- PayPal client id; '' for Stripe
+      secret_enc TEXT NOT NULL,            -- lib/secretBox sealed secret / API key
+      account_label TEXT NOT NULL DEFAULT '', -- what the provider said the account is (email / business name)
+      sandbox INTEGER NOT NULL DEFAULT 0,  -- PayPal sandbox or a Stripe test key
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (organizer_id, provider)
+    );
+    CREATE INDEX IF NOT EXISTS idx_payment_connections_org ON organizer_payment_connections(organizer_id);
+  `);
+
+  const eventCols = (db.pragma(`table_info(events)`) as { name: string }[]).map((c) => c.name);
+  // Which routes THIS listing offers. Bank transfer (with the optional
+  // PayPal.Me link beside it) stays on by default — it is what every listing
+  // sold with before this existed. The instant routes default OFF and only
+  // work while the seller has the matching connection; lib/paymentConnections
+  // is the one reader that combines the two.
+  if (!eventCols.includes('pay_transfer')) {
+    db.exec(`ALTER TABLE events ADD COLUMN pay_transfer INTEGER NOT NULL DEFAULT 1`);
+  }
+  if (!eventCols.includes('pay_paypal')) {
+    db.exec(`ALTER TABLE events ADD COLUMN pay_paypal INTEGER NOT NULL DEFAULT 0`);
+  }
+  if (!eventCols.includes('pay_stripe')) {
+    db.exec(`ALTER TABLE events ADD COLUMN pay_stripe INTEGER NOT NULL DEFAULT 0`);
+  }
+
+  const orderCols = (db.pragma(`table_info(orders)`) as { name: string }[]).map((c) => c.name);
+  // The connection an instant order was started with. Captured against the
+  // SAME credentials later — a seller who swaps their PayPal app between a
+  // buyer's approval and the capture must not make that capture silently run
+  // against the new one.
+  if (!orderCols.includes('payment_connection_id')) {
+    db.exec(`ALTER TABLE orders ADD COLUMN payment_connection_id TEXT`);
+  }
+  if (!orderCols.includes('stripe_session_id')) {
+    db.exec(`ALTER TABLE orders ADD COLUMN stripe_session_id TEXT`);
+  }
+  if (!orderCols.includes('stripe_session_url')) {
+    db.exec(`ALTER TABLE orders ADD COLUMN stripe_session_url TEXT`);
+  }
 }

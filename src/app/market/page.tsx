@@ -1,70 +1,82 @@
-import { shareImages } from '@/lib/seo';
+import { absoluteUrl, itemListJsonLd, jsonLdScript, shareImages } from '@/lib/seo';
 import Np from '@/components/Np';
+import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
 import Link from 'next/link';
-import EventCard from '@/components/EventCard';
-import ItemRail from '@/components/ItemRail';
+import LiveSearchInput from './LiveSearchInput';
 import ItemTile from '@/components/ItemTile';
-import { SHOP_CATEGORIES, isShopCategory } from '@/lib/categories';
-import { listPublishedEvents } from '@/lib/events';
+import { expansionsFor } from '@/lib/bazaarWords';
+import { SHOP_CATEGORIES, categoryLabel } from '@/lib/categories';
+import { cropTag, listPublishedEvents, mediaUrl, parseCropRect } from '@/lib/events';
 import { FESTIVALS, currentOccurrence } from '@/lib/festivals';
 import type { Festival, FestivalOccurrence } from '@/lib/festivals';
 import { loadFeedSnapshot } from '@/lib/feedSnapshot';
 import { howItWorks } from '@/lib/howItWorks';
 import {
+  SORTS,
   countByCategory,
+  facetBands,
   facetCities,
+  facetShops,
   filterShopItems,
   listShopItems,
   queryTerms,
-  searchShopItems,
   searchSuggestions,
   sortShopItems,
 } from '@/lib/marketItems';
-import type { ShopItem } from '@/lib/marketItems';
+import type { Facet } from '@/lib/marketItems';
+import {
+  PER_PAGE,
+  capFacet,
+  filtersOf,
+  hrefFor,
+  isSlice,
+  named,
+  pageWindow,
+  readQuery,
+  shopNames,
+  townKey,
+  townNames,
+} from '@/lib/marketQuery';
+import type { SearchParams } from '@/lib/marketQuery';
 import { platformNameFromEnv } from '@/lib/platform';
+import { vocabFor } from '@/lib/vocab';
 
-// The public bazaar: every published shop on the platform, grouped by the
-// shelf its seller picked in the editor (lib/categories). The feed on / mixes
-// shops in between events by date; this page is for the person who came to
-// BUY SOMETHING — momo for Saturday, a sari before Teej — and wants to browse
-// by what is sold, not by when things happen.
+// The public bazaar, goods-first: every item every published shop sells, on
+// one page, the moment it opens — searchable, filterable and sortable.
 //
-// It used to be shops and nothing else, which meant a visitor had to guess a
-// shop before they could see one thing on sale. Now the goods come first — a
-// search box, the seven departments, and a few rows of actual items — and the
-// shelves of shops sit under them for the person who came looking for a
-// particular seller. Both halves are the same bazaar, and each says which it
-// is rather than leaving the visitor to find out by clicking.
+// It used to be a front page (hero, seven department cards, item rails, then
+// shelves of shop cards) with the actual wall of goods a click away on
+// /market/items. The owner's verdict on that was the right one: a visitor who
+// opens a bazaar wants to see the things for sale, the way a shopping site
+// shows products before it shows departments. So the wall IS the page now,
+// and the departments and the shops — which still matter, because "sweets"
+// and "Sarita's kitchen" are both how people narrow a search — are small
+// chips above the grid rather than sections that push it below the fold.
+// /market/items redirects here with its query string intact.
+//
+// Everything that narrows or reorders this page is a plain GET — two small
+// forms (search, sort) and links for every chip, pill and page number. No
+// JavaScript runs to produce a result, which is not nostalgia: a result here is
+// a URL somebody can send to a friend, the back button returns to it, and a
+// search engine that follows a chip sees exactly what a visitor sees. The
+// machinery that decides WHICH items lives in lib/marketItems as pure functions
+// over rows this page already has in memory, and the URL reading and writing
+// lives in lib/marketQuery, so a query with five filters and a sort costs the
+// same fixed statements the bare page costs.
 //
 // Live availability shows on every tile — always render fresh.
 export const dynamic = 'force-dynamic';
 
-/**
- * Under this many items in the whole bazaar there are no rails at all.
- *
- * A rail is a claim that a SET of things belong together, and five items split
- * into three rows of two is not five sets — it is the same handful of goods
- * dealt out under headings that imply the bazaar has more behind them. Below
- * the line the page shows one grid holding literally everything and says so,
- * which is both the honest picture and the more useful one while the bazaar is
- * this young.
- */
-const RAILS_NEED_ITEMS = 8;
+interface Props {
+  searchParams: Promise<SearchParams>;
+}
 
-/** How many tiles one rail may hold. Beyond this a row stops being a taster. */
-const RAIL_MAX = 12;
-
-/**
- * Six things people actually type, offered as searches rather than as shelves.
- *
- * Searches, deliberately: a shelf is where the seller filed their shop, and
- * "momo" cuts across shelves — a momo listing might sit under Khaja or, from a
- * seller who mostly does groceries, somewhere else entirely. Every one of them
- * is checked against the real goods before it is shown (see below), on the
- * same rule searchSuggestions follows: a chip that leads to an empty page
- * teaches a first-time visitor that the search is broken.
- */
-const QUICK_SEARCHES = ['momo', 'sel roti', 'timur', 'dhaka topi', 'achar', 'pote'];
+/** How many towns and sellers the chip rows offer before they stop. A row
+    that scrolls is fine; a row that scrolls past forty sellers is a list
+    nobody reaches the end of, and the search box finds the rest by name. */
+const MAX_TOWN_CHIPS = 10;
+const MAX_SELLER_CHIPS = 40;
 
 /**
  * Which shelf a festival sends a shopper to, and what they would be going for.
@@ -76,9 +88,8 @@ const QUICK_SEARCHES = ['momo', 'sel roti', 'timur', 'dhaka topi', 'achar', 'pot
  * "Jewellery" in front of somebody shopping for Chhath.
  *
  * The phrase is what people buy, in their own words. It is never a claim that
- * a seller HAS it — the strip only links to a shelf that currently holds
- * something, and the wording below says "the shelf people look on", not "we
- * have it".
+ * a seller HAS it — the line only links to a shelf that currently holds
+ * something.
  */
 const FESTIVAL_SHELVES: Record<string, { shelf: string; going: string }> = {
   dashain: { shelf: 'khaja-food', going: 'sel roti and a khaja set for Tika day' },
@@ -94,10 +105,11 @@ const FESTIVAL_SHELVES: Record<string, { shelf: string; going: string }> = {
   'buddha-jayanti': { shelf: 'handicrafts', going: 'butter lamps, incense and prayer flags' },
 };
 
-/** How far ahead a festival may be and still be worth a strip on this page. */
+/** How far ahead a festival may be and still be worth a line on this page. */
 const FESTIVAL_HORIZON_DAYS = 45;
 
-export function generateMetadata() {
+export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
+  const query = readQuery(await searchParams);
   const name = platformNameFromEnv();
   const title = 'Nepali shops in Germany — order food, sweets & crafts';
   // Kept under the ~155 characters a search result shows. The words that earn
@@ -109,7 +121,14 @@ export function generateMetadata() {
   return {
     title,
     description,
+    // Canonical to the BARE page, always. Every search, every shelf, every town
+    // and every page number is a slice of this one list, and asking Google to
+    // hold a URL per combination is how a site fills an index with near-
+    // identical thin pages.
     alternates: { canonical: '/market' },
+    // …and a slice is not offered for indexing at all, though the links on it
+    // are still worth following through to the item pages.
+    ...(isSlice(query) ? { robots: { index: false, follow: true } } : {}),
     openGraph: { type: 'website', title, description, url: '/market', images: shareImages() },
   };
 }
@@ -135,22 +154,13 @@ interface NearFestival {
 /**
  * The one festival close enough ahead to be worth shopping for, or null.
  *
- * currentOccurrence() is the site's single answer to "which Dashain does a
- * visitor today mean", and it deliberately keeps a finished festival visible
- * for two months afterwards — the festival PAGES want that, because "how was
- * Dashain this year" is real traffic. A shopping strip does not: nobody is
- * ordering sel roti for a Tika that happened three weeks ago, and a bazaar
- * that says so would be selling against its own calendar. So a finished
- * occurrence is dropped here, and only the next 45 days count.
+ * currentOccurrence() deliberately keeps a finished festival visible for two
+ * months afterwards — the festival PAGES want that. A shopping line does not:
+ * nobody is ordering sel roti for a Tika that happened three weeks ago. So a
+ * finished occurrence is dropped here, and only the next 45 days count —
+ * roughly when a household starts buying rather than only remembering.
  *
- * Forty-five days because that is roughly when a household starts buying
- * rather than only remembering: sweets are made to order, a sari has to be
- * chosen, and a seller needs the notice. Further out than that and the strip
- * would be a countdown widget rather than a reason to open a shop.
- *
- * null is the normal state for most of the year, and it renders nothing at
- * all. A permanent "the next festival is in 143 days" band is a countdown
- * nobody asked for taking up the best space on the page.
+ * null is the normal state for most of the year, and it renders nothing.
  */
 function nearestFestival(today: Date): NearFestival | null {
   const iso = today.toISOString().slice(0, 10);
@@ -165,9 +175,7 @@ function nearestFestival(today: Date): NearFestival | null {
   return best;
 }
 
-/** "in 23 days" / "tomorrow" / "today" / "on now" — the whole countdown, and
-    only ever the true one. An occurrence that has started but not ended reads
-    as under way rather than as a negative number of days. */
+/** "in 23 days" / "tomorrow" / "today" / "on now" — only ever the true one. */
 function whenPhrase(days: number): string {
   if (days < 0) return 'is on now';
   if (days === 0) return 'starts today';
@@ -175,9 +183,8 @@ function whenPhrase(days: number): string {
   return `starts in ${days} days`;
 }
 
-/** A festival date as a shopper reads it. The year is left off on purpose —
-    everything this strip shows is inside the next six weeks, so printing 2026
-    beside it only invites the question of whether it means next year. */
+/** A festival date as a shopper reads it; the year is left off because
+    everything this line shows is inside the next six weeks. */
 function festivalDate(iso: string): string {
   const d = new Date(`${iso}T12:00:00Z`);
   return Number.isNaN(d.getTime())
@@ -185,184 +192,266 @@ function festivalDate(iso: string): string {
     : d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
 }
 
-export default function MarketPage() {
+/**
+ * One chip. A link, always — the active one links to the URL WITHOUT itself,
+ * so every chip on the page is a toggle and the visitor can click their way
+ * back off any filter, which is the thing a filter row most often gets wrong.
+ */
+function Chip({
+  href,
+  on,
+  muted,
+  label,
+  children,
+}: {
+  href: string;
+  on: boolean;
+  muted?: boolean;
+  /** The spoken name when the visible content is more than plain text. */
+  label?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      className={`bz-chip${on ? ' bz-chip-on' : ''}${muted ? ' bz-chip-muted' : ''}`}
+      href={href}
+      aria-current={on ? 'true' : undefined}
+      aria-label={label ? (on ? `${label} — remove this filter` : label) : undefined}
+    >
+      {children}
+    </Link>
+  );
+}
+
+export default async function MarketPage({ searchParams }: Props) {
+  const query = readQuery(await searchParams);
+  const v = vocabFor('shop');
+  const f = filtersOf(query);
+  const terms = queryTerms(query.q);
+  // The Nepali/English connections this particular search leaned on, so the
+  // page can name them under the results. Computed from what was TYPED rather
+  // than from what matched — a shopper deserves to know the site widened their
+  // word whether or not the widening found anything.
+  const expansions = expansionsFor(terms);
+
   const shops = listPublishedEvents().filter((e) => e.kind === 'shop');
-  // One read of tiers, photos and availability for every tile below — the same
-  // snapshot the homepage feed uses. See lib/feedSnapshot.
+  // The shops' own photos, for the round avatar on each shop chip. The same
+  // snapshot the homepage feed reads; see lib/feedSnapshot. A second fixed
+  // read beside listShopItems' five — fixed is the rule that matters, never a
+  // reader inside a loop.
   const snapshot = loadFeedSnapshot(shops);
-  /**
-   * Every sellable thing in the bazaar, for the search hints, the department
-   * counts and the rails.
-   *
-   * This is a SECOND fixed read rather than a reuse of `snapshot` above, and
-   * that is a deliberate trade. listShopItems does its own five statements; the
-   * shelves below need the shops themselves, including the ones that have not
-   * listed a single item yet and so appear nowhere in this array. Ten fixed
-   * statements is still ten whatever the size of the bazaar, which is the rule
-   * that actually matters — the thing forbidden here is a reader called inside
-   * a loop, not a second reader called once. (If it ever matters, the fix is
-   * for lib/marketItems to hand back the snapshot it already built rather than
-   * for this page to start reading shops one at a time.)
-   */
-  const items = listShopItems();
+  const all = listShopItems();
+  const results = filterShopItems(all, f);
 
-  // The shelves, in the fixed order of the list — a shelf nobody stocks yet is
-  // simply absent, not an empty heading apologising for itself.
-  const shelves = SHOP_CATEGORIES.map((c) => ({
-    ...c,
-    shops: shops.filter((s) => s.category === c.key),
-  })).filter((c) => c.shops.length > 0);
+  // Every facet counts against the items matching every OTHER active filter,
+  // with its own dimension cleared — the rule lib/marketItems documents at
+  // length. Count against the fully filtered list instead and the moment
+  // somebody picks Berlin every other town reads "0" and the visitor is
+  // trapped in the town they clicked, with the page telling them, wrongly,
+  // that the bazaar sells nothing anywhere else. Six more passes over an array
+  // already in memory; no filter here opens a second database connection.
+  const forShelf = filterShopItems(all, { ...f, category: '' });
+  const forCity = filterShopItems(all, { ...f, city: '' });
+  const forShop = filterShopItems(all, { ...f, shop: '' });
+  const forBand = filterShopItems(all, { ...f, band: '' });
+  const forStock = filterShopItems(all, { ...f, inStock: false });
+  const forQuery = filterShopItems(all, { ...f, q: '' });
 
-  // Shops whose seller has not picked a shelf (or picked one the list no
-  // longer knows). They belong on the page every bit as much — a shop is not
-  // hidden for skipping an optional field — they just file at the end.
-  const uncategorised = shops.filter((s) => !isShopCategory(s.category));
+  // The department chips: always all seven. A shelf nobody stocks is shown
+  // muted rather than hidden — it is a door to a department page that tells a
+  // would-be seller exactly what belongs there, and the empty ones are the
+  // whole recruiting pitch. A shelf with goods that merely fall outside the
+  // current filters stays a filter link, and lands on an honest empty state.
+  const shelfCounts = countByCategory(forShelf);
+  const shelfTotals = countByCategory(all);
 
-  // The state between "no shops at all" (which has its own page below) and a
-  // stocked bazaar — a handful of shops on one or two shelves. It is where
-  // this page really sits now that the seed publishes ONE example shop rather
-  // than seven (scripts/seed-bazaar.mjs), and it will sit here for a while.
-  //
-  // It does not LOOK broken: .feed-grid centres its columns at max 300px, so a
-  // single tile sits centred at card width instead of stretching across the
-  // page. But the hero above promises a bazaar across Germany, and a visitor
-  // who then counts two tiles is owed the reason in words rather than left to
-  // decide the site is abandoned. One line, and no growth claim we cannot
-  // keep.
-  const isYoungBazaar = shops.length > 0 && shops.length <= 3;
+  const cityKey = townKey(query.city);
+  const cityRows = named(facetCities(forCity, query.city), townNames(all));
+  const shopRows = named(facetShops(forShop, query.shop), shopNames(all));
+  const bandRows = facetBands(forBand, query.band);
+  // "In stock" means what the buy button means, so the count is the number of
+  // rows that would survive the toggle rather than the number with stock on
+  // the shelf — a paused shop's goods are not something a shopper can have.
+  const inStockCount = forStock.filter((i) => i.buyable).length;
 
-  // Search hints and quick chips both describe what is on sale RIGHT NOW, so
-  // both are computed from the items and neither is offered when there is
-  // nothing to search. A search box over an empty bazaar is a trap with a
-  // button on it.
-  const hints = searchSuggestions(items);
-  const quick = QUICK_SEARCHES.filter((term) => searchShopItems(items, queryTerms(term)).length > 0);
+  // Which sellers are the site's own example shops. facetShops prints the name
+  // with the "(example shop)" mark taken off, exactly as every tile does, so
+  // the chip carries a small "example" tag of its own — the one place on the
+  // site a made-up shop must never look like a real one.
+  const exampleShops = new Set(all.filter((i) => i.isExample).map((i) => i.shopSlug));
+  const sellerLabel = (row: Facet) =>
+    exampleShops.has(row.key) ? `${row.label} · example shop` : row.label;
 
-  const itemsByShelf = countByCategory(items);
+  // A shop's round profile photo, by slug — guarded the way the shop's own
+  // page guards it, so a pointer to a deleted photo draws the initial instead
+  // of a broken image.
+  const avatarOf = new Map<string, string>();
+  for (const s of shops) {
+    const photos = snapshot.photos.get(s.id) ?? [];
+    if (s.profileMediaId && photos.some((m) => m.id === s.profileMediaId)) {
+      avatarOf.set(s.slug, mediaUrl(s.profileMediaId, 'avatar', cropTag(parseCropRect(s.profileCrop))));
+    }
+  }
+
+  const townChips = capFacet(cityRows, cityKey, MAX_TOWN_CHIPS);
+  const shopChips = capFacet(shopRows, query.shop, MAX_SELLER_CHIPS);
+
+  const sorted = sortShopItems(results, query.sort);
+  const total = sorted.length;
+  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
+  // Clamped rather than refused. ?page=99 in an old link, or a page that has
+  // shrunk because a seller sold out, should land on the last page of what
+  // there is — a "that page does not exist" for a page that used to exist
+  // blames the visitor for a bazaar that moved underneath them.
+  const page = Math.min(query.page, totalPages);
+  const start = (page - 1) * PER_PAGE;
+  const pageItems = sorted.slice(start, start + PER_PAGE);
+
+  const activeSort = SORTS.find((s) => s.key === query.sort) ?? SORTS[0];
+
+  // The filters that are not the search box or the shelf. Kept apart because
+  // the empty state has to know: "nobody sells that here" is a true sentence
+  // about a search and a false one about a search with a town, a price band
+  // and a seller stacked on top of it.
+  const narrowed = Boolean(query.city || query.shop || query.band || query.inStock);
+  const filtered = Boolean(terms.length || query.category || narrowed);
+
+  // Removable pills for the two filters that are not a chip the visitor can
+  // see: the search text (which lives in the box, not in a row) and the seller
+  // (whose chip may be scrolled out of sight in a long row). Town, price and
+  // stock are their own removers — the highlighted chip links to the page
+  // without itself — and a pill for each would be the same control twice.
+  const pills: { key: string; label: string; href: string }[] = [];
+  if (query.q) pills.push({ key: 'q', label: `“${query.q}”`, href: hrefFor(query, { q: '' }) });
+  if (query.shop) {
+    const row = shopRows.find((s) => s.key === query.shop);
+    pills.push({
+      key: 'shop',
+      label: row ? sellerLabel(row) : query.shop,
+      href: hrefFor(query, { shop: '' }),
+    });
+  }
+
+  const exampleCount = pageItems.filter((i) => i.isExample).length;
+  const realCount = pageItems.length - exampleCount;
+  // The state the bazaar is genuinely in for now: the site publishes its own
+  // example shops, and while the real sellers are still arriving those can be
+  // most of what a visitor scrolls past. Counted over the tiles on THIS page,
+  // because "most of what is on this page" has to be true of the page the
+  // visitor is looking at; realTotal is over the whole result set, which is
+  // the only thing that can answer "has a real seller listed anything like
+  // this at all".
+  const mostlyExamples = pageItems.length > 0 && exampleCount > pageItems.length / 2;
+  const realTotal = results.filter((i) => !i.isExample).length;
+  // Only offered under the featured sort, which is the one that puts real
+  // sellers ahead of example shops.
+  const realFirst = query.sort === 'featured';
+
+  // Drawn from the goods matching every filter EXCEPT the search box, so every
+  // suggestion returns at least one result on the page the visitor is standing
+  // on. Suggesting a word that leads to an empty page teaches somebody that
+  // the search is broken.
+  const suggestions = searchSuggestions(forQuery);
+
   const near = nearestFestival(new Date());
   const festivalShelf = near ? FESTIVAL_SHELVES[near.festival.slug] : undefined;
-  // Only when that shelf actually holds something. A festival strip pointing at
-  // an empty department would be the page promising sweets for Tihar on the
+  // Only when that shelf actually holds something — a line pointing at an
+  // empty department would be the page promising sweets for Tihar on the
   // strength of a lookup table rather than of a seller.
   const festivalShelfHasGoods = Boolean(
-    festivalShelf && (itemsByShelf.get(festivalShelf.shelf) ?? 0) > 0
+    festivalShelf && (shelfTotals.get(festivalShelf.shelf) ?? 0) > 0
   );
 
-  const rails = buildRails(items);
+  const shopCount = new Set(results.map((i) => i.shop.id)).size;
+  const noun = total === 1 ? v.unit : v.units;
+
+  // What this page IS, for a crawler: a list of products, in the order drawn.
+  // Built from pageItems — the slice actually rendered — because an ItemList
+  // that counts the whole result set on a page showing 48 of them is a
+  // mismatch, and a mismatch costs the page its structured data outright.
+  const listLd = itemListJsonLd(
+    'Nepali goods on sale in Germany',
+    pageItems.map((item) => ({ name: item.tier.name, url: absoluteUrl(item.href) }))
+  );
+
+  // The hidden fields both forms carry, so a new search keeps the visitor's
+  // shelf and town and a new sort keeps their search. Rendered only when set,
+  // because an empty hidden field writes `&city=` into the URL and that is a
+  // second address for this same page. Neither form carries the page number:
+  // a changed search or sort means page one.
+  const carried = (omit: 'q' | 'sort') => (
+    <>
+      {omit !== 'q' && query.q && <input type="hidden" name="q" value={query.q} />}
+      {query.category && <input type="hidden" name="category" value={query.category} />}
+      {query.city && <input type="hidden" name="city" value={query.city} />}
+      {query.shop && <input type="hidden" name="shop" value={query.shop} />}
+      {query.band && <input type="hidden" name="band" value={query.band} />}
+      {query.inStock && <input type="hidden" name="stock" value="1" />}
+      {omit !== 'sort' && query.sort !== 'featured' && (
+        <input type="hidden" name="sort" value={query.sort} />
+      )}
+    </>
+  );
 
   return (
     <>
-      <section className="feed-hero" style={{ padding: '64px 0 36px' }}>
-        <div className="container">
-          <p className="feed-kicker anim-fade-up">
-            <Np>नेपाली बजार</Np> · The bazaar
-          </p>
-          <h1 className="anim-fade-up anim-d1" style={{ fontSize: 'clamp(1.9rem, 4.4vw, 3rem)' }}>
-            The Nepali bazaar, wherever you are in Germany
-          </h1>
-          {/* "Every shop here belongs to a Nepali seller near you" stopped being
-              true the day the site published its own example shops (see
-              scripts/seed-bazaar.mjs): those name an invented seller and an
-              invented collection address, and a promise like this one is
-              exactly what would send somebody to a doorbell that does not
-              exist. Naming the marked-out exception keeps the sentence honest
-              without softening it — every shop that is NOT marked is still a
-              real Nepali seller, which is the claim the real sellers on this
-              page have earned. If the example shops ever come down, this
-              clause can go with them. */}
-          <p className="feed-hero-sub anim-fade-up anim-d2" style={{ marginBottom: 0 }}>
-            Momo folded the way somebody&rsquo;s mother taught them. Sel roti for the festival,
-            timur for the achar, dhaka for the photo. Every shop here that isn&rsquo;t marked
-            &ldquo;example shop&rdquo; belongs to a Nepali seller near you — you order, pay them
-            directly, and collect with the QR code on your order. No middleman between you and
-            the person who made it.
-          </p>
+      {/* Only on the page Google is allowed to keep. Every filtered slice is
+          noindex (see generateMetadata), and handing a crawler a product list
+          for a page we have just asked it to forget is noise at best. */}
+      {!filtered && pageItems.length > 0 && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(listLd)} />
+      )}
 
-          {items.length > 0 && (
-            <>
-              {/* A plain GET form to the search page: what a visitor types lands
-                  in the URL, so a result is a link they can send to a friend, a
-                  page the back button returns to, and a thing that works before
-                  any JavaScript has loaded. The <datalist> is the browser's own
-                  suggestion list — no dropdown of ours, no keystroke sent
-                  anywhere, and every word in it is drawn from goods that are on
-                  sale this minute (searchSuggestions in lib/marketItems). */}
-              <form
-                action="/market/items"
-                method="get"
-                role="search"
-                className="bz-search anim-fade-up anim-d3"
-                style={{ marginTop: 22, maxWidth: 560 }}
-              >
-                <input
-                  className="bz-search-input"
-                  type="search"
-                  name="q"
-                  list="bz-market-hints"
-                  aria-label="Search everything on sale in the bazaar"
-                  placeholder="momo, timur, dhaka topi, Berlin…"
-                  autoComplete="off"
-                />
-                <button className="btn btn-brand bz-search-btn" type="submit">
-                  Search
-                </button>
-              </form>
-              {hints.length > 0 && (
-                <datalist id="bz-market-hints">
-                  {hints.map((hint) => (
-                    <option key={hint} value={hint} />
-                  ))}
-                </datalist>
-              )}
-
-              {quick.length > 0 && (
-                <nav
-                  className="bz-quick anim-fade-up anim-d3"
-                  aria-label="Quick searches"
-                  style={{ justifyContent: 'flex-start' }}
-                >
-                  {quick.map((term) => (
-                    <Link
-                      key={term}
-                      className="bz-quick-chip"
-                      href={`/market/items?q=${encodeURIComponent(term)}`}
-                    >
-                      {term}
-                    </Link>
-                  ))}
-                </nav>
-              )}
-            </>
+      {/* The hero is one band: the name of the page on the left, the search on
+          the right, wrapping under it on a phone. Nothing else — every pixel
+          this takes is a pixel the goods are not in. */}
+      <section className="feed-hero bz-hero">
+        <div className="container bz-hero-row">
+          <div className="bz-hero-text">
+            <p className="feed-kicker anim-fade-up">
+              <Np>नेपाली बजार</Np> · The bazaar
+            </p>
+            <h1 className="bz-hero-title anim-fade-up anim-d1">
+              Nepali shops across Germany — order direct, collect with a QR code
+            </h1>
+          </div>
+          {all.length > 0 && (
+            /* A plain GET form: what a visitor types lands in the URL, so a
+               result is a link they can send to a friend and a page the back
+               button returns to. The <datalist> is the browser's own
+               suggestion list, drawn from goods on sale this minute. */
+            <form action="/market" method="get" role="search" className="bz-search bz-hero-search anim-fade-up anim-d2">
+              {/* Results update as you type (LiveSearchInput); Enter and the
+                  button still submit the plain form without JavaScript. */}
+              <LiveSearchInput
+                listId={suggestions.length > 0 ? 'bz-market-hints' : undefined}
+                ariaLabel={`Search every ${v.unit} on sale in the bazaar`}
+                defaultValue={query.q}
+                placeholder="momo, timur, dhaka topi, Berlin…"
+              />
+              <button className="btn btn-brand bz-search-btn" type="submit">
+                Search
+              </button>
+              {carried('q')}
+            </form>
           )}
-
-          {/* The same bazaar the other way round. Named rather than hinted at,
-              because "browse" on its own does not tell anybody which of two
-              pages they are about to land on: this one is a wall of SHOPS,
-              that one is a wall of GOODS with a search box over it. Somebody
-              who came looking for a seller wants this page; somebody who came
-              looking for sel roti wants that one, and until now had to guess a
-              shop before they could see a single thing on sale. */}
-          <p className="anim-fade-up anim-d3" style={{ marginTop: 18 }}>
-            <Link href="/market/items" className="btn">
-              Browse everything on sale →
-            </Link>{' '}
-            {/* Quiet, and it has to be: a shopper who has saved nothing gets an
-                empty page, so this is a way back to a list they already made
-                rather than an invitation to go and make one. */}
-            <Link href="/market/saved" style={{ marginLeft: 8, textDecoration: 'underline' }}>
-              Your saved items
-            </Link>
-          </p>
+          {suggestions.length > 0 && (
+            <datalist id="bz-market-hints">
+              {suggestions.map((hint) => (
+                <option key={hint} value={hint} />
+              ))}
+            </datalist>
+          )}
         </div>
       </section>
 
-      <section className="section" style={{ paddingTop: 20 }}>
+      <section className="section bz-wall">
         <div className="container">
           {shops.length === 0 ? (
             // Zero shops ever: the state the page launches in. It still has to
             // be worth arriving at — say what is coming, and invite the person
             // who could stock the first shelf.
-            <div style={{ textAlign: 'center', maxWidth: 560, margin: '0 auto' }}>
+            <div className="bz-empty" style={{ maxWidth: 620, margin: '10px auto 0' }}>
               <h2 className="feed-section-title anim-fade-up">The shelves are going up</h2>
               <p className="muted anim-fade-up anim-d1" style={{ margin: '10px 0 0' }}>
                 The first shops are being set up right now. Soon this page will be where you order
@@ -379,197 +468,462 @@ export default function MarketPage() {
                 </Link>
               </p>
             </div>
+          ) : all.length === 0 ? (
+            /* Shops, but not one of them has a visible item on sale — mid-setup,
+               or everything hidden for the week. No search box over it: a
+               control that can only ever return nothing is a trap. The shops
+               themselves are still worth a link. */
+            <div className="bz-empty" style={{ maxWidth: 620, margin: '10px auto 0' }}>
+              <h2 className="feed-section-title anim-fade-up">Nothing on the shelves yet</h2>
+              <p className="muted anim-fade-up anim-d1" style={{ margin: '10px 0 0' }}>
+                {shops.length === 1 ? 'One shop has' : `${shops.length} shops have`} opened here but
+                nothing is listed for sale at the moment — sellers often list a batch for a
+                particular weekend rather than keeping a permanent counter.
+              </p>
+              <nav className="bz-chips anim-fade-up anim-d2" aria-label="Shops" style={{ justifyContent: 'center' }}>
+                {shops.map((s) => (
+                  <Link key={s.id} className="bz-chip" href={`/e/${s.slug}`}>
+                    {s.name}
+                  </Link>
+                ))}
+              </nav>
+              <p className="anim-fade-up anim-d2" style={{ marginTop: 18 }}>
+                <Link href="/organizers" className="btn btn-brand">
+                  Open your shop — it&rsquo;s free
+                </Link>
+              </p>
+            </div>
           ) : (
             <>
-              {isYoungBazaar && (
-                <p
-                  className="muted anim-fade-up"
-                  style={{ textAlign: 'center', maxWidth: 560, margin: '0 auto 30px' }}
-                >
-                  Early days — {shops.length === 1 ? 'one shop' : `${shops.length} shops`} on the
-                  shelves so far. The bazaar fills up as sellers join, and joining is free.
-                </p>
-              )}
-
-              {/* The seven departments, always all seven.
-                  A shelf nobody stocks is shown with "nothing yet" rather than
-                  hidden, and that is the opposite of the rule the shop shelves
-                  below follow, on purpose: down there an empty heading would be
-                  a heading with nothing under it, while up here the card is a
-                  door to a department page that tells a would-be seller exactly
-                  what belongs on that shelf. The empty ones are the whole
-                  recruiting pitch, so hiding them would hide it. */}
-              <h2 className="feed-section-title anim-fade-up">Departments</h2>
-              {/* Not "every shop sits on one of them", which this same page
-                  disproves a few hundred pixels further down: the shelf is an
-                  optional field in the editor, and the shops whose seller left
-                  it blank are gathered under "More from the bazaar" below.
-                  Saying otherwise would make the one section a visitor cannot
-                  explain look like a bug in the page rather than a seller who
-                  has not filled a box in yet. */}
-              <p className="muted anim-fade-up" style={{ margin: '4px 0 16px' }}>
-                Seven shelves, and a seller picks the one their shop belongs on.
-              </p>
-              <nav className="bz-depts anim-fade-up" aria-label="Departments">
+              {/* Departments: "All" and the seven shelves, each a toggle. The
+                  Nepali name leads, small, because it is the word a Nepali
+                  shopper recognises first; the English label is the translation. */}
+              <nav className="bz-chips" aria-label="Departments">
+                <Chip href={hrefFor(query, { category: '' })} on={!query.category}>
+                  <span>All</span>
+                  <span className="bz-chip-count">{forShelf.length}</span>
+                </Chip>
                 {SHOP_CATEGORIES.map((shelf) => {
-                  const count = itemsByShelf.get(shelf.key) ?? 0;
-                  const shopCount = shops.filter((s) => s.category === shelf.key).length;
+                  const count = shelfCounts.get(shelf.key) ?? 0;
+                  const on = query.category === shelf.key;
+                  const emptyShelf = (shelfTotals.get(shelf.key) ?? 0) === 0;
                   return (
-                    <Link key={shelf.key} className="bz-dept" href={`/market/c/${shelf.key}`}>
-                      {/* lang="ne" so a screen reader reaches for a Nepali voice
-                          instead of spelling खाजा out in English phonemes. */}
-                      <span className="bz-dept-np" lang="ne">
+                    <Chip
+                      key={shelf.key}
+                      // An unstocked shelf goes to its department page, which
+                      // says what belongs on it — that page is the recruiting
+                      // pitch, and a filter to zero items would not be.
+                      href={emptyShelf ? `/market/c/${shelf.key}` : hrefFor(query, { category: on ? '' : shelf.key })}
+                      on={on}
+                      muted={count === 0 && !on}
+                      label={`${shelf.label}${count === 0 ? ' — nothing here yet' : ''}`}
+                    >
+                      <span className="bz-chip-np" lang="ne">
                         {shelf.np}
                       </span>
-                      <span className="bz-dept-name">{shelf.label}</span>
-                      <p className="bz-dept-line">{shelf.line}</p>
-                      <span className="bz-dept-count">{shelfCountLabel(count, shopCount)}</span>
-                    </Link>
+                      <span>{shelf.label}</span>
+                      <span className="bz-chip-count">{count}</span>
+                    </Chip>
                   );
                 })}
               </nav>
 
-              {near && (
-                <div className="bz-festival anim-fade-up" style={{ marginTop: 26 }}>
-                  <div className="bz-festival-body">
-                    <p className="feed-kicker" style={{ margin: 0 }}>
-                      <span lang="ne">{near.festival.nameNe}</span> · The calendar
-                    </p>
-                    <h2 className="feed-section-title" style={{ margin: '2px 0 0' }}>
-                      {near.festival.name} {whenPhrase(near.days)}
-                    </h2>
-                    <p className="muted small" style={{ margin: '6px 0 0' }}>
-                      {near.occurrence.mainDayName} falls on{' '}
-                      {festivalDate(near.occurrence.mainDay)}.{' '}
-                      {festivalShelf && festivalShelfHasGoods ? (
-                        <>The shelf people look on for it is {shelfLabel(festivalShelf.shelf)} —{' '}
-                        {festivalShelf.going}.</>
-                      ) : (
-                        <>
-                          Sellers list what they are making for it in their own shops, so it is
-                          worth a look through the bazaar as the day gets closer.
-                        </>
-                      )}
-                    </p>
-                  </div>
-                  <p style={{ margin: 0, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {festivalShelf && festivalShelfHasGoods && (
-                      <Link className="btn btn-brand" href={`/market/c/${festivalShelf.shelf}`}>
-                        {shelfLabel(festivalShelf.shelf)} →
+              {/* Shops: every seller with something on sale under the other
+                  filters, busiest first, with their round photo where they
+                  have one. Also toggles. */}
+              {shopChips.length > 0 && (
+                <nav className="bz-chips bz-chips-shops" aria-label="Shops">
+                  {shopChips.map((row) => {
+                    const on = row.key === query.shop;
+                    const avatar = avatarOf.get(row.key);
+                    return (
+                      <Chip
+                        key={row.key}
+                        href={hrefFor(query, { shop: on ? '' : row.key })}
+                        on={on}
+                        muted={row.count === 0 && !on}
+                        label={sellerLabel(row)}
+                      >
+                        {avatar ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img className="bz-chip-avatar" src={avatar} alt="" loading="lazy" />
+                        ) : (
+                          <span className="bz-chip-avatar bz-chip-avatar-blank" aria-hidden="true">
+                            {row.label.trim().charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                        <span>{row.label}</span>
+                        {exampleShops.has(row.key) && <span className="bz-chip-tag">example</span>}
+                        <span className="bz-chip-count">{row.count}</span>
+                      </Chip>
+                    );
+                  })}
+                  {shopRows.length > shopChips.length && (
+                    <span className="bz-chips-note">
+                      the {shopChips.length} busiest of {shopRows.length} — search a name for the rest
+                    </span>
+                  )}
+                </nav>
+              )}
+
+              {/* The toolbar: how many, the small toggles, and the sort. The
+                  sort is its own GET form with an always-visible Apply — no
+                  JavaScript, so there is no change handler to submit it, and a
+                  select that silently does nothing is worse than no sort. */}
+              <div className="bz-toolbar bz-bar">
+                <p className="bz-toolbar-count">
+                  {total} {noun}
+                </p>
+                <div className="bz-chips bz-chips-inline" role="group" aria-label="Filters">
+                  {/* Held to the same rule as every other facet: a toggle that
+                      would empty the page is not offered, and the one the
+                      visitor is standing on is offered even at zero. */}
+                  {(inStockCount > 0 || query.inStock) && (
+                    <Chip href={hrefFor(query, { inStock: !query.inStock })} on={query.inStock} label="In stock only">
+                      <span>In stock only</span>
+                      <span className="bz-chip-count">{inStockCount}</span>
+                    </Chip>
+                  )}
+                  {/* Towns only when there is a choice to make — one town is
+                      a fact, not a filter. */}
+                  {(cityRows.length > 1 || query.city) &&
+                    townChips.map((row) => {
+                      const on = row.key === cityKey;
+                      return (
+                        <Chip key={row.key} href={hrefFor(query, { city: on ? '' : row.key })} on={on} label={`Collect in ${row.label}`}>
+                          <span>{row.label}</span>
+                          <span className="bz-chip-count">{row.count}</span>
+                        </Chip>
+                      );
+                    })}
+                  {bandRows.length > 1 &&
+                    bandRows.map((row) => {
+                      const on = row.key === query.band;
+                      return (
+                        <Chip key={row.key} href={hrefFor(query, { band: on ? '' : row.key })} on={on} label={row.label}>
+                          <span>{row.label}</span>
+                          <span className="bz-chip-count">{row.count}</span>
+                        </Chip>
+                      );
+                    })}
+                </div>
+                <form action="/market" method="get" className="bz-sort" aria-label="Sort">
+                  <label htmlFor="bz-sort-by">Sort</label>
+                  <select id="bz-sort-by" name="sort" aria-label="Sort by" defaultValue={query.sort}>
+                    {SORTS.map((s) => (
+                      <option key={s.key} value={s.key}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button className="btn btn-sm" type="submit">
+                    Apply
+                  </button>
+                  {carried('sort')}
+                </form>
+              </div>
+
+              {(pills.length > 0 || filtered) && (
+                <ul className="bz-pills" aria-label="Filters you have set">
+                  {pills.map((pill) => (
+                    <li key={pill.key}>
+                      <Link className="bz-pill" href={pill.href} aria-label={`Remove filter: ${pill.label}`}>
+                        <span>{pill.label}</span>
+                        <span className="bz-pill-x" aria-hidden="true">
+                          ×
+                        </span>
                       </Link>
+                    </li>
+                  ))}
+                  {filtered && (
+                    <li>
+                      <Link className="bz-pill bz-pill-clear" href="/market">
+                        Clear all
+                      </Link>
+                    </li>
+                  )}
+                </ul>
+              )}
+
+              {total === 0 ? (
+                /* Matched nothing. The honest version says what was searched,
+                   does not pretend a near-miss was found, and hands back every
+                   way out. */
+                <div className="bz-empty" style={{ marginTop: 16, textAlign: 'left' }}>
+                  <h2 className="feed-section-title" style={{ marginTop: 0 }}>
+                    {terms.length > 0 ? (
+                      <>Nothing matched &ldquo;{query.q}&rdquo;</>
+                    ) : query.category ? (
+                      <>Nothing on this shelf yet</>
+                    ) : (
+                      <>Nothing matched those filters</>
                     )}
-                    <Link className="btn" href={`/${near.festival.slug}`}>
-                      Dates &amp; what&rsquo;s on
+                  </h2>
+                  <p className="muted" style={{ margin: '10px 0 0' }}>
+                    {terms.length > 0 && narrowed ? (
+                      <>
+                        Nothing is left once the other filters you set are applied. The {v.unit} you
+                        are after may be in another town, at another price, or from a seller you
+                        have filtered out — take one filter off and look again.
+                      </>
+                    ) : terms.length > 0 && query.category ? (
+                      <>
+                        No {v.unit} on the {categoryLabel(query.category)} shelf mentions that. It
+                        may be on another shelf, or nobody is selling it here yet — the bazaar is
+                        still filling up.
+                      </>
+                    ) : terms.length > 0 ? (
+                      <>
+                        We searched every {v.unit} name, the sellers&rsquo; own descriptions, and the
+                        shop names and towns. Nobody is selling that here yet — the bazaar is still
+                        filling up, so it is worth looking again.
+                      </>
+                    ) : query.category && !narrowed ? (
+                      <>
+                        No shop has listed anything on this shelf so far.{' '}
+                        <Link href={`/market/c/${query.category}`} style={{ textDecoration: 'underline' }}>
+                          What belongs here
+                        </Link>
+                        , if it is yours to sell.
+                      </>
+                    ) : (
+                      <>
+                        Nothing on sale is left once these filters are applied. Take one off — each
+                        highlighted chip above removes only itself.
+                      </>
+                    )}
+                  </p>
+                  {/* Real words drawn from goods on sale right now, so every
+                      one of them lands on results. Capped at six: a consolation,
+                      not a second search box. */}
+                  {suggestions.length > 0 && (
+                    <div style={{ marginTop: 16 }}>
+                      <p className="muted small" style={{ margin: '0 0 8px' }}>
+                        On the shelves right now:
+                      </p>
+                      <div className="chip-row">
+                        {suggestions.slice(0, 6).map((word) => (
+                          <Link key={word} className="chip" href={hrefFor(query, { q: word, page: 1 })}>
+                            {word}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <p style={{ marginTop: 18 }}>
+                    {terms.length > 0 && query.category && (
+                      <>
+                        <Link className="btn" href={hrefFor(query, { category: '' })}>
+                          Search every shelf
+                        </Link>{' '}
+                      </>
+                    )}
+                    {narrowed && (terms.length > 0 || query.category) && (
+                      <>
+                        <Link
+                          className="btn"
+                          href={hrefFor(query, { city: '', shop: '', band: '', inStock: false })}
+                        >
+                          {terms.length > 0
+                            ? 'Drop the filters, keep the search'
+                            : 'Drop the filters, keep the shelf'}
+                        </Link>{' '}
+                      </>
+                    )}
+                    <Link className="btn btn-brand" href="/market">
+                      Show everything on sale
                     </Link>
                   </p>
                 </div>
-              )}
+              ) : (
+                <>
+                  <div className="bz-grid" style={{ marginTop: 12 }}>
+                    {/* Compact: the shelf badge repeats the chip row above, and
+                        the example-shop sentence is said once, under the grid,
+                        instead of on every tile. The price, the seller and the
+                        Example mark stay on every tile regardless. */}
+                    {pageItems.map((item) => (
+                      <ItemTile key={`${item.shop.id}:${item.tier.tierKey}`} item={item} compact />
+                    ))}
+                  </div>
 
-              {items.length > 0 && (
-                <div style={{ marginTop: 34 }}>
-                  {items.length < RAILS_NEED_ITEMS ? (
-                    /* Everything, in one grid. See RAILS_NEED_ITEMS: below the
-                       line there is no honest way to cut this into rows, so the
-                       page stops pretending it is a department store for a
-                       moment and simply shows the shelves as they are. */
-                    <>
-                      <h2 className="feed-section-title anim-fade-up">On the shelves right now</h2>
-                      <p className="muted anim-fade-up" style={{ margin: '4px 0 0' }}>
-                        Not enough here yet to sort into rows worth the name, so this is all of it
-                        — every item every shop has listed, {items.length} in total.
-                      </p>
-                      <div className="bz-grid" style={{ marginTop: 16 }}>
-                        {items.map((item) => (
-                          <ItemTile key={`${item.shop.id}:${item.tier.tierKey}`} item={item} />
-                        ))}
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      {/* Only once there is more than one row to describe. No
-                          rail may show an item another rail already took (see
-                          buildRails), so just over the eight-item line the
-                          newest row can claim everything there is and the
-                          others come back empty — and "a handful from each
-                          corner" over a single row holding the entire bazaar
-                          is a promise of depth the shelves do not have yet.
-                          The row's own heading and note say what it is. */}
-                      {rails.length > 1 && (
-                        <p className="muted anim-fade-up" style={{ margin: '0 0 6px' }}>
-                          A handful from each corner of the bazaar. Every row has a link at its
-                          end to the full list behind it.
-                        </p>
-                      )}
-                      {rails.map((rail) => (
-                        <ItemRail
-                          key={rail.title}
-                          title={rail.title}
-                          items={rail.items}
-                          href={rail.href}
-                          hrefLabel={rail.hrefLabel}
-                          note={rail.note}
-                        />
-                      ))}
-                    </>
+                  {totalPages > 1 && (
+                    <nav aria-label="Result pages">
+                      <ul className="bz-pages">
+                        {page > 1 && (
+                          <li>
+                            <Link className="bz-page-link" rel="prev" href={hrefFor(query, { page: page - 1 })}>
+                              ← Previous
+                            </Link>
+                          </li>
+                        )}
+                        {pageWindow(page, totalPages).map((n, i) =>
+                          n === 'gap' ? (
+                            /* Punctuation, not a control: the numbers it stands
+                               for are reachable from the page it sits beside. */
+                            <li key={`gap-${i}`} className="muted" aria-hidden="true">
+                              …
+                            </li>
+                          ) : n === page ? (
+                            <li key={n}>
+                              <span className="bz-page-link bz-page-current" aria-current="page">
+                                {n}
+                              </span>
+                            </li>
+                          ) : (
+                            <li key={n}>
+                              <Link className="bz-page-link" href={hrefFor(query, { page: n })} aria-label={`Page ${n}`}>
+                                {n}
+                              </Link>
+                            </li>
+                          )
+                        )}
+                        {page < totalPages && (
+                          <li>
+                            <Link className="bz-page-link" rel="next" href={hrefFor(query, { page: page + 1 })}>
+                              Next →
+                            </Link>
+                          </li>
+                        )}
+                      </ul>
+                    </nav>
                   )}
-                </div>
-              )}
 
-              {/* And the same bazaar shop-first, for the visitor who came for a
-                  particular seller rather than for a particular thing. */}
-              <p className="muted anim-fade-up" style={{ margin: '38px 0 18px' }}>
-                The shops themselves, shelf by shelf — open one to see everything that seller
-                makes.
-              </p>
-              {shelves.map((shelf, i) => (
-                <div key={shelf.key} style={{ marginTop: i === 0 ? 0 : 36 }}>
-                  <h2 className="feed-section-title anim-fade-up">{shelf.label}</h2>
-                  <p className="muted anim-fade-up" style={{ margin: '4px 0 0' }}>
-                    {shelf.line}
+                  {/* Everything that explains the grid sits UNDER it. The goods
+                      are the first thing on the page; the notes about them are
+                      for whoever scrolls past the last row. */}
+                  <div className="bz-below">
+                  {/* One quiet line saying what the grid is, which slice of it
+                      is on screen, and what order it is in — in the sort's own
+                      words, because an arrangement a shop will not describe is
+                      one it is asking to be trusted about. */}
+                  <p className="muted small bz-results-line">
+                    {filtered ? (
+                      <>
+                        <strong>
+                          {total} {noun}
+                        </strong>{' '}
+                        {terms.length > 0 ? (
+                          <>
+                            matching &ldquo;{query.q}&rdquo;
+                            {query.category ? <> on the {categoryLabel(query.category)} shelf</> : null}
+                          </>
+                        ) : query.category ? (
+                          <>on the {categoryLabel(query.category)} shelf</>
+                        ) : (
+                          <>matching the filters you set</>
+                        )}
+                        {narrowed && (terms.length > 0 || query.category)
+                          ? ', with your other filters applied'
+                          : ''}
+                        .{' '}
+                      </>
+                    ) : (
+                      <>
+                        <strong>
+                          Everything on sale — {total} {noun}
+                        </strong>{' '}
+                        from {shopCount === 1 ? 'one shop' : `${shopCount} shops`}.{' '}
+                      </>
+                    )}
+                    {totalPages > 1 ? (
+                      <>
+                        Showing {start + 1}&ndash;{start + pageItems.length} of {total}, page {page} of{' '}
+                        {totalPages}.{' '}
+                      </>
+                    ) : null}
+                    {activeSort.explainer}
+                    {terms.length > 0 && (
+                      <> Searched in {v.unit} names, the sellers&rsquo; descriptions, and shop names and towns.</>
+                    )}
+                    {/* Why a jar labelled in a language you do not read came
+                        back: the search knows some things have two names, and
+                        this is it saying which one it used. */}
+                    {expansions.map((e) => (
+                      <span key={e.label}>
+                        {' '}
+                        &ldquo;{e.typed}&rdquo; also matches <strong>{e.label}</strong>.
+                      </span>
+                    ))}
                   </p>
-                  <div className="feed-grid" style={{ marginTop: 18 }}>
-                    {shelf.shops.map((s) => (
-                      <EventCard key={s.id} event={s} snapshot={snapshot} />
-                    ))}
+
+                  {mostlyExamples && (
+                    <p className="notice" style={{ marginTop: 12, maxWidth: 720 }}>
+                      Most of what is on this page right now is <strong>example shops</strong> —
+                      shops the site publishes itself so a Nepali seller can see their own before
+                      they build it. Every one of them is marked, and nothing on them can be ordered
+                      or collected.
+                      {realCount > 0 ? (
+                        <>
+                          {' '}
+                          The {realCount} unmarked {realCount === 1 ? v.unit : v.units} on this page{' '}
+                          {realCount === 1 ? 'is' : 'are'} from real sellers
+                          {realFirst ? <>, and the featured order puts them first</> : null}.
+                        </>
+                      ) : realTotal > 0 ? (
+                        <>
+                          {' '}
+                          {realTotal} unmarked {realTotal === 1 ? v.unit : v.units} from real sellers{' '}
+                          {realTotal === 1 ? 'matches' : 'match'} this too —{' '}
+                          {realTotal === 1 ? 'it is' : 'they are'} on another page.
+                        </>
+                      ) : (
+                        <>
+                          {' '}
+                          No real seller has listed anything matching this yet.{' '}
+                          <Link href="/organizers" style={{ textDecoration: 'underline' }}>
+                            Opening a shop is free
+                          </Link>
+                          .
+                        </>
+                      )}
+                    </p>
+                  )}
+
+                  {/* One line, only when a festival is genuinely near — the warmest
+                      thing on the page, and the smallest. */}
+                  {near && (
+                    <p className="bz-festival-line">
+                      <span lang="ne">{near.festival.nameNe}</span>{' '}
+                      <strong>
+                        {near.festival.name} {whenPhrase(near.days)}
+                      </strong>{' '}
+                      — {near.occurrence.mainDayName} falls on {festivalDate(near.occurrence.mainDay)}.{' '}
+                      {festivalShelf && festivalShelfHasGoods ? (
+                        <>
+                          People look on{' '}
+                          <Link href={hrefFor(query, { category: festivalShelf.shelf, q: '', page: 1 })}>
+                            {categoryLabel(festivalShelf.shelf)}
+                          </Link>{' '}
+                          for {festivalShelf.going}.
+                        </>
+                      ) : (
+                        <>Sellers list what they are making for it in their own shops.</>
+                      )}{' '}
+                      <Link href={`/${near.festival.slug}`}>Dates &amp; what&rsquo;s on →</Link>
+                    </p>
+                  )}
                   </div>
-                </div>
-              ))}
-              {uncategorised.length > 0 && (
-                <div style={{ marginTop: shelves.length > 0 ? 36 : 0 }}>
-                  <h2 className="feed-section-title anim-fade-up">More from the bazaar</h2>
-                  <div className="feed-grid" style={{ marginTop: 18 }}>
-                    {uncategorised.map((s) => (
-                      <EventCard key={s.id} event={s} snapshot={snapshot} />
-                    ))}
-                  </div>
-                </div>
+                </>
               )}
-              {/* How buying here actually WORKS.
-                  The page above sells the feeling — momo folded the way
-                  somebody's mother taught them — and then leaves a first-time
-                  visitor to open a shop before they learn there is no card
-                  field, that they transfer the money to the seller themselves,
-                  and that what arrives is a code to show at a door. That is a
-                  surprising enough shape that it should not be a surprise.
 
-                  Four steps, and not one word of them written here: they come
-                  from lib/howItWorks, the same function every seller's own
-                  page calls, so the bazaar's front page and a shop's page
-                  cannot promise different things. 'varies' is what this page
-                  honestly knows about payment — each seller chooses their own
-                  routes, and only their own page can say which.
-
-                  Kept short and placed BELOW the shelves: the shops are the
-                  point of this page, and an explainer above them would be a
-                  wall of process in front of the thing people came for. */}
-              <div style={{ marginTop: 44 }}>
-                <h2 className="feed-section-title anim-fade-up">How ordering works here</h2>
-                <p className="muted anim-fade-up" style={{ margin: '4px 0 0' }}>
+              {/* How buying here actually WORKS — collapsed, at the bottom.
+                  The goods are the point of this page; an explainer above them
+                  would be a wall of process in front of the thing people came
+                  for, and one open below them is a screen of text under the
+                  last row. The four steps come from lib/howItWorks, the same
+                  function every seller's own page calls, so this page and a
+                  shop's page cannot promise different things. 'varies' is what
+                  this page honestly knows about payment — each seller chooses
+                  their own routes. */}
+              <details className="bz-how">
+                <summary>How ordering works here</summary>
+                <p className="muted" style={{ margin: '10px 0 0' }}>
                   Every shop is run by its own seller. You order from them, pay them, and collect
                   from them — {platformNameFromEnv()} is only the software in between, and never
                   touches the money.
                 </p>
-                <ol className="step-list anim-fade-up" style={{ maxWidth: 680, marginTop: 20 }}>
+                <ol className="step-list" style={{ maxWidth: 680, marginTop: 16 }}>
                   {howItWorks('varies', 'shop').map((item, i) => (
                     <li className="step-item" key={item.title}>
                       <span className="step-num">{i + 1}</span>
@@ -582,21 +936,24 @@ export default function MarketPage() {
                     </li>
                   ))}
                 </ol>
-                <p className="muted small anim-fade-up" style={{ maxWidth: 680, margin: '4px 0 0' }}>
+                <p className="muted small" style={{ maxWidth: 680, margin: '4px 0 0' }}>
                   Each seller sets their own prices, their own collection days and how long they
                   hold an order — their shop&rsquo;s own page says which, and that page is the one
                   that counts.
                 </p>
-              </div>
+              </details>
 
               {/* One quiet line for the seller scrolling past the shelves and
                   thinking "I could do this" — because they can, for nothing. */}
-              <p className="muted anim-fade-up" style={{ textAlign: 'center', marginTop: 40 }}>
+              <p className="muted" style={{ textAlign: 'center', marginTop: 28 }}>
                 Have something to sell?{' '}
                 <Link href="/organizers" style={{ textDecoration: 'underline' }}>
                   A shop here is free
+                </Link>{' '}
+                — buyers pay you directly, and you hand orders over with one scan.{' '}
+                <Link href="/market/saved" style={{ textDecoration: 'underline' }}>
+                  Your saved items
                 </Link>
-                {' '}— buyers pay you directly, and you hand orders over with one scan.
               </p>
             </>
           )}
@@ -604,159 +961,4 @@ export default function MarketPage() {
       </section>
     </>
   );
-}
-
-/** A shelf's label from its key, for the two places that print one from a
-    lookup rather than from a shelf object already in hand. */
-function shelfLabel(key: string): string {
-  return SHOP_CATEGORIES.find((c) => c.key === key)?.label ?? key;
-}
-
-/**
- * What the corner of a department card says about how full it is.
- *
- * Three states, because there are genuinely three: goods on the shelf, a shop
- * that has opened but listed nothing yet, and an empty department. Collapsing
- * the middle one into "nothing yet" would be a small lie about a seller who is
- * standing right there mid-setup, and collapsing it into "1 shop" would send a
- * shopper to a page with no prices on it.
- */
-function shelfCountLabel(items: number, shopsOnShelf: number): string {
-  if (items > 0) return `${items} ${items === 1 ? 'item' : 'items'}`;
-  if (shopsOnShelf > 0) {
-    return `${shopsOnShelf === 1 ? 'One shop' : `${shopsOnShelf} shops`}, nothing on sale yet`;
-  }
-  return 'Nothing yet';
-}
-
-interface Rail {
-  title: string;
-  items: ShopItem[];
-  href?: string;
-  hrefLabel?: string;
-  note?: string;
-}
-
-/**
- * The rows of goods on the front of the bazaar, with one item never in two of
- * them.
- *
- * The no-repeat rule is the interesting part, and it is not a layout
- * preference. A young bazaar's newest item is also, usually, its best rated
- * and its cheapest and the only thing in Hamburg — so without the rule the
- * page becomes four rows of the same six jars of achar, which reads as a shop
- * with a lot of stock right up until the moment somebody looks properly.
- *
- * Which rail gets first claim on an item is therefore a real decision, and it
- * is made by how much the heading CLAIMS:
- *
- *   - "Best rated" is a RANKING. If an earlier row had taken the highest-rated
- *     item, this row would be showing the fourth, fifth and sixth best under a
- *     heading that says otherwise. So it picks first.
- *   - "Fresh on the shelves" is a ranking too, a softer one, and picks second.
- *   - "In stock today", "Under €10" and "Collect in X" are plain facts, true of
- *     every tile they show whichever tiles those turn out to be. Losing an item
- *     to a row above cannot make one of these say something false; it only
- *     makes the row shorter, and the link at its end goes to the complete list.
- *
- * They are RENDERED in the order the storefront wants — freshness first,
- * because that is what a returning visitor came to see — which is why claiming
- * and rendering are two separate lists below.
- */
-function buildRails(items: ShopItem[]): Rail[] {
-  const claimed = new Set<string>();
-  const idOf = (i: ShopItem) => `${i.shop.id}:${i.tier.tierKey}`;
-
-  /** Take up to RAIL_MAX of these that no earlier rail took. Under three, the
-      rail is abandoned and — importantly — claims nothing, so the items stay
-      available to the rows below rather than being swallowed by a row that
-      never rendered. ItemRail enforces the same floor itself; this is here so
-      the accounting matches what the page will actually show. */
-  const claim = (pool: ShopItem[]): ShopItem[] => {
-    const picked = pool.filter((i) => !claimed.has(idOf(i))).slice(0, RAIL_MAX);
-    if (picked.length < 3) return [];
-    for (const i of picked) claimed.add(idOf(i));
-    return picked;
-  };
-
-  // Only items somebody has actually reviewed, and only when there are enough
-  // of them for the row to be a selection rather than a list of everything
-  // that has ever been rated. Three is the same floor ItemRail uses.
-  const rated = items.filter((i) => i.rating);
-  const bestRated = rated.length >= 3 ? claim(sortShopItems(rated, 'rating')) : [];
-
-  const fresh = claim(sortShopItems(items, 'newest'));
-
-  const inStock = claim(items.filter((i) => i.buyable));
-
-  // EUR only, and the reason is the same one bandOf gives in lib/marketItems:
-  // a shop selling in another currency has prices this heading has not
-  // converted, and putting one under "Under €10" would be the page making a
-  // claim about a number it has not looked at.
-  const cheap = claim(
-    items.filter((i) => i.currency.trim().toUpperCase() === 'EUR' && i.priceCents < 1000)
-  );
-
-  // The busiest town, from the same facet the search page's Town filter is
-  // built from — so the row and the filter can never disagree about which
-  // spelling of "berlin" is the town. facetCities sorts busiest first.
-  const topCity = facetCities(items)[0];
-  const cityItems = topCity
-    ? filterShopItems(items, {
-        q: '',
-        category: '',
-        city: topCity.key,
-        shop: '',
-        inStock: false,
-        band: '',
-      })
-    : [];
-  const local = claim(cityItems);
-
-  return [
-    {
-      title: 'Fresh on the shelves',
-      items: fresh,
-      href: '/market/items?sort=newest',
-      hrefLabel: 'All the newest',
-      note: 'The most recently opened shops first — it is the shop’s own age, not the item’s.',
-    },
-    {
-      title: 'In stock today',
-      items: inStock,
-      href: '/market/items?stock=1',
-      hrefLabel: 'Everything in stock',
-      note: 'On sale this minute, from a shop that is open and has some left.',
-    },
-    {
-      title: 'Under €10',
-      items: cheap,
-      // There is no "under €10" band — PRICE_BANDS splits it at €5, and this
-      // page does not get to invent a seventh band in lib/marketItems' name.
-      // Cheapest-first is the honest neighbouring list: every tile in this row
-      // is near the top of it.
-      href: '/market/items?sort=price-asc',
-      hrefLabel: 'Cheapest first',
-    },
-    {
-      title: 'Best rated',
-      items: bestRated,
-      href: '/market/items?sort=rating',
-      hrefLabel: 'All rated items',
-      note:
-        'Scored by people who ordered and paid for them here. Items nobody has reviewed yet are ' +
-        'not in this row and are not given a score.',
-    },
-    ...(topCity
-      ? [
-          {
-            title: `Collect in ${topCity.label}`,
-            items: local,
-            href: `/market/items?city=${encodeURIComponent(topCity.label)}`,
-            hrefLabel: `Everything in ${topCity.label}`,
-            note: `Shops based in ${topCity.label} — you collect from the seller there.`,
-          },
-        ]
-      : []),
-  ].filter((rail) => rail.items.length >= 3);
 }

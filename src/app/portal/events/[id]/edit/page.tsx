@@ -33,6 +33,7 @@ import { requirePortalOrganizer } from '../../../guard';
 import AssistantPanel from './AssistantPanel';
 import { organizerTotpEnabled } from '@/lib/organizerTotp';
 import { effectivePayout, queuedPayoutChange } from '@/lib/payout';
+import { anyPaymentRoute, listConnections, paymentOptionsFor } from '@/lib/paymentConnections';
 import BankForm from './BankForm';
 import DangerZone from './DangerZone';
 import DesignPanel from './DesignPanel';
@@ -242,7 +243,10 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
   // exists to make visible.
   const effective = effectivePayout(event);
   const queued = queuedPayoutChange(event);
-  const bankDone = Boolean(effective.iban.trim() && effective.holder.trim());
+  // Done when a buyer could actually pay: a transfer route with an account
+  // behind it, or an instant route with the seller's own connection behind it.
+  const bankDone = anyPaymentRoute(paymentOptionsFor(event));
+  const connections = listConnections(organizer.id);
   const basicsDone = detailsDone && bankDone;
   const ticketsDone = tiers.length > 0;
   // Any visual at all counts — a video-only event still has something to show.
@@ -342,7 +346,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
         <EditorSection
           id="bank"
           title="How you get paid"
-          hint="Your money goes straight to you — double-check the IBAN. Add PayPal too if you want to offer it."
+          hint="Your money goes straight to you — double-check the IBAN. Add PayPal.Me, or switch on instant payment through your own PayPal or Stripe account."
           status={bankDone ? 'done' : 'todo'}
         >
           <BankForm
@@ -354,6 +358,11 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
               bankBic: effective.bic,
               bankName: effective.bankName,
               paypalAccount: effective.paypal,
+            }}
+            routes={{ transfer: event.payTransfer, paypal: event.payPaypal, stripe: event.payStripe }}
+            connected={{
+              paypal: connections.find((c) => c.provider === 'paypal')?.accountLabel ?? null,
+              stripe: connections.find((c) => c.provider === 'stripe')?.accountLabel ?? null,
             }}
             queued={
               queued && {

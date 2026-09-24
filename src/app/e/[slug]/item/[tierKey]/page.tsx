@@ -846,7 +846,7 @@ export default async function ItemPage({ params, searchParams }: Params) {
       <ItemRail
         title="Others on this shelf"
         items={onSameShelf}
-        href={shelf ? `/market/items?c=${encodeURIComponent(shelf.key)}` : undefined}
+        href={shelf ? `/market?category=${encodeURIComponent(shelf.key)}` : undefined}
         hrefLabel="See the whole shelf"
         note={
           shelf

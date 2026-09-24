@@ -10,6 +10,8 @@ import {
   type PaypalCaptureResponse,
 } from '@/lib/paypal';
 import { reconcileStuckOrder } from '@/lib/reconcile';
+import { getConnectionById, paypalCredentialsFor } from '@/lib/paymentConnections';
+import { settleStripeOrder } from '@/lib/stripeOrders';
 import { awardReferralVouchers } from '@/lib/referrals';
 import { sendTicketEmail } from '@/lib/email';
 import type { ApiErrorResponse, CaptureOrderResponse } from '@/lib/types';
@@ -84,6 +86,30 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       return paidResponse(id);
     }
 
+    // A Stripe order is settled by ASKING Stripe, not by capturing: the buyer
+    // paid (or did not) on Stripe's own page. lib/stripeOrders owns the rules.
+    if (order.paymentMode === 'stripe') {
+      const outcome = await settleStripeOrder(id);
+      switch (outcome) {
+        case 'paid':
+          return paidResponse(id);
+        case 'unpaid':
+          return apiError(
+            402,
+            'PAYMENT_FAILED',
+            'Your card payment has not been completed yet — finish it on the payment page, or start a new order. You have not been charged.'
+          );
+        case 'expired':
+          return apiError(
+            402,
+            'PAYMENT_FAILED',
+            'The payment page expired and you have not been charged — please start a new order.'
+          );
+        default:
+          return apiError(500, 'PAYMENT_FAILED', UNCLEAR_PAYMENT_MSG);
+      }
+    }
+
     // Another request owns the capture — or a previous attempt crashed. For a
     // stale hold (>10 min), resolve it against PayPal right now so the buyer
     // isn't stuck; for a fresh one, just ask them to wait.
@@ -136,9 +162,20 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       return apiError(500, 'PAYMENT_FAILED', 'Payment could not be started — please start a new order. You have not been charged.');
     }
 
+    // The SELLER'S credentials this order was started with. Without them we
+    // cannot ask PayPal anything — and the buyer may already have approved, so
+    // the seats stay held ('capturing') for a human rather than being released
+    // on a guess.
+    const conn = order.paymentConnectionId ? getConnectionById(order.paymentConnectionId) : null;
+    const creds = conn ? paypalCredentialsFor(conn) : null;
+    if (!creds) {
+      console.error(`Order ${id}: PayPal connection ${order.paymentConnectionId} is gone; holding`);
+      return apiError(500, 'PAYMENT_FAILED', UNCLEAR_PAYMENT_MSG);
+    }
+
     let captureResponse: PaypalCaptureResponse;
     try {
-      captureResponse = await capturePaypalOrder(order.paypalOrderId);
+      captureResponse = await capturePaypalOrder(creds, order.paypalOrderId);
     } catch (e) {
       if (e instanceof InstrumentDeclinedError) {
         // Retryable: put the order back to pending so the buyer can try another method.
@@ -151,7 +188,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       // never mark a possibly-charged buyer as failed.
       console.error(`PayPal capture for order ${id} errored, reconciling:`, e);
       try {
-        const paypalOrder = await getPaypalOrder(order.paypalOrderId);
+        const paypalOrder = await getPaypalOrder(creds, order.paypalOrderId);
         const capture = extractCaptureDetails(paypalOrder);
         const expectedValue = (order.totalCents / 100).toFixed(2);
         if (
@@ -169,7 +206,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
           // commit. Re-attempt (idempotent via PayPal-Request-Id) instead of
           // releasing and falsely promising "not charged".
           try {
-            const retry = await capturePaypalOrder(order.paypalOrderId);
+            const retry = await capturePaypalOrder(creds, order.paypalOrderId);
             const d2 = extractCaptureDetails(retry);
             if (
               (d2.status === 'COMPLETED' || d2.status === 'PENDING') &&

@@ -90,6 +90,15 @@ export interface EventRow {
   pendingPayoutEffectiveAt: number | null;
   /** 1 once the event could ever take money. Never cleared — see lib/payout.ts. */
   payoutLocked: number;
+  /**
+   * Which ways to pay THIS listing offers. A tick alone offers nothing: the
+   * transfer route needs a bank account or PayPal.Me link set above, and the
+   * instant routes need the seller's own connection (lib/paymentConnections).
+   * paymentOptionsFor() is the only reader that combines the two.
+   */
+  payTransfer: boolean;
+  payPaypal: boolean;
+  payStripe: boolean;
   posterMediaId: string | null;
   profileMediaId: string | null;
   /** First/legacy uploaded video — an event can now hold several. */
@@ -249,6 +258,9 @@ const EVENT_COLS = `
   pending_paypal_account AS pendingPaypalAccount,
   pending_payout_effective_at AS pendingPayoutEffectiveAt,
   payout_locked AS payoutLocked,
+  pay_transfer AS payTransfer,
+  pay_paypal AS payPaypal,
+  pay_stripe AS payStripe,
   poster_media_id AS posterMediaId,
   profile_media_id AS profileMediaId,
   video_media_id AS videoMediaId,
@@ -295,6 +307,11 @@ function rowToEvent(row: Record<string, unknown> | undefined): EventRow | null {
     assistantContext: (row.assistantContext as string | null) ?? '',
     paypalAccount: (row.paypalAccount as string | null) ?? '',
     payoutLocked: Number(row.payoutLocked ?? 0),
+    // Rows from before the columns existed read NULL: transfer was the only
+    // route then, so it stays on and the instant ones stay off.
+    payTransfer: row.payTransfer === null || row.payTransfer === undefined ? true : Boolean(row.payTransfer),
+    payPaypal: Boolean(row.payPaypal),
+    payStripe: Boolean(row.payStripe),
   };
 }
 

@@ -20,7 +20,8 @@ import { platformNameFromEnv } from './platform';
 // every event, not just the one that lied.
 import { categoryLabel, isShopCategory } from './categories';
 import { readListingName } from './exampleShop';
-import { getBaseUrl, getPaymentMode } from './config';
+import { getBaseUrl } from './config';
+import { anyPaymentRoute, paymentOptionsFor } from './paymentConnections';
 import { paypalPayee } from './events';
 import type { EventRow, EventTierRow } from './events';
 import { effectivePayout } from './payout';
@@ -134,23 +135,14 @@ export function machineDate(event: EventRow): string | null {
 /**
  * Can a buyer actually pay for something on this listing?
  *
- * The same question POST /api/orders asks, in the same words, because the
- * answer has to match: `mode === 'transfer' && !hasBankRoute && !hasPaypalRoute`
- * is the branch that refuses the order, and effectivePayout() (not the raw
- * columns) is what that branch reads, so a payout change still inside its
- * waiting period is not counted as an account yet.
- *
- * In any other payment mode the platform's own credentials take the money, so a
- * listing with no payout route of its own is still perfectly orderable — the
- * seller simply has no way to be paid afterwards. That is a different problem
- * and not one structured data should be lying about in either direction.
+ * The same question POST /api/orders asks, through the same reader
+ * (lib/paymentConnections paymentOptionsFor): a transfer route that is
+ * switched on with an account behind it, or an instant route with the
+ * seller's own connection behind it. Structured data must not say InStock
+ * for a listing whose checkout refuses every order.
  */
 export function canTakePaidOrders(event: EventRow): boolean {
-  if (getPaymentMode() !== 'transfer') return true;
-  const payout = effectivePayout(event);
-  const hasBankRoute = Boolean(payout.iban.trim() && payout.holder.trim());
-  const hasPaypalRoute = paypalPayee({ paypalAccount: payout.paypal }) !== null;
-  return hasBankRoute || hasPaypalRoute;
+  return anyPaymentRoute(paymentOptionsFor(event));
 }
 
 /**
@@ -477,7 +469,7 @@ export function shareImages(
 /**
  * A page that IS a list of products, described as one.
  *
- * /market/items and each department page are the two surfaces on this site
+ * /market and each department page are the two surfaces on this site
  * that exist to show many things at once. Without this, a crawler sees a wall
  * of links and has to guess; with it, the page says "these are products, in
  * this order, at these URLs" — which is what lets a listing page show as a

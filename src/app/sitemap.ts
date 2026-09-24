@@ -33,16 +33,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const staticPages: MetadataRoute.Sitemap = [
     { url: base, changeFrequency: 'daily', priority: 1 },
     { url: `${base}/organizers`, changeFrequency: 'monthly', priority: 0.8 },
-    // The bazaar: every published shop, grouped by category. Weekly — shops
-    // come and go far more slowly than the event feed turns over.
-    { url: `${base}/market`, changeFrequency: 'weekly', priority: 0.8 },
-    // The same bazaar goods-first: every item every published shop sells, on
-    // one page. Daily rather than weekly — a shop's shelves turn over (and
-    // sell out) far faster than the list of shops does. Only the BARE URL is
-    // offered: every ?q= and ?c= is a slice of this list, the page canonicals
-    // them all back to here, and a sitemap full of search results is how a
-    // domain teaches a crawler that most of its pages are near-duplicates.
-    { url: `${base}/market/items`, changeFrequency: 'daily', priority: 0.8 },
+    // The bazaar: every item every published shop sells, on one page. Daily —
+    // a shop's shelves turn over (and sell out) far faster than the list of
+    // shops does. Only the BARE URL is offered: every ?q= and ?category= is a
+    // slice of this list, the page canonicals them all back to here, and a
+    // sitemap full of search results is how a domain teaches a crawler that
+    // most of its pages are near-duplicates. (/market/items redirects here.)
+    { url: `${base}/market`, changeFrequency: 'daily', priority: 0.8 },
     // The evergreen festival pages: same URL every year, so their search
     // standing compounds. Weekly — the events listed on them change.
     { url: `${base}/dashain`, changeFrequency: 'weekly', priority: 0.8 },
@@ -126,8 +123,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const shelfPages: MetadataRoute.Sitemap = SHOP_CATEGORIES.filter((c) => stocked.has(c.key)).map(
     (c) => ({
       url: `${base}/market/c/${c.key}`,
-      // Between /market (weekly) and /market/items (daily): a shelf changes
-      // when a shop on it lists something, which is oftener than shops open.
+      // Weekly, under /market's daily: a shelf changes when a shop on it
+      // lists something, which is oftener than shelves gain a shop.
       changeFrequency: 'weekly' as const,
       priority: 0.8,
     })

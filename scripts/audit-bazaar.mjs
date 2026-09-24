@@ -60,8 +60,8 @@ const base = (args.find((a) => !a.startsWith('--')) ?? 'http://localhost:3000').
 const SEED_PATHS = [
   '/',
   '/market',
-  '/market/items',
-  '/market/items?sort=price-asc',
+  '/market?sort=price-asc',
+  '/market?category=groceries-spices',
   '/market/items?c=groceries-spices',
   '/market/saved',
   '/festivals',
@@ -618,7 +618,7 @@ async function checkCsp(html) {
 /**
  * What a hand-edited URL does to the page that has the most of them.
  *
- * /market/items reads eight parameters — a search, a shelf, a town, a seller, a
+ * /market reads eight parameters — a search, a shelf, a town, a seller, a
  * price band, an in-stock flag, a sort and a page number — and every one of
  * them is a string somebody can type. Three things must hold for all of them,
  * and none is guaranteed by the framework:
@@ -644,7 +644,7 @@ const HOSTILE_QUERIES = [
   'band=nonsense',
   'sort=../../etc/passwd',
   'stock=maybe',
-  'c=%00',
+  'category=%00',
   'city=%3Cscript%3Ealert(1)%3C%2Fscript%3E',
   'shop=%22onmouseover%3D%22alert(2)',
   "shop='%3B%20DROP%20TABLE%20events%3B%20--",
@@ -653,7 +653,7 @@ const HOSTILE_QUERIES = [
 
 async function checkHostileUrls() {
   for (const query of HOSTILE_QUERIES) {
-    const path = `/market/items?${query}`;
+    const path = `/market?${query}`;
     const res = await fetch(base + path).catch(() => null);
     if (!res) {
       fail('hostile', path, 'the request failed outright');

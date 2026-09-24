@@ -1,7 +1,10 @@
 import Link from 'next/link';
 import EventCard from '@/components/EventCard';
 import EventRail from '@/components/EventRail';
-import Logo from '@/components/Logo';
+import ItemRail from '@/components/ItemRail';
+import { SHOP_CATEGORIES } from '@/lib/categories';
+import { listShopItems, sortShopItems } from '@/lib/marketItems';
+import type { ShopItem } from '@/lib/marketItems';
 import PlatformAssistant from '@/components/PlatformAssistant';
 import { listPublishedEvents, paypalPayee } from '@/lib/events';
 import type { EventRow } from '@/lib/events';
@@ -270,43 +273,37 @@ function buildRows(listings: EventRow[]): Row[] {
 // Icons — small, single-stroke, and the same weight everywhere.
 // ---------------------------------------------------------------------------
 
-function TicketIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1.2a2.8 2.8 0 0 0 0 5.6V16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-1.2a2.8 2.8 0 0 0 0-5.6Z"
-        stroke="currentColor"
-        strokeWidth="1.7"
-      />
-      <path d="M14 6.5v11" stroke="currentColor" strokeWidth="1.7" strokeDasharray="2 2.6" />
-    </svg>
-  );
+/** Items per department row on the homepage. The row's "See all" goes to the rest. */
+const HOME_RAIL_MAX = 12;
+
+interface DepartmentRail {
+  key: string;
+  title: string;
+  href: string;
+  items: ShopItem[];
 }
 
-function BankIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M3.5 9.5 12 5l8.5 4.5" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-      <path d="M5.5 10v7M10 10v7M14 10v7M18.5 10v7M3.5 19.5h17" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function MailIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="3" y="5.5" width="18" height="13" rx="2.5" stroke="currentColor" strokeWidth="1.7" />
-      <path d="m4.5 8 6.4 4.6a2 2 0 0 0 2.2 0L19.5 8" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function heroChips(anyPaypal: boolean) {
-  return [
-    { icon: <TicketIcon />, label: 'No account needed' },
-    { icon: <BankIcon />, label: anyPaypal ? 'Bank transfer or PayPal' : 'Pay by bank transfer' },
-    { icon: <MailIcon />, label: 'QR tickets by email' },
-  ];
+/**
+ * One row per department that has enough goods to be a row (ItemRail's own
+ * floor is three), in the fixed department order, featured order inside each.
+ * Items nobody filed on a shelf get a last "More from the bazaar" row.
+ */
+function departmentRails(all: ShopItem[]): DepartmentRail[] {
+  const sorted = sortShopItems(all, 'featured');
+  const rails: DepartmentRail[] = SHOP_CATEGORIES.map((c) => ({
+    key: c.key,
+    title: `${c.np} · ${c.label}`,
+    href: `/market?category=${encodeURIComponent(c.key)}`,
+    items: sorted.filter((i) => i.categoryKey === c.key).slice(0, HOME_RAIL_MAX),
+  }));
+  const known = new Set(SHOP_CATEGORIES.map((c) => c.key));
+  rails.push({
+    key: 'other-shelves',
+    title: 'More from the bazaar',
+    href: '/market',
+    items: sorted.filter((i) => !known.has(i.categoryKey)).slice(0, HOME_RAIL_MAX),
+  });
+  return rails.filter((r) => r.items.length >= 3);
 }
 
 // ---------------------------------------------------------------------------
@@ -323,6 +320,10 @@ export default function HomePage() {
   const snapshot = loadFeedSnapshot(events);
   const platformPosts = listPlatformPosts(3);
   const rows = buildRows(events);
+  // The bazaar shelf as several short rows, one per department, Netflix-style —
+  // rather than one long row of shop cards. Items, not shops: a visitor sees
+  // what is on sale before they have to pick a seller.
+  const bazaarRails = departmentRails(listShopItems());
   // Whether ANY live event actually takes PayPal. This page speaks for the whole
   // platform, so it must not advertise a payment route no organizer on it offers
   // — nor stay silent about one that several of them do.
@@ -347,53 +348,35 @@ export default function HomePage() {
           structured data thrown out site-wide. */}
       <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(faqJsonLd(faqItems))} />
 
-      <section className="feed-hero">
+      {/* One short band, then the listings. The logo is already in the nav, and
+          the longer explanation (how paying works, what a QR code is for) lives
+          in "How it works" and the FAQ further down — a visitor who came for
+          Saturday's concert should see it on the first screen, not a paragraph. */}
+      <section className="feed-hero home-hero">
         <div className="container">
-          <div className="feed-hero-logo anim-fade-up">
-            <Logo size={44} />
-          </div>
-          <h1 className="anim-fade-up anim-d1">Nepali concerts &amp; events, near you</h1>
-          <p className="feed-hero-sub anim-fade-up anim-d2">
-            It starts the same way every time: a poster lands in the family group chat, and
-            suddenly Saturday has a plan. This is where that poster leads — concerts, cultural
-            nights and parties from Nepali organizers. Reserve your tickets in one click,
-            pay {anyPaypal ? 'by bank transfer or PayPal' : 'by bank transfer'}, and your QR
-            tickets arrive by email before you have picked what to wear — and between the
-            shows, the bazaar stays open: momo to pre-order, sweets and crafts from Nepali
-            sellers, paid straight to them and collected with a QR code.
+          <h1 className="anim-fade-up">Nepali events &amp; bazaar, near you</h1>
+          <p className="home-hero-sub anim-fade-up anim-d1">
+            Tickets from Nepali organizers, goods from Nepali sellers — pay them directly, get a QR
+            code by email.
+            {events.length > 0 && (
+              <>
+                {' '}
+                <span className="home-hero-count">
+                  {events.length} on sale{cities.size > 1 ? ` in ${cities.size} cities` : ''}.
+                </span>
+              </>
+            )}
           </p>
-          <p className="feed-hero-actions anim-fade-up anim-d2">
-            <a href="#events" className="btn btn-brand btn-lg">
-              Browse events
-            </a>
-            {/* The pitch, not the sign-in door: someone who does not have an
-                account yet needs the price and the explanation first. Green
-                rather than outlined: side by side with the crimson button, an
-                outline reads as a caption, and half the audience for this page
-                is the organizer who needs to see a second door. */}
-            <Link href="/organizers" className="btn btn-green btn-lg">
+          <p className="home-hero-actions anim-fade-up anim-d1">
+            <Link href="/market" className="btn btn-brand btn-sm">
+              Shop the bazaar →
+            </Link>
+            {/* The pitch, not the sign-in door: someone without an account
+                needs the explanation first. */}
+            <Link href="/organizers" className="btn btn-green btn-sm">
               For organizers
             </Link>
           </p>
-          {/* Reassurance, not a third row of buttons. These were pill-shaped
-              chips sitting ABOVE the call to action, which put three things
-              that look pressable in front of the two that are — so nobody
-              could tell which was which. They read as a caption now, and they
-              read it after the buttons rather than instead of them. */}
-          <ul className="feed-trust anim-fade-up anim-d3" aria-label="How buying works here">
-            {heroChips(anyPaypal).map((chip) => (
-              <li className="feed-trust-item" key={chip.label}>
-                {chip.icon}
-                {chip.label}
-              </li>
-            ))}
-          </ul>
-          {events.length > 0 && (
-            <p className="feed-hero-count anim-fade-up anim-d3">
-              {events.length} {events.length === 1 ? 'event' : 'events'} on sale
-              {cities.size > 1 ? ` across ${cities.size} cities` : ''}
-            </p>
-          )}
         </div>
       </section>
 
@@ -426,7 +409,33 @@ export default function HomePage() {
           </section>
         ) : (
           <>
-            {rows.map((row) => (
+            {rows.map((row) =>
+              row.key === 'shops' && bazaarRails.length > 0 ? (
+                <section className="section rail-section" key={row.key}>
+                  <div className="container">
+                    <div className="rail-head anim-fade-up">
+                      <p className="feed-kicker">{row.kicker}</p>
+                      <h2 className="feed-section-title">{row.title}</h2>
+                      {row.more && (
+                        <p className="muted small" style={{ margin: '4px 0 0' }}>
+                          <Link href={row.more.href} className="inline-link">
+                            {row.more.label}
+                          </Link>
+                        </p>
+                      )}
+                    </div>
+                    {bazaarRails.map((rail) => (
+                      <ItemRail
+                        key={rail.key}
+                        title={rail.title}
+                        items={rail.items}
+                        href={rail.href}
+                        hrefLabel="See all"
+                      />
+                    ))}
+                  </div>
+                </section>
+              ) : (
               <section className="section rail-section" key={row.key}>
                 <div className="container">
                   <div className="rail-head anim-fade-up">
@@ -456,7 +465,8 @@ export default function HomePage() {
                   </div>
                 </div>
               </section>
-            ))}
+              )
+            )}
           </>
         )}
       </div>

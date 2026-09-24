@@ -139,10 +139,25 @@ export function getPublicConfig(): PublicEventConfig {
   };
 }
 
-export type PaymentMode = 'paypal' | 'mock' | 'transfer';
+/**
+ * The platform-wide payment mode.
+ *
+ *   transfer — the real thing. Buyers pay the SELLER: by bank transfer or
+ *              PayPal.Me (seller confirms by hand), or instantly through the
+ *              seller's own PayPal / Stripe account (lib/paymentConnections).
+ *   mock     — dev only: a simulated payment that finalizes at once.
+ *
+ * There is no platform-credential 'paypal' mode any more. The old
+ * PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET / PAYPAL_ENV variables are ignored:
+ * every PayPal call is made with a seller's own app, so the platform never
+ * receives a buyer's money (see PLATFORM.md). PAYMENT_MODE=paypal is read as
+ * 'transfer' for the same reason.
+ */
+export type PaymentMode = 'mock' | 'transfer';
 
+/** @deprecated the platform no longer holds PayPal credentials; always false. */
 export function hasPaypalCredentials(): boolean {
-  return Boolean(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
+  return false;
 }
 
 /**
@@ -167,24 +182,15 @@ export function isTransferConfigured(): boolean {
 }
 
 export function getPaymentMode(): PaymentMode {
-  const explicitMode = (process.env.PAYMENT_MODE || 'auto').toLowerCase();
-  // Bank transfer moves real money, so unlike mock it is allowed everywhere —
-  // including PAYPAL_ENV=live (that guard exists only to keep mock out).
-  if (explicitMode === 'transfer') return 'transfer';
-  // Live environment never allows mock payments.
-  if (process.env.PAYPAL_ENV === 'live') return 'paypal';
-  const explicit = explicitMode;
-  const isProd = process.env.NODE_ENV === 'production';
-  // Fail closed: in a production build, mock (test) payments require BOTH
-  // PAYMENT_MODE=mock and ALLOW_MOCK_PAYMENTS=true. A production deploy whose
-  // env vars failed to load must never silently hand out free tickets.
-  const mockAllowed = !isProd || process.env.ALLOW_MOCK_PAYMENTS === 'true';
-  if (explicit === 'mock') return mockAllowed ? 'mock' : 'paypal';
-  if (explicit === 'paypal') return 'paypal';
-  if (hasPaypalCredentials()) return 'paypal';
-  // auto + no credentials: mock is a dev convenience only. In production this
-  // returns 'paypal', which surfaces a clear "payment not configured" error.
-  return isProd ? 'paypal' : 'mock';
+  const explicit = (process.env.PAYMENT_MODE || 'auto').toLowerCase();
+  if (explicit !== 'mock') return 'transfer';
+  // Mock was asked for. It is a dev convenience and nothing else: never on a
+  // live PayPal environment (the historical "this is the live site" signal),
+  // and in a production build only with the explicit second switch — a deploy
+  // whose env vars failed to load must never silently hand out free tickets.
+  if (process.env.PAYPAL_ENV === 'live') return 'transfer';
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_MOCK_PAYMENTS !== 'true') return 'transfer';
+  return 'mock';
 }
 
 export function getBaseUrl(): string {

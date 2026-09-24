@@ -282,6 +282,16 @@ export function beginCapture(orderId: string): boolean {
   return res.changes === 1;
 }
 
+/**
+ * Hand the capture step back (capturing -> claimed) WITHOUT releasing the
+ * seats: the payment is still genuinely in progress somewhere we cannot see
+ * (a Stripe Checkout page that is still open), and the next look must be
+ * able to take ownership again.
+ */
+export function endCapture(orderId: string): void {
+  getDb().prepare(`UPDATE orders SET status = 'claimed' WHERE id = ? AND status = 'capturing'`).run(orderId);
+}
+
 /** Release a claim/capture hold so the seats go back on sale. */
 export function releaseClaim(orderId: string, toStatus: 'pending' | 'failed' | 'cancelled' = 'failed'): void {
   const db = getDb();

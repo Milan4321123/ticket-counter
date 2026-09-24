@@ -50,7 +50,9 @@ export async function GET(req: Request) {
       config: publicEventConfig(event),
       availability: getAvailabilityCached(event.id),
       mode: getPaymentMode(),
-      paypalClientId: process.env.PAYPAL_CLIENT_ID ?? null,
+      // The platform holds no PayPal credentials any more — each seller's own
+      // app is offered on the checkout page for their own listing only.
+      paypalClientId: null,
     });
   } catch (e) {
     console.error('GET /api/config failed:', e);

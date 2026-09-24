@@ -14,7 +14,7 @@
 // invented storefronts do not fill the room, they bury the people actually
 // trading in it, and a visitor cannot tell which of the tiles are the point.
 // One example answers the only question this seed exists to answer (what would
-// MY shop look like here) and costs the real sellers one tile. The other six
+// MY shop look like here) and costs the real sellers one tile. The other seven
 // shops are still in this file, complete, behind --all-shops for a walkthrough
 // that genuinely wants a full bazaar — see DEFAULT_SHOP_ID.
 //
@@ -530,15 +530,16 @@ function loadEnvFiles() {
  * it through.
  */
 function resolvePaymentMode() {
+  // Mirrors src/lib/config.ts getPaymentMode(): 'mock' only when asked for
+  // AND allowed; everything else is 'transfer'. There is no platform 'paypal'
+  // mode any more — instant payments run on each seller's OWN PayPal/Stripe
+  // account (src/lib/paymentConnections), which the example sellers never
+  // get, so the transfer-mode refusal in POST /api/orders still covers them.
   const explicitMode = (process.env.PAYMENT_MODE || 'auto').toLowerCase();
-  if (explicitMode === 'transfer') return 'transfer';
-  if (process.env.PAYPAL_ENV === 'live') return 'paypal';
-  const isProd = isProduction;
-  const mockAllowed = !isProd || process.env.ALLOW_MOCK_PAYMENTS === 'true';
-  if (explicitMode === 'mock') return mockAllowed ? 'mock' : 'paypal';
-  if (explicitMode === 'paypal') return 'paypal';
-  if (process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET) return 'paypal';
-  return isProd ? 'paypal' : 'mock';
+  if (explicitMode !== 'mock') return 'transfer';
+  if (process.env.PAYPAL_ENV === 'live') return 'transfer';
+  if (isProduction && process.env.ALLOW_MOCK_PAYMENTS !== 'true') return 'transfer';
+  return 'mock';
 }
 
 function refuse(reason, detail) {
@@ -694,8 +695,9 @@ if (!cleanOnly) {
 
 // ---------------------------------------------------------------------------
 // The sellers. Three accounts written the way a real family business splits —
-// the grower's son sells what the hills produce, the Newari kitchen sells what
-// it cooks, and the importer runs the three non-food storefronts.
+// the grower's son sells what the hills produce (and runs the general kirana in
+// Hamburg), the Newari kitchen sells what it cooks, and the importer runs the
+// three non-food storefronts.
 //
 // Only the ones that actually OWN a seeded shop are written: SELLERS is
 // derived from SHOPS below, so the default one-shop run creates exactly one
@@ -1468,6 +1470,206 @@ Cushion and striker are not included at this size — most people at this point 
       },
     ],
   },
+  // ------------------------------------------------------------- THE KIRANA --
+  // The general grocery — twenty products, which is exactly the portal's
+  // MAX_TIERS (src/app/api/portal/events/[id]/route.ts). Deliberately at the
+  // limit: a seller with a whole shop's worth of stock should be able to see
+  // what a full shelf looks like here, and a walkthrough should see how the
+  // grid, the chips and the pagination behave with a shop that big.
+  {
+    slug: 'kathmandu-kirana-pasal',
+    id: `${MARKER}kirana`,
+    seller: `${MARKER}seller-rajendra`,
+    name: 'Kathmandu Kirana Pasal',
+    deva: 'काठमाडौँ किराना पसल',
+    mono: 'कि',
+    kicker: 'Nepali groceries · rice, dal, chiura, masala, tea',
+    foot: 'The shelf you raid before you cook · collect in Hamburg',
+    city: 'Hamburg',
+    category: 'groceries-spices',
+    payWithinDays: 5,
+    palette: { bg1: '#1f2a14', bg2: '#0b1006', accent: '#b7d95a', ink: '#f6fbe9', sub: '#d5e6a4' },
+    description: `This shop could be yours. It is an example: there is no kirana, no sacks in a Hamburg garage and no Rajendra weighing anything out, nothing ships, there is nothing to collect, and checkout will refuse an order. It is here to show you — if you bring cartons back from Nepal, or buy pallets from the importer in Hamburg and split them for the people you know — what your own grocery shop on this site would look like. You can have one exactly like it, free, set up in an afternoon: ${ORGANIZERS_LINK}. Everything below is written the way I would write it for a real shelf.
+
+The ordinary Nepali kitchen shelf, in one place, in Hamburg — so nobody has to drive to Berlin for a bag of chiura or pay a courier more than the dal cost.
+
+Rice and dal by the kilo, chiura, the spices that make dal taste like home (timur, jimbu, a proper momo masala), gundruk and sinki for the winter, Ilam tea, Wai Wai by the box, ghee, mustard oil, incense for the puja corner. Nothing fancy. The kind of shop every Nepali neighbourhood in Kathmandu has on its corner, run out of a garage in Wandsbek.
+
+Most of it comes in on the same monthly consignment from the importer, so what is on the shelf is what landed. When a line is out, it is out until the next carton, and I will not sell you a substitute without saying so. Prices are what they are — I am not the cheapest jar of ghee in Germany, but I am the one where the rice is the rice your mother uses and the timur actually numbs.
+
+Everything here keeps. Order once, come and collect on a Saturday, and stock the shelf for a couple of months.`,
+    pickupInfo: `Nothing to collect here — this is an example shop, so there is no garage, no Saturday and nobody to hand you a sack. What follows is the kind of thing you would write in this box for your own buyers. Your shop is free and takes an afternoon: ${ORGANIZERS_LINK}.
+
+Collect on Saturdays 11am–5pm and Wednesday evenings 6–8pm from the garage in Wandsbek — I'll send the street and the gate number with your order.
+
+Rice and oil are heavy: if you are coming by bus, say so when you order and I'll split a 5kg into two bags. If you are coming by car there is space to pull in at the gate.
+
+Bring the QR code on your order — on your phone is fine, I scan it and hand it over. I hold orders for a week; after that, message me and we'll sort out another day. Nothing here spoils in a week.`,
+    assistantContext: `A general Nepali grocery: dry goods only, nothing cooked and nothing fresh. Stock arrives on a monthly consignment, so a sold-out line returns when the next carton lands and is never substituted without saying so. Everything is shelf-stable; rice, dal, chiura and spices keep for months in a closed container away from damp. Gundruk and sinki are fermented dried greens/radish with a strong sour smell — that is correct, not spoilage. Timur is Nepali Sichuan pepper (Zanthoxylum) and numbs the tongue; jimbu is a dried Himalayan allium used in a small pinch fried in ghee. Wai Wai and Rara are instant noodles; Wai Wai's seasoning contains wheat, soy and may contain peanut. Ghee is clarified cow's-milk butter (dairy). Packed and split in a home garage that also handles nuts, wheat and dairy, so no allergen-free claim is made — anyone avoiding an ingredient should ask the seller before ordering. No shipping — collection in Hamburg only.`,
+    tiers: [
+      {
+        key: 'basmati-5kg',
+        name: 'Basmati rice · 5kg',
+        price: 1490,
+        cap: 30,
+        description: 'Long-grain aged basmati for the Saturday biryani and the guests. The 5kg sack is the one that works out cheapest.',
+        details: `Aged basmati in the 5kg sack, which is the size every family here actually buys — the 1kg bags cost nearly half as much again per kilo. Long grain, fluffs up separate, and it has been aged a year so it does not go gluey when you rest it. Rinse until the water runs clear and soak twenty minutes before it goes on; that is the whole trick. Keep the sack closed and off the floor and it lasts as long as it takes you to eat it.`,
+      },
+      {
+        key: 'jeera-masino-5kg',
+        name: 'Jeera masino rice · 5kg',
+        price: 1690,
+        cap: 12,
+        description: 'The small, fragrant Nepali rice for everyday dal bhat. Not basmati — softer, shorter, and the one that tastes like home.',
+        details: `Jeera masino is the small-grained aromatic rice of the Nepali plains, and it is what dal bhat is made of at home — softer and a little sticky, with a smell when it cooks that basmati does not have. It is harder to get in Germany than basmati, which is why I carry it and why the sack is dearer. Cook it with a bit less water than basmati and do not soak it as long. Twelve sacks per consignment; when they are gone they are gone until the next one.`,
+      },
+      {
+        key: 'chiura-1kg',
+        name: 'Chiura · beaten rice · 1kg',
+        price: 420,
+        cap: 40,
+        description: 'Flattened rice for khaja, for Tihar plates and for a quick chiura-dahi breakfast. Thin-type, the one that crisps.',
+        details: `Chiura is rice that has been parboiled, flattened and dried, and it is the base of half of Nepali snacking — with dahi and sugar in the morning, fried with peanuts and chilli for khaja, on the plate at Dashain tika beside the meat. This is the thin type, which crisps properly in hot oil and softens in seconds under yoghurt. A kilo is a lot of chiura; it keeps for months in a jar with the lid on, and it is the thing people run out of at eight on a Sunday morning.`,
+      },
+      {
+        key: 'masoor-dal-1kg',
+        name: 'Masoor dal · 1kg',
+        price: 360,
+        cap: 50,
+        description: 'Split red lentils — the quick weeknight dal that cooks in twenty minutes without a pressure cooker.',
+        details: `The everyday dal. Split red masoor cooks in twenty minutes in an ordinary pot, needs no soaking, and takes a tempering of ghee, jimbu and dried chilli better than anything else on this shelf. A kilo is roughly twelve pots for a family of four. Pick it over for the odd stone — it comes from the mill, not from a laboratory — and keep it in a closed jar.`,
+      },
+      {
+        key: 'kalo-dal-1kg',
+        name: 'Kalo dal · black urad · 1kg',
+        price: 480,
+        cap: 25,
+        description: 'Whole black urad for the slow, thick kalo dal you cook in an iron pot for guests. Needs a soak and time.',
+        details: `Whole black urad, skin on, for the dal that takes the afternoon and is worth it. Soak it overnight, cook it slowly with plenty of ghee, garlic and a pinch of jimbu until it is thick and dark, and it is the dish people remember from weddings and from their grandmother's iron pot. It also makes the batter for bara if you grind it. A kilo goes a long way because you use less of it than masoor.`,
+      },
+      {
+        key: 'rahar-dal-1kg',
+        name: 'Rahar dal · toor · 1kg',
+        price: 440,
+        cap: 30,
+        description: 'Split pigeon pea for the yellow dal most restaurants serve. Thicker and rounder than masoor, and takes a bit longer.',
+        details: `Rahar — toor, arhar, split pigeon pea — is the yellow dal you get in every Nepali restaurant in Germany, and the one many Terai families cook daily. It takes longer than masoor, forty minutes or so, and a pressure cooker helps; it comes out thicker and slightly sweet. Good with a tempering of mustard oil, cumin and dried red chilli. Unoiled, so it does not need rinsing three times before it stops feeling greasy.`,
+      },
+      {
+        key: 'timur-50g',
+        name: 'Timur · Nepali Sichuan pepper · 50g',
+        price: 390,
+        cap: 20,
+        description: 'The pepper that numbs. Whole, from the eastern hills, for achar, chhoila and the tomato chutney momo is nothing without.',
+        details: `Timur is Nepali Sichuan pepper — the small husks that make your tongue buzz — and it is the one spice you cannot fake with something from a German supermarket. Whole, so it keeps; toast a teaspoon in a dry pan and crush it just before it goes into the tomato achar, the chhoila marinade or the aloo. Fifty grams is a lot of timur, because you use a pinch at a time, and it holds its numb for a year in a closed jar out of the sun. Ground timur that has sat in a packet since spring does nothing at all.`,
+      },
+      {
+        key: 'jimbu-20g',
+        name: 'Jimbu · Himalayan herb · 20g',
+        price: 350,
+        cap: 8,
+        description: 'Dried jimbu for the tempering. One pinch fried in ghee over the dal and the whole kitchen smells like Nepal.',
+        details: `Jimbu is a dried Himalayan allium — a wild chive from the high valleys — and it is the smell of a Nepali kitchen at dinner time. You do not cook with it so much as finish with it: a pinch dropped into hot ghee for five seconds and poured over the dal. Twenty grams is months of dal. It is light and it is fragile, so I pack it in a tin, and I only get a little of it each time, which is why the shelf count is low.`,
+      },
+      {
+        key: 'dalle-achar-200g',
+        name: 'Dalle khursani achar · 200g',
+        price: 590,
+        cap: 4,
+        description: 'The round red chilli, pickled whole in mustard oil. Genuinely hot. A jar lasts a household a long time — a chilli at a time.',
+        details: `Dalle khursani is the small round chilli from the eastern hills, and it is properly hot — the kind of hot that people who grew up with it still respect. Pickled whole in mustard oil with a little salt and timur, so a jar keeps for months in the fridge and you take one chilli out at a time with a clean dry spoon. Eat it beside dal bhat, or crush one into a tomato achar for the heat without the chilli. Four jars this consignment; the importer gets it in small lots.`,
+      },
+      {
+        key: 'gundruk-200g',
+        name: 'Gundruk · fermented greens · 200g',
+        price: 450,
+        cap: 10,
+        description: 'Fermented, sun-dried mustard greens for the sour winter soup. Smells strong in the packet — that is the point.',
+        details: `Gundruk is mustard greens that have been fermented in a jar and then dried in the sun, and the packet smells sour and strong the moment you open it — that is gundruk doing its job, not going off. Soak a handful, then cook it with soybeans, potato and tomato for the winter soup that every hill family lives on; it is also good fried dry with onion and chilli as a side. Two hundred grams is a lot once it swells back. Keep it dry and closed.`,
+      },
+      {
+        key: 'sinki-200g',
+        name: 'Sinki · fermented radish · 200g',
+        price: 450,
+        cap: 5,
+        description: 'Fermented dried radish, gundruk’s cousin. Sourer and earthier. For the soup on a cold day and for the achar.',
+        details: `Sinki is radish that has been packed in a pit, fermented and dried, and it is sourer and earthier than gundruk — some people prefer it, some people cannot be in the room with it. Soak it, then cook it into the same kind of soup, or fry it with potato for the sour side that cuts through a heavy meal. It keeps for a year if you keep it dry. Five packets, because the importer only brings a case now and then.`,
+      },
+      {
+        key: 'momo-masala-100g',
+        name: 'Momo masala · 100g',
+        price: 320,
+        cap: 35,
+        description: 'The ready mix for the filling — cumin, coriander, timur and the rest, ground together so you don’t have to.',
+        details: `If you make momo often you have your own mix; if you do not, this is a good one — cumin, coriander, black pepper, timur, cardamom, cinnamon and a little ginger and garlic powder, ground together the way a Kathmandu momo kitchen would. A tablespoon per half kilo of filling, plus your onion, ginger, garlic and coriander leaf. It is a spice mix and not a flavouring: it does nothing on its own and everything with the meat. Keeps for a good six months in the tin.`,
+      },
+      {
+        key: 'garam-masala-100g',
+        name: 'Nepali garam masala · 100g',
+        price: 300,
+        cap: 35,
+        description: 'The finishing masala for curry and dal — the Nepali balance, heavier on cardamom and timur than the Indian mixes.',
+        details: `Every garam masala in a German Asia shop is somebody else's: the Nepali one leans on black cardamom, timur and cinnamon rather than on clove and mace, and it goes in at the end of a curry rather than the beginning. This is that one. A teaspoon stirred through a mutton or chicken curry two minutes before it comes off, or over the tarkari. Ground, so it fades — buy the 100g, use it, and buy another, rather than keeping a jar for two years.`,
+      },
+      {
+        key: 'ilam-tea-250g',
+        name: 'Ilam CTC tea · 250g',
+        price: 650,
+        cap: 24,
+        description: 'Strong CTC tea from Ilam for milk chiya — the everyday one, not the fancy leaf. Boil it with milk, sugar and a little masala.',
+        details: `This is the tea that gets boiled, not brewed: strong CTC granules from the Ilam gardens in the east, for milk chiya in the morning and again at four. A teaspoon per cup into the water with a crushed cardamom and a slice of ginger, boil, add the milk, boil again until it climbs the pan, then the sugar. It is not the orthodox leaf tea that the same hills also make for export — that is another shop's business; this is the one every kitchen in Nepal actually has on the shelf. Two hundred and fifty grams is a month for a two-cup household.`,
+      },
+      {
+        key: 'wai-wai-30',
+        name: 'Wai Wai chicken · box of 30',
+        price: 1590,
+        cap: 15,
+        description: 'The box of thirty. Eat it dry from the packet with the seasoning shaken in, or cook it — every Nepali has an opinion.',
+        details: `A full box of thirty Wai Wai chicken, the noodle every Nepali child was raised on. Half the country eats it dry — crush the packet, shake the seasoning and the chilli oil in, eat with your fingers — and the other half cooks it two minutes with an egg and a handful of spinach. The box works out at roughly half the price of buying packets one at a time. Wheat, soy, and the seasoning may contain peanut; the packet says so and so do I.`,
+      },
+      {
+        key: 'rara-noodles-10',
+        name: 'Rara noodles · 10 packs',
+        price: 590,
+        cap: 20,
+        description: 'The other noodle. Thinner than Wai Wai, softer when cooked, and the one older people ask for by name.',
+        details: `Rara was Nepal's first instant noodle and it still has its people — thinner strands, softer once cooked, a plainer seasoning that takes a beaten egg and a spoon of achar well. Ten packets, because it is not a dry-snack noodle and nobody eats it thirty at a time. Wheat, and the seasoning has soy. Cook it two and a half minutes and not four; it goes to mush if you leave it.`,
+      },
+      {
+        key: 'ghee-500g',
+        name: 'Ghee · 500g',
+        price: 890,
+        cap: 14,
+        description: 'Clarified cow’s-milk butter for the dal tempering, the sel roti and the halwa. Keeps on the shelf without a fridge.',
+        details: `Ghee is what dal is finished with and what sel roti is fried in, and it needs no fridge — a closed tin on a cool shelf lasts months, which is why every Nepali kitchen has one. This is cow's-milk ghee, made from cream rather than from butter, which gives it the nutty, slightly grainy texture of the real thing rather than the flat taste of the supermarket jars. Half a kilo is a household's three months if you cook with it, or a fortnight around Tihar. Dairy, obviously.`,
+      },
+      {
+        key: 'mustard-oil-1l',
+        name: 'Mustard oil · 1 litre',
+        price: 690,
+        cap: 18,
+        description: 'Cold-pressed, pungent, for achar and for frying. The smell is right — heat it until it just smokes before you use it.',
+        details: `Mustard oil is the cooking fat of the plains and the base of every achar, and there is no substitute: rapeseed oil looks the same and tastes of nothing. This one is cold-pressed and pungent — it should make your eyes prick when you open it. Heat it until it just begins to smoke and let it cool a little before the spices go in; that takes the raw edge off. A litre does a family a month of ordinary cooking plus a few jars of achar. Keep it out of the sun.`,
+      },
+      {
+        key: 'titaura-100g',
+        name: 'Titaura · lapsi candy · 100g',
+        price: 290,
+        cap: 3,
+        description: 'The sour-sweet-hot lapsi sweet from Kathmandu that nobody can stop eating. Three packets left from the last carton.',
+        details: `Titaura is made from lapsi — the Nepali hog plum — cooked down with sugar, salt and chilli into the sour, sweet, hot, sticky thing that every school gate in Kathmandu sells. This is the soft, chewy kind. It is a snack, not an ingredient, and it disappears from a room faster than anything else on this shelf, which is why there are three packets left from the last carton and the next one is a month away. Contains chilli; children who grew up here find it hot, children who grew up there do not.`,
+      },
+      {
+        key: 'incense-dhoop',
+        name: 'Dhoop incense · 2 rolls',
+        price: 350,
+        cap: 22,
+        description: 'Tibetan-style rope dhoop for the morning puja — juniper and herbs, no bamboo stick, burns slow and smells like a monastery.',
+        details: `Two rolls of rope dhoop — the herb-and-juniper kind from the Kathmandu valley that is twisted into a cord rather than rolled onto a stick, so there is no bamboo smell underneath it. Light the end, blow it out, and lay it in the burner or across a dish of ash; a length burns for twenty minutes and smells of juniper and a monastery. For the morning puja corner, or for the flat when it has been raining for a week. Not for a smoke alarm at close range — burn it with a window cracked.`,
+      },
+    ],
+  },
+
 ];
 
 /**
@@ -1478,8 +1680,8 @@ Cushion and striker are not included at this size — most people at this point 
  * difference between a page somebody cared about and filler, and that
  * difference is the entire pitch.
  *
- * Why one and not seven: /market is a REAL marketplace with real sellers on
- * it, and seven invented storefronts do not "fill the room" so much as bury
+ * Why one and not eight: /market is a REAL marketplace with real sellers on
+ * it, and eight invented storefronts do not "fill the room" so much as bury
  * the people who are actually trading. One is enough to answer the only
  * question this seed exists to answer — what would MY shop look like here —
  * and it is the smallest amount of invented seller that answers it. Every
@@ -1490,7 +1692,7 @@ const DEFAULT_SHOP_ID = `${MARKER}alaichi`;
 
 /**
  * The fuller demo, one flag away. Nothing is deleted from this file when the
- * default shrinks — six good pages that took real work to write are not worth
+ * default shrinks — seven good pages that took real work to write are not worth
  * losing to a count, and a walkthrough that wants a stocked bazaar (several
  * shelves, three sellers, category grouping doing something visible) gets it
  * by typing the flag.
@@ -1798,7 +2000,13 @@ function itemPalette(shop, index) {
   // and not enough to turn a warm brown cardamom shop olive. Rotating in one
   // direction from zero, which is what this did first, sent the last item on
   // every shelf a third of the way round the wheel.
-  const deg = (index - (shop.tiers.length - 1) / 2) * 15;
+  //
+  // The step shrinks for a bigger shelf so the whole spread never exceeds
+  // ±30°: the twenty-product kirana at 15° a step would have put its first
+  // and last items a full 285° apart, which is not one shop's family of
+  // pictures but twenty different shops'. Five products still get 15°.
+  const step = Math.min(15, 60 / Math.max(1, shop.tiers.length - 1));
+  const deg = (index - (shop.tiers.length - 1) / 2) * step;
   return {
     ...p,
     bg1: shiftHue(p.bg1, deg),

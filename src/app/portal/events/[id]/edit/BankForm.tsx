@@ -28,14 +28,21 @@ interface Props {
   };
   /** A confirmed change still inside its waiting period, if any. */
   queued?: QueuedChange | null;
+  /** Which ways to pay THIS listing offers — see lib/paymentConnections. */
+  routes: { transfer: boolean; paypal: boolean; stripe: boolean };
+  /** The seller's connected accounts (label), or null when not connected. */
+  connected: { paypal: string | null; stripe: string | null };
 }
 
 /** The exact patch that was refused, held so the confirmed save is the same one. */
 type PendingPatch = Record<string, unknown>;
 
-export default function BankForm({ eventId, kind, initial, queued }: Props) {
+export default function BankForm({ eventId, kind, initial, queued, routes, connected }: Props) {
   const router = useRouter();
   const v = vocabFor(kind);
+  const [payTransfer, setPayTransfer] = useState(routes.transfer);
+  const [payPaypal, setPayPaypal] = useState(routes.paypal);
+  const [payStripe, setPayStripe] = useState(routes.stripe);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [holder, setHolder] = useState(initial.bankAccountHolder);
@@ -66,8 +73,17 @@ export default function BankForm({ eventId, kind, initial, queued }: Props) {
       bankBic: bic,
       bankName,
       paypalAccount: paypal,
+      payTransfer,
+      payPaypal,
+      payStripe,
     };
   }
+
+  /** Nothing a buyer could pay by — said before they publish, not after. */
+  const noRoute =
+    !(payTransfer && (iban.trim() && holder.trim() || paypal.trim())) &&
+    !(payPaypal && connected.paypal) &&
+    !(payStripe && connected.stripe);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -249,8 +265,64 @@ export default function BankForm({ eventId, kind, initial, queued }: Props) {
     <form onSubmit={submit}>
       <p className="muted small" style={{ marginTop: 0 }}>
         Buyers pay <strong>directly to you</strong> — their money goes straight into your own account, the
-        platform never touches it. You confirm each payment on the orders page and the {v.codes} go out by email.
+        platform never touches it. By bank transfer you confirm each payment on the orders page and the {v.codes}{' '}
+        go out by email; with an instant route they go out by themselves the second the buyer pays.
       </p>
+
+      {/* Which routes THIS listing offers. The instant ones only work with a
+          connection behind them, set once under Settings — a tick here is the
+          listing's choice, the connection is the account's. */}
+      <fieldset className="field" style={{ border: 0, padding: 0, margin: '0 0 16px' }}>
+        <legend style={{ fontWeight: 600, marginBottom: 6 }}>How buyers can pay for this {v.listing}</legend>
+        <label className="checkbox-row" style={{ fontWeight: 400 }}>
+          <input type="checkbox" checked={payTransfer} onChange={(e) => setPayTransfer(e.target.checked)} />
+          <span>
+            <strong>Bank transfer</strong> (and PayPal.Me, if set below) — free, buyers reserve and you confirm
+          </span>
+        </label>
+        <label className="checkbox-row" style={{ fontWeight: 400 }}>
+          <input
+            type="checkbox"
+            checked={payPaypal}
+            onChange={(e) => setPayPaypal(e.target.checked)}
+            disabled={!connected.paypal}
+          />
+          <span>
+            <strong>PayPal Checkout</strong> — instant, into your own PayPal{' '}
+            {connected.paypal ? (
+              <span className="muted">({connected.paypal})</span>
+            ) : (
+              <span className="muted">
+                — <a href="/portal/settings#instant-payments">connect your PayPal account</a> first
+              </span>
+            )}
+          </span>
+        </label>
+        <label className="checkbox-row" style={{ fontWeight: 400 }}>
+          <input
+            type="checkbox"
+            checked={payStripe}
+            onChange={(e) => setPayStripe(e.target.checked)}
+            disabled={!connected.stripe}
+          />
+          <span>
+            <strong>Card via Stripe</strong> — instant, into your own Stripe account{' '}
+            {connected.stripe ? (
+              <span className="muted">({connected.stripe})</span>
+            ) : (
+              <span className="muted">
+                — <a href="/portal/settings#instant-payments">connect your Stripe account</a> first
+              </span>
+            )}
+          </span>
+        </label>
+        {noRoute && (
+          <p className="small" style={{ margin: '6px 0 0', color: 'var(--amber-text, #8a5a00)' }}>
+            With these settings nobody can pay for this {v.listing} yet — fill in a bank account or PayPal.Me
+            below, or tick a connected instant route.
+          </p>
+        )}
+      </fieldset>
 
       {/* A confirmed change that has not landed yet. This is the whole payoff of
           the waiting period: if it was not you, the account has not actually

@@ -58,6 +58,14 @@ export interface CreateOrderRequest {
   voucherCode?: string;
   items: { tierId: string; quantity: number }[];
   /**
+   * Optional: which of the listing's offered routes the buyer picked —
+   * 'transfer' (reserve, pay the seller directly, seller confirms), 'paypal'
+   * (PayPal Checkout on the seller's own account) or 'stripe' (card, on the
+   * seller's own Stripe account). The server refuses a route the listing does
+   * not offer; absent means the listing's default.
+   */
+  payVia?: 'transfer' | 'paypal' | 'stripe' | 'mock';
+  /**
    * The total the checkout DISPLAYED, in cents. Purely a guard: the server
    * always prices from its own tiers, and refuses (409) when the two disagree
    * — an organizer repricing mid-checkout must not silently charge a buyer a
@@ -69,8 +77,10 @@ export interface CreateOrderRequest {
 export interface CreateOrderResponse {
   orderId: string; // local order id (uuid) — used for capture + the order page URL
   /** 'free' = a zero-total RSVP: already paid, tickets already minted. */
-  mode: 'paypal' | 'mock' | 'transfer' | 'free';
+  mode: 'paypal' | 'stripe' | 'mock' | 'transfer' | 'free';
   paypalOrderId: string | null; // set when mode === 'paypal'; return this from createOrder() in the PayPal JS SDK
+  /** Where to send the browser next, when mode === 'stripe' (the hosted Checkout page). */
+  redirectUrl: string | null;
   /** The FINAL amount owed — items minus any voucher discount. */
   totalCents: number;
   /** What a redeemed voucher took off, 0 on almost every order. */

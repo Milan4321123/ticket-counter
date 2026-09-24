@@ -19,6 +19,7 @@ import {
   FOCUS_RE,
 } from '@/lib/events';
 import { isShopCategory } from '@/lib/categories';
+import { getConnection } from '@/lib/paymentConnections';
 import { readJsonLimited, BodyTooLargeError } from '@/lib/http';
 import { organizerTotpEnabled } from '@/lib/organizerTotp';
 import {
@@ -500,6 +501,38 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // When it is delayed, `merged` is left alone on purpose: the publish
     // checklist below asks what buyers can pay TODAY, and today they still get
     // the old account.
+
+    // ---- Which ways to pay this listing offers -----------------------------
+    //
+    // Three switches, no step-up: none of them moves money to a different
+    // account. The transfer route still pays the account above, and an instant
+    // route pays the seller's OWN connection (lib/paymentConnections), which is
+    // guarded when it is set, not when it is offered. Turning an instant route
+    // on without a connection is refused rather than saved as a promise the
+    // checkout would silently break.
+    if ('payTransfer' in body) {
+      need(typeof body.payTransfer === 'boolean', 'That payment option does not look right.');
+      set('pay_transfer', body.payTransfer ? 1 : 0);
+      merged.payTransfer = body.payTransfer;
+    }
+    if ('payPaypal' in body) {
+      need(typeof body.payPaypal === 'boolean', 'That payment option does not look right.');
+      need(
+        !body.payPaypal || getConnection(organizer.id, 'paypal') !== null,
+        'Connect your PayPal account under Settings → Get paid instantly first.'
+      );
+      set('pay_paypal', body.payPaypal ? 1 : 0);
+      merged.payPaypal = body.payPaypal;
+    }
+    if ('payStripe' in body) {
+      need(typeof body.payStripe === 'boolean', 'That payment option does not look right.');
+      need(
+        !body.payStripe || getConnection(organizer.id, 'stripe') !== null,
+        'Connect your Stripe account under Settings → Get paid instantly first.'
+      );
+      set('pay_stripe', body.payStripe ? 1 : 0);
+      merged.payStripe = body.payStripe;
+    }
 
     // ---- Media / video ---------------------------------------------------
     if ('videoUrl' in body) {

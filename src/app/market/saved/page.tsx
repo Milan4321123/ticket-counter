@@ -44,12 +44,8 @@ export default function SavedPage() {
           know what you saved, and neither does the seller.
         </p>
         <p style={{ margin: '14px 0 30px' }}>
-          <Link href="/market/items" style={{ textDecoration: 'underline' }}>
-            Everything on sale
-          </Link>
-          {' · '}
           <Link href="/market" style={{ textDecoration: 'underline' }}>
-            Browse the shops
+            Everything on sale in the bazaar
           </Link>
         </p>
         <SavedItems />

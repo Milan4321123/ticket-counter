@@ -1,9 +1,18 @@
 import { NextResponse } from 'next/server';
-import { getPaymentMode, hasPaypalCredentials } from '@/lib/config';
-import { getEventById, getEventTier, getEventTiers, paypalPayee, type EventRow } from '@/lib/events';
+import { getBaseUrl } from '@/lib/config';
+import { getEventById, getEventTier, getEventTiers, type EventRow } from '@/lib/events';
 import { readsAsComingSoon } from '@/lib/ticketState';
 import { getAvailability, SoldOutError } from '@/lib/inventory';
-import { effectivePayout } from '@/lib/payout';
+import {
+  anyPaymentRoute,
+  getConnectionById,
+  paymentOptionsFor,
+  paypalCredentialsFor,
+  resolvePaymentRoute,
+  stripeCredentialsFor,
+} from '@/lib/paymentConnections';
+import { createStripeCheckoutSession } from '@/lib/stripe';
+import { armStripeSweep } from '@/lib/stripeOrders';
 import {
   createOrder,
   expireOverdueTransferReservations,
@@ -12,7 +21,10 @@ import {
   getPaidOrderByReferralCode,
   heldUnpaidTicketsForEmail,
   markOrderFailed,
+  paymentReference,
+  setOrderPaymentConnection,
   setPaypalOrderId,
+  setStripeSession,
   type PaymentMethod,
 } from '@/lib/orders';
 import { requestMarketingConsent } from '@/lib/marketing';
@@ -284,7 +296,27 @@ export async function POST(req: Request) {
     // complete answer on its own — a script can vary the address — but it turns
     // "reserve the event from one script" into "keep hundreds of distinct
     // mailboxes alive", and it costs a real buyer nothing.
-    if (getPaymentMode() === 'transfer' || isFree) {
+    // ---- Which way is this buyer paying? --------------------------------
+    //
+    // The listing's own offer (lib/paymentConnections) is the only authority:
+    // a route the seller has not switched on, or has nothing behind, is
+    // refused even if the request names it. A zero total is an RSVP and pays
+    // by no route at all.
+    const options = paymentOptionsFor(event);
+    let mode: PaymentMethod;
+    if (isFree) {
+      mode = 'free';
+    } else {
+      const route = resolvePaymentRoute(options, (raw as Partial<CreateOrderRequest>).payVia);
+      if (!route) {
+        return anyPaymentRoute(options)
+          ? apiError(400, 'VALIDATION', 'That way of paying is not offered for this listing — please choose another.')
+          : apiError(500, 'INTERNAL', 'Payment is not configured yet — please try again later or contact the organizer.');
+      }
+      mode = route;
+    }
+
+    if (mode === 'transfer' || isFree) {
       // Both counters together: unpaid transfer holds AND already-RSVP'd free
       // seats. A free order finalizes instantly, so without its own count one
       // address could RSVP a free event into "sold out" with nothing ever
@@ -356,28 +388,6 @@ export async function POST(req: Request) {
           ? `Only ${avail.totalRemaining} ticket${avail.totalRemaining === 1 ? '' : 's'} left for this event — please adjust your order.`
           : 'This event is sold out.';
       return apiError(409, 'SOLD_OUT', msg);
-    }
-
-    const mode: PaymentMethod = isFree ? 'free' : getPaymentMode();
-    if (mode === 'paypal' && !hasPaypalCredentials()) {
-      return apiError(500, 'INTERNAL', 'Payment is not configured yet — please try again later or contact the organizer.');
-    }
-    // Bank details live on the EVENT: buyers transfer straight to the organizer.
-    // effectivePayout(), not the raw columns, so a change still inside its
-    // waiting period is not treated as the account yet — createOrder freezes
-    // the same answer onto the order a moment later.
-    const payout = effectivePayout(event);
-    // SOME route has to exist — but a complete bank account is not the only one.
-    // PayPal is a full route on its own here (the organizer's own address, the
-    // same reference, the same confirm-by-hand step), and the checkout page has
-    // always offered it that way. This guard still demanded an IBAN, so a
-    // PayPal-only organizer got a working "Reserve — pay by PayPal" button and a
-    // 500 behind it: they could not sell at all. Both halves of the bank account
-    // are still required together — a holder with no IBAN is not a route.
-    const hasBankRoute = Boolean(payout.iban.trim() && payout.holder.trim());
-    const hasPaypalRoute = paypalPayee({ paypalAccount: payout.paypal }) !== null;
-    if (mode === 'transfer' && !hasBankRoute && !hasPaypalRoute) {
-      return apiError(500, 'INTERNAL', 'Payment is not configured yet — please try again later or contact the organizer.');
     }
 
     // Referral code, validated hard before it may be stored. It arrives either
@@ -482,14 +492,28 @@ export async function POST(req: Request) {
         .catch((e) => console.error(`Transfer instructions email for order ${order.id} threw unexpectedly:`, e));
     }
 
+    // ---- Instant routes: start the payment on the SELLER'S account ------
+    //
+    // Both use the connection paymentOptionsFor resolved a moment ago, and pin
+    // its id to the order, so the capture/settle step later runs against the
+    // same credentials even if the seller swaps their app in between.
     let paypalOrderId: string | null = null;
+    let redirectUrl: string | null = null;
+
     if (mode === 'paypal') {
+      const conn = options.paypal ? getConnectionById(options.paypal.connectionId) : null;
+      const creds = conn ? paypalCredentialsFor(conn) : null;
+      if (!conn || !creds) {
+        markOrderFailed(order.id);
+        return apiError(500, 'INTERNAL', 'Payment is not configured yet — please try again later or contact the organizer.');
+      }
       try {
-        paypalOrderId = await createPaypalOrder({
+        setOrderPaymentConnection(order.id, conn.id);
+        paypalOrderId = await createPaypalOrder(creds, {
           totalCents: order.totalCents,
           currency: order.currency,
           referenceId: order.id,
-          description: event.name,
+          description: `${paymentReference(order.id)} — ${event.name}`.slice(0, 127),
         });
         setPaypalOrderId(order.id, paypalOrderId);
       } catch (e) {
@@ -503,10 +527,52 @@ export async function POST(req: Request) {
       }
     }
 
+    if (mode === 'stripe') {
+      const conn = options.stripe ? getConnectionById(options.stripe.connectionId) : null;
+      const creds = conn ? stripeCredentialsFor(conn) : null;
+      if (!conn || !creds) {
+        markOrderFailed(order.id, 'cancelled');
+        return apiError(500, 'INTERNAL', 'Payment is not configured yet — please try again later or contact the organizer.');
+      }
+      try {
+        setOrderPaymentConnection(order.id, conn.id);
+        const base = getBaseUrl();
+        const reference = paymentReference(order.id);
+        const session = await createStripeCheckoutSession(creds, {
+          orderId: order.id,
+          totalCents: order.totalCents,
+          currency: order.currency,
+          itemName: event.name,
+          itemDescription: `${validated.items.reduce((n, it) => n + it.quantity, 0)} × ${event.kind === 'shop' ? 'item' : 'ticket'} · ${reference}`,
+          buyerEmail: validated.buyerEmail,
+          // Stripe fills in {CHECKOUT_SESSION_ID} itself; the return route
+          // verifies the session before anything is minted.
+          successUrl: `${base}/api/orders/${order.id}/stripe-return?session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: `${base}/order/${order.id}?stripe=cancelled`,
+          paymentReference: reference,
+        });
+        setStripeSession(order.id, session.id, session.url);
+        redirectUrl = session.url;
+        // Somebody has to look again if this buyer never comes back.
+        armStripeSweep();
+        if (!redirectUrl) throw new Error('Stripe session has no url');
+      } catch (e) {
+        console.error(`Creating Stripe session for local order ${order.id} failed:`, e);
+        // The seats were claimed by createOrder; nothing was charged.
+        markOrderFailed(order.id, 'cancelled');
+        return apiError(
+          502,
+          'PAYMENT_FAILED',
+          'We could not start the card payment. You have not been charged — please try again in a moment.'
+        );
+      }
+    }
+
     const response: CreateOrderResponse = {
       orderId: order.id,
       mode,
       paypalOrderId,
+      redirectUrl,
       totalCents: order.totalCents,
       discountCents: order.discountCents,
       currency: order.currency,
@@ -517,7 +583,7 @@ export async function POST(req: Request) {
     return apiError(
       500,
       'INTERNAL',
-      'Something went wrong. You have not been charged unless PayPal shows a completed payment.'
+      'Something went wrong. You have not been charged unless PayPal or your card statement shows a completed payment.'
     );
   }
 }

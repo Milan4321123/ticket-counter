@@ -32,12 +32,21 @@ export type OrderStatus = 'pending' | 'claimed' | 'capturing' | 'paid' | 'failed
  * €0.00, no reminder chases a payment that does not exist, and the books can
  * tell a seat that was given away from one that was sold.
  */
-export type PaymentMethod = 'paypal' | 'mock' | 'transfer' | 'free';
+export type PaymentMethod = 'paypal' | 'stripe' | 'mock' | 'transfer' | 'free';
 
 export interface OrderRow {
   id: string;
   eventId: string;
   paypalOrderId: string | null;
+  /**
+   * The seller's connection an instant order was started with — it is
+   * settled against the SAME credentials later. NULL on transfer/free/mock.
+   */
+  paymentConnectionId: string | null;
+  /** Stripe Checkout session, when paymentMode is 'stripe'. */
+  stripeSessionId: string | null;
+  /** Its hosted page — the buyer is sent back here to finish paying. */
+  stripeSessionUrl: string | null;
   status: OrderStatus;
   buyerName: string;
   buyerEmail: string;
@@ -383,6 +392,9 @@ const ORDER_COLS = `
   id,
   event_id AS eventId,
   paypal_order_id AS paypalOrderId,
+  payment_connection_id AS paymentConnectionId,
+  stripe_session_id AS stripeSessionId,
+  stripe_session_url AS stripeSessionUrl,
   status,
   buyer_name AS buyerName,
   buyer_email AS buyerEmail,
@@ -603,7 +615,11 @@ export function createOrder(params: {
   // Transfer orders hold seats while the money travels; free orders hold them
   // for the instant before finalizePaidOrder mints the codes. Either way the
   // claim happens here, atomically, or the order dies cleanly as 'cancelled'.
-  if (params.paymentMode === 'transfer' || params.paymentMode === 'free') {
+  // A Stripe order holds its seats the same way a transfer does — the buyer
+  // pays on Stripe's page, out of our sight, and must not come back paid to
+  // find the room full. The hold is short (the session itself expires) and
+  // lib/stripeOrders releases it once Stripe says nobody paid.
+  if (params.paymentMode === 'transfer' || params.paymentMode === 'free' || params.paymentMode === 'stripe') {
     try {
       claimInventory(id); // pending -> claimed, or throws SoldOutError
     } catch (e) {
@@ -629,6 +645,39 @@ export function getOrderByPaypalId(paypalOrderId: string): OrderRow | null {
 
 export function setPaypalOrderId(orderId: string, paypalOrderId: string): void {
   getDb().prepare(`UPDATE orders SET paypal_order_id = ? WHERE id = ?`).run(paypalOrderId, orderId);
+}
+
+/** Pin the seller connection an instant order will be settled with. */
+export function setOrderPaymentConnection(orderId: string, connectionId: string): void {
+  getDb().prepare(`UPDATE orders SET payment_connection_id = ? WHERE id = ?`).run(connectionId, orderId);
+}
+
+export function setStripeSession(orderId: string, sessionId: string, url: string | null): void {
+  getDb()
+    .prepare(`UPDATE orders SET stripe_session_id = ?, stripe_session_url = ? WHERE id = ?`)
+    .run(sessionId, url, orderId);
+}
+
+export function getOrderByStripeSessionId(sessionId: string): OrderRow | null {
+  return (
+    (getDb().prepare(`SELECT ${ORDER_COLS} FROM orders WHERE stripe_session_id = ?`).get(sessionId) as OrderRow) ?? null
+  );
+}
+
+/**
+ * Stripe orders still holding seats: the buyer is on (or has left) the hosted
+ * Checkout page. lib/stripeOrders settles each against Stripe — paid ones
+ * finalize, expired ones give their seats back.
+ */
+export function getOpenStripeOrders(olderThanMinutes: number, limit = 100): OrderRow[] {
+  return getDb()
+    .prepare(
+      `SELECT ${ORDER_COLS} FROM orders
+       WHERE status IN ('claimed', 'capturing') AND payment_mode = 'stripe'
+         AND created_at < datetime('now', ?)
+       ORDER BY created_at ASC LIMIT ?`
+    )
+    .all(`-${Math.max(1, Math.floor(olderThanMinutes))} minutes`, limit) as OrderRow[];
 }
 
 const ORDER_ITEM_COLS = `order_id AS orderId, tier_id AS tierId, quantity, unit_price_cents AS unitPriceCents`;

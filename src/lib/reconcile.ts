@@ -31,14 +31,16 @@ import {
   type OrderRow,
 } from './orders';
 import { beginCapture, claimInventory, releaseClaim, SoldOutError } from './inventory';
-import { hasPaypalCredentials } from './config';
 import {
   capturePaypalOrder,
   extractCaptureDetails,
   getPaypalOrder,
   InstrumentDeclinedError,
   type CaptureDetails,
+  type PaypalCredentials,
 } from './paypal';
+import { getConnectionById, paypalCredentialsFor } from './paymentConnections';
+import { settleStripeOrder } from './stripeOrders';
 import { sendTicketEmail } from './email';
 // Recovery paths mint tickets exactly like a live capture does, so they must
 // also settle what the sale earned the person who brought this buyer in. The
@@ -70,6 +72,16 @@ function captureLooksPaid(order: OrderRow, c: CaptureDetails): boolean {
     (c.status === 'COMPLETED' || c.status === 'PENDING') &&
     amountMatches(order, c.amountValue, c.currencyCode)
   );
+}
+
+/**
+ * The seller's PayPal credentials this order was started with, or null when
+ * the connection has since been removed — in which case nothing can be asked
+ * and the order is left for a human.
+ */
+function paypalCredsFor(order: OrderRow): PaypalCredentials | null {
+  const conn = order.paymentConnectionId ? getConnectionById(order.paymentConnectionId) : null;
+  return conn ? paypalCredentialsFor(conn) : null;
 }
 
 async function emailBestEffort(orderId: string): Promise<void> {
@@ -122,10 +134,24 @@ async function reconcileStuckOrderLocked(orderId: string): Promise<Bucket> {
     return 'needsAttention';
   }
 
+  if (fresh.paymentMode === 'stripe') {
+    // Settled by asking Stripe — lib/stripeOrders owns the rules and its own lock.
+    const outcome = await settleStripeOrder(fresh.id);
+    if (outcome === 'paid') return 'finalized';
+    if (outcome === 'expired') return 'released';
+    return 'needsAttention';
+  }
+
   if (fresh.paymentMode === 'mock' || !fresh.paypalOrderId) {
     // No real money can be involved — safe to release.
     releaseClaim(fresh.id, 'failed');
     return 'released';
+  }
+
+  const creds = paypalCredsFor(fresh);
+  if (!creds) {
+    console.error(`Reconcile: order ${fresh.id} has no usable PayPal connection — leaving alone`);
+    return 'needsAttention';
   }
 
   // Own the capture step: for a 'claimed' order another request may be about
@@ -136,7 +162,7 @@ async function reconcileStuckOrderLocked(orderId: string): Promise<Bucket> {
 
   let paypalOrder;
   try {
-    paypalOrder = await getPaypalOrder(fresh.paypalOrderId);
+    paypalOrder = await getPaypalOrder(creds, fresh.paypalOrderId);
   } catch (e) {
     console.error(`Reconcile: could not fetch PayPal order for ${fresh.id}:`, e);
     return 'needsAttention'; // PayPal unreachable — do NOT guess
@@ -163,7 +189,7 @@ async function reconcileStuckOrderLocked(orderId: string): Promise<Bucket> {
     // Buyer approved but no capture committed yet — capture it now. The
     // PayPal-Request-Id makes this idempotent with any earlier attempt.
     try {
-      const captureResponse = await capturePaypalOrder(fresh.paypalOrderId);
+      const captureResponse = await capturePaypalOrder(creds, fresh.paypalOrderId);
       const details = extractCaptureDetails(captureResponse);
       if (captureLooksPaid(fresh, details)) {
         finalizePaidOrder(fresh.id, details.captureId);
@@ -204,10 +230,12 @@ function reconcilePendingOrder(order: OrderRow): Promise<Bucket | null> {
 async function reconcilePendingOrderLocked(orderId: string): Promise<Bucket | null> {
   const order = getOrder(orderId);
   if (!order || order.status !== 'pending' || !order.paypalOrderId) return null;
+  const creds = paypalCredsFor(order);
+  if (!creds) return null;
 
   let paypalOrder;
   try {
-    paypalOrder = await getPaypalOrder(order.paypalOrderId);
+    paypalOrder = await getPaypalOrder(creds, order.paypalOrderId);
   } catch {
     return null; // can't tell; PayPal-backed pending orders are never deleted
   }
@@ -258,7 +286,7 @@ async function reconcilePendingOrderLocked(orderId: string): Promise<Bucket | nu
   }
 
   try {
-    const captureResponse = await capturePaypalOrder(order.paypalOrderId);
+    const captureResponse = await capturePaypalOrder(creds, order.paypalOrderId);
     const details = extractCaptureDetails(captureResponse);
     if (captureLooksPaid(order, details)) {
       finalizePaidOrder(order.id, details.captureId);
@@ -308,16 +336,14 @@ export async function reconcileOrders(): Promise<ReconcileResult> {
     }
   }
 
-  // 2. Approved-but-abandoned PayPal sales (>30 minutes old). Only possible
-  //    when PayPal credentials are configured.
-  if (hasPaypalCredentials()) {
-    for (const order of getStalePendingPaypalOrders(30)) {
-      try {
-        const bucket = await reconcilePendingOrder(order);
-        if (bucket) result[bucket].push(order.id);
-      } catch (e) {
-        console.error(`Reconcile: unexpected error on pending order ${order.id}:`, e);
-      }
+  // 2. Approved-but-abandoned PayPal sales (>30 minutes old), each asked
+  //    with the credentials of the seller it was started for.
+  for (const order of getStalePendingPaypalOrders(30)) {
+    try {
+      const bucket = await reconcilePendingOrder(order);
+      if (bucket) result[bucket].push(order.id);
+    } catch (e) {
+      console.error(`Reconcile: unexpected error on pending order ${order.id}:`, e);
     }
   }
 

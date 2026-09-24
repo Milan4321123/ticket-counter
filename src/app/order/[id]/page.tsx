@@ -31,6 +31,7 @@ import { ticketQrDataUrl } from '@/lib/tickets';
 import { vocabFor } from '@/lib/vocab';
 import { cityLabel, shortDateLabel } from '@/lib/sameAct';
 import { whatsappShareUrl } from '@/lib/whatsapp';
+import { armStripeSweep } from '@/lib/stripeOrders';
 
 export const dynamic = 'force-dynamic';
 
@@ -129,17 +130,68 @@ export default async function OrderPage({
     />
   ) : null;
 
-  if (order.status === 'capturing') {
+  // A Stripe order is paid on Stripe's page, out of our sight — somebody has
+  // to keep looking for the buyer who paid and never came back.
+  if (order.paymentMode === 'stripe') armStripeSweep();
+
+  if (order.status === 'capturing' && order.paymentMode !== 'stripe') {
     return (
       <div className="container container-narrow section">
         <h1 className="page-title anim-fade-up">Your order</h1>
         <div className="notice notice-warn anim-fade-up anim-d1">
           We&rsquo;re confirming your payment with PayPal. Refresh this page in a minute — if you completed the
-          payment, your tickets will appear here. If it didn&rsquo;t go through, you have not been charged.
+          payment, your {v.codes} will appear here. If it didn&rsquo;t go through, you have not been charged.
         </div>
         <div className="anim-fade-up anim-d2">
           <CheckPaymentButton orderId={order.id} />
         </div>
+      </div>
+    );
+  }
+
+  if (
+    order.paymentMode === 'stripe' &&
+    (order.status === 'claimed' || order.status === 'capturing' || order.status === 'pending')
+  ) {
+    // Not paid yet, as far as we know. The buyer either left Stripe's page
+    // without paying (the cancel link brings them here), or paid and Stripe
+    // has not been asked since — the button asks now. The order holds its
+    // seats only as long as Stripe's own page stays open (30 minutes).
+    const cancelled = (Array.isArray(sp.stripe) ? sp.stripe[0] : sp.stripe) === 'cancelled';
+    return (
+      <div className="container container-narrow section">
+        <h1 className="page-title anim-fade-up">Your order</h1>
+        {event ? (
+          <div className="checkout-for anim-fade-up" style={{ marginTop: -8 }}>
+            <div className="checkout-for-name">{event.name}</div>
+            <div className="muted small">{[event.dateDisplay, eventVenue].filter(Boolean).join(' · ')}</div>
+          </div>
+        ) : null}
+        <div className={`notice ${cancelled ? 'notice-warn' : ''} anim-fade-up anim-d1`}>
+          {cancelled ? (
+            <>
+              <strong>Payment not completed — you have not been charged.</strong> Your {v.units} are still held
+              for a little while; you can finish paying below, or simply leave this page and they go back on sale.
+            </>
+          ) : (
+            <>
+              <strong>Your card payment has not been confirmed yet.</strong> If you just paid, press the button
+              below and your {v.codes} will appear. If you did not finish, you have not been charged.
+            </>
+          )}
+        </div>
+        <div className="anim-fade-up anim-d2" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          {order.stripeSessionUrl && (
+            <a className="btn btn-brand" href={order.stripeSessionUrl}>
+              Finish paying {formatMoney(order.totalCents, order.currency)} by card →
+            </a>
+          )}
+          <CheckPaymentButton orderId={order.id} />
+        </div>
+        <p className="muted small anim-fade-up anim-d3" style={{ marginTop: 14 }}>
+          The payment goes to {organizer?.name?.trim() || 'the seller'} directly — the card page is run by Stripe on
+          their own account, and {'the platform'} never sees your card details.
+        </p>
       </div>
     );
   }

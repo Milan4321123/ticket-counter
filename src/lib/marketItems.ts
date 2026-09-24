@@ -1,9 +1,9 @@
 // Server-only: every sellable GOOD in the bazaar, flattened out of its shop.
 //
-// /market browses shop-first — shelves of shops, open one, then see what it
-// sells. That is how a market square works and not at all how people shop
-// online: they look for a THING ("sel roti", "timur", "dhaka topi") across
-// every seller at once. /market/items is that view, and this is what it reads.
+// /market opens on the goods themselves — every item every seller has on
+// sale, searchable and filterable — because that is how people shop online:
+// they look for a THING ("sel roti", "timur", "dhaka topi") across every
+// seller at once. This is what that page reads.
 //
 // Two jobs live here rather than in the page, and both for the same reason —
 // the page is JSX and cannot be measured or tested without a renderer:

@@ -1,15 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getPaymentMode } from '@/lib/config';
-import { getEventBySlug, getEventTiers, paypalPayee } from '@/lib/events';
+import { getEventBySlug, getEventTiers } from '@/lib/events';
 import { getAvailability } from '@/lib/inventory';
 import { ticketState, tiersInSaleOrder } from '@/lib/ticketState';
 import { cityLabel, otherShowsByAct, shortDateLabel } from '@/lib/sameAct';
 import { vocabFor } from '@/lib/vocab';
 import { expireOverdueTransferReservations } from '@/lib/orders';
 import { getOrganizer } from '@/lib/organizers';
-import { effectivePayout } from '@/lib/payout';
+import { paymentOptionsFor } from '@/lib/paymentConnections';
 import { BUYER_RETENTION_DAYS } from '@/lib/retention';
 import CheckoutClient from './CheckoutClient';
 
@@ -106,18 +105,13 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
   // the box must name them — a tick about "somebody" is not informed consent.
   const organizerName = getOrganizer(event.organizerId)?.name?.trim() ?? '';
 
-  const mode = getPaymentMode();
-  const paypalClientId = process.env.PAYPAL_CLIENT_ID ?? null;
-  // Per-event bank details: transfers only work once the organizer filled them
-  // in. Through effectivePayout(), so a payout change that is still inside its
-  // waiting period does not reach a buyer early — until it matures, this page
-  // keeps offering the account the organizer has been selling on all along.
-  const payout = effectivePayout(event);
-  const transferConfigured = Boolean(payout.iban.trim() && payout.holder.trim());
-  // Whether this organizer ALSO takes PayPal. Only a yes/no crosses to the
-  // browser — the address itself belongs on the order page, after someone has
-  // actually reserved, not on a public page for anyone to scrape.
-  const paypalOffered = paypalPayee({ paypalAccount: payout.paypal }) !== null;
+  // Which ways to pay this listing offers, resolved from the seller's own
+  // settings and connections (lib/paymentConnections). Through
+  // effectivePayout() underneath, so a payout change still inside its waiting
+  // period does not reach a buyer early. Only yes/no answers and a PayPal
+  // client id cross to the browser — the seller's bank details belong on the
+  // order page, after someone has actually reserved.
+  const options = paymentOptionsFor(event);
 
   return (
     <CheckoutClient
@@ -152,10 +146,14 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
           })),
       }}
       availability={availability}
-      mode={mode}
-      paypalClientId={paypalClientId}
-      transferConfigured={transferConfigured}
-      paypalOffered={paypalOffered}
+      payment={{
+        transfer: options.transfer,
+        bank: options.bank,
+        paypalMe: options.paypalMe,
+        paypal: options.paypal ? { clientId: options.paypal.clientId, sandbox: options.paypal.sandbox } : null,
+        stripe: options.stripe !== null,
+        mock: options.mock,
+      }}
       retentionDays={BUYER_RETENTION_DAYS}
       organizerName={organizerName}
       refCode={refCode}

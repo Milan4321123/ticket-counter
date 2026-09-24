@@ -496,101 +496,298 @@
   color: var(--amber);
 }
 
-/* ---------- Departments (the seven shelves) ---------- */
+/* ---------- The bazaar's hero: one band, name left, search right ---------- */
 
-.bz-depts {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr));
-  gap: 10px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+/* /market opens on the goods, so the hero is allowed exactly one band: the
+   page's name and its search box side by side, wrapping under each other on a
+   phone. Left-aligned against .feed-hero's centred default because a search
+   box and a heading centred over a left-aligned grid read as two pages. The
+   padding is a third of the feed hero's: every pixel here is a pixel the
+   first row of tiles is not in. */
+.bz-hero {
+  padding: 30px 0 20px;
+  text-align: left;
 }
 
-.bz-dept {
+.bz-hero-row {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 28px;
+}
+
+.bz-hero-text {
+  flex: 1 1 300px;
   min-width: 0;
-  padding: 13px 14px;
+}
+
+.bz-hero-text .feed-kicker {
+  margin: 0 0 4px;
+}
+
+/* Two classes deep on purpose: globals' `.feed-hero h1` sets the big display
+   size and would beat a lone class. */
+.bz-hero .bz-hero-title {
+  margin: 0;
+  font-size: clamp(1.2rem, 2.4vw, 1.6rem);
+  line-height: 1.25;
+}
+
+.bz-hero-search {
+  flex: 1 1 320px;
+  max-width: 520px;
+}
+
+/* A 200px basis rather than .bz-search-input's 240px: on a 375px phone the
+   box and its button then share one line instead of the button dropping
+   under the box, which cost a whole row of the first screen. */
+.bz-hero-search .bz-search-input {
+  flex-basis: 200px;
+  padding: 10px 14px;
+  font-size: 0.95rem;
+}
+
+/* ---------- Chip rows: departments, shops, and the toolbar's toggles ---------- */
+
+/* A row that scrolls sideways rather than wrapping. Seven departments plus
+   "All" is already two lines on a phone, and a row of forty sellers would be
+   ten; wrapped, either pushes the grid off the first screen, which is the one
+   thing this page exists not to do. The scrollbar is hidden but the scrolling
+   is real — same trick as .bz-rail-track, same reasoning: a bar under every
+   chip row is furniture, and a phone scrolls it by touch anyway. */
+.bz-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 2px 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  white-space: nowrap;
+}
+
+.bz-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.bz-chips + .bz-chips {
+  margin-top: 8px;
+}
+
+/* 32px tall: the smallest a pill can be and still be a comfortable thumb
+   target, and short enough that two rows of them cost less than one
+   department card used to. flex: none so a long shop name widens its own chip
+   instead of squeezing every chip in the row. */
+.bz-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 32px;
+  padding: 0 11px;
   border: 1px solid var(--border);
-  border-radius: var(--bz-radius);
+  border-radius: 999px;
   background: var(--bg-card);
-  color: inherit;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
   transition:
     border-color 0.15s ease,
-    transform 0.18s var(--ease-out);
+    color 0.15s ease,
+    background-color 0.15s ease,
+    opacity 0.15s ease;
 }
 
-.bz-dept:hover {
+.bz-chip:hover {
   border-color: var(--accent);
-  transform: translateY(-2px);
+  color: var(--text);
 }
 
-/* The Nepali name leads, in amber, because it is the thing a Nepali shopper
-   recognises first and the English label underneath is the translation rather
-   than the other way round. The generous line-height is not taste: Devanagari
-   hangs matras above and below the baseline, and at the 1.32 the rest of this
-   file uses the top marks of खाजा were being clipped by the line box. */
-.bz-dept-np {
+/* The one you are standing on. It is still a link — to the page without
+   itself — so it keeps a hover, but it gets the accent fill so a glance down
+   the row says which filters are set without reading the pills. */
+.bz-chip-on,
+.bz-chip[aria-current='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+/* A department nobody stocks yet, or a seller with nothing left under the
+   other filters. Still shown, because the empty shelves are the recruiting
+   pitch, but dimmed so a shopper's eye lands on the ones with goods first. */
+.bz-chip-muted {
+  opacity: 0.5;
+}
+
+.bz-chip-muted:hover {
+  opacity: 1;
+}
+
+/* The Nepali name, small and amber, before the English one — the word a
+   Nepali shopper recognises first. The taller line-height is for Devanagari's
+   matras, which a 1.0 line box clips at this size. */
+.bz-chip-np {
   font-family: var(--font-display, var(--font));
-  font-size: 1.02rem;
-  font-weight: 700;
+  font-size: 0.78rem;
   line-height: 1.5;
   color: var(--amber);
 }
 
-.bz-dept-name {
-  font-size: 0.88rem;
-  font-weight: 600;
-  line-height: 1.3;
+.bz-chip-on .bz-chip-np {
+  color: inherit;
 }
 
-.bz-dept-line {
-  margin: 0;
-  font-size: 0.78rem;
-  line-height: 1.4;
-  color: var(--text-dim);
+.bz-chip-count {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
 }
 
-/* Pinned to the bottom so the counts line up across a row of cards whose
-   one-line descriptions are different lengths. An empty shelf prints "nothing
-   yet" here rather than a zero — page-market's wording, not this file's, but
-   the box is sized for a short phrase and not only for a number. */
-.bz-dept-count {
-  margin-top: auto;
-  padding-top: 7px;
+.bz-chip-on .bz-chip-count {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* The shop's round photo, tucked into the chip's left edge. 22px is as small
+   as a face stays a face. */
+.bz-chip-avatar {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-left: -5px;
+  border-radius: 999px;
+  object-fit: cover;
+  background: var(--bg-elevated);
+}
+
+.bz-chip-avatar-blank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+/* The "example" mark on a seed shop's chip — the tile's amber badge at chip
+   scale, because a made-up seller must never look like a real one anywhere. */
+.bz-chip-tag {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--amber-soft);
+  color: var(--amber);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.bz-chips-note {
+  flex: none;
+  padding-left: 4px;
   font-size: 0.74rem;
   color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
 }
 
-/* ---------- Festival strip ---------- */
+/* Inside the toolbar the chips are a size down, so the count, the toggles and
+   the sort read as one line rather than as a second chip row. */
+.bz-chips-inline {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+}
 
-/* Only rendered when a festival is genuinely near, so it is allowed to be the
-   warmest thing on the page. Amber wash rather than the accent violet: this is
-   the market's own colour, and the strip must not compete with the primary
-   call to action beside it. */
-.bz-festival {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
+.bz-chips-inline .bz-chip {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 0.76rem;
+}
+
+/* ---------- The wall: what sits between the chips and the grid ---------- */
+
+.bz-wall {
+  padding-top: 12px;
+}
+
+.bz-bar {
+  margin-top: 12px;
+  padding: 7px 10px;
+  gap: 8px 12px;
+}
+
+.bz-results-line {
+  margin: 10px 0 0;
+}
+
+/* One line, only when a festival is genuinely near. The same amber wash the
+   old strip had, on a single line of text rather than a box with a heading
+   and two buttons in it. */
+.bz-festival-line {
+  margin: 10px 0 0;
+  padding: 8px 12px;
   border: 1px solid rgba(251, 191, 36, 0.34);
   border-radius: var(--bz-radius);
   background:
     linear-gradient(180deg, rgba(251, 191, 36, 0.07), transparent 70%),
     var(--bg-card);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--text-dim);
 }
 
-.bz-festival-body {
-  flex: 1 1 240px;
-  min-width: 0;
+.bz-festival-line strong {
+  color: var(--text);
 }
 
-.bz-festival-body > :last-child {
-  margin-bottom: 0;
+.bz-festival-line a {
+  color: var(--amber);
+  text-decoration: underline;
+}
+
+/* "Clear all" beside the pills: a pill that removes everything, so it hovers
+   red like the others but carries no × of its own. */
+.bz-pill-clear {
+  padding-right: 12px;
+}
+
+/* "How ordering works", folded shut at the foot of the page. Open it is the
+   same four steps every shop page prints; shut it is one line, which is all
+   the space the explainer earns under a grid of goods. */
+.bz-how {
+  margin-top: 36px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--bz-radius);
+  background: var(--bg-card);
+}
+
+.bz-how > summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.bz-how > summary::-webkit-details-marker {
+  display: none;
+}
+
+.bz-how > summary::after {
+  content: '+';
+  float: right;
+  color: var(--text-dim);
+}
+
+.bz-how[open] > summary::after {
+  content: '–';
 }
 
 /* ---------- Results layout: facets beside the grid ---------- */
@@ -1276,8 +1473,7 @@
    zero-duration transform still jumps, which is exactly the movement somebody
    who set this preference asked not to see. */
 @media (prefers-reduced-motion: reduce) {
-  .bz-tile:hover,
-  .bz-dept:hover {
+  .bz-tile:hover {
     transform: none !important;
   }
 
@@ -1415,4 +1611,133 @@
 .consent-state-now {
   font-weight: 700;
   color: var(--text);
+}
+
+/* ---------- /market on a phone: the goods on the first screen ---------- */
+
+/* The notes that explain the grid (what it holds, the sort order, the
+   example-shop notice, the festival line) sit under it. */
+.bz-below {
+  margin-top: 22px;
+  display: grid;
+  gap: 10px;
+}
+
+.bz-below > * {
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  /* Hero: the heading shrinks to one short line and the kicker goes. The
+     search box is what a phone visitor actually uses. */
+  .bz-hero {
+    padding: 14px 0 10px;
+  }
+  .bz-hero-text .feed-kicker {
+    display: none;
+  }
+  .bz-hero .bz-hero-title {
+    font-size: 1.02rem;
+    line-height: 1.3;
+  }
+  .bz-hero-row {
+    gap: 8px;
+  }
+
+  .bz-wall {
+    padding-top: 8px;
+  }
+
+  /* Toolbar: count and sort share the first line, the filter chips scroll
+     on the second. Without this the three stacked into three rows. */
+  .bz-bar {
+    margin-top: 8px;
+    padding: 6px 8px;
+  }
+  .bz-bar .bz-chips-inline {
+    order: 3;
+    flex: 1 1 100%;
+  }
+  .bz-bar .bz-sort label,
+  .bz-bar .bz-sort > span {
+    display: none;
+  }
+  .bz-bar .bz-sort select {
+    padding: 5px 8px;
+    font-size: 0.82rem;
+  }
+  .bz-bar .bz-sort .btn {
+    padding: 5px 10px;
+    font-size: 0.82rem;
+  }
+
+  /* Two columns on every phone, like a shopping app. The desktop rule's
+     180px minimum drops a 375px phone to ONE tile per row, which made every
+     item a whole screen tall. */
+  .bz-wall .bz-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    --bz-gap: 8px;
+  }
+
+  /* Tiles: a landscape picture instead of a square one, so a phone shows two
+     full rows of goods rather than one and a half. */
+  .bz-tile-media {
+    aspect-ratio: 4 / 3;
+  }
+  .bz-tile-blank {
+    font-size: 1.8rem;
+  }
+  .bz-tile-body {
+    padding: 8px 9px 10px;
+    gap: 2px;
+  }
+  .bz-tile-price {
+    font-size: 1.02rem;
+  }
+  .bz-tile-name {
+    font-size: 0.86rem;
+  }
+  .bz-tile-seller {
+    font-size: 0.74rem;
+    padding-top: 3px;
+  }
+}
+
+/* Live search: a thin bar along the bottom of the search form while new
+   results load. The form is the positioning context. */
+.bz-hero-search {
+  position: relative;
+}
+
+.bz-search-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -5px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  transform-origin: left;
+  transform: scaleX(0);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bz-search-progress-on {
+  opacity: 1;
+  animation: bz-search-progress 0.9s ease-in-out infinite;
+}
+
+@keyframes bz-search-progress {
+  0% { transform: scaleX(0); }
+  60% { transform: scaleX(0.8); }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bz-search-progress-on {
+    animation: none;
+    transform: scaleX(1);
+    opacity: 0.6;
+  }
 }

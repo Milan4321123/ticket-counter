@@ -149,11 +149,8 @@ export default function SavedItems() {
               {DEVICE_LINE}
             </p>
             <p style={{ margin: '16px 0 0' }}>
-              <Link className="btn btn-brand" href="/market/items">
+              <Link className="btn btn-brand" href="/market">
                 Browse everything on sale
-              </Link>{' '}
-              <Link className="btn" href="/market" style={{ marginLeft: 8 }}>
-                Browse the shops &rarr;
               </Link>
             </p>
           </div>

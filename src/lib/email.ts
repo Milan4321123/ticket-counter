@@ -3163,3 +3163,111 @@ export async function sendStallRevokedEmail(
     return { sent: false, reason: 'send-failed' };
   }
 }
+
+// ---------------- An instant-payment connection changed ----------------
+
+export interface PaymentConnectionChange {
+  provider: 'paypal' | 'stripe';
+  action: 'connected' | 'replaced' | 'removed';
+  /** What the provider said the account is — never a key. */
+  accountLabel: string;
+  sandbox: boolean;
+}
+
+/**
+ * The seller connected, replaced or removed their own PayPal app / Stripe key.
+ *
+ * The same alarm shape as sendPayoutChangedEmail, for the same reason: a
+ * replaced connection is a redirected payout with extra steps — every instant
+ * payment from then on lands in whoever's PayPal or Stripe the new
+ * credentials belong to. Written for the person who did NOT do it, and copied
+ * to the platform owner as the backstop. Never throws.
+ */
+export async function sendPaymentConnectionChangedEmail(
+  organizer: OrganizerContact,
+  change: PaymentConnectionChange
+): Promise<{ sent: boolean; reason?: string }> {
+  try {
+    if (!isEmailConfigured()) return { sent: false, reason: 'email-not-configured' };
+    const brand = platformName();
+    const providerName = change.provider === 'paypal' ? 'PayPal' : 'Stripe';
+    const verb =
+      change.action === 'connected'
+        ? `${providerName} was connected to your account`
+        : change.action === 'replaced'
+          ? `Your ${providerName} connection was replaced`
+          : `Your ${providerName} connection was removed`;
+    const headline = verb;
+    const settingsUrl = `${getBaseUrl()}/portal/settings`;
+    const what =
+      change.action === 'removed'
+        ? `Instant ${providerName} payments are switched off on every listing that offered them; those listings fall back to bank transfer.`
+        : `From now on, buyers who choose "${providerName}" at checkout pay straight into ${
+            change.sandbox ? `a ${providerName} TEST account (no real money moves)` : `the ${providerName} account behind these credentials`
+          }${change.accountLabel ? ` — ${change.accountLabel}` : ''}.`;
+    const alarm =
+      change.action === 'removed'
+        ? 'If you did not do this, someone else is signed in to your organizer account. Change your password now and reply to this email.'
+        : 'If you did not make this change, act now: someone else is signed in to your organizer account and your buyers’ instant payments are going to them. Remove the connection under Settings, change your password immediately, and reply to this email so we can help.';
+
+    const bodyHtml =
+      pHtml(`Hi ${escapeHtml(organizer.name)},`) +
+      pHtml(`${escapeHtml(verb)}. ${escapeHtml(what)}`, 20) +
+      calloutHtml(`<strong>${escapeHtml(alarm)}</strong>`) +
+      pHtml(
+        `You can check your connections any time under ` +
+          `<a class="brandtext" href="${escapeHtml(settingsUrl)}" style="color:${C.brandDeep};font-weight:700;">Settings → Get paid instantly</a>.`,
+        0
+      );
+    const text = renderText({
+      headline,
+      lines: [`Hi ${organizer.name},`, '', wrapText(`${verb}. ${what}`), '', wrapText(alarm.toUpperCase()), '', wrapText(`Settings: ${settingsUrl}`)],
+      footer: [`${brand} · ${getBaseUrl()}`],
+    });
+
+    const mailed = await sendMailAs('organizers', {
+      replyTo: replyToOrganizers(),
+      to: organizer.email,
+      subject: change.action === 'connected' ? headline : `Action may be needed: ${headline.toLowerCase()}`,
+      text,
+      html: renderEmail({
+        title: headline,
+        preheader: what,
+        kicker: 'Instant payments',
+        headline,
+        bodyHtml,
+        footerLines: [`${brand} · ${getBaseUrl()}`],
+      }),
+    });
+    if (!mailed.sent) return mailed;
+
+    const ownerInbox = platformContactEmail();
+    if (ownerInbox && ownerInbox.toLowerCase() !== organizer.email.trim().toLowerCase()) {
+      const ownerLine = `${organizer.name} (${organizer.email}) ${change.action} their ${providerName} connection${
+        change.accountLabel ? ` (${change.accountLabel})` : ''
+      }${change.sandbox ? ' [TEST MODE]' : ''}.`;
+      try {
+        await sendMailAs('organizers', {
+          replyTo: replyToOrganizers(),
+          to: ownerInbox,
+          subject: `${providerName} connection ${change.action} — ${organizer.name}`,
+          text: renderText({ headline: `${providerName} connection ${change.action}`, lines: [wrapText(ownerLine)] }),
+          html: renderEmail({
+            title: `${providerName} connection ${change.action}`,
+            preheader: ownerLine,
+            kicker: 'Instant payments',
+            headline: `${providerName} connection ${change.action}`,
+            bodyHtml: pHtml(escapeHtml(ownerLine)),
+            footerLines: [`${brand} · ${getBaseUrl()}`],
+          }),
+        });
+      } catch (e) {
+        console.error('Owner copy of payment-connection email failed:', e);
+      }
+    }
+    return mailed;
+  } catch (e) {
+    console.error('sendPaymentConnectionChangedEmail failed:', e);
+    return { sent: false, reason: 'error' };
+  }
+}

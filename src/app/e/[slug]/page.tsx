@@ -37,6 +37,7 @@ import {
   videoEmbedUrl,
 } from '@/lib/events';
 import type { EventRow, PageDesign } from '@/lib/events';
+import { paymentOptionsFor } from '@/lib/paymentConnections';
 import { ACCENT_THEMES } from '@/lib/accents';
 import { listStallLinksForShop, listVisibleStallsForEvent, stallBannerVisibleOnShopPage } from '@/lib/stalls';
 import type { StallLinkRow } from '@/lib/stalls';
@@ -393,6 +394,9 @@ export default async function EventPage({ params, searchParams }: Params) {
   // The words this page speaks. A shop sells items to collect, not tickets to
   // a night out, and every noun below comes from here rather than a literal.
   const v = vocabFor(event.kind);
+  // Which ways to pay this listing takes, for the 'how it works' steps below.
+  const payOptions = paymentOptionsFor(event);
+  const payOffer = { instant: payOptions.paypal !== null || payOptions.stripe !== null, transfer: payOptions.transfer, paypalMe: payOptions.paypalMe };
   const isShop = event.kind === 'shop';
 
   // Everything buyers have said about this shop, in TWO statements for the
@@ -1335,7 +1339,7 @@ export default async function EventPage({ params, searchParams }: Params) {
           <p className="section-kicker">{isShop ? 'From order to collection' : 'From reserve to entry'}</p>
           <h2 className="page-title">How it works</h2>
           <ol className="step-list" style={{ maxWidth: 680 }}>
-            {howItWorks(paypalPayee(event) !== null, event.kind).map((item, i) => (
+            {howItWorks(payOffer, event.kind).map((item, i) => (
               <li className="step-item" key={item.title}>
                 <span className="step-num">{i + 1}</span>
                 <div>

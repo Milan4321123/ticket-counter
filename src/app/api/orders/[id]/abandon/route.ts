@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { hasPaypalCredentials } from '@/lib/config';
+import { getConnectionById, paypalCredentialsFor } from '@/lib/paymentConnections';
 import { getOrder, markOrderFailed } from '@/lib/orders';
 import { getPaypalOrder } from '@/lib/paypal';
 import { clientIp, rateLimit } from '@/lib/ratelimit';
@@ -61,10 +61,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     if (order.paypalOrderId) {
-      if (!hasPaypalCredentials()) return done(false);
+      // Asked with the seller's own credentials this order was started with.
+      const conn = order.paymentConnectionId ? getConnectionById(order.paymentConnectionId) : null;
+      const creds = conn ? paypalCredentialsFor(conn) : null;
+      if (!creds) return done(false);
       let paypalOrder;
       try {
-        paypalOrder = await getPaypalOrder(order.paypalOrderId);
+        paypalOrder = await getPaypalOrder(creds, order.paypalOrderId);
       } catch (e) {
         // Cannot tell whether money is moving — the one answer that is never
         // safe to guess. Reconciliation will pick it up.

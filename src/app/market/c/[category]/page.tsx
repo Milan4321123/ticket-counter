@@ -16,8 +16,8 @@ import { platformNameFromEnv } from '@/lib/platform';
 // and goods together.
 //
 // It exists for two people who never meet. The first is a shopper who typed
-// "Nepali sweets Germany" into a search engine — /market/items is a search
-// page and asks not to be indexed slice by slice, so without this there is no
+// "Nepali sweets Germany" into a search engine — /market is a search page
+// and asks not to be indexed slice by slice, so without this there is no
 // stable, indexable page for "sweets" at all, only a query string. The second
 // is a seller wondering where their thing would go: the shelf's own
 // description says what belongs here, which is why an EMPTY department is
@@ -97,7 +97,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title,
     description,
     ...(stocked ? {} : { robots: { index: false, follow: true } }),
-    // Unlike /market/items, this URL IS worth holding: it is a fixed shelf
+    // Unlike a filtered /market, this URL IS worth holding: it is a fixed shelf
     // rather than a slice of a search, its words do not change with a query
     // string, and there are exactly seven of them.
     alternates: { canonical: `/market/c/${shelf.key}` },
@@ -232,7 +232,7 @@ export default async function DepartmentPage({ params }: Props) {
                     <Link
                       key={term}
                       className="bz-quick-chip"
-                      href={`/market/items?q=${encodeURIComponent(term)}&c=${shelf.key}`}
+                      href={`/market?q=${encodeURIComponent(term)}&category=${shelf.key}`}
                     >
                       {term}
                     </Link>
@@ -282,7 +282,7 @@ export default async function DepartmentPage({ params }: Props) {
                     {/* The full list, with the filters and the sort on it. This
                         page is the shelf's front window; that page is the one
                         you rummage through. */}
-                    <Link className="btn btn-brand" href={`/market/items?c=${shelf.key}`}>
+                    <Link className="btn btn-brand" href={`/market?category=${shelf.key}`}>
                       {items.length > MAX_ITEMS
                         ? `See all ${items.length} — filter and sort`
                         : 'Filter and sort these'}
@@ -305,7 +305,7 @@ export default async function DepartmentPage({ params }: Props) {
                     for a particular weekend rather than keeping a permanent counter.
                   </p>
                   <p style={{ margin: '16px 0 0' }}>
-                    <Link className="btn" href="/market/items">
+                    <Link className="btn" href="/market">
                       Everything on sale in the bazaar &rarr;
                     </Link>
                   </p>

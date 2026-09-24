@@ -75,15 +75,44 @@ export interface CheckoutAvailability {
   tiers: Record<string, CheckoutTierAvailability>;
 }
 
+/**
+ * Which ways to pay THIS listing offers — resolved on the server by
+ * lib/paymentConnections from the seller's own settings. Only booleans and a
+ * PayPal client id cross to the browser; the seller's bank details stay on
+ * the order page, after somebody has actually reserved.
+ */
+export interface CheckoutPayment {
+  /** Reserve now, pay the seller directly, seller confirms by hand. */
+  transfer: boolean;
+  /** The transfer route includes the seller's bank account. */
+  bank: boolean;
+  /** The transfer route includes a PayPal.Me link / address. */
+  paypalMe: boolean;
+  /** PayPal Checkout on the SELLER'S own PayPal app — pays instantly. */
+  paypal: { clientId: string; sandbox: boolean } | null;
+  /** Card payment on the SELLER'S own Stripe account — pays instantly. */
+  stripe: boolean;
+  /** Dev-only simulated payment. */
+  mock: boolean;
+}
+
+export type PayMethod = 'paypal' | 'stripe' | 'transfer' | 'mock';
+
+/** Instant routes first — they are why a seller switched them on. */
+export function availableMethods(p: CheckoutPayment): PayMethod[] {
+  const out: PayMethod[] = [];
+  if (p.paypal) out.push('paypal');
+  if (p.stripe) out.push('stripe');
+  if (p.transfer) out.push('transfer');
+  if (p.mock) out.push('mock');
+  return out;
+}
+
 interface Props {
   eventId: string;
   config: CheckoutConfig;
   availability: CheckoutAvailability;
-  mode: 'paypal' | 'mock' | 'transfer';
-  paypalClientId: string | null;
-  transferConfigured: boolean;
-  /** This organizer also takes PayPal — the address itself is on the order page. */
-  paypalOffered: boolean;
+  payment: CheckoutPayment;
   /**
    * How many days after the event the buyer's name and email are erased. Passed
    * down from the server rather than imported, because the one constant that
@@ -139,6 +168,8 @@ interface CreateOrderBody {
   ref: string;
   /** A discount code the buyer applied, '' when they did not. */
   voucherCode: string;
+  /** Which of the listing's offered routes this order pays by. */
+  payVia: PayMethod;
 }
 
 type ApiCode = NonNullable<ApiErrorResponse['code']>;
@@ -262,10 +293,7 @@ export default function CheckoutClient({
   eventId,
   config,
   availability,
-  mode,
-  paypalClientId,
-  transferConfigured,
-  paypalOffered,
+  payment,
   retentionDays,
   organizerName,
   refCode,
@@ -300,9 +328,20 @@ export default function CheckoutClient({
   const [marketingOptIn, setMarketingOptIn] = useState(false);
   const [touched, setTouched] = useState<Touched>({});
   const [message, setMessage] = useState<InlineMessage | null>(null);
-  const [busy, setBusy] = useState(false); // mock payment in flight
+  const [busy, setBusy] = useState(false); // mock / transfer / stripe request in flight
   const [capturing, setCapturing] = useState(false); // PayPal capture in flight
   const [sdkState, setSdkState] = useState<'loading' | 'ready' | 'error'>('loading');
+
+  /**
+   * Which way the buyer is paying. The listing's routes, instant ones first,
+   * and the first of them pre-selected: a seller who connected PayPal or
+   * Stripe did it so buyers pay on the spot, and a buyer who would rather
+   * transfer is one tap away. Nothing is charged until they act on the panel
+   * the choice reveals.
+   */
+  const methods = availableMethods(payment);
+  const [method, setMethod] = useState<PayMethod | null>(methods[0] ?? null);
+  const paypalClientId = payment.paypal?.clientId ?? null;
 
   const tierMax = (tierId: string) =>
     Math.min(availability.tiers[tierId]?.remaining ?? 0, config.maxTicketsPerOrder);
@@ -413,6 +452,9 @@ export default function CheckoutClient({
             : null;
 
   const working = busy || capturing;
+
+  /** The one line every route's panel starts with: whom the money goes to. */
+  const sellerWord = isShop ? 'the seller' : 'the organizer';
 
   // Latest state snapshot for PayPal callbacks (they are registered once and
   // would otherwise close over stale state).
@@ -595,6 +637,7 @@ export default function CheckoutClient({
         marketingOptIn,
         ref: sentRefCode,
         voucherCode: sentCode,
+        payVia: 'mock',
       };
       const created = await postJson<CreateOrderResponse>('/api/orders', req);
       await postJson<CaptureOrderResponse>(`/api/orders/${created.orderId}/capture`, {});
@@ -630,6 +673,8 @@ export default function CheckoutClient({
         marketingOptIn,
         ref: sentRefCode,
         voucherCode: sentCode,
+        // A free order pays by no route; the server ignores this for it.
+        payVia: 'transfer',
       };
       const created = await postJson<CreateOrderResponse>('/api/orders', req);
       // The order page shows the bank details, amount, and reference.
@@ -641,11 +686,54 @@ export default function CheckoutClient({
     }
   }
 
+  // ---------------- Card (Stripe) flow ----------------
+
+  /**
+   * Write the order, then hand the browser to Stripe's hosted page on the
+   * SELLER'S account. The seats are held from this moment; the order page
+   * (which Stripe returns the buyer to) settles the outcome. No card field
+   * ever exists on this site.
+   */
+  async function handleStripePay() {
+    markAllTouched();
+    if (!formReady || busy) {
+      setMessage({
+        kind: 'error',
+        text: `Please choose at least one ${v.unit} and fill in your details above.`,
+      });
+      return;
+    }
+    setMessage(null);
+    setBusy(true);
+    try {
+      const req: CreateOrderBody = {
+        eventId,
+        buyerName: name.trim(),
+        buyerEmail: email.trim(),
+        payerName: payerName.trim(),
+        items: buildItems(qty),
+        expectedTotalCents: totalCents,
+        marketingOptIn,
+        ref: sentRefCode,
+        voucherCode: sentCode,
+        payVia: 'stripe',
+      };
+      const created = await postJson<CreateOrderResponse>('/api/orders', req);
+      if (!created.redirectUrl) throw new ApiError(GENERIC_ERROR, undefined, 500);
+      window.location.assign(created.redirectUrl);
+      // Keep the button disabled while the browser leaves.
+    } catch (e) {
+      setMessage({ kind: 'error', text: friendlyError(e, v) });
+      setBusy(false);
+    }
+  }
+
   // ---------------- PayPal flow ----------------
 
-  // Load the PayPal JS SDK once.
+  // Load the PayPal JS SDK once — as soon as the listing offers PayPal, not
+  // only once it is chosen, so the buttons are ready the moment it is.
   useEffect(() => {
-    if (mode !== 'paypal' || !paypalClientId) return;
+    if (!paypalClientId) return;
     if (window.paypal) {
       setSdkState('ready');
       return;
@@ -675,7 +763,7 @@ export default function CheckoutClient({
     script.onload = () => setSdkState('ready');
     script.onerror = () => setSdkState('error');
     document.body.appendChild(script);
-  }, [mode, paypalClientId, config.currency]);
+  }, [paypalClientId, config.currency]);
 
   // Render the PayPal buttons once the SDK is ready — and re-render them
   // whenever the free/paid boundary is crossed. The RSVP branch unmounts the
@@ -684,8 +772,10 @@ export default function CheckoutClient({
   // and then adds a paid one would face a silently empty payment box, and one
   // who toggled free→paid→free→paid would lose the buttons on the way back.
   // The cleanup below is what makes the re-render possible.
+  // `method` is a dependency for the same reason: choosing bank transfer
+  // unmounts the PayPal box, and choosing PayPal again needs fresh buttons.
   useEffect(() => {
-    if (mode !== 'paypal' || sdkState !== 'ready' || isFreeOrder) return;
+    if (method !== 'paypal' || !paypalClientId || sdkState !== 'ready' || isFreeOrder) return;
     if (buttonsRenderedRef.current || !paypalBoxRef.current) return;
     if (!window.paypal?.Buttons) {
       setSdkState('error');
@@ -727,6 +817,7 @@ export default function CheckoutClient({
               // Same rule as the rest of the page, read off the snapshot: a
               // code is never spent on a basket that costs nothing.
               voucherCode: snapshotTotalCents > 0 ? (s.applied?.code ?? '') : '',
+              payVia: 'paypal',
             };
             const created = await postJson<CreateOrderResponse>('/api/orders', req);
             localOrderIdRef.current = created.orderId;
@@ -806,7 +897,7 @@ export default function CheckoutClient({
       buttonsRenderedRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, sdkState, isFreeOrder]);
+  }, [method, paypalClientId, sdkState, isFreeOrder]);
 
   // ---------------- Render ----------------
 
@@ -1266,11 +1357,13 @@ export default function CheckoutClient({
             they are who your {v.code} is issued by, and how you get a new copy if it goes missing.
             {isFreeOrder
               ? ' Nothing is charged and no payment details exist here at all.'
-              : mode === 'transfer'
-                ? paypalOffered
-                  ? ` Your payment goes straight to them — to their own bank account or their own PayPal, so the money never passes through us, and the reference on it is how they match it to your ${v.codes}.`
-                  : ` Your payment goes straight to their bank account, so the money never passes through us, and the reference on your transfer is how they match it to your ${v.codes}.`
-                : ` The reference on your order is how your payment is matched to your ${v.codes}.`}{' '}
+              : method === 'paypal'
+                ? ` Your payment goes straight into their own PayPal account — the money never passes through us, and your ${v.codes} are issued the moment PayPal confirms it.`
+                : method === 'stripe'
+                  ? ` Your card is charged by Stripe on their own account — the money never passes through us, and your ${v.codes} are issued the moment the payment goes through.`
+                  : payment.paypalMe
+                    ? ` Your payment goes straight to them — to their own bank account or their own PayPal, so the money never passes through us, and the reference on it is how they match it to your ${v.codes}.`
+                    : ` Your payment goes straight to their bank account, so the money never passes through us, and the reference on your transfer is how they match it to your ${v.codes}.`}{' '}
             We never ask for a card number or your bank details here. {retentionDays} days after
             {isShop ? ' you collect' : ' the event'}, your name and email are erased from our system
             for good — {isShop ? 'the seller' : 'the organizer'} keeps their sales count, but not you.
@@ -1402,171 +1495,229 @@ export default function CheckoutClient({
               </p>
             )}
           </>
-        ) : mode === 'transfer' ? (
-          /* Blocked ONLY when there is genuinely no way to pay. This used to
-             test the bank details alone, so an organizer who had set up PayPal
-             and left the IBAN half-filled got a checkout that refused every
-             buyer — with a message telling those buyers to contact the very
-             person whose page it was. PayPal is a complete route on its own. */
-          !transferConfigured && !paypalOffered ? (
-            /* Say what is true about THIS LISTING and stop there.
-               The old wording — "please check back soon or contact the
-               organizer" — made two promises this component cannot keep. It
-               promised the listing is about to start working, when nothing
-               here knows whether anyone will ever add a payout account; and it
-               sent the buyer after a person, when the reason there is no
-               payout account may be that there is nobody behind the page at
-               all (an abandoned draft that got published, a listing kept up as
-               an example). A buyer chasing a seller who does not exist is a
-               worse outcome than a buyer who simply knows this one cannot be
-               ordered from. The seller's own "ask a question" box is still on
-               the listing page for anyone who does want to reach them. */
-            <div className="notice notice-error">
-              This {v.listing} has no payment details, so an order cannot be placed on it.
-              Nothing has been reserved and nothing can be charged.
-            </div>
-          ) : (
-            <>
-              {/* PayPal first and in green when it is on offer: it clears in
-                  seconds while a transfer takes days, so the tickets arrive the
-                  same evening rather than midweek. Recommending the faster route
-                  is not decoration — it is the difference between a buyer
-                  getting their QR code tonight and waiting for a bank. */}
-              {paypalOffered && (
-                <div className={styles.payPreferred}>
-                  <strong>PayPal — fastest</strong>
-                  <span>
-                    Arrives in seconds, so they can confirm it and send your QR {v.codes}
-                    straight away. Recommended.
-                  </span>
-                </div>
-              )}
-              <p className="muted small" style={{ marginTop: paypalOffered ? 12 : 0 }}>
-                {paypalOffered
-                  ? `Pay by PayPal today, or by bank transfer (Überweisung) if you prefer. Reserving takes one click — your ${v.units} are held for you straight away.`
-                  : `Pay by regular bank transfer (Überweisung). Reserving takes one click — your ${v.units} are held for you straight away.`}
-              </p>
-              <ul className={styles.perkList}>
-                {paypalOffered && (
-                  <li>
-                    <strong>PayPal arrives in seconds</strong> — bank transfers take 1–2 business
-                    days
-                  </li>
-                )}
-                <li>
-                  {paypalOffered
-                    ? 'No fees, no account needed — pay with PayPal, or from any bank app'
-                    : 'No fees, no account needed — pay from any bank app'}
-                </li>
-                <li>
-                  On the next page you&rsquo;ll get the organizer&rsquo;s{' '}
-                  {paypalOffered ? 'bank and PayPal details' : 'bank details'} and your personal
-                  payment reference (also sent to you by email)
-                </li>
-                <li>
-                  {/* Not "as soon as your transfer arrives": nothing here can see
-                      the organizer's bank account — THEY confirm the payment, and
-                      that confirmation is what sends the tickets. */}
-                  Your QR-code {v.codes} are emailed the moment the organizer confirms your
-                  transfer — it usually lands within 1–2 business days
-                </li>
-                <li>
-                  You&rsquo;ll have a few days to pay — the exact deadline is shown on the next
-                  page, and unpaid reservations are simply released again
-                </li>
-              </ul>
-              <button
-                type="button"
-                className="btn btn-primary btn-lg btn-block"
-                onClick={handleTransferReserve}
-                disabled={!formReady || busy}
-              >
-                {busy ? (
-                  <>
-                    <span className="spinner" aria-hidden="true" /> Reserving…
-                  </>
-                ) : (
-                  /* Name the routes the buyer actually has — the copy above
-                     already promised PayPal when it is offered, and a button
-                     that then says only "bank transfer" reads like PayPal was
-                     withdrawn at the last moment. */
-                  `Reserve ${v.units} — ${
-                    paypalOffered && transferConfigured
-                      ? 'pay by PayPal or bank transfer'
-                      : paypalOffered
-                        ? 'pay by PayPal'
-                        : 'pay by bank transfer'
-                  }`
-                )}
-              </button>
-              {!formReady && !busy && (
-                <p className={`muted small ${styles.hint}`}>
-                  {blockedReason}
-                </p>
-              )}
-            </>
-          )
-        ) : mode === 'mock' ? (
-          <>
-            <div className="notice notice-warn">
-              TEST MODE — payments are simulated; no real money moves.
-            </div>
-            <button
-              type="button"
-              className="btn btn-primary btn-lg btn-block"
-              onClick={handleMockPay}
-              disabled={!formReady || busy}
-            >
-              {busy ? (
-                <>
-                  <span className="spinner" aria-hidden="true" /> Processing…
-                </>
-              ) : (
-                'Complete test payment'
-              )}
-            </button>
-            {!formReady && !busy && (
-              <p className={`muted small ${styles.hint}`}>
-                {blockedReason}
-              </p>
-            )}
-          </>
-        ) : !paypalClientId ? (
+        ) : methods.length === 0 ? (
+          /* Say what is true about THIS LISTING and stop there.
+             The old wording — "please check back soon or contact the
+             organizer" — made two promises this component cannot keep. It
+             promised the listing is about to start working, when nothing
+             here knows whether anyone will ever add a payout account; and it
+             sent the buyer after a person, when the reason there is no
+             payout account may be that there is nobody behind the page at
+             all (an abandoned draft that got published, a listing kept up as
+             an example). A buyer chasing a seller who does not exist is a
+             worse outcome than a buyer who simply knows this one cannot be
+             ordered from. The seller's own "ask a question" box is still on
+             the listing page for anyone who does want to reach them. */
           <div className="notice notice-error">
-            Payment is not set up yet, so orders cannot be placed right now. Please check back
-            soon or contact the organizer.
-          </div>
-        ) : sdkState === 'error' ? (
-          <div className="notice notice-error">
-            We could not load the payment form. Please refresh the page and try again.
+            This {v.listing} has no payment details, so an order cannot be placed on it.
+            Nothing has been reserved and nothing can be charged.
           </div>
         ) : (
           <>
-            {sdkState === 'loading' && (
-              <p className={`muted small ${styles.loadingRow}`}>
-                <span className="spinner" aria-hidden="true" /> Loading secure payment…
-              </p>
+            {/* The choice, only when there IS one. Each row says the one
+                thing that separates it from the others — pays now, or
+                reserve and transfer — and whose account the money lands in,
+                which is always the seller's. */}
+            {methods.length > 1 && (
+              <div className={styles.payMethods} role="radiogroup" aria-label="How would you like to pay?">
+                {methods.map((m) => {
+                  const on = method === m;
+                  const label =
+                    m === 'paypal'
+                      ? 'PayPal'
+                      : m === 'stripe'
+                        ? 'Card (Visa, Mastercard, …)'
+                        : m === 'transfer'
+                          ? payment.paypalMe && payment.bank
+                            ? 'Bank transfer or PayPal.Me'
+                            : payment.paypalMe
+                              ? 'PayPal.Me'
+                              : 'Bank transfer (Überweisung)'
+                          : 'Test payment';
+                  const line =
+                    m === 'paypal' || m === 'stripe'
+                      ? `Pay now — your ${v.codes} arrive straight away`
+                      : m === 'transfer'
+                        ? `Reserve now, send the money yourself — ${sellerWord} confirms it`
+                        : 'Simulated — no money moves';
+                  return (
+                    <label key={m} className={`${styles.payMethod}${on ? ` ${styles.payMethodOn}` : ''}`}>
+                      <input
+                        type="radio"
+                        name="pay-method"
+                        value={m}
+                        checked={on}
+                        onChange={() => {
+                          setMethod(m);
+                          setMessage(null);
+                        }}
+                        disabled={working}
+                      />
+                      <span>
+                        <strong>{label}</strong>
+                        {(m === 'paypal' || m === 'stripe') && <span className={styles.payMethodTag}>Instant</span>}
+                        <span className={styles.payMethodLine}>{line}</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
             )}
-            {capturing && (
-              <p className={`muted small ${styles.loadingRow}`}>
-                <span className="spinner" aria-hidden="true" /> Finalizing your order…
-              </p>
+
+            {method === 'transfer' ? (
+              <>
+                <p className="muted small" style={{ marginTop: 0 }}>
+                  {payment.paypalMe
+                    ? `Reserve in one click — your ${v.units} are held for you straight away — then send the money by PayPal or bank transfer (Überweisung).`
+                    : `Reserve in one click — your ${v.units} are held for you straight away — then send a regular bank transfer (Überweisung).`}
+                </p>
+                <ul className={styles.perkList}>
+                  {payment.paypalMe && (
+                    <li>
+                      <strong>PayPal arrives in seconds</strong> — bank transfers take 1–2 business days
+                    </li>
+                  )}
+                  <li>
+                    {payment.paypalMe
+                      ? 'No fees, no account needed — pay with PayPal, or from any bank app'
+                      : 'No fees, no account needed — pay from any bank app'}
+                  </li>
+                  <li>
+                    On the next page you&rsquo;ll get {sellerWord}&rsquo;s{' '}
+                    {payment.paypalMe && payment.bank ? 'bank and PayPal details' : payment.paypalMe ? 'PayPal details' : 'bank details'} and your
+                    personal payment reference (also sent to you by email)
+                  </li>
+                  <li>
+                    {/* Not "as soon as your transfer arrives": nothing here can see
+                        the organizer's bank account — THEY confirm the payment, and
+                        that confirmation is what sends the tickets. */}
+                    Your QR-code {v.codes} are emailed the moment {sellerWord} confirms your
+                    payment — it usually lands within 1–2 business days
+                  </li>
+                  <li>
+                    You&rsquo;ll have a few days to pay — the exact deadline is shown on the next
+                    page, and unpaid reservations are simply released again
+                  </li>
+                </ul>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-lg btn-block"
+                  onClick={handleTransferReserve}
+                  disabled={!formReady || busy}
+                >
+                  {busy ? (
+                    <>
+                      <span className="spinner" aria-hidden="true" /> Reserving…
+                    </>
+                  ) : (
+                    /* Name the routes the buyer actually has — a button that
+                       says only "bank transfer" when PayPal.Me was promised
+                       reads like PayPal was withdrawn at the last moment. */
+                    `Reserve ${v.units} — ${
+                      payment.paypalMe && payment.bank
+                        ? 'pay by PayPal or bank transfer'
+                        : payment.paypalMe
+                          ? 'pay by PayPal'
+                          : 'pay by bank transfer'
+                    }`
+                  )}
+                </button>
+                {!formReady && !busy && (
+                  <p className={`muted small ${styles.hint}`}>
+                    {blockedReason}
+                  </p>
+                )}
+              </>
+            ) : method === 'stripe' ? (
+              <>
+                <p className="muted small" style={{ marginTop: 0 }}>
+                  You&rsquo;ll be taken to a secure card page run by Stripe for {sellerWord}. Pay there, and you
+                  come straight back here with your QR {v.codes} — they are emailed to you at the same moment.
+                </p>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-lg btn-block"
+                  onClick={handleStripePay}
+                  disabled={!formReady || busy}
+                >
+                  {busy ? (
+                    <>
+                      <span className="spinner" aria-hidden="true" /> Opening secure payment…
+                    </>
+                  ) : (
+                    `Pay ${formatMoney(payableCents, config.currency)} by card →`
+                  )}
+                </button>
+                {!formReady && !busy && (
+                  <p className={`muted small ${styles.hint}`}>
+                    {blockedReason}
+                  </p>
+                )}
+                <p className={`muted small ${styles.hint}`}>
+                  Your card details go to Stripe only — never to this site. You are charged once, when you confirm
+                  on the Stripe page.
+                </p>
+              </>
+            ) : method === 'mock' ? (
+              <>
+                <div className="notice notice-warn">
+                  TEST MODE — payments are simulated; no real money moves.
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-lg btn-block"
+                  onClick={handleMockPay}
+                  disabled={!formReady || busy}
+                >
+                  {busy ? (
+                    <>
+                      <span className="spinner" aria-hidden="true" /> Processing…
+                    </>
+                  ) : (
+                    'Complete test payment'
+                  )}
+                </button>
+                {!formReady && !busy && (
+                  <p className={`muted small ${styles.hint}`}>
+                    {blockedReason}
+                  </p>
+                )}
+              </>
+            ) : sdkState === 'error' ? (
+              <div className="notice notice-error">
+                We could not load the PayPal buttons. Please refresh the page and try again
+                {methods.length > 1 ? ', or choose another way to pay above' : ''}.
+              </div>
+            ) : (
+              <>
+                {sdkState === 'loading' && (
+                  <p className={`muted small ${styles.loadingRow}`}>
+                    <span className="spinner" aria-hidden="true" /> Loading secure payment…
+                  </p>
+                )}
+                {capturing && (
+                  <p className={`muted small ${styles.loadingRow}`}>
+                    <span className="spinner" aria-hidden="true" /> Finalizing your order…
+                  </p>
+                )}
+                <div
+                  className={!formReady || capturing ? styles.payDisabled : undefined}
+                  aria-disabled={!formReady || capturing}
+                >
+                  <div ref={paypalBoxRef} className={styles.paypalBox} />
+                </div>
+                {!formReady && (
+                  <p className={`muted small ${styles.hint}`}>
+                    {blockedReason}
+                  </p>
+                )}
+                <p className={`muted small ${styles.hint}`}>
+                  Pay securely with PayPal or a debit/credit card, into {sellerWord}&rsquo;s own PayPal account.
+                  You are only charged once you approve the payment
+                  {payment.paypal?.sandbox ? ' — this listing is in PayPal sandbox (test) mode, no real money moves' : ''}.
+                </p>
+              </>
             )}
-            <div
-              className={!formReady || capturing ? styles.payDisabled : undefined}
-              aria-disabled={!formReady || capturing}
-            >
-              <div ref={paypalBoxRef} className={styles.paypalBox} />
-            </div>
-            {!formReady && (
-              <p className={`muted small ${styles.hint}`}>
-                {blockedReason}
-              </p>
-            )}
-            <p className={`muted small ${styles.hint}`}>
-              Pay securely with PayPal or a debit/credit card. You are only charged once you
-              approve the payment.
-            </p>
           </>
         )}
       </div>
