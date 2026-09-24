@@ -7,30 +7,48 @@
 // Anthropic or to organizer-answered questions. Nothing here ever throws.
 
 /**
- * A floating "-latest" alias, NOT a pinned version, and the LITE tier — both
- * deliberate.
+ * The models tried, in order, for every question.
  *
- * Floating, because Google retires individual Gemini versions and the endpoint
- * then answers 404 for every request. That is exactly what happened here: this
- * file pinned gemini-2.0-flash, Google withdrew it, and from that moment every
- * visitor question silently fell through to "the organizer has been asked" —
- * the assistant looked alive but could never answer. (gemini-2.5-flash is
- * already closed to new keys too, so pinning any version just restarts the
- * clock.)
+ * A LADDER rather than one model, because the free tier is not only
+ * quota-limited but capacity-limited: on 2026-09-24 Google answered 503
+ * "This model is currently experiencing high demand" to nearly every request
+ * for the lite models, for hours, while the full flash model answered every
+ * time. With a single model that meant the website chatbot replied "I could
+ * not find that" to every visitor question — it looked alive and knew nothing.
  *
- * Lite, because of the FREE-TIER QUOTA, which is the binding constraint here,
- * not quality. The plain "-latest" alias resolves to the current premium flash
- * model, whose free allowance is **20 requests per day** — a single curious
- * visitor exhausts that before lunch, and the assistant then escalates
- * everything until midnight. The lite alias has a far larger allowance and
- * answers in roughly half the time. Answering "where can I park?" from a block
- * of supplied text needs no premium reasoning; not being rate-limited into
- * silence matters far more. Set GEMINI_MODEL to override if you ever move to a
- * paid key.
+ * Lite first (largest free allowance), then newer lite, then full flash
+ * (smaller daily allowance, but it is only reached when the lite ones are
+ * refusing). "-latest" aliases float, so a retired version cannot strand the
+ * ladder; the pinned names are extra rungs, and a model Google has retired
+ * answers 404 and is simply skipped. GEMINI_MODEL, when set, goes to the front.
  */
-const GEMINI_MODEL = (process.env.GEMINI_MODEL || '').trim() || 'gemini-flash-lite-latest';
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
-const TIMEOUT_MS = 15_000;
+const MODEL_LADDER = Array.from(
+  new Set(
+    [
+      (process.env.GEMINI_MODEL || '').trim(),
+      'gemini-flash-lite-latest',
+      'gemini-3.5-flash-lite',
+      'gemini-3.5-flash',
+      'gemini-flash-latest',
+    ].filter(Boolean)
+  )
+);
+
+const modelUrl = (model: string) =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+
+/**
+ * A model that just said "busy" (503) or "quota" (429) is skipped for a while,
+ * so the next visitor does not wait for the same refusal again. 404 (retired)
+ * is benched for an hour. Per server process; a restart forgets it, harmlessly.
+ */
+const benchedUntil = new Map<string, number>();
+const BENCH_MS: Record<number, number> = { 503: 60_000, 500: 60_000, 429: 5 * 60_000, 404: 60 * 60_000 };
+
+/** Per model. Short, because a hung model is followed by up to three more rungs. */
+const TIMEOUT_MS = 9_000;
+/** For the whole ladder — raised automatically for callers that ask for a longer per-model timeout. */
+const TOTAL_BUDGET_MS = 12_000;
 
 /** Failures are routine on a free-tier key — warn at most once per minute. */
 const WARN_MIN_INTERVAL_MS = 60_000;
@@ -78,11 +96,48 @@ export async function geminiJson(prompt: string, options: GeminiOptions = {}): P
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
 
+  const started = Date.now();
+  // Every model failed within the last minute: do not make this visitor wait
+  // through the same failures again — the caller has its own fallback.
+  const ladder = MODEL_LADDER.filter((m) => (benchedUntil.get(m) ?? 0) <= started);
+
+  // An overall budget, so a visitor never waits more than ~12s for "busy".
+  // Callers that asked for a longer per-model wait (list-shaped generators)
+  // get at least that much in total.
+  const budget = Math.max(TOTAL_BUDGET_MS, options.timeoutMs ?? 0);
+  for (const model of ladder) {
+    const left = budget - (Date.now() - started);
+    if (left < 1_500) break;
+    const outcome = await geminiJsonOnce(model, key, prompt, {
+      ...options,
+      timeoutMs: Math.min(options.timeoutMs ?? TIMEOUT_MS, left),
+    });
+    if (outcome.kind === 'ok') return outcome.value;
+    if (outcome.kind === 'stop') return null; // bad key: no other model will do better
+    // Busy, over quota, retired, or hung past the timeout: skip it for a while
+    // so the next visitor does not wait for the same failure.
+    const bench = outcome.status ? BENCH_MS[outcome.status] : outcome.timedOut ? 60_000 : 0;
+    if (bench) benchedUntil.set(model, Date.now() + bench);
+  }
+  return null;
+}
+
+type Outcome =
+  | { kind: 'ok'; value: unknown }
+  | { kind: 'next'; status?: number; timedOut?: boolean }
+  | { kind: 'stop' };
+
+async function geminiJsonOnce(
+  model: string,
+  key: string,
+  prompt: string,
+  options: GeminiOptions
+): Promise<Outcome> {
   const maxOutputTokens = options.maxOutputTokens ?? 800;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? TIMEOUT_MS);
   try {
-    const res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(key)}`, {
+    const res = await fetch(`${modelUrl(model)}?key=${encodeURIComponent(key)}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -93,43 +148,35 @@ export async function geminiJson(prompt: string, options: GeminiOptions = {}): P
     });
 
     if (!res.ok) {
-      if (res.status === 404) {
-        // Not a blip: the configured model no longer exists, so EVERY question
-        // will fall through to the organizer from now on. Say so unmistakably —
-        // the previous version of this message was indistinguishable from a
-        // quota warning, which is how a dead assistant went unnoticed.
-        warnThrottled(
-          `Gemini model "${GEMINI_MODEL}" was not found (404). The AI assistant is DISABLED until this is ` +
-            `fixed: every visitor question will be passed to the organizer instead. Google retires model ` +
-            `versions — set GEMINI_MODEL to a current one, or leave it unset to use the floating alias.`
-        );
-      } else if (res.status === 401 || res.status === 403) {
+      if (res.status === 401 || res.status === 403) {
         warnThrottled(
           `Gemini rejected the API key (${res.status}). Check GEMINI_API_KEY — the assistant is falling back ` +
             `to organizer-answered questions until it is valid.`
         );
-      } else {
-        warnThrottled(
-          `Gemini request failed with status ${res.status}` +
-            (res.status === 429 ? ' (free-tier quota exhausted — falling back)' : '') +
-            '.'
-        );
+        return { kind: 'stop' };
       }
-      return null;
+      warnThrottled(
+        res.status === 404
+          ? `Gemini model "${model}" was not found (404) — Google retired it; skipping to the next model.`
+          : `Gemini "${model}" answered ${res.status}` +
+              (res.status === 503 ? ' (busy — trying the next model)' : res.status === 429 ? ' (quota — trying the next model)' : '') +
+              '.'
+      );
+      return { kind: 'next', status: res.status };
     }
 
     const data = (await res.json()) as GeminiResponse;
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (typeof text !== 'string' || text.length === 0) {
-      warnThrottled('Gemini returned an unexpected response shape.');
-      return null;
+      warnThrottled(`Gemini "${model}" returned an unexpected response shape.`);
+      return { kind: 'next' };
     }
-    return JSON.parse(text);
+    return { kind: 'ok', value: JSON.parse(text) };
   } catch (e) {
-    // AbortError (timeout), fetch/network failures, and JSON.parse errors all
-    // land here — same outcome: this provider produced no answer.
-    warnThrottled(`Gemini request failed: ${e instanceof Error ? e.message : String(e)}`);
-    return null;
+    // Timeout, network failure, or truncated/invalid JSON: this model produced
+    // no answer — the next one may.
+    warnThrottled(`Gemini "${model}" request failed: ${e instanceof Error ? e.message : String(e)}`);
+    return { kind: 'next', timedOut: e instanceof Error && e.name === 'AbortError' };
   } finally {
     clearTimeout(timer);
   }

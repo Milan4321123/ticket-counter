@@ -4,6 +4,7 @@ import { BodyTooLargeError, readJsonLimited } from '@/lib/http';
 import { clientIp, rateLimit } from '@/lib/ratelimit';
 import type { ApiErrorResponse } from '@/lib/types';
 import { platformNameFromEnv } from '@/lib/platform';
+import { fallbackAnswer } from '@/lib/assistantFallback';
 
 const MIN_QUESTION = 3;
 const MAX_QUESTION = 500;
@@ -98,7 +99,23 @@ export async function POST(req: Request) {
       });
     }
 
-    // Genuinely not covered — or no provider configured at all. Offer the team
+    // No model answered at all (every provider busy or failing). Saying "I
+    // could not find that" here would be false — it never looked — and it is
+    // what made the bot seem to know nothing. Say it is busy instead.
+    if (!result) {
+      // The common questions still get a real answer from the built-in list.
+      const canned = fallbackAnswer(question);
+      if (canned) return NextResponse.json({ kind: 'answered', answer: canned });
+      return NextResponse.json({
+        kind: 'unanswered',
+        message: 'Sorry — I could not get an answer just now. Please ask again in a moment.',
+        canEscalate: true,
+        escalateHref: '/contact',
+        escalateLabel: `Ask the ${platformNameFromEnv()} team`,
+      });
+    }
+
+    // Genuinely not covered. Offer the team
     // rather than dead-ending, the same way the event assistant offers the
     // organizer. Nothing is stored here: the platform inbox is the contact form,
     // and a question with no way to reply to it would help nobody.
