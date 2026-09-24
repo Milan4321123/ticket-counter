@@ -27,6 +27,12 @@ interface Props {
 export default function LiveSearchInput({ defaultValue, placeholder, ariaLabel, listId }: Props) {
   const router = useRouter();
   const [value, setValue] = useState(defaultValue);
+  // The header's search icon lands here with ?focus=search: put the cursor in
+  // the box so the visitor can type straight away.
+  const boxRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('focus') === 'search') boxRef.current?.focus();
+  }, []);
   const [pending, startTransition] = useTransition();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSent = useRef(defaultValue.trim());
@@ -73,6 +79,7 @@ export default function LiveSearchInput({ defaultValue, placeholder, ariaLabel, 
   return (
     <>
       <input
+        ref={boxRef}
         className="bz-search-input"
         type="search"
         name="q"

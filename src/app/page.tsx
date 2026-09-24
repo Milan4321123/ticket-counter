@@ -16,7 +16,10 @@ import { runBuyerDataRetentionSweep } from '@/lib/retention';
 import { eventListJsonLd, jsonLdScript } from '@/lib/seo';
 import HomeBillboard from '@/components/HomeBillboard';
 import type { BillboardSlide } from '@/components/HomeBillboard';
-import { listingCoverUrl } from '@/lib/listing';
+import { listingCoverUrl, listingStillUrl } from '@/lib/listing';
+import BazaarPager from '@/components/BazaarPager';
+import type { PagerItem } from '@/components/BazaarPager';
+import { formatMoney as fmt, subscribeDiscountCents } from '@/lib/money';
 import { fromPriceCents } from '@/lib/ticketState';
 import { formatMoney } from '@/lib/money';
 import type { FeedSnapshot } from '@/lib/feedSnapshot';
@@ -219,6 +222,7 @@ function billboardSlides(
       id: `e-${e.id}`,
       href: `/e/${e.slug}`,
       image,
+      imageTall: listingStillUrl(e, snapshot.photos.get(e.id)),
       art: null,
       kicker: [tr('bb.event'), e.city.trim()].filter(Boolean).join(' · '),
       title: e.name,
@@ -254,6 +258,48 @@ function billboardSlides(
   return slides;
 }
 
+/**
+ * The bazaar grid under the carousel: goods with a picture first, dealt round
+ * the shops so one seller never fills a whole page.
+ */
+function pagerItems(items: ShopItem[]): PagerItem[] {
+  const byShop = new Map<string, ShopItem[]>();
+  for (const it of sortShopItems(items, 'featured')) {
+    if (!it.buyable && !it.isExample) continue;
+    const list = byShop.get(it.shop.id) ?? [];
+    list.push(it);
+    byShop.set(it.shop.id, list);
+  }
+  for (const list of byShop.values()) list.sort((a, b) => Number(Boolean(b.photo)) - Number(Boolean(a.photo)));
+  const dealt: ShopItem[] = [];
+  for (let round = 0; dealt.length < 30; round++) {
+    let any = false;
+    for (const list of byShop.values()) {
+      if (list[round]) {
+        dealt.push(list[round]);
+        any = true;
+      }
+    }
+    if (!any) break;
+  }
+  // Pictures first: a grid that opens on a blank tile looks broken.
+  const ordered = [...dealt.filter((it) => it.photo), ...dealt.filter((it) => !it.photo)];
+  return ordered.slice(0, 30).map((it) => {
+    const pct = it.shop.subscribePct || 0;
+    return {
+      key: `${it.shop.id}:${it.tier.tierKey}`,
+      href: it.href,
+      image: it.photo ? mediaUrl(it.photo.id, 'card', null) : null,
+      name: it.tier.name,
+      shop: it.shopName,
+      price: it.priceCents === 0 ? 'Free' : fmt(it.priceCents, it.currency),
+      subscribe:
+        pct > 0 && it.priceCents > 0 ? `${fmt(it.priceCents - subscribeDiscountCents(pct, it.priceCents), it.currency)} with subscription` : '',
+      example: it.isExample,
+    };
+  });
+}
+
 export default async function HomePage() {
   // Example shops for a fresh hosted site, once, in the background (lib/exampleBazaar).
   ensureExampleBazaarOnce();
@@ -277,6 +323,7 @@ export default async function HomePage() {
   const shopItems = listShopItems();
   const bazaarRails = departmentRails(shopItems);
   const slides = billboardSlides(events, snapshot, shopItems, tr);
+  const picks = pagerItems(shopItems);
   const cities = new Set(events.map((e) => e.city.trim()).filter(Boolean));
 
   return (
@@ -315,6 +362,14 @@ export default async function HomePage() {
           the first thing between a visitor and the reason they came, and news
           about the site is never that. Someone who has scrolled the whole
           listing is the one it is actually for. */}
+      <BazaarPager
+        kicker={tr('bb.bazaar')}
+        title={tr('home.picks')}
+        items={picks}
+        moreHref="/market"
+        moreLabel={tr('home.seeAll')}
+      />
+
       <div id="events">
         {events.length === 0 ? (
           <section className="section">

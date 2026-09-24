@@ -19,6 +19,7 @@ import './globals.css';
 import './bazaar.css';
 import { ServiceWorkerRegistrar } from '@/components/AppInstall';
 import { Suspense } from 'react';
+import HeaderNav from '@/components/HeaderNav';
 import LangSwitch from '@/components/LangSwitch';
 import { translator } from '@/lib/i18n';
 import { currentLang } from '@/lib/i18nServer';
@@ -134,67 +135,25 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <a href="#main" className="skip-link">
           {tr('skip')}
         </a>
-        <header className="site-header">
+        <header className="site-header gn">
           <div className="container header-inner">
             <Link href="/" className="brand" aria-label={`${PLATFORM_NAME} — home`}>
               <Logo size={22} />
             </Link>
-            <nav aria-label="Main" className="header-nav">
-              {/* Two labels per link, one long and one short, swapped by CSS at
-                  the width where the long one stops fitting. A phone gets the
-                  short one; the accessible name stays the full phrase either
-                  way, so nothing is lost to a screen reader. Shortening beats
-                  hiding: all three of these are meant to stay visible, and a
-                  nav that drops an item on small screens is a nav that hides
-                  the thing you were looking for.
-                  Three of them no longer fit beside the wordmark on a phone —
-                  measured, not assumed — so below 480px the header keeps the
-                  pennant mark and drops the word. See globals.css. */}
-              <Link href="/" className="btn btn-sm btn-green" aria-label={tr('nav.browse')}>
-                <span className="header-label-long">{tr('nav.browse')}</span>
-                <span className="header-label-short" aria-hidden="true">
-                  {tr('nav.browse.short')}
-                </span>
-              </Link>
-              {/* The bazaar had exactly one link in the whole site — the
-                  footer — so a visitor who landed on any page had no visible
-                  way to it, and the shops might as well not have existed.
-                  Second of three on purpose: browsing events is still the only
-                  brand-coloured call to action, this is the site's other
-                  BUYER destination and sits straight after it, and organizer
-                  sign-in stays last because it is a utility for the few. The
-                  warm tint puts it between the two in weight — clearly a place
-                  to go, clearly not competing with the green button. */}
-              <Link href="/market" className="btn btn-sm header-bazaar" aria-label={tr('nav.bazaar')}>
-                <span className="header-label-long">{tr('nav.bazaar')}</span>
-                <span className="header-label-short" aria-hidden="true">
-                  {tr('nav.bazaar.short')}
-                </span>
-              </Link>
-              {/* Named for what it does. The home page's "For organizers"
-                  button goes to the pitch; this one lets an organizer who
-                  already works with us get straight in. Both used to say "For
-                  organizers" and lead to different places, which is exactly the
-                  kind of thing nobody notices until it wastes their time.
-                  Deliberately the quieter button too: signing in is a utility,
-                  while the brand-coloured call to action belongs to the thing we
-                  actually want visitors doing — browsing events. */}
-              <Link href="/portal" className="btn btn-sm header-signin" aria-label={tr('nav.organizer')}>
-                <span className="header-label-long">{tr('nav.organizer')}</span>
-                <span className="header-label-short" aria-hidden="true">
-                  {/* NOT "Sign in". Shortened to that, it read as an invitation
-                      to whoever was looking — and ticket buyers need no account
-                      at all here, so the one thing this label must never do is
-                      suggest they do. The audience is the whole message. */}
-                  {tr('nav.organizer.short')}
-                </span>
-              </Link>
-            </nav>
-            <div className="lang-switch-header">
-              <Suspense fallback={null}>
-                <LangSwitch lang={lang} label={tr('nav.language')} />
-              </Suspense>
-            </div>
+            <HeaderNav
+              events={tr('nav.events')}
+              bazaar={tr('nav.bazaar.short')}
+              organizer={tr('nav.organizer')}
+              organizerShort={tr('nav.organizer.short')}
+              search={tr('nav.search')}
+              lang={
+                <div className="lang-switch-header">
+                  <Suspense fallback={null}>
+                    <LangSwitch lang={lang} label={tr('nav.language')} />
+                  </Suspense>
+                </div>
+              }
+            />
           </div>
         </header>
         <main id="main" className="anim-fade-up">
