@@ -261,72 +261,63 @@ export default function BankForm({ eventId, kind, initial, queued, routes, conne
     router.refresh();
   }
 
+  /** "de89 3704…" → "DE89 3704 0044 …", as a bank app would show it. */
+  const tidyIban = (raw: string) =>
+    raw
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .replace(/(.{4})/g, '$1 ')
+      .trim();
+
+  const routeCards: { key: 'transfer' | 'paypal' | 'stripe'; icon: string; title: string; line: string; on: boolean; set: (v: boolean) => void; needs: string | null }[] = [
+    { key: 'transfer', icon: '🏦', title: 'Bank transfer', line: 'Free · you confirm each payment', on: payTransfer, set: setPayTransfer, needs: null },
+    { key: 'paypal', icon: '🅿️', title: 'PayPal checkout', line: connected.paypal ? `Instant · ${connected.paypal}` : 'Instant · into your PayPal', on: payPaypal, set: setPayPaypal, needs: connected.paypal ? null : 'PayPal' },
+    { key: 'stripe', icon: '💳', title: 'Card', line: connected.stripe ? `Instant · ${connected.stripe}` : 'Instant · via your Stripe', on: payStripe, set: setPayStripe, needs: connected.stripe ? null : 'Stripe' },
+  ];
+
   return (
-    <form onSubmit={submit}>
-      <p className="muted small" style={{ marginTop: 0 }}>
-        Buyers pay <strong>directly to you</strong> — their money goes straight into your own account, the
-        platform never touches it. By bank transfer you confirm each payment on the orders page and the {v.codes}{' '}
-        go out by email; with an instant route they go out by themselves the second the buyer pays.
+    <form onSubmit={submit} className="ks bk">
+      <p className="muted small" style={{ margin: 0 }}>
+        Buyers pay <strong>you</strong> directly — the money never passes through us.
       </p>
 
-      {/* Which routes THIS listing offers. The instant ones only work with a
-          connection behind them, set once under Settings — a tick here is the
-          listing's choice, the connection is the account's. */}
-      <fieldset className="field" style={{ border: 0, padding: 0, margin: '0 0 16px' }}>
-        <legend style={{ fontWeight: 600, marginBottom: 6 }}>How buyers can pay for this {v.listing}</legend>
-        <label className="checkbox-row" style={{ fontWeight: 400 }}>
-          <input type="checkbox" checked={payTransfer} onChange={(e) => setPayTransfer(e.target.checked)} />
-          <span>
-            <strong>Bank transfer</strong> (and PayPal.Me, if set below) — free, buyers reserve and you confirm
-          </span>
-        </label>
-        <label className="checkbox-row" style={{ fontWeight: 400 }}>
-          <input
-            type="checkbox"
-            checked={payPaypal}
-            onChange={(e) => setPayPaypal(e.target.checked)}
-            disabled={!connected.paypal}
-          />
-          <span>
-            <strong>PayPal Checkout</strong> — instant, into your own PayPal{' '}
-            {connected.paypal ? (
-              <span className="muted">({connected.paypal})</span>
-            ) : (
-              <span className="muted">
-                — <a href="/portal/settings#instant-payments">connect your PayPal account</a> first
+      {/* ---- 1. How buyers pay ---- */}
+      <section className="ks-step">
+        <h3 className="ks-q">
+          <span className="ks-num">1</span> How can buyers pay?
+        </h3>
+        <div className="ks-modes">
+          {routeCards.map((r) => (
+            <button
+              key={r.key}
+              type="button"
+              role="checkbox"
+              aria-checked={r.on}
+              className={`ks-mode${r.on ? ' is-on' : ''}`}
+              disabled={Boolean(r.needs)}
+              onClick={() => r.set(!r.on)}
+            >
+              <span className="ks-mode-icon" aria-hidden="true">
+                {r.icon}
               </span>
-            )}
-          </span>
-        </label>
-        <label className="checkbox-row" style={{ fontWeight: 400 }}>
-          <input
-            type="checkbox"
-            checked={payStripe}
-            onChange={(e) => setPayStripe(e.target.checked)}
-            disabled={!connected.stripe}
-          />
-          <span>
-            <strong>Card via Stripe</strong> — instant, into your own Stripe account{' '}
-            {connected.stripe ? (
-              <span className="muted">({connected.stripe})</span>
-            ) : (
-              <span className="muted">
-                — <a href="/portal/settings#instant-payments">connect your Stripe account</a> first
-              </span>
-            )}
-          </span>
-        </label>
-        {noRoute && (
-          <p className="small" style={{ margin: '6px 0 0', color: 'var(--amber-text, #8a5a00)' }}>
-            With these settings nobody can pay for this {v.listing} yet — fill in a bank account or PayPal.Me
-            below, or tick a connected instant route.
+              <strong>
+                {r.title} {r.on ? '✓' : ''}
+              </strong>
+              <span>{r.line}</span>
+            </button>
+          ))}
+        </div>
+        {(!connected.paypal || !connected.stripe) && (
+          <p className="muted small" style={{ margin: 0 }}>
+            Instant payments need your own account connected once —{' '}
+            <a href="/portal/settings#instant-payments">connect PayPal or Stripe in Settings</a>.
           </p>
         )}
-      </fieldset>
+        {noRoute && (
+          <p className="ks-preview is-bad">Nobody can pay yet — add a bank account or PayPal.Me below, or pick a connected instant route.</p>
+        )}
+      </section>
 
-      {/* A confirmed change that has not landed yet. This is the whole payoff of
-          the waiting period: if it was not you, the account has not actually
-          moved and one click puts it back. */}
       {queued && (
         <div className="notice notice-warn">
           <strong>A change to your payment details is waiting.</strong>
@@ -368,122 +359,99 @@ export default function BankForm({ eventId, kind, initial, queued, routes, conne
         </div>
       )}
 
-      {error && <div className="notice notice-error">{error}</div>}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', columnGap: 16 }}>
-        <div className="field">
-          <label htmlFor="bank-holder">Account holder</label>
+      {error && (
+        <div className="notice notice-error" style={{ margin: 0 }}>
+          {error}
+        </div>
+      )}
+
+      {/* ---- 2. Where the money goes ---- */}
+      <section className="ks-step">
+        <h3 className="ks-q">
+          <span className="ks-num">2</span> Where should the money go?
+        </h3>
+        <div className="bf-row">
+          <div className="field" style={{ margin: 0 }}>
+            <label htmlFor="bank-holder">Account holder</label>
+            <input
+              id="bank-holder"
+              className="input"
+              value={holder}
+              onChange={(e) => setHolder(e.target.value)}
+              maxLength={120}
+              autoComplete="name"
+              placeholder="Name on the account"
+            />
+            <p className="muted small" style={{ margin: '6px 0 0' }}>
+              Exactly as your bank has it — buyers&rsquo; banking apps check it.
+            </p>
+          </div>
+          <div className="field" style={{ margin: 0 }}>
+            <label htmlFor="bank-iban">IBAN</label>
+            <input
+              id="bank-iban"
+              className="input mono"
+              value={iban}
+              onChange={(e) => setIban(e.target.value)}
+              onBlur={() => setIban((x) => (x.trim() ? tidyIban(x) : x))}
+              maxLength={60}
+              spellCheck={false}
+              autoCapitalize="characters"
+              placeholder="DE89 3704 0044 0532 0130 00"
+            />
+          </div>
+        </div>
+        <details className="bf-inline" open={bic || bankName ? true : undefined}>
+          <summary>+ BIC and bank name (optional)</summary>
+          <div className="bf-row">
+            <input
+              id="bank-bic"
+              className="input mono"
+              value={bic}
+              onChange={(e) => setBic(e.target.value.toUpperCase())}
+              maxLength={20}
+              spellCheck={false}
+              placeholder="BIC, e.g. COBADEFFXXX"
+              aria-label="BIC"
+            />
+            <input
+              id="bank-bankname"
+              className="input"
+              value={bankName}
+              onChange={(e) => setBankName(e.target.value)}
+              maxLength={120}
+              placeholder="Bank, e.g. Commerzbank"
+              aria-label="Bank name"
+            />
+          </div>
+        </details>
+
+        <div className="field" style={{ margin: 0, maxWidth: 460 }}>
+          <label htmlFor="bank-paypal">PayPal.Me (optional)</label>
           <input
-            id="bank-holder"
+            id="bank-paypal"
             className="input"
-            value={holder}
-            onChange={(e) => setHolder(e.target.value)}
+            value={paypal}
+            onChange={(e) => setPaypal(e.target.value)}
             maxLength={120}
-            placeholder="Name on the account"
+            spellCheck={false}
+            autoCapitalize="none"
+            placeholder="paypal.me/yourname"
           />
-          {/* Since October 2025 every EU bank checks this name against the one
-              registered to the IBAN before the payer confirms, and shows them a
-              match / no-match warning. A near-miss here does not fail quietly —
-              it puts a fraud warning in front of every single buyer at the
-              moment they are deciding whether to trust a page they have never
-              seen before. Worth a sentence to prevent. */}
-          <p className="muted small" style={{ margin: '6px 0 0' }}>
-            Type this <strong>exactly</strong> as your bank has it — buyers&rsquo; banking apps now
-            check the name against the IBAN and warn them if it does not match. Leave the event name
-            out; it goes in the reference automatically.
+          <p className={`small${paypal.trim() && paypalLinkFor(paypal) ? '' : ' muted'}`} style={{ margin: '6px 0 0', ...(paypal.trim() && paypalLinkFor(paypal) ? { color: 'var(--green)', fontWeight: 600 } : {}) }}>
+            {!paypal.trim()
+              ? 'Offered next to your IBAN. PayPal payments arrive under the sender’s name — match it on the orders page.'
+              : paypalLinkFor(paypal)
+                ? '✓ Buyers get a Pay button with the amount already filled in.'
+                : 'Works, but buyers must type the amount. A paypal.me/yourname link gives them a ready button.'}
           </p>
         </div>
-        <div className="field">
-          <label htmlFor="bank-iban">IBAN</label>
-          <input
-            id="bank-iban"
-            className="input mono"
-            value={iban}
-            onChange={(e) => setIban(e.target.value)}
-            maxLength={60}
-            spellCheck={false}
-            placeholder="DE89 3704 0044 0532 0130 00"
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="bank-bic">BIC (optional)</label>
-          <input
-            id="bank-bic"
-            className="input mono"
-            value={bic}
-            onChange={(e) => setBic(e.target.value)}
-            maxLength={20}
-            spellCheck={false}
-            placeholder="COBADEFFXXX"
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="bank-bankname">Bank name (optional)</label>
-          <input
-            id="bank-bankname"
-            className="input"
-            value={bankName}
-            onChange={(e) => setBankName(e.target.value)}
-            maxLength={120}
-            placeholder="e.g. Commerzbank"
-          />
-        </div>
-      </div>
-      {/* PayPal sits in the same form as the IBAN because it is the same thing:
-          somewhere for the buyer to send the money, shown to them with the same
-          reference. It is NOT a PayPal checkout — nothing is collected on your
-          behalf, so there is nothing for us to pay out to you. */}
-      <div className="field" style={{ maxWidth: 460 }}>
-        <label htmlFor="bank-paypal">PayPal (optional)</label>
-        <input
-          id="bank-paypal"
-          className="input"
-          value={paypal}
-          onChange={(e) => setPaypal(e.target.value)}
-          maxLength={120}
-          spellCheck={false}
-          placeholder="paypal.me/yourname"
-        />
-        {/* Both forms are accepted, and they are NOT equally good — a PayPal.Me
-            link becomes a button with the amount already in it, an email becomes
-            text to copy into the PayPal app. That difference used to be
-            invisible until after publishing, so this says which one they have
-            just typed, while they can still change it. */}
-        {paypal.trim() ? (
-          paypalLinkFor(paypal) ? (
-            <p className="small" style={{ margin: '6px 0 0', color: 'var(--green)', fontWeight: 600 }}>
-              ✓ Buyers get a <strong>Pay</strong> button with the amount already filled in, plus a QR code —
-              nothing for them to type.
-            </p>
-          ) : (
-            <p className="muted small" style={{ margin: '6px 0 0' }}>
-              This works, but buyers will have to <strong>copy it into the PayPal app themselves</strong> and type
-              the amount. A <strong>paypal.me/yourname</strong> link instead gives them a button with the amount
-              already in it — it is free to set up at{' '}
-              <a href="https://paypal.me" target="_blank" rel="noopener noreferrer">
-                paypal.me
-              </a>
-              .
-            </p>
-          )
-        ) : null}
-        <p className="muted small" style={{ margin: '6px 0 0' }}>
-          Offer PayPal as well as the bank transfer. Buyers see this next to your IBAN with the same payment
-          reference, send the money themselves, and you confirm it on the orders page exactly as you do a transfer.
-          The money lands in <strong>your</strong> PayPal — we never hold it. Leave empty for bank transfer only.
-        </p>
-        {/* Said here rather than only in the confirm box, because it changes
-            what an organizer should ASK for: PayPal has no field a link can put
-            the reference in, so those payments arrive as a name and an amount. */}
-        <p className="muted small" style={{ margin: '6px 0 0' }}>
-          One thing to know: PayPal has nowhere to carry your payment reference, so those payments arrive under the
-          sender&rsquo;s <strong>name</strong> instead. Confirming a PayPal payment on the orders page lets you match
-          that name — you do not need the reference for it.
-        </p>
-      </div>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+      </section>
+
+      <div className="ks-save">
         <button type="submit" className="btn btn-brand" disabled={busy}>
           {busy ? <span className="spinner" aria-hidden /> : null}
-          {busy ? 'Saving…' : 'Save payment details'}
+          {busy ? 'Saving…' : 'Save'}
         </button>
         {saved && <span className="badge badge-green">Saved ✓</span>}
       </div>

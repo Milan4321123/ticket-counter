@@ -407,7 +407,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
         <EditorSection
           id="bank"
           title="How you get paid"
-          hint="Your money goes straight to you — double-check the IBAN. Add PayPal.Me, or switch on instant payment through your own PayPal or Stripe account."
+          hint="How buyers pay, and where the money goes."
           status={bankDone ? 'done' : 'todo'}
         >
           <BankForm
