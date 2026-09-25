@@ -49,6 +49,7 @@ import { cityLabel, otherShowsByAct, shortDateLabel } from '@/lib/sameAct';
 import GoToTab from './GoToTab';
 import EditorTabs from './EditorTabs';
 import SetupAssistant from './SetupAssistant';
+import { currentLang } from '@/lib/i18nServer';
 import DetailsForm from './DetailsForm';
 import { FAQ_SUGGESTIONS_EVENT } from './faqBridge';
 import MediaPanel from './MediaPanel';
@@ -720,6 +721,8 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
           panels={panels}
           intro={
             <SetupAssistant
+              lang={await currentLang()}
+              startedAlready={Boolean(event.description.trim()) || tiers.length > 0}
               eventId={event.id}
               kind={event.kind}
               currency={event.currency}

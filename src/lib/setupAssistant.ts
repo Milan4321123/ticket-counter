@@ -128,7 +128,11 @@ export function normaliseProposal(raw: unknown, kind: 'event' | 'shop'): SetupPr
  * the reply says they are suggestions.
  */
 export function wantsSuggestions(said: string): boolean {
-  return /\b(come up with|your own (idea|one)|make (it|one|a|me) up|make up|invent|suggest|you decide|up to you|surprise me|example|sample|demo|dummy|just (give|make|create)|create (me )?(a|an) )/i.test(said);
+  return (
+    /\b(come up with|your own (idea|one)|make (it|one|a|me) up|make up|invent|suggest|you decide|up to you|surprise me|example|sample|demo|dummy|just (give|make|create)|create (me )?(a|an) |denk dir|ausdenken|beispiel|vorschlag|du entscheidest)/i.test(said) ||
+    // Nepali: "yourself", "make it for me", "example", "demo", "suggest".
+    /आफैं|आफै|बनाइदिनु|बनाइदेऊ|बनाइदिनुस्|उदाहरण|डेमो|सुझाव|तपाईं नै/.test(said)
+  );
 }
 
 function prompt(kind: 'event' | 'shop', said: string): string {
@@ -148,7 +152,7 @@ ${wantsSuggestions(said) ? `SUGGESTION MODE — the seller asked you to come up 
 - ${kind === 'event' ? '"eventDate": the event day as YYYY-MM-DD (resolve words like "next Saturday" from today); "dateDisplay": that day written out, with doors/start time if said, e.g. "Saturday, 10 October 2026 · Doors 18:00".' : 'No dates. "pickupInfo": where/when buyers collect, only if said.'}
 - ${kind === 'event' ? '"tiers" are ticket types' : '"tiers" are the items for sale'}: [{"name","priceCents","cap","description","studentOnly"}]; "cap" only if a quantity was said.
 - ${kind === 'shop' ? `"category": one key from: ${cats} — only if clearly one of them.` : '"artist": performers, only if named. "venueName": the venue, only if named.'}
-- LANGUAGE: write "description" and "reply" in the SAME language the seller wrote in — English if they wrote English, German if German, Nepali if Nepali.
+- LANGUAGE: write "description" and "reply" in the SAME language the seller wrote in — English if they wrote English, German if German, Nepali (Devanagari) if Nepali or romanised Nepali. Names of items may stay as the seller wrote them.
 - "description": 1–3 friendly sentences built ONLY from the stated facts, no promises that were not made.
 - "totalCapacity": total people/items, only if said. "city" and "address" only if said.
 - "reply": one short sentence to the seller about what you filled and what is still missing (e.g. no date yet).
