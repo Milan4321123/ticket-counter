@@ -49,6 +49,7 @@ import { cityLabel, otherShowsByAct, shortDateLabel } from '@/lib/sameAct';
 import GoToTab from './GoToTab';
 import EditorTabs from './EditorTabs';
 import SetupAssistant from './SetupAssistant';
+import { listEventsForOrganizer } from '@/lib/events';
 import { currentLang } from '@/lib/i18nServer';
 import DetailsForm from './DetailsForm';
 import { FAQ_SUGGESTIONS_EVENT } from './faqBridge';
@@ -724,6 +725,9 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
               lang={await currentLang()}
               startedAlready={Boolean(event.description.trim()) || tiers.length > 0}
               slug={event.slug}
+              listings={listEventsForOrganizer(organizer.id)
+                .filter((e) => e.status !== 'archived')
+                .map((e) => ({ id: e.id, name: e.name, kind: e.kind, status: e.status }))}
               eventId={event.id}
               kind={event.kind}
               currency={event.currency}

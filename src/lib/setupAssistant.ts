@@ -129,11 +129,11 @@ export function normaliseProposal(raw: unknown, kind: 'event' | 'shop'): SetupPr
  */
 export function wantsSuggestions(said: string): boolean {
   return (
-    /\b(come up with|your own (idea|one)|make (it|one|a|me) up|make up|invent|suggest|you decide|up to you|surprise me|example|sample|demo|dummy|just (give|make|create)|create (me )?(a|an) |denk dir|ausdenken|beispiel|vorschlag|du entscheidest)/i.test(said) ||
+    /\b(come up with|your own (idea|one)|make (it|one|a|me) up|make up|invent|suggest|you decide|up to you|surprise me|example|sample|demo|dummy|just (give|make|create)|add (some |a few |\d+ )?(more )?(content|items|things|products|dishes|tickets|stuff)|more (content|items|products|dishes)|fill (it|the rest)|create (me )?(a|an) |denk dir|ausdenken|beispiel|vorschlag|du entscheidest)/i.test(said) ||
     // Nepali: "yourself", "make it for me", "example", "demo", "suggest".
     /आफैं|आफै|बनाइदिनु|बनाइदेऊ|बनाइदिनुस्|उदाहरण|डेमो|सुझाव|तपाईं नै/.test(said) ||
     // …and the same in Roman Nepali, typed in English letters.
-    /\b(aa?f(a|ai|ei|ey)|banai?di(nu|nus|nuhos|a|eu)|bana(u|unus|idinus)|udaharan|sujha?w|tapai(le)? nai|timi(le)? nai|jasto (bhaye|pani))\b/i.test(said)
+    /\b(aa?f(a|ai|ei|ey)|banai?di(nu|nus|nuhos|a|eu)|bana(u|unus|idinus)|udaharan|sujha?w|tapai(le)? nai|thap(nu|nus|nuhos|idinus|a)|timi(le)? nai|jasto (bhaye|pani))\b/i.test(said)
   );
 }
 

@@ -55,6 +55,15 @@ interface Message {
   publishNow?: boolean;
   /** A link to the published page. */
   view?: string;
+  /** Show the "which listing?" picker under this message. */
+  picker?: boolean;
+}
+
+interface ListingChoice {
+  id: string;
+  name: string;
+  kind: 'event' | 'shop';
+  status: string;
 }
 
 type Words = {
@@ -81,6 +90,14 @@ type Words = {
   q: Record<string, string>;
   buttons: { photo: string; publish: string; publishNow: string; view: string };
   published: string;
+  switchBtn: string;
+  whatChange: string;
+  which: string;
+  newShop: string;
+  newEvent: string;
+  current: string;
+  draft: string;
+  live: string;
   labels: Record<string, string>;
 };
 
@@ -133,6 +150,14 @@ const T: Record<Lang, Words> = {
     },
     buttons: { photo: 'Add a photo →', publish: 'Open the Publish section', publishNow: '🚀 Publish now', view: 'View your page →' },
     published: 'Published 🎉 — your page is live.',
+    switchBtn: '⇄ Switch',
+    whatChange: 'Sure — what shall I change or add? E.g. “add 4 more items”, “veg momo 7€”, “write a nicer description”. Say “done” when you are happy.',
+    which: 'Which one shall we work on? Pick one, or start a new one.',
+    newShop: '＋ New shop',
+    newEvent: '＋ New event',
+    current: 'open now',
+    draft: 'draft',
+    live: 'live',
     labels: {
       name: 'Name', artist: 'Artists', description: 'Description', dateDisplay: 'Date (as shown)', eventDate: 'Calendar date',
       venueName: 'Venue', address: 'Address', city: 'City', totalCapacity: 'Capacity', pickupInfo: 'Collection',
@@ -186,6 +211,14 @@ const T: Record<Lang, Words> = {
     },
     buttons: { photo: 'Foto hinzufügen →', publish: 'Bereich Veröffentlichen öffnen', publishNow: '🚀 Jetzt veröffentlichen', view: 'Deine Seite ansehen →' },
     published: 'Veröffentlicht 🎉 – deine Seite ist online.',
+    switchBtn: '⇄ Wechseln',
+    whatChange: 'Klar – was soll ich ändern oder ergänzen? Z. B. „füge 4 Artikel hinzu“, „Veggie-Momo 7€“, „schreib eine schönere Beschreibung“. Sag „fertig“, wenn alles passt.',
+    which: 'Woran sollen wir arbeiten? Wähle eins aus oder fang neu an.',
+    newShop: '＋ Neuer Laden',
+    newEvent: '＋ Neues Event',
+    current: 'gerade offen',
+    draft: 'Entwurf',
+    live: 'online',
     labels: {
       name: 'Name', artist: 'Künstler', description: 'Beschreibung', dateDisplay: 'Datum (Anzeige)', eventDate: 'Kalenderdatum',
       venueName: 'Ort', address: 'Adresse', city: 'Stadt', totalCapacity: 'Kapazität', pickupInfo: 'Abholung',
@@ -235,6 +268,14 @@ const T: Record<Lang, Words> = {
     },
     buttons: { photo: 'फोटो थप्नुहोस् →', publish: 'प्रकाशन खण्ड खोल्नुहोस्', publishNow: '🚀 अहिले प्रकाशित गर्नुहोस्', view: 'आफ्नो पेज हेर्नुहोस् →' },
     published: 'प्रकाशित भयो 🎉 — तपाईंको पेज लाइभ छ।',
+    switchBtn: '⇄ अर्को',
+    whatChange: 'हुन्छ — के बदल्ने वा थप्ने? जस्तै “arko 4 item thapnus”, “veg momo 7 euro”, “ramro description lekhnus”। सबै ठीक भए “bhayo” भन्नुहोस्।',
+    which: 'कुनमा काम गर्ने? एउटा छान्नुहोस्, वा नयाँ सुरु गर्नुहोस्।',
+    newShop: '＋ नयाँ पसल',
+    newEvent: '＋ नयाँ कार्यक्रम',
+    current: 'अहिले खुला',
+    draft: 'ड्राफ्ट',
+    live: 'लाइभ',
     labels: {
       name: 'नाम', artist: 'कलाकार', description: 'विवरण', dateDisplay: 'मिति (देखिने)', eventDate: 'क्यालेन्डर मिति',
       venueName: 'ठाउँ', address: 'ठेगाना', city: 'शहर', totalCapacity: 'क्षमता', pickupInfo: 'लिन आउने',
@@ -258,6 +299,12 @@ const ORDER = ['name', 'eventDate', 'venueName', 'address', 'pickupInfo', 'descr
 
 /** "done" in the languages people type — including Roman Nepali. */
 const DONE_RE = /^\s*(done|ok|okay|yes|yep|ready|ja|fertig|erledigt|passt|bhayo|bhaeo|sakiyo|thik cha|thik xa|thik chha|huncha|hunchha|hunxa|ho|भयो|सकियो|ठीक छ|हो)\s*[.!✓]*\s*$/i;
+/** Just "edit" / "change it" with nothing said about what — ask what. */
+const EDIT_ONLY_RE = /^\s*(i want to |i'?d like to |let'?s |lets |can i |please )?(edit|change|modify|update|fix|correct)( it| this| something| more| the page| my (shop|page|event))?( please)?\s*[.!?]*\s*$|^\s*(bearbeiten|ändern|etwas ändern|korrigieren|badalnu( cha| chha| xa)?|edit garnu( cha| chha| xa)?|milaunu( cha| chha| xa)?|बदल्नु छ|सच्याउनु छ)\s*[.!?]*\s*$/i;
+
+/** Asking to work on a different listing, in any of the three languages. */
+const SWITCH_RE = /\b(another|other|different|new|next|second)\s+(shop|store|event|listing|business|page)\b|\b(anderen?|neuen?|weiteren?)\s+(laden|shop|event)\b|\b(arko|naya|aarko|dosro)\s+(pasal|karyakram|dokan|shop|event)\b|अर्को पसल|नयाँ पसल|अर्को कार्यक्रम/i;
+
 /** Questions during which the seller can keep chatting changes. */
 const FREE_CHAT = new Set(['confirm', 'photo', 'publish']);
 
@@ -272,6 +319,7 @@ export default function SetupAssistant({
   lang = 'en',
   startedAlready = false,
   slug = '',
+  listings = [],
 }: {
   eventId: string;
   kind: 'event' | 'shop';
@@ -282,6 +330,8 @@ export default function SetupAssistant({
   startedAlready?: boolean;
   /** Its address, for "View your page" after publishing. */
   slug?: string;
+  /** The seller's other listings, for "which one shall we work on?". */
+  listings?: ListingChoice[];
 }) {
   const t = T[lang] ?? T.en;
   const router = useRouter();
@@ -390,6 +440,36 @@ export default function SetupAssistant({
     }
   }
 
+  /** "Which one shall we work on?" — the picker, as a chat message. */
+  function showPicker() {
+    say({ from: 'bot', text: t.which, picker: true });
+  }
+
+  /** Open another listing's editor with the assistant ready. */
+  function openListing(id: string) {
+    window.location.href = `/portal/events/${id}/edit?assistant=1`;
+  }
+
+  async function startNew(newKind: 'shop' | 'event') {
+    setBusy(true);
+    try {
+      const res = await fetch('/api/portal/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newKind === 'shop' ? 'My new shop' : 'My new event', kind: newKind }),
+      });
+      const data = (await res.json().catch(() => null)) as { eventId?: string; error?: string } | null;
+      if (data?.eventId) openListing(data.eventId);
+      else {
+        say({ from: 'bot', text: data?.error ?? t.error });
+        setBusy(false);
+      }
+    } catch {
+      say({ from: 'bot', text: t.offline });
+      setBusy(false);
+    }
+  }
+
   /** "Publish now" in the chat: the normal save, so every publishing rule applies. */
   async function publishNow() {
     if (busy) return;
@@ -485,6 +565,19 @@ export default function SetupAssistant({
     if (!text || busy) return;
     setMessages((m) => [...m, { from: 'me', text }]);
     setDraft('');
+    // "another shop", "new event", "arko pasal"… — offer the picker.
+    if (SWITCH_RE.test(text)) {
+      showPicker();
+      return;
+    }
+    // A bare "edit": ask what, and hold the photo / publish steps until they
+    // say "done" again — never loop back to "publish?" without answering.
+    if (EDIT_ONLY_RE.test(text)) {
+      confirmed.current = false;
+      setAsking('confirm');
+      say({ from: 'bot', text: t.whatChange });
+      return;
+    }
     setBusy(true);
     try {
       if (asking && FREE_CHAT.has(asking)) {
@@ -503,6 +596,14 @@ export default function SetupAssistant({
         say({ from: 'bot', text: data?.error ?? t.error });
       } else {
         const p = data.proposal;
+        if (Object.keys(p).filter((k) => k !== 'tiers').length === 0 && !(p.tiers ?? []).length) {
+          // Nothing to fill in: answer, and ask what to change instead of repeating the last question.
+          if (data.reply) say({ from: 'bot', text: data.reply });
+          confirmed.current = false;
+          setAsking('confirm');
+          say({ from: 'bot', text: t.whatChange });
+          return;
+        }
         const tk: Record<string, boolean> = {};
         for (const k of Object.keys(p)) if (k !== 'tiers') tk[k] = true;
         (p.tiers ?? []).forEach((_, i) => (tk[`tier:${i}`] = true));
@@ -532,6 +633,7 @@ export default function SetupAssistant({
     setSaving(false);
     if (ok) {
       say({ from: 'bot', text: t.filled(Object.keys(patch).length + chosen.length) });
+      confirmed.current = false;
       router.refresh();
       setBusy(true);
       await askNext();
@@ -595,6 +697,9 @@ export default function SetupAssistant({
     <section className="sa" aria-label={t.openTitle}>
       <header className="sa-head">
         <strong>✨ {t.openTitle}</strong>
+        <button type="button" className="sa-switch" onClick={showPicker}>
+          {t.switchBtn}
+        </button>
         <button type="button" className="sa-close" onClick={() => setOpen(false)} aria-label="Close">
           ×
         </button>
@@ -603,6 +708,33 @@ export default function SetupAssistant({
         {messages.map((m, i) => (
           <div key={i} className={`sa-msg sa-${m.from}`}>
             {m.text ? <p>{m.text}</p> : null}
+            {m.picker && (
+              <div className="sa-picker">
+                {listings.map((l) => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    className={`sa-pick${l.id === eventId ? ' is-current' : ''}`}
+                    disabled={l.id === eventId || busy}
+                    onClick={() => openListing(l.id)}
+                  >
+                    <span aria-hidden="true">{l.kind === 'shop' ? '🛍' : '🎟'}</span>
+                    <span className="sa-pick-name">{l.name}</span>
+                    <span className="sa-pick-state">
+                      {l.id === eventId ? t.current : l.status === 'published' ? t.live : t.draft}
+                    </span>
+                  </button>
+                ))}
+                <div className="sa-pick-new">
+                  <button type="button" className="btn btn-brand btn-sm" disabled={busy} onClick={() => void startNew('shop')}>
+                    {t.newShop}
+                  </button>
+                  <button type="button" className="btn btn-sm" disabled={busy} onClick={() => void startNew('event')}>
+                    {t.newEvent}
+                  </button>
+                </div>
+              </div>
+            )}
             {m.publishNow && m === last && (
               <button type="button" className="btn btn-brand sa-goto" onClick={() => void publishNow()} disabled={busy}>
                 {t.buttons.publishNow}
