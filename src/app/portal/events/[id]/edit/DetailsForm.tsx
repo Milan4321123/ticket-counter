@@ -45,6 +45,15 @@ interface Props {
   };
 }
 
+/** "Saturday 24 October 2026 · Doors 19:00", from the calendar date and doors time. */
+function writtenDate(date: string, doors: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return '';
+  const d = new Date(`${date}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return '';
+  const day = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  return doors ? `${day} · Doors ${doors}` : day;
+}
+
 export default function DetailsForm({ eventId, isDraft, kind, initial }: Props) {
   const router = useRouter();
   // A shop and an event fill in different halves of this form: a shop has no
@@ -57,6 +66,15 @@ export default function DetailsForm({ eventId, isDraft, kind, initial }: Props) 
   const [description, setDescription] = useState(initial.description);
   const [dateDisplay, setDateDisplay] = useState(initial.dateDisplay);
   const [eventDate, setEventDate] = useState(initial.eventDate);
+  // The written-out date is built from the calendar date and the doors time,
+  // so an organizer picks a day once instead of typing it twice. A text that
+  // was written by hand (and does not match what we would build) stays theirs.
+  const [doors, setDoors] = useState(() => initial.dateDisplay.match(/Doors (\d{1,2}:\d{2})/)?.[1] ?? '');
+  const [customDate, setCustomDate] = useState(
+    () =>
+      initial.dateDisplay.trim() !== '' &&
+      initial.dateDisplay.trim() !== writtenDate(initial.eventDate, initial.dateDisplay.match(/Doors (\d{1,2}:\d{2})/)?.[1] ?? '')
+  );
   const [venueName, setVenueName] = useState(initial.venueName);
   const [pickupInfo, setPickupInfo] = useState(initial.pickupInfo);
   const [category, setCategory] = useState(initial.category);
@@ -162,7 +180,7 @@ export default function DetailsForm({ eventId, isDraft, kind, initial }: Props) 
       name: name.trim(),
       artist,
       description,
-      dateDisplay,
+      dateDisplay: isShop || customDate ? dateDisplay : writtenDate(eventDate, doors),
       eventDate,
       venueName,
       pickupInfo,
@@ -191,50 +209,94 @@ export default function DetailsForm({ eventId, isDraft, kind, initial }: Props) 
     router.refresh();
   }
 
-  const grid: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    columnGap: 16,
+  const catIcon: Record<string, string> = {
+    'khaja-food': '🥟',
+    'sweets-bakery': '🍬',
+    'groceries-spices': '🌶️',
+    'clothing-fabrics': '🧣',
+    jewellery: '💍',
+    handicrafts: '🪔',
+    other: '🛍️',
   };
+  const builtDate = writtenDate(eventDate, doors);
 
+  // Step numbers follow what is shown, so a shop and an event both count 1, 2, 3.
   return (
-    <form onSubmit={submit}>
-      {error && <div className="notice notice-error">{error}</div>}
-      <div style={grid}>
-        <div className="field">
-          <label htmlFor="ev-name">{v.Listing} name</label>
-          <input id="ev-name" className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} />
-          {isDraft && (
-            <p className="muted small" style={{ margin: '6px 0 0' }}>
-              While the {v.listing} is a draft, renaming it also updates its web address.
-            </p>
-          )}
+    <form onSubmit={submit} className="ks bf">
+      {error && (
+        <div className="notice notice-error" style={{ margin: 0 }}>
+          {error}
         </div>
-        <div className="field">
-          <label htmlFor="ev-artist">{isShop ? 'Who is behind it (optional)' : 'Artist / act'}</label>
+      )}
+
+      {/* ---- 1. What is it ---- */}
+      <section className="ks-step">
+        <h3 className="ks-q">
+          <span className="ks-num">1</span> What is it called?
+        </h3>
+        <input
+          id="ev-name"
+          className="input bf-big"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          maxLength={120}
+          placeholder={isShop ? 'e.g. Didi’s Momo Kitchen' : 'e.g. Dashain Night 2026'}
+          aria-label={`${v.Listing} name`}
+        />
+        {!isShop && (
           <input
             id="ev-artist"
             className="input"
             value={artist}
             onChange={(e) => setArtist(e.target.value)}
             maxLength={120}
-            placeholder={isShop ? 'The cook, the maker, the family name' : 'Who is performing?'}
+            placeholder="Who is performing? (optional)"
+            aria-label="Artist / act"
           />
-        </div>
-      </div>
-      <div className="field">
-        <label htmlFor="ev-description">Description</label>
+        )}
+        {isShop && (
+          <div>
+            <div className="bf-label">What do you sell?</div>
+            <div className="ks-presets" role="radiogroup" aria-label="Category">
+              {SHOP_CATEGORIES.map((c) => (
+                <button
+                  key={c.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={category === c.key}
+                  className={`ks-chip${category === c.key ? ' is-on' : ''}`}
+                  onClick={() => setCategory(category === c.key ? '' : c.key)}
+                >
+                  {catIcon[c.key] ?? '🛍️'} {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {isDraft && (
+          <p className="muted small" style={{ margin: 0 }}>
+            While it is a draft, renaming also updates its web address.
+          </p>
+        )}
+      </section>
+
+      {/* ---- 2. About ---- */}
+      <section className="ks-step">
+        <h3 className="ks-q">
+          <span className="ks-num">2</span> Tell people about it
+        </h3>
         <textarea
           id="ev-description"
           className="input"
-          rows={6}
+          rows={4}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           maxLength={8000}
+          aria-label="Description"
           placeholder={
             isShop
-              ? 'Tell people what you make and what makes it worth ordering — how it is cooked, where it comes from, what is in it.'
-              : 'Tell people what makes this night special — the lineup, the atmosphere, what to expect.'
+              ? 'What you make, how it is cooked, where it comes from…'
+              : 'The line-up, the atmosphere, what to expect…'
           }
           style={{ resize: 'vertical', fontFamily: 'inherit' }}
         />
@@ -248,28 +310,23 @@ export default function DetailsForm({ eventId, isDraft, kind, initial }: Props) 
             onText={(text) => setDescription(descSpeechBase.current + text)}
           />
         </div>
-      </div>
-      {/* A date is what an event IS, and a shop has none — it sells until it
-          stops. So a shop is asked the question a date was standing in for all
-          along: when should the buyer turn up, and what should they do when
-          they get there. Both write to fields the buyer sees in the same slot
-          on the page. */}
+      </section>
+
+      {/* ---- 3. When & where / how to collect ---- */}
       {isShop ? (
-        <div className="field" style={{ maxWidth: 640 }}>
-          <label htmlFor="ev-pickup">How to collect</label>
-          <p className="muted small" style={{ margin: '0 0 8px' }}>
-            When someone can come and get their order, and anything they need to know when they
-            arrive. This is the first thing a buyer looks for, and it is required before you can
-            publish.
-          </p>
+        <section className="ks-step">
+          <h3 className="ks-q">
+            <span className="ks-num">3</span> How do people get their order?
+          </h3>
           <textarea
             id="ev-pickup"
             className="input"
-            rows={4}
+            rows={3}
             value={pickupInfo}
             onChange={(e) => setPickupInfo(e.target.value)}
             maxLength={2000}
-            placeholder={'e.g. Collect Saturdays 4–7pm. Ring the bell marked Sharma, second floor. Show your collection code — I will have your order bagged and ready.'}
+            aria-label="How to collect"
+            placeholder="e.g. Collect Saturdays 4–7pm, ring the bell marked Sharma."
             style={{ resize: 'vertical', fontFamily: 'inherit' }}
           />
           <div className="speech-row">
@@ -282,177 +339,144 @@ export default function DetailsForm({ eventId, isDraft, kind, initial }: Props) 
               onText={(text) => setPickupInfo(pickupSpeechBase.current + text)}
             />
           </div>
-          {/* A closed list, not free text: the /market page groups shops by
-              this, and a browse page only works when sellers pick from the
-              same shelves. Optional — an unpicked shop still publishes, it
-              just files under "More from the bazaar" instead of a shelf. */}
-          <div className="field" style={{ marginTop: 12, marginBottom: 0 }}>
-            <label htmlFor="ev-category">Category</label>
-            <select
-              id="ev-category"
+          <div className="bf-row">
+            <div className="field" style={{ margin: 0 }}>
+              <label htmlFor="ev-city">City</label>
+              <input id="ev-city" className="input" value={city} onChange={(e) => setCity(e.target.value)} maxLength={80} placeholder="e.g. Berlin" />
+            </div>
+            <div className="field" style={{ margin: 0 }}>
+              <label htmlFor="ev-venue">Place (optional)</label>
+              <input
+                id="ev-venue"
+                className="input"
+                value={venueName}
+                onChange={(e) => setVenueName(e.target.value)}
+                maxLength={160}
+                placeholder="e.g. Sunita’s kitchen, Neukölln"
+              />
+            </div>
+          </div>
+          <details className="bf-inline" open={address ? true : undefined}>
+            <summary>+ Add a street address (optional)</summary>
+            <input
+              id="ev-address"
               className="input"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            >
-              <option value="">Not picked yet</option>
-              {SHOP_CATEGORIES.map((c) => (
-                <option key={c.key} value={c.key}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              maxLength={240}
+              placeholder="Street and number — for the Open in Maps link"
+              aria-label="Street address"
+            />
             <p className="muted small" style={{ margin: '6px 0 0' }}>
-              Where your shop sits in the bazaar — buyers browse by it.
+              Leave it empty if you would rather not publish where you live — tell buyers after they order.
             </p>
-          </div>
-        </div>
+          </details>
+        </section>
       ) : (
-        <div style={grid}>
-          <div className="field">
-            <label htmlFor="ev-date-display">Date, as shown to buyers</label>
-            <input
-              id="ev-date-display"
-              className="input"
-              value={dateDisplay}
-              onChange={(e) => setDateDisplay(e.target.value)}
-              maxLength={120}
-              placeholder="e.g. Saturday, 24 October 2026 · Doors 19:00"
-            />
+        <section className="ks-step">
+          <h3 className="ks-q">
+            <span className="ks-num">3</span> When and where?
+          </h3>
+          <div className="bf-row">
+            <div className="field" style={{ margin: 0 }}>
+              <label htmlFor="ev-date">Day</label>
+              <input id="ev-date" className="input" type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
+            </div>
+            <div className="field" style={{ margin: 0 }}>
+              <label htmlFor="ev-doors">Doors open (optional)</label>
+              <input id="ev-doors" className="input" type="time" value={doors} onChange={(e) => setDoors(e.target.value)} />
+            </div>
           </div>
-          <div className="field">
-            <label htmlFor="ev-date">Calendar date (sorts the public feed)</label>
-            <input
-              id="ev-date"
-              className="input"
-              type="date"
-              value={eventDate}
-              onChange={(e) => setEventDate(e.target.value)}
-            />
+          {customDate ? (
+            <div className="field" style={{ margin: 0 }}>
+              <label htmlFor="ev-date-display">Written on the page as</label>
+              <input
+                id="ev-date-display"
+                className="input"
+                value={dateDisplay}
+                onChange={(e) => setDateDisplay(e.target.value)}
+                maxLength={120}
+              />
+              <button type="button" className="bf-link" onClick={() => setCustomDate(false)}>
+                Write it for me instead
+              </button>
+            </div>
+          ) : (
+            builtDate && (
+              <p className="ks-preview">
+                Shown as: {builtDate}{' '}
+                <button
+                  type="button"
+                  className="bf-link"
+                  onClick={() => {
+                    setDateDisplay(builtDate);
+                    setCustomDate(true);
+                  }}
+                >
+                  Change the wording
+                </button>
+              </p>
+            )
+          )}
+          <div className="bf-row">
+            <div className="field" style={{ margin: 0 }}>
+              <label htmlFor="ev-venue">Venue</label>
+              <input id="ev-venue" className="input" value={venueName} onChange={(e) => setVenueName(e.target.value)} maxLength={160} placeholder="e.g. Stadthalle" />
+            </div>
+            <div className="field" style={{ margin: 0 }}>
+              <label htmlFor="ev-city">City</label>
+              <input id="ev-city" className="input" value={city} onChange={(e) => setCity(e.target.value)} maxLength={80} placeholder="e.g. Berlin" />
+            </div>
           </div>
-        </div>
-      )}
-      <div style={grid}>
-        <div className="field">
-          <label htmlFor="ev-venue">{isShop ? 'Collection point (optional)' : 'Venue name'}</label>
-          <input
-            id="ev-venue"
-            className="input"
-            value={venueName}
-            onChange={(e) => setVenueName(e.target.value)}
-            maxLength={160}
-            placeholder={isShop ? 'e.g. Sunita’s kitchen, Neukölln' : 'e.g. Stadthalle'}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="ev-address">{isShop ? 'Street address (optional)' : 'Street address'}</label>
           <input
             id="ev-address"
             className="input"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
             maxLength={240}
-            placeholder="Street and number — feeds the Open in Maps link"
+            placeholder="Street and number — for the Open in Maps link"
+            aria-label="Street address"
           />
-          {/* Optional on purpose. Plenty of shops here are run out of somebody's
-              home, and publishing a home address to a public page is a decision
-              that belongs to the person who lives there — not a box they have
-              to fill to be allowed to sell. Those who leave it blank say "message
-              me for the address" in the collection details instead. */}
-          {isShop && (
-            <p className="muted small" style={{ margin: '6px 0 0' }}>
-              Leave this empty if you would rather not publish where you live — you can give the
-              address to buyers privately once they have ordered.
-            </p>
-          )}
-        </div>
-        <div className="field">
-          <label htmlFor="ev-city">City</label>
-          <input id="ev-city" className="input" value={city} onChange={(e) => setCity(e.target.value)} maxLength={80} />
-        </div>
-      </div>
-      <div style={grid}>
-        <div className="field">
-          <label htmlFor="ev-capacity">{isShop ? 'Total you can sell' : 'Total capacity'}</label>
-          <input
-            id="ev-capacity"
-            className="input"
-            type="number"
-            min={1}
-            max={200000}
-            value={totalCapacity}
-            onChange={(e) => setTotalCapacity(e.target.value)}
-          />
-          <p className="muted small" style={{ margin: '6px 0 0' }}>
-            {isShop
-              ? 'The most you could sell across every item together — a ceiling, not a promise. Each item has its own stock below.'
-              : 'How many people the venue holds — ticket sales stop when this many are sold.'}
-          </p>
-          {/* There is no longer a way to opt out of the ceiling: inventory
-              maths needs one real number for the room. Hiding the COUNT is a
-              different question, and it is the switch below — which is what an
-              organizer actually wanted when they reached for "no limit". */}
-          <label className="checkbox-row" style={{ marginTop: 10 }}>
-            <input
-              type="checkbox"
-              checked={showRemaining}
-              onChange={(e) => setShowRemaining(e.target.checked)}
-            />
-            <span>
-              Show buyers how many {v.units} are left
-              <span className="muted small" style={{ display: 'block' }}>
-                {isShop
-                  ? '“Only 3 left” is the best reason a hesitating buyer has to order now — but it also tells everyone how small a batch you make. Your stock limits apply either way; this only decides whether the number is shown.'
-                  : 'Turn this OFF if you sell early-bird tickets. “Only 8 left” is read as the whole event nearly selling out, when it only means the cheap tier is nearly gone — and that puts people off an event with hundreds of seats free. Your limits still apply either way; this only decides whether the number is shown.'}
-              </span>
-            </span>
-          </label>
-        </div>
-        <div className="field">
-          <label htmlFor="ev-max-per-order">Max {v.units} per order</label>
-          <input
-            id="ev-max-per-order"
-            className="input"
-            type="number"
-            min={1}
-            max={50}
-            value={maxPerOrder}
-            onChange={(e) => setMaxPerOrder(e.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="ev-pay-days">Bank transfer due within (days)</label>
-          <input
-            id="ev-pay-days"
-            className="input"
-            type="number"
-            min={1}
-            max={30}
-            value={payWithinDays}
-            onChange={(e) => setPayWithinDays(e.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="ev-currency">Currency</label>
-          <input id="ev-currency" className="input" value={initial.currency} disabled aria-label="Currency (fixed)" />
-          <p className="muted small" style={{ margin: '6px 0 0' }}>
-            Everything on the platform uses EUR for now.
-          </p>
-        </div>
-      </div>
-      <div className="field" style={{ maxWidth: 640 }}>
-        <label htmlFor="ev-whatsapp">Talk to buyers on WhatsApp (optional)</label>
-        <p className="muted small" style={{ margin: '0 0 10px' }}>
-          Puts a bubble on your {v.listing} page and on the payment page. Buyers tap it and reach{' '}
-          <strong style={{ color: 'var(--text)' }}>you</strong>, with your {v.listing}&rsquo;s name
-          already in the message. It is the fastest way to settle the one thing people hesitate over before
-          paying — whether the bank account is really yours. Leave the number empty and no bubble
-          appears.
+          <div>
+            <div className="bf-label">How many people fit?</div>
+            <div className="ks-presets">
+              {[50, 100, 200, 300, 500, 1000].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className={`ks-chip${totalCapacity === String(n) ? ' is-on' : ''}`}
+                  onClick={() => setTotalCapacity(String(n))}
+                >
+                  {n}
+                </button>
+              ))}
+              <input
+                id="ev-capacity"
+                className="input bf-num"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={200000}
+                value={totalCapacity}
+                onChange={(e) => setTotalCapacity(e.target.value)}
+                aria-label="Total capacity"
+              />
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ---- Optional: WhatsApp ---- */}
+      <details className="ks-step ks-more" open={whatsapp ? true : undefined}>
+        <summary className="ks-q">
+          <span className="ks-num">💬</span> WhatsApp bubble <span className="badge">optional</span>
+        </summary>
+        <p className="muted small" style={{ margin: '0 0 8px' }}>
+          Buyers tap a bubble on your page and message you directly. Leave the number empty for no bubble.
         </p>
-        <div style={grid}>
-          <div className="field" style={{ marginBottom: 12 }}>
-            <label htmlFor="ev-whatsapp-num" className="small">
-              WhatsApp number
-            </label>
+        <div className="bf-row">
+          <div className="field" style={{ margin: 0 }}>
+            <label htmlFor="ev-whatsapp-num">WhatsApp number</label>
             <input
               id="ev-whatsapp-num"
               className="input"
@@ -463,14 +487,9 @@ export default function DetailsForm({ eventId, isDraft, kind, initial }: Props) 
               autoComplete="tel"
               maxLength={32}
             />
-            <p className="muted small" style={{ margin: '6px 0 0' }}>
-              Start with your country code.
-            </p>
           </div>
-          <div className="field" style={{ marginBottom: 12 }}>
-            <label htmlFor="ev-whatsapp-name" className="small">
-              Name on the bubble
-            </label>
+          <div className="field" style={{ margin: 0 }}>
+            <label htmlFor="ev-whatsapp-name">Name on the bubble</label>
             <input
               id="ev-whatsapp-name"
               className="input"
@@ -479,17 +498,10 @@ export default function DetailsForm({ eventId, isDraft, kind, initial }: Props) 
               placeholder={initial.accountName}
               maxLength={60}
             />
-            <p className="muted small" style={{ margin: '6px 0 0' }}>
-              Whoever actually answers. Empty uses {initial.accountName}.
-            </p>
           </div>
         </div>
-
-        {/* The real bubble, with its own upload beside it. An organizer should
-            not have to publish and open their own page to find out what their
-            bubble looks like — and this photo is deliberately its own, not the
-            page's profile photo: the face you want beside a WhatsApp number is
-            usually a person, while the page's profile photo is often a logo. */}
+        {whatsapp.trim() && (
+          <div style={{ marginTop: 12 }}>
         <div
           style={{
             display: 'flex',
@@ -596,33 +608,97 @@ export default function DetailsForm({ eventId, isDraft, kind, initial }: Props) 
               }}
             />
             <p className="muted small" style={{ margin: '8px 0 0' }}>
-              Press <strong style={{ color: 'var(--text)' }}>Save details</strong> to keep the framing.
+              Press <strong style={{ color: 'var(--text)' }}>Save</strong> to keep the framing.
             </p>
           </div>
         )}
-      </div>
-      <label className="checkbox-row" htmlFor="ev-sales-open">
-        <input
-          id="ev-sales-open"
-          type="checkbox"
-          checked={salesOpen}
-          onChange={(e) => setSalesOpen(e.target.checked)}
-        />
-        <span>
-          <strong style={{ color: 'var(--text)' }}>{v.Sales} open</strong> — switch off to pause
-          sales on the whole {v.listing} without taking the page down. Buyers see{' '}
-          <strong style={{ color: 'var(--text)' }}>Sales closed</strong>.
-          <span className="muted small" style={{ display: 'block' }}>
-            To announce {isShop ? 'an item' : 'a ticket'} instead of selling it, leave this on and set
-            that {v.unit} to <strong>Coming soon</strong> in the {v.Units} tab — it is a property of
-            one {v.unit}, not of the whole {v.listing}.
+          </div>
+        )}
+      </details>
+
+      {/* ---- Optional: everything else ---- */}
+      <details className="ks-step ks-more">
+        <summary className="ks-q">
+          <span className="ks-num">⚙︎</span> More settings <span className="badge">optional</span>
+        </summary>
+        <div className="bf-row">
+          {isShop && (
+            <div className="field" style={{ margin: 0 }}>
+              <label htmlFor="ev-artist">Who is behind it</label>
+              <input
+                id="ev-artist"
+                className="input"
+                value={artist}
+                onChange={(e) => setArtist(e.target.value)}
+                maxLength={120}
+                placeholder="The cook, the maker, the family name"
+              />
+            </div>
+          )}
+          {isShop && (
+            <div className="field" style={{ margin: 0 }}>
+              <label htmlFor="ev-capacity">Most you can sell in total</label>
+              <input
+                id="ev-capacity"
+                className="input"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={200000}
+                value={totalCapacity}
+                onChange={(e) => setTotalCapacity(e.target.value)}
+              />
+            </div>
+          )}
+          <div className="field" style={{ margin: 0 }}>
+            <label htmlFor="ev-max-per-order">Most {v.units} in one order</label>
+            <input
+              id="ev-max-per-order"
+              className="input"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={50}
+              value={maxPerOrder}
+              onChange={(e) => setMaxPerOrder(e.target.value)}
+            />
+          </div>
+          <div className="field" style={{ margin: 0 }}>
+            <label htmlFor="ev-pay-days">Bank transfer within (days)</label>
+            <input
+              id="ev-pay-days"
+              className="input"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={30}
+              value={payWithinDays}
+              onChange={(e) => setPayWithinDays(e.target.value)}
+            />
+          </div>
+        </div>
+        <label className="bf-switch">
+          <input type="checkbox" checked={showRemaining} onChange={(e) => setShowRemaining(e.target.checked)} />
+          <span>
+            <strong>Show how many are left</strong>
+            <span className="muted small">
+              {isShop ? '“Only 3 left” makes people order now.' : 'Turn off if you sell early-bird tickets — “only 8 left” can scare people off.'}
+            </span>
           </span>
-        </span>
-      </label>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        </label>
+        <label className="bf-switch" htmlFor="ev-sales-open">
+          <input id="ev-sales-open" type="checkbox" checked={salesOpen} onChange={(e) => setSalesOpen(e.target.checked)} />
+          <span>
+            <strong>{v.Sales} open</strong>
+            <span className="muted small">Switch off to pause all sales without taking the page down.</span>
+          </span>
+        </label>
+      </details>
+
+      <div className="ks-save">
         <button type="submit" className="btn btn-brand" disabled={busy}>
           {busy ? <span className="spinner" aria-hidden /> : null}
-          {busy ? 'Saving…' : 'Save details'}
+          {busy ? 'Saving…' : 'Save'}
         </button>
         {saved && <span className="badge badge-green">Saved ✓</span>}
       </div>
