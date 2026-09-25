@@ -100,25 +100,25 @@ const HELP: Answers = {
     'No problem — here is what you can do here:\n' +
     '🎟 **Go out** — [upcoming Nepali events](/#events): concerts, Dashain and Tihar nights, tickets straight to your phone.\n' +
     '🥟 **Eat & shop** — [the bazaar](/market): momo, sweets, groceries and crafts to collect with a QR code. Try “items under 10 euro”.\n' +
-    '🚀 **Sell** — put your own event, shop or restaurant here, free: [try the demo](/demo).\n' +
+    '🚀 **Sell** — put your own event, shop or restaurant here, free: [try the demo](/organizers).\n' +
     '▶ Or [watch how it all works](/#watch) in 1½ minutes. Just tell me which one — or ask anything.',
   de:
     'Kein Problem — das kannst du hier machen:\n' +
     '🎟 **Ausgehen** — [kommende nepalesische Events](/#events): Konzerte, Dashain- und Tihar-Abende, Tickets direkt aufs Handy.\n' +
     '🥟 **Essen & einkaufen** — [der Basar](/market): Momo, Süßes, Lebensmittel und Handwerk, abholen mit QR-Code. Probier „Artikel unter 10 Euro“.\n' +
-    '🚀 **Verkaufen** — dein eigenes Event, deinen Laden oder dein Restaurant hier, kostenlos: [Demo ausprobieren](/demo).\n' +
+    '🚀 **Verkaufen** — dein eigenes Event, deinen Laden oder dein Restaurant hier, kostenlos: [Demo ausprobieren](/organizers).\n' +
     'Sag einfach, was davon — oder frag irgendwas.',
   ne:
     'कुनै समस्या छैन — यहाँ यी गर्न सकिन्छ:\n' +
     '🎟 **घुम्न** — [आउँदा नेपाली कार्यक्रम](/#events): कन्सर्ट, दशैं-तिहार साँझ, टिकट सिधै फोनमा।\n' +
     '🥟 **खान र किन्न** — [बजार](/market): मम, मिठाई, किराना र हस्तकला, QR कोडले लिनुहोस्।\n' +
-    '🚀 **बेच्न** — आफ्नो कार्यक्रम, पसल वा रेस्टुरेन्ट यहाँ निःशुल्क: [डेमो चलाउनुहोस्](/demo)।\n' +
+    '🚀 **बेच्न** — आफ्नो कार्यक्रम, पसल वा रेस्टुरेन्ट यहाँ निःशुल्क: [डेमो चलाउनुहोस्](/organizers)।\n' +
     'कुन चाहिन्छ भन्नुहोस् — वा जे पनि सोध्नुहोस्।',
   rn:
     'Kei samasya chaina — yaha yo garna sakincha:\n' +
     '🎟 **Ghumna** — [aauna lageka Nepali event](/#events): concert, Dashain-Tihar saanjh, ticket sidhai phone ma.\n' +
     '🥟 **Khana ra kinna** — [bazaar](/market): momo, mithai, kirana ra hastakala, QR code le linus. “10 euro bhanda sasto khaja” lekhnus.\n' +
-    '🚀 **Bechna** — aafno event, pasal wa restaurant yaha free ma: [demo chalaunus](/demo).\n' +
+    '🚀 **Bechna** — aafno event, pasal wa restaurant yaha free ma: [demo chalaunus](/organizers).\n' +
     'Kun chahincha bhannus — wa je pani sodhnus.',
 };
 
@@ -187,7 +187,7 @@ export const ASK_CONTEXT = [
   'Payment: buyers pay each organizer or shop DIRECTLY (bank transfer with a personal reference and a QR for the banking app, PayPal, or card where the seller offers it). The money never passes through MartNepali.',
   'After paying, QR tickets / collection codes arrive by email and are in the buyer account (/account). Sold-out events have a waitlist. Things not on sale yet can go on a wish list.',
   'Sellers (organizers, shops, restaurants, salons): completely free, no commission. An AI helper builds the page from a few words in a chat (tickets, menus, photos, payment). Features: ticket types, student tickets, table bookings, seat maps, pickup time slots, kitchen screen, door scanner, discount codes, referral rewards, subscribe & save, reviews, insights, pages in English, German and Nepali.',
-  'To start selling: try the demo without signing up (/demo), then apply for a free account (/contact?intent=account) — a person approves it. Seller sign-in: /portal/login.',
+  'To start selling: try the demo without signing up (/organizers), then apply for a free account (/contact?intent=account) — a person approves it. Seller sign-in: /portal/login.',
   'The team can design a custom page or a promo video on request (/contact).',
 ].join('\n');
 

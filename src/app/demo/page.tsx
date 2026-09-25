@@ -109,6 +109,10 @@ export default async function DemoPage({
   // the session — nothing is created from a GET.
   const viewer = await currentOrganizer();
   if (viewer?.isDemo && rawTo) redirect(demoTargetPath(viewer.id, to));
+  // Plain /demo is "Sell with us" now: its Try-the-demo and Create buttons
+  // and the story videos. This page stays for the demo's own messages
+  // (?error=…) and deep links (?to=…).
+  if (!rawTo && !error) redirect('/organizers');
 
   const brand = platformNameFromEnv();
   const realSession = viewer !== null && !viewer.isDemo;

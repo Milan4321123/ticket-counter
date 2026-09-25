@@ -7,6 +7,29 @@ import { vocabFor } from '@/lib/vocab';
 import styles from './checkin.module.css';
 
 type DetectedBarcode = { rawValue: string };
+
+/**
+ * The fallback for browsers without BarcodeDetector (iPhone Safari): each
+ * poll draws the camera frame onto a small canvas and lets jsQR read it.
+ * Loaded only when the camera opens, so the page itself stays light.
+ */
+async function jsQrDetector(): Promise<{ detect(source: HTMLVideoElement): Promise<DetectedBarcode[]> }> {
+  const { default: jsQR } = await import('jsqr');
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  return {
+    async detect(video: HTMLVideoElement) {
+      if (!ctx || !video.videoWidth) return [];
+      const scale = Math.min(1, 640 / video.videoWidth);
+      canvas.width = Math.round(video.videoWidth * scale);
+      canvas.height = Math.round(video.videoHeight * scale);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const hit = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+      return hit?.data ? [{ rawValue: hit.data }] : [];
+    },
+  };
+}
 type BarcodeDetectorInstance = { detect(source: HTMLVideoElement): Promise<DetectedBarcode[]> };
 type BarcodeDetectorCtor = new (options?: { formats?: string[] }) => BarcodeDetectorInstance;
 
@@ -98,8 +121,10 @@ export default function CheckinClient({
   const busyRef = useRef(false);
   const detectingRef = useRef(false);
 
+  // Any phone with a camera: the browser's own QR detector where it has one
+  // (Chrome, Android), otherwise jsQR reading the frames (iPhone Safari).
   useEffect(() => {
-    setCameraSupported(typeof window !== 'undefined' && 'BarcodeDetector' in window);
+    setCameraSupported(typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia));
   }, []);
 
   const stopCamera = useCallback(() => {
@@ -169,8 +194,7 @@ export default function CheckinClient({
     setCameraNote(null);
     try {
       const Ctor = (window as unknown as { BarcodeDetector?: BarcodeDetectorCtor }).BarcodeDetector;
-      if (!Ctor) throw new Error('unsupported');
-      detectorRef.current = new Ctor({ formats: ['qr_code'] });
+      detectorRef.current = Ctor ? new Ctor({ formats: ['qr_code'] }) : await jsQrDetector();
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       streamRef.current = stream;
       setScanning(true);

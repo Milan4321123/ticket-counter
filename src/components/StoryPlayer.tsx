@@ -4,6 +4,7 @@
 // or — from a tool button's "▶ See how" — just that tool's chapters, stopping
 // at the end with "Watch the whole story". The chapter list beside it jumps
 // anywhere. Opened by a tap, so it may play with sound straight away.
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { storyById, type Story } from '@/lib/stories';
@@ -66,11 +67,20 @@ export default function StoryPlayer({
   );
 }
 
+/** The full-screen player on its own — for a card that is itself the trigger (StoryDeck). */
+export function StoryModal({ story, onClose }: { story: Story; onClose: () => void }) {
+  return <Player story={story} onClose={onClose} />;
+}
+
 function Player({ story, start, end, onClose }: { story: Story; start?: number; end?: number; onClose: () => void }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [limit, setLimit] = useState<number | null>(end ?? null);
   const [stopped, setStopped] = useState(false);
   const [now, setNow] = useState(start ?? 0);
+  const [ended, setEnded] = useState(false);
+  // The closing card (last ~7 s): its buttons are drawn in the video, so real
+  // ones are laid over it here.
+  const atEnd = ended || now >= story.length - 6.5;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -112,6 +122,8 @@ function Player({ story, start, end, onClose }: { story: Story; start?: number; 
             onLoadedMetadata={(e) => {
               if (start !== undefined) e.currentTarget.currentTime = start;
             }}
+            onEnded={() => setEnded(true)}
+            onPlay={() => setEnded(false)}
             onTimeUpdate={(e) => {
               const t = e.currentTarget.currentTime;
               setNow(t);
@@ -122,6 +134,29 @@ function Player({ story, start, end, onClose }: { story: Story; start?: number; 
               }
             }}
           />
+          {atEnd && !stopped && (
+            <div className="sp-cta">
+              {story.audience === 'buyer' ? (
+                <>
+                  <Link href="/#events" className="btn btn-brand" onClick={onClose}>
+                    🎟 Upcoming events
+                  </Link>
+                  <Link href="/market" className="btn" onClick={onClose}>
+                    🛍 The bazaar
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link href="/organizers" className="btn btn-brand" onClick={onClose}>
+                    ▶ Try it free
+                  </Link>
+                  <a href="mailto:support@eventsticketbuy.com?subject=A%20video%20for%20my%20page" className="btn">
+                    🎬 Want a video like this?
+                  </a>
+                </>
+              )}
+            </div>
+          )}
           {stopped && (
             <div className="sp-end">
               <button type="button" className="btn btn-brand" onClick={() => jump(0, null)}>

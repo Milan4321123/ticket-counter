@@ -16,6 +16,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",
     "better-sqlite3": "^12.2.0",
+    "jsqr": "^1.4.0",
     "next": "^15.4.5",
     "nodemailer": "^6.10.1",
     "qrcode": "^1.5.4",
