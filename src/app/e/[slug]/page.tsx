@@ -771,6 +771,12 @@ export default async function EventPage({ params, searchParams }: Params) {
           </div>
         )}
 
+        {/* Phone: the round photo sits on the cover's bottom edge, like a
+            storefront's logo — the laptop copy is the one after the hero. */}
+        {profileUrl && (stillUrl || coverVideoUrl) && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={profileUrl} alt="" aria-hidden="true" className="event-avatar event-avatar-edge" />
+        )}
         <div className="container event-hero-inner">
           {/* Poster layout: the poster itself, crisp, as a tilted card. */}
           {layout === 'poster' && stillUrl && (
@@ -952,7 +958,7 @@ export default async function EventPage({ params, searchParams }: Params) {
 
       {/* Facebook-style profile photo, overlapping the hero's bottom edge. */}
       {profileUrl && (
-        <div className="container event-avatar-wrap">
+        <div className={`container event-avatar-wrap${stillUrl || coverVideoUrl ? ' has-edge-copy' : ''}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={profileUrl} alt={`${event.name} profile photo`} className="event-avatar" />
         </div>
