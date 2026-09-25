@@ -1,0 +1,832 @@
+/* /organizers — short, visual, animated. Each scene's loop only runs while it
+   is on screen (components/InView sets data-in). */
+
+.og {
+  --og-card: #12141d;
+  --og-line: rgba(255, 255, 255, 0.08);
+  padding-bottom: 40px;
+}
+
+/* ---------- Hero ---------- */
+.og-hero {
+  text-align: center;
+  padding-top: 56px;
+  padding-bottom: 36px;
+}
+
+.og-title {
+  margin: 8px 0 14px;
+  font-size: clamp(2.2rem, 7vw, 4rem);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+}
+
+.og-title span {
+  background: linear-gradient(100deg, #34d399, #10b981 40%, #fbbf24);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.og-sub {
+  max-width: 520px;
+  margin: 0 auto 22px;
+  color: var(--text-dim);
+  font-size: 1.08rem;
+  line-height: 1.5;
+}
+
+.og-cta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.og-chips {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 22px 0 0;
+  padding: 0;
+}
+
+.og-chips li {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px var(--og-line);
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+/* ---------- Scenes ---------- */
+.og-scenes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  padding-top: 8px;
+}
+
+.og-scene {
+  display: flex;
+  flex-direction: column;
+  border-radius: 22px;
+  background: var(--og-card);
+  box-shadow: inset 0 0 0 1px var(--og-line);
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity 0.7s ease,
+    transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.og-scene[data-seen] {
+  opacity: 1;
+  transform: none;
+}
+
+.og-scene:nth-child(3n + 2) {
+  transition-delay: 0.08s;
+}
+
+.og-scene:nth-child(3n) {
+  transition-delay: 0.16s;
+}
+
+/* Loops pause while off screen. */
+.og-scene:not([data-in]) *,
+.og-steps:not([data-in]) * {
+  animation-play-state: paused !important;
+}
+
+.og-screen {
+  position: relative;
+  height: 220px;
+  margin: 14px 14px 0;
+  border-radius: 16px;
+  background: radial-gradient(120% 100% at 0% 0%, rgba(255, 255, 255, 0.05), transparent 60%), #0b0c12;
+  box-shadow: inset 0 0 0 1px var(--og-line);
+  overflow: hidden;
+}
+
+.og-caption {
+  padding: 16px 18px 20px;
+}
+
+.og-caption h2 {
+  margin: 0 0 4px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.og-caption p {
+  margin: 0 0 10px;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.og-caption a {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #34d399;
+}
+
+/* ---- 1. Build: the page fills itself in ---- */
+.og-build > * {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  opacity: 0;
+  animation: og-build 7s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+
+.og-b-cover {
+  top: 16px;
+  height: 64px;
+  border-radius: 10px;
+  background: linear-gradient(120deg, #dc143c, #7c3aed 60%, #003893);
+}
+
+.og-b-line {
+  height: 9px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.og-b-l1 {
+  top: 92px;
+  right: 40%;
+  animation-delay: 0.35s;
+}
+
+.og-b-l2 {
+  top: 108px;
+  right: 60%;
+  background: rgba(255, 255, 255, 0.12);
+  animation-delay: 0.55s;
+}
+
+.og-b-tier {
+  top: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px var(--og-line);
+  font-size: 0.78rem;
+  animation-delay: 0.8s;
+}
+
+.og-b-tier span {
+  width: 40%;
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.og-b-t2 {
+  top: 164px;
+  animation-delay: 1s;
+}
+
+.og-b-publish {
+  top: auto;
+  bottom: 12px;
+  left: auto;
+  right: 18px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: #10b981;
+  color: #04120c;
+  font-size: 0.75rem;
+  font-weight: 800;
+  animation-name: og-pop;
+  animation-delay: 1.5s;
+}
+
+@keyframes og-build {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  8%,
+  86% {
+    opacity: 1;
+    transform: none;
+  }
+  94%,
+  100% {
+    opacity: 0;
+    transform: none;
+  }
+}
+
+@keyframes og-pop {
+  0%,
+  4% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  9% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  13%,
+  78% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  86%,
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+/* ---- 2. Paid: money notifications arrive, the total counts up ---- */
+@property --og-n {
+  syntax: '<integer>';
+  inherits: false;
+  initial-value: 0;
+}
+
+.og-p-total {
+  position: absolute;
+  top: 16px;
+  left: 18px;
+  display: grid;
+}
+
+.og-p-total span {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+}
+
+.og-p-total b {
+  font-size: 1.9rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.og-count {
+  font-style: normal;
+  animation: og-count 6s linear infinite;
+  counter-reset: og-n var(--og-n);
+}
+
+.og-count::after {
+  content: counter(og-n);
+}
+
+@keyframes og-count {
+  0%,
+  12% {
+    --og-n: 1480;
+  }
+  30% {
+    --og-n: 1510;
+  }
+  50% {
+    --og-n: 1537;
+  }
+  70%,
+  100% {
+    --og-n: 1582;
+  }
+}
+
+.og-p-toast {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px var(--og-line);
+  font-size: 0.8rem;
+  opacity: 0;
+  animation: og-toast 6s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+
+.og-p-toast b {
+  margin-left: auto;
+  color: #34d399;
+}
+
+.og-p-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #34d399;
+  box-shadow: 0 0 10px #34d399;
+}
+
+.og-p-1 {
+  top: 82px;
+  animation-delay: 0.6s;
+}
+
+.og-p-2 {
+  top: 126px;
+  animation-delay: 1.8s;
+}
+
+.og-p-3 {
+  top: 170px;
+  animation-delay: 3s;
+}
+
+@keyframes og-toast {
+  0% {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  6%,
+  60% {
+    opacity: 1;
+    transform: none;
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: none;
+  }
+}
+
+/* ---- 3. Kitchen: an order moves New → Cooking → Ready ---- */
+.og-k-cols {
+  position: absolute;
+  inset: 12px 12px auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.og-k-cols span {
+  padding: 4px 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.og-k-card {
+  position: absolute;
+  top: 48px;
+  left: 12px;
+  width: calc((100% - 24px - 16px) / 3);
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border-radius: 10px;
+  background: #1c1f2c;
+  box-shadow:
+    inset 0 0 0 1px rgba(251, 191, 36, 0.4),
+    0 8px 20px rgba(0, 0, 0, 0.4);
+  font-size: 0.7rem;
+  animation: og-cook 6s cubic-bezier(0.5, 0, 0.2, 1) infinite;
+}
+
+.og-k-card b {
+  font-size: 0.72rem;
+}
+
+.og-k-card span {
+  color: var(--text-dim);
+}
+
+.og-k-still {
+  animation: none;
+  box-shadow: inset 0 0 0 1px var(--og-line);
+}
+
+.og-k-s1 {
+  top: 118px;
+}
+
+.og-k-s2 {
+  top: 48px;
+  left: calc(12px + 2 * ((100% - 24px - 16px) / 3 + 8px));
+  opacity: 0.55;
+  top: 118px;
+}
+
+@keyframes og-cook {
+  0%,
+  22% {
+    transform: none;
+    box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.5), 0 8px 20px rgba(0, 0, 0, 0.4);
+  }
+  32%,
+  54% {
+    transform: translateX(calc(100% + 8px));
+    box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.6), 0 8px 20px rgba(0, 0, 0, 0.4);
+  }
+  64%,
+  92% {
+    transform: translateX(calc(200% + 16px));
+    box-shadow: inset 0 0 0 1px rgba(52, 211, 153, 0.8), 0 0 24px rgba(52, 211, 153, 0.35);
+  }
+  100% {
+    transform: translateX(calc(200% + 16px));
+    opacity: 0;
+  }
+}
+
+/* ---- 4. Scan: a beam crosses the code, then the welcome ---- */
+.og-s-qr {
+  position: absolute;
+  top: 26px;
+  left: 50%;
+  width: 120px;
+  height: 120px;
+  margin-left: -60px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 5px;
+  padding: 10px;
+  border-radius: 14px;
+  background: #f5f5f7;
+  overflow: hidden;
+}
+
+.og-s-qr span {
+  border-radius: 3px;
+}
+
+.og-s-qr span.on {
+  background: #111;
+}
+
+.og-s-beam {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 3px;
+  background: #34d399;
+  box-shadow: 0 0 14px 4px rgba(52, 211, 153, 0.7);
+  animation: og-beam 3.6s ease-in-out infinite;
+}
+
+@keyframes og-beam {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  45% {
+    transform: translateY(118px);
+    opacity: 1;
+  }
+  50%,
+  100% {
+    transform: translateY(118px);
+    opacity: 0;
+  }
+}
+
+.og-s-ok {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(52, 211, 153, 0.5);
+  color: #d1fae5;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  opacity: 0;
+  animation: og-ok 3.6s ease infinite;
+}
+
+.og-s-ok b {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #10b981;
+  color: #04120c;
+  font-size: 0.72rem;
+}
+
+@keyframes og-ok {
+  0%,
+  46% {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.85);
+  }
+  54% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.06);
+  }
+  60%,
+  90% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+/* ---- 5. Seats: the hall fills up ---- */
+.og-st-stage {
+  position: absolute;
+  top: 14px;
+  left: 20%;
+  right: 20%;
+  padding: 5px 0;
+  border-radius: 0 0 40px 40px;
+  background: rgba(255, 255, 255, 0.08);
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.og-st-grid {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  display: grid;
+  grid-template-columns: repeat(10, 16px);
+  gap: 7px;
+  transform: translateX(-50%);
+}
+
+.og-st-grid span {
+  height: 16px;
+  border-radius: 5px 5px 3px 3px;
+  background: rgba(255, 255, 255, 0.1);
+  animation: og-seat 6s ease infinite;
+  animation-delay: calc(var(--i) * 0.08s);
+}
+
+.og-st-grid span.vip {
+  box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.5);
+}
+
+@keyframes og-seat {
+  0%,
+  10% {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(1);
+  }
+  14% {
+    background: #dc143c;
+    transform: scale(1.25);
+  }
+  18%,
+  85% {
+    background: #dc143c;
+    transform: scale(1);
+  }
+  95%,
+  100% {
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* ---- 6. Stats: bars grow, a number shows the trend ---- */
+.og-c-head {
+  position: absolute;
+  top: 14px;
+  left: 18px;
+  right: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+.og-c-head b {
+  color: #34d399;
+  font-size: 1.2rem;
+}
+
+.og-c-bars {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 34px;
+  height: 130px;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  align-items: end;
+  gap: 8px;
+}
+
+.og-c-bars span {
+  height: var(--h);
+  border-radius: 6px 6px 3px 3px;
+  background: linear-gradient(180deg, #60a5fa, #3b82f6 70%, rgba(59, 130, 246, 0.5));
+  transform-origin: bottom;
+  animation: og-bar 5s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  animation-delay: calc(var(--i) * 0.09s);
+}
+
+.og-c-bars span:last-child {
+  background: linear-gradient(180deg, #34d399, #10b981);
+}
+
+@keyframes og-bar {
+  0% {
+    transform: scaleY(0.05);
+  }
+  25%,
+  85% {
+    transform: scaleY(1);
+  }
+  100% {
+    transform: scaleY(0.05);
+  }
+}
+
+.og-c-days {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 12px;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.66rem;
+}
+
+/* ---------- Steps ---------- */
+.og-steps {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  padding-top: 48px;
+  padding-bottom: 8px;
+}
+
+.og-step {
+  position: relative;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 0.6s ease,
+    transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.og-steps[data-seen] .og-step {
+  opacity: 1;
+  transform: none;
+}
+
+.og-steps[data-seen] .og-step:nth-child(2) {
+  transition-delay: 0.15s;
+}
+
+.og-steps[data-seen] .og-step:nth-child(3) {
+  transition-delay: 0.3s;
+}
+
+.og-step > span {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  margin-bottom: 10px;
+  border-radius: 999px;
+  background: rgba(220, 20, 60, 0.15);
+  box-shadow: inset 0 0 0 1px rgba(220, 20, 60, 0.45);
+  color: #fda4af;
+  font-weight: 800;
+}
+
+/* The line joining the three numbers draws itself. */
+.og-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 21px;
+  left: calc(50% + 30px);
+  width: calc(100% - 60px + 18px);
+  height: 2px;
+  background: linear-gradient(90deg, rgba(220, 20, 60, 0.6), rgba(220, 20, 60, 0.1));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.8s ease 0.4s;
+}
+
+.og-steps[data-seen] .og-step::after {
+  transform: scaleX(1);
+}
+
+.og-step b {
+  display: block;
+  font-size: 1.02rem;
+  margin-bottom: 4px;
+}
+
+.og-step p {
+  margin: 0 auto;
+  max-width: 240px;
+  color: var(--text-dim);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+/* ---------- Close ---------- */
+.og-close {
+  text-align: center;
+  padding-top: 52px;
+}
+
+.og-close h2 {
+  margin: 0 0 6px;
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.og-close > p {
+  margin: 0 0 18px;
+}
+
+/* ---------- Tablet & phone ---------- */
+@media (max-width: 980px) {
+  .og-scenes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .og-hero {
+    padding-top: 36px;
+    padding-bottom: 26px;
+  }
+
+  .og-sub {
+    font-size: 1rem;
+  }
+
+  .og-scenes {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .og-scene {
+    transition-delay: 0s !important;
+  }
+
+  .og-steps {
+    grid-template-columns: 1fr;
+    gap: 22px;
+    padding-top: 36px;
+  }
+
+  .og-step:not(:last-child)::after {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .og *,
+  .og-scene,
+  .og-step {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+  }
+
+  .og-scene,
+  .og-step {
+    transform: none !important;
+  }
+}
