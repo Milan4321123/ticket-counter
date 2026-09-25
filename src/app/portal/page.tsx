@@ -189,6 +189,9 @@ export default async function PortalDashboardPage({
           </div>
         )}
 
+        {/* A demo's home is only for picking a business; its tools are on
+            each business's board. Real sellers keep the quick tools. */}
+        {!organizer.isDemo && (
         <section className="hub-panel hub-quick anim-fade-up anim-d1" aria-label="Quick tools">
               <h2 className="hub-panel-title">{tr('hub.tools')}</h2>
               <div className="hub-tools">
@@ -214,6 +217,7 @@ export default async function PortalDashboardPage({
                 </Link>
               </div>
         </section>
+        )}
 
         {shownCards.length > 0 && (
           <>

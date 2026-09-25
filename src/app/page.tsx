@@ -3,6 +3,7 @@ import { serverT } from '@/lib/i18nServer';
 import { ensureExampleBazaarOnce } from '@/lib/exampleBazaar';
 import { runSubscriptionSweep } from '@/lib/subscriptions';
 import ShopRail from '@/components/ShopRail';
+import DemoTile from '@/components/DemoTile';
 import type { ShopCardData } from '@/components/ShopRail';
 import { readListingName } from '@/lib/exampleShop';
 import { listShopItems, sortShopItems } from '@/lib/marketItems';
@@ -250,17 +251,15 @@ export default async function HomePage() {
             <span>{tr('qt.sellSub')}</span>
           </span>
         </Link>
-        <Link href="/demo" className="qt-tile qt-demo">
-          <span className="qt-icon" aria-hidden="true">
+        <DemoTile
+          title={tr('qt.demo')}
+          sub={tr('qt.demoSub')}
+          icon={
             <svg viewBox="0 0 24 24">
               <path d="M8 5v14l11-7L8 5Z" />
             </svg>
-          </span>
-          <span className="qt-text">
-            <strong>{tr('qt.demo')}</strong>
-            <span>{tr('qt.demoSub')}</span>
-          </span>
-        </Link>
+          }
+        />
       </nav>
 
       {/* The platform's own voice, AFTER the listing. Above the events it was

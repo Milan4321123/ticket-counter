@@ -3919,3 +3919,22 @@
     transition: none;
   }
 }
+
+/* The demo tile is a form button (components/DemoTile); it looks like its siblings. */
+.qt-form {
+  display: flex;
+  margin: 0;
+}
+
+.qt-form .qt-tile {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.qt-form .qt-tile:disabled {
+  cursor: progress;
+}
