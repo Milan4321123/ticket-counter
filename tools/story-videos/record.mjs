@@ -20,6 +20,8 @@ for (const l of [L.restaurant, L.event, L.grocery].filter(Boolean)) {
   await h.warm(`/e/${l.slug}`);
   await h.warm(`/e/${l.slug}/checkout`);
 }
+// The check-in API compiles on its first call — make that call now (refused, harmlessly).
+await h.page.evaluate(() => fetch('/api/admin/checkin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {}));
 await h.page.evaluate(() => sessionStorage.removeItem('__fvis'));
 
 await h.start();

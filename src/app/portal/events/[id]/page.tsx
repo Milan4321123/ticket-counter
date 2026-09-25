@@ -6,7 +6,7 @@ import { organizerPlanActive } from '@/lib/organizers';
 import { readListingName } from '@/lib/exampleShop';
 import { listWishTotals } from '@/lib/wishes';
 import { parseSlotConfig } from '@/lib/kitchen';
-import { clipForTool, storyForListing } from '@/lib/stories';
+import { clipForTool, storyById, storyForListing } from '@/lib/stories';
 import StoryPlayer from '@/components/StoryPlayer';
 import PlanExpired from '../../PlanExpired';
 import PortalNav from '../../PortalNav';
@@ -104,7 +104,10 @@ export default async function ListingToolsPage({ params }: { params: Promise<{ i
         <h2 className="hub-board-title">Run it</h2>
         <div className="hub-board-grid anim-fade-up anim-d1">
           {main.map((t) => {
-            const clip = story ? clipForTool(story, t.key) : null;
+            // Edit plays how to make the page (the setup story); the other tools
+            // play their chapter of this business's story.
+            const clipStory = (t.key === 'edit' ? storyById('setup') : null) ?? story;
+            const clip = clipStory ? clipForTool(clipStory, t.key) : null;
             return (
               <div key={t.key} className="hub-board-cell">
                 <Link href={t.href} className={`hub-board-tool hub-board-${t.key}`}>
@@ -121,10 +124,10 @@ export default async function ListingToolsPage({ params }: { params: Promise<{ i
                   </span>
                 </Link>
                 {/* This tool's chapter of the story video, beside its button. */}
-                {clip && story && (
+                {clip && clipStory && (
                   <span className="hub-board-see">
                     <StoryPlayer
-                      storyId={story.id}
+                      storyId={clipStory.id}
                       start={clip.start}
                       end={clip.end}
                       label={clip.label}

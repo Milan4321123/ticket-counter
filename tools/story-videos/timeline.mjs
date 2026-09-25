@@ -29,8 +29,17 @@ for (let i = 0; i < ev.length; i++) {
     if (end) squeeze.push([e.t, end.t, 0.45]);
   }
 }
+// Stretches to slow down (the camera reading a QR code): half speed.
+const slow = [];
+for (let i = 0; i < ev.length; i++) {
+  if (ev[i].type === 'slow-start') {
+    const end = ev.slice(i).find((x) => x.type === 'slow-end');
+    if (end) slow.push([ev[i].t, end.t]);
+  }
+}
 function speedAt(r) {
   for (const [a, b, d] of squeeze) if (r >= a && r < b) return Math.max(BASE_SPEED, (b - a) / d);
+  for (const [a, b] of slow) if (r >= a && r < b) return 0.55;
   return BASE_SPEED;
 }
 const map = [];

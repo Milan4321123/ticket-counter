@@ -17,7 +17,7 @@ export interface StoryChapter {
 }
 
 export interface Story {
-  id: 'restaurant' | 'shop' | 'event' | 'customer';
+  id: 'restaurant' | 'shop' | 'event' | 'customer' | 'setup';
   /** Who watches it: sellers (demo, Sell-with-us, tool buttons) or buyers (homepage, the Ask chat). */
   audience: 'seller' | 'buyer';
   title: string;
@@ -38,10 +38,10 @@ export const STORIES: Story[] = [
     title: 'A Friday evening at a momo kitchen',
     forWho: 'Restaurants & food',
     icon: '🥟',
-    src: '/media/stories/restaurant.mp4',
-    poster: '/media/stories/restaurant-poster.jpg',
-    length: 86,
-    chapters: [{"id": "home", "tool": "overview", "chapter": "Open your restaurant", "start": 3.2, "end": 8.11}, {"id": "order", "tool": "buyer", "chapter": "A customer orders", "start": 8.11, "end": 25.06}, {"id": "paid", "tool": "buyer", "chapter": "Paid \u00b7 QR code", "start": 25.06, "end": 33.53}, {"id": "orders", "tool": "orders", "chapter": "New order!", "start": 33.53, "end": 37.66}, {"id": "transfer", "tool": "orders", "chapter": "Confirm a transfer", "start": 37.66, "end": 45.18}, {"id": "kitchen", "tool": "kitchen", "chapter": "Kitchen: cook it", "start": 45.18, "end": 56.42}, {"id": "ready", "tool": "buyer", "chapter": "Customer sees \u201cready\u201d", "start": 56.42, "end": 61.75}, {"id": "collect", "tool": "checkin", "chapter": "Hand it over", "start": 61.75, "end": 67.86}, {"id": "live", "tool": "live", "chapter": "Live screen", "start": 67.86, "end": 73.11}, {"id": "insights", "tool": "insights", "chapter": "Insights", "start": 73.11, "end": 78.44}],
+    src: '/media/stories/restaurant-v2.mp4',
+    poster: '/media/stories/restaurant-v2-poster.jpg',
+    length: 93,
+    chapters: [{"id": "home", "tool": "overview", "chapter": "Open your restaurant", "start": 3.2, "end": 8.12}, {"id": "order", "tool": "buyer", "chapter": "A customer orders", "start": 8.12, "end": 25.71}, {"id": "paid", "tool": "buyer", "chapter": "Paid · QR code", "start": 25.71, "end": 37.63}, {"id": "orders", "tool": "orders", "chapter": "New order!", "start": 37.63, "end": 41.74}, {"id": "transfer", "tool": "orders", "chapter": "Confirm a transfer", "start": 41.74, "end": 49.33}, {"id": "kitchen", "tool": "kitchen", "chapter": "Kitchen: cook it", "start": 49.33, "end": 60.12}, {"id": "ready", "tool": "buyer", "chapter": "Customer sees “ready”", "start": 60.12, "end": 65.53}, {"id": "collect", "tool": "checkin", "chapter": "Hand it over", "start": 65.53, "end": 74.82}, {"id": "live", "tool": "live", "chapter": "Live screen", "start": 74.82, "end": 79.69}, {"id": "insights", "tool": "insights", "chapter": "Insights", "start": 79.69, "end": 85.03}],
   },
   {
     id: 'shop',
@@ -49,10 +49,10 @@ export const STORIES: Story[] = [
     title: 'A week at a grocery shop',
     forWho: 'Shops & goods',
     icon: '🛍',
-    src: '/media/stories/shop.mp4',
-    poster: '/media/stories/shop-poster.jpg',
-    length: 69,
-    chapters: [{"id": "home", "tool": "overview", "chapter": "Open your shop", "start": 3.2, "end": 7.86}, {"id": "order", "tool": "buyer", "chapter": "A customer orders", "start": 7.86, "end": 26.59}, {"id": "paid", "tool": "buyer", "chapter": "Paid · pickup code", "start": 26.59, "end": 35.93}, {"id": "orders", "tool": "orders", "chapter": "New order!", "start": 35.93, "end": 39.93}, {"id": "transfer", "tool": "orders", "chapter": "Confirm a transfer", "start": 39.93, "end": 47.35}, {"id": "collect", "tool": "checkin", "chapter": "Hand it over", "start": 47.35, "end": 53.26}, {"id": "wishes", "tool": "overview", "chapter": "What people want", "start": 53.26, "end": 56.64}, {"id": "insights", "tool": "insights", "chapter": "Insights", "start": 56.64, "end": 62}],
+    src: '/media/stories/shop-v2.mp4',
+    poster: '/media/stories/shop-v2-poster.jpg',
+    length: 77,
+    chapters: [{"id": "home", "tool": "overview", "chapter": "Open your shop", "start": 3.2, "end": 7.95}, {"id": "order", "tool": "buyer", "chapter": "A customer orders", "start": 7.95, "end": 29.95}, {"id": "paid", "tool": "buyer", "chapter": "Paid · pickup code", "start": 29.95, "end": 40.26}, {"id": "orders", "tool": "orders", "chapter": "New order!", "start": 40.26, "end": 44.36}, {"id": "transfer", "tool": "orders", "chapter": "Confirm a transfer", "start": 44.36, "end": 51.9}, {"id": "collect", "tool": "checkin", "chapter": "Hand it over", "start": 51.9, "end": 61}, {"id": "wishes", "tool": "overview", "chapter": "What people want", "start": 61, "end": 64.49}, {"id": "insights", "tool": "insights", "chapter": "Insights", "start": 64.49, "end": 69.93}],
   },
   {
     id: 'event',
@@ -60,10 +60,10 @@ export const STORIES: Story[] = [
     title: 'Dashain Night, from first ticket to a full hall',
     forWho: 'Event organizers',
     icon: '🎟',
-    src: '/media/stories/event.mp4',
-    poster: '/media/stories/event-poster.jpg',
-    length: 77,
-    chapters: [{"id": "home", "tool": "overview", "chapter": "Tickets on sale", "start": 3.2, "end": 8.01}, {"id": "order", "tool": "buyer", "chapter": "A guest picks seats", "start": 8.01, "end": 24.34}, {"id": "paid", "tool": "buyer", "chapter": "QR tickets", "start": 24.34, "end": 35.18}, {"id": "orders", "tool": "orders", "chapter": "New booking", "start": 35.18, "end": 39.25}, {"id": "transfer", "tool": "orders", "chapter": "Confirm a transfer", "start": 39.25, "end": 46.84}, {"id": "insights", "tool": "insights", "chapter": "Sales day by day", "start": 46.84, "end": 53.66}, {"id": "door", "tool": "checkin", "chapter": "Scan at the door", "start": 53.66, "end": 64}, {"id": "live", "tool": "live", "chapter": "Live screen", "start": 64, "end": 69.58}],
+    src: '/media/stories/event-v2.mp4',
+    poster: '/media/stories/event-v2-poster.jpg',
+    length: 86,
+    chapters: [{"id": "home", "tool": "overview", "chapter": "Tickets on sale", "start": 3.2, "end": 8.01}, {"id": "order", "tool": "buyer", "chapter": "A guest picks seats", "start": 8.01, "end": 24.03}, {"id": "paid", "tool": "buyer", "chapter": "QR tickets", "start": 24.03, "end": 38.75}, {"id": "orders", "tool": "orders", "chapter": "New booking", "start": 38.75, "end": 42.96}, {"id": "transfer", "tool": "orders", "chapter": "Confirm a transfer", "start": 42.96, "end": 50.77}, {"id": "insights", "tool": "insights", "chapter": "Sales day by day", "start": 50.77, "end": 57.58}, {"id": "door", "tool": "checkin", "chapter": "Scan at the door", "start": 57.58, "end": 72.35}, {"id": "live", "tool": "live", "chapter": "Live screen", "start": 72.35, "end": 78.41}],
   },
   {
     id: 'customer',
@@ -75,6 +75,17 @@ export const STORIES: Story[] = [
     poster: '/media/stories/customer-v2-poster.jpg',
     length: 108,
     chapters: [{"id": "home", "tool": "home", "chapter": "Discover", "start": 3.2, "end": 10.66}, {"id": "ask", "tool": "ask", "chapter": "Ask anything", "start": 10.66, "end": 35.18}, {"id": "bazaar", "tool": "bazaar", "chapter": "The bazaar", "start": 35.18, "end": 46.97}, {"id": "order", "tool": "order", "chapter": "Order ahead", "start": 46.97, "end": 64.57}, {"id": "ready", "tool": "order", "chapter": "Watch it get ready", "start": 64.57, "end": 73.04}, {"id": "tickets", "tool": "tickets", "chapter": "Tickets for a night out", "start": 73.04, "end": 95.39}, {"id": "wish", "tool": "wish", "chapter": "Wish list", "start": 95.39, "end": 100.95}],
+  },
+  {
+    id: 'setup',
+    audience: 'seller',
+    title: 'Make your event page, step by step',
+    forWho: 'Create your page',
+    icon: '✨',
+    src: '/media/stories/setup-v2.mp4',
+    poster: '/media/stories/setup-v2-poster.jpg',
+    length: 113,
+    chapters: [{"id": "start", "tool": "start", "chapter": "Create an event page", "start": 3.2, "end": 9.07}, {"id": "describe", "tool": "edit", "chapter": "Say it in one sentence", "start": 9.07, "end": 21.36}, {"id": "fill", "tool": "edit", "chapter": "It fills in the form", "start": 21.36, "end": 33.34}, {"id": "photo", "tool": "edit", "chapter": "Add your poster", "start": 33.34, "end": 41.46}, {"id": "extras", "tool": "edit", "chapter": "What’s done, what’s optional", "start": 41.46, "end": 44.18}, {"id": "tickets", "tool": "edit", "chapter": "Ticket details", "start": 44.18, "end": 60.07}, {"id": "updates", "tool": "edit", "chapter": "Post an update", "start": 60.07, "end": 69.36}, {"id": "faq", "tool": "edit", "chapter": "Answer questions first", "start": 69.36, "end": 82.75}, {"id": "design", "tool": "edit", "chapter": "Colours & style", "start": 82.75, "end": 93.57}, {"id": "preview", "tool": "edit", "chapter": "See your page", "start": 93.57, "end": 105.01}],
   },
 ];
 

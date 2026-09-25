@@ -2,7 +2,7 @@ import Link from 'next/link';
 import LogoutButton from './LogoutButton';
 import DemoPicker from './DemoPicker';
 import LoopCarousel from '@/components/LoopCarousel';
-import PitchVideo from '@/components/PitchVideo';
+import StoryPlayer from '@/components/StoryPlayer';
 import { readListingName } from '@/lib/exampleShop';
 import PlatformAssistant from '@/components/PlatformAssistant';
 import {
@@ -151,7 +151,7 @@ export default async function PortalDashboardPage({
             tool board, and every page's "All tools" brings you back. */}
         {organizer.isDemo && (
           <div className="pv-row">
-            <PitchVideo variant="button" />
+            <StoryPlayer storyId="setup" label="How to make your page" />
           </div>
         )}
         {demoPicks.length > 0 && <DemoPicker picks={demoPicks} />}

@@ -6,6 +6,7 @@ import StoryDeck from '@/components/StoryDeck';
 import { ensureExampleBazaarOnce } from '@/lib/exampleBazaar';
 import { runSubscriptionSweep } from '@/lib/subscriptions';
 import ShopRail from '@/components/ShopRail';
+import { parseSlotConfig } from '@/lib/kitchen';
 import DemoTile from '@/components/DemoTile';
 import type { ShopCardData } from '@/components/ShopRail';
 import { readListingName } from '@/lib/exampleShop';
@@ -115,7 +116,9 @@ function billboardSlides(
   // bazaar's goods carry on in the same swipe.
   // The events first, then the goods. The row is endless (HomeBillboard), so
   // it opens on the events with goods to swipe to on BOTH sides.
-  return { slides: [...eventSlides, ...itemSlides], startAt: 0 };
+  // Events only — the food and the shops have rows of their own below. The
+  // goods stand in only when there is no event to show.
+  return { slides: eventSlides.length ? eventSlides : itemSlides, startAt: 0 };
 }
 
 /**
@@ -161,9 +164,17 @@ function pagerItems(items: ShopItem[]): PagerItem[] {
 }
 
 /** The shops rail: real shops first, then the site's example ones. */
-function shopCards(events: EventRow[], snapshot: FeedSnapshot): ShopCardData[] {
+/**
+ * Restaurants and food (a kitchen with pickup times, or food / sweets on the
+ * shelf) get their own row; every other shop is in "Shops".
+ */
+function isFoodPlace(e: EventRow): boolean {
+  return e.category === 'khaja-food' || e.category === 'sweets-bakery' || parseSlotConfig(e.pickupSlots).enabled;
+}
+
+function shopCards(events: EventRow[], snapshot: FeedSnapshot, food: boolean): ShopCardData[] {
   return events
-    .filter((e) => e.kind === 'shop')
+    .filter((e) => e.kind === 'shop' && isFoodPlace(e) === food)
     .map((e) => {
       const { name, isExample } = readListingName(e.name);
       const items = (snapshot.tiers.get(e.id) ?? []).filter((t) => t.status !== 'hidden').length;
@@ -203,7 +214,8 @@ export default async function HomePage() {
   const picks = pagerItems(shopItems);
   // Real shops first; the row is endless, so it opens on them with the
   // others to swipe to on both sides.
-  const shops = shopCards(events, snapshot);
+  const restaurants = shopCards(events, snapshot, true);
+  const shops = shopCards(events, snapshot, false);
   const upcoming = events.filter((e) => e.kind !== 'shop' && !isPast(e, todayIso()));
   const upcomingCount = upcoming.length;
   const upcomingCities = new Set(upcoming.map((e) => e.city.trim()).filter(Boolean));
@@ -284,6 +296,16 @@ export default async function HomePage() {
       {/* How it works, as videos you can swipe: the customer's first. */}
       <span id="watch" className="ab-anchor" aria-hidden="true" />
       <StoryDeck kicker="Watch · 1–2 min" title="See how it works" />
+
+      <span id="food" className="ab-anchor" aria-hidden="true" />
+      <ShopRail
+        kicker="Order ahead · collect"
+        title="Restaurants & food"
+        shops={restaurants}
+        moreHref="/market?category=khaja-food"
+        moreLabel={tr('home.seeAll')}
+        itemsLabel={tr('sr.items')}
+      />
 
       <span id="shops" className="ab-anchor" aria-hidden="true" />
       <ShopRail

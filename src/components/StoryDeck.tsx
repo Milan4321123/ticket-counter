@@ -7,10 +7,22 @@ import { useEffect, useRef, useState } from 'react';
 import { STORIES, type Story } from '@/lib/stories';
 import { StoryModal } from './StoryPlayer';
 
-const ORDER: Story['id'][] = ['customer', 'restaurant', 'shop', 'event'];
+const HOME_ORDER: Story['id'][] = ['customer', 'restaurant', 'shop', 'event', 'setup'];
 
-export default function StoryDeck({ kicker, title }: { kicker: string; title: string }) {
-  const stories = [...STORIES].sort((a, b) => rank(a) - rank(b));
+/**
+ * `order` picks and orders the videos (homepage: the customer's first; Sell
+ * with us: making a page first). Ids without a rendered video are skipped.
+ */
+export default function StoryDeck({
+  kicker,
+  title,
+  order = HOME_ORDER,
+}: {
+  kicker: string;
+  title: string;
+  order?: Story['id'][];
+}) {
+  const stories = order.map((id) => STORIES.find((s) => s.id === id)).filter((s): s is Story => Boolean(s));
   const [open, setOpen] = useState<Story | null>(null);
   if (!stories.length) return null;
   return (
@@ -27,11 +39,6 @@ export default function StoryDeck({ kicker, title }: { kicker: string; title: st
       {open && <StoryModal story={open} onClose={() => setOpen(null)} />}
     </section>
   );
-}
-
-function rank(s: Story): number {
-  const i = ORDER.indexOf(s.id);
-  return i === -1 ? ORDER.length : i;
 }
 
 function DeckCard({ story, onOpen }: { story: Story; onOpen: () => void }) {

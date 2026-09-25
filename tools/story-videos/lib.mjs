@@ -91,6 +91,49 @@ async function maskPoster(name, city, i) {
   return file;
 }
 
+/**
+ * The camera, faked: what the scanner's camera "sees" is a phone held up with
+ * the customer's QR code on it (the real code of the real order), sliding in
+ * and swaying a little — written as the .y4m video the browser plays as its
+ * camera (--use-file-for-fake-video-capture). The app's own scanner reads it.
+ */
+export const CAMERA_FEED = fileURLToPath(new URL('./out/camera.y4m', import.meta.url));
+export async function writeCameraFeed(code, caption = '') {
+  const sharp = require('sharp');
+  const QRCode = require('qrcode');
+  const qr = await QRCode.toBuffer(code, { width: 300, margin: 2 });
+  const dir = fileURLToPath(new URL('./out/camframes/', import.meta.url));
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+  const b64 = qr.toString('base64');
+  const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  // 1 s of the empty counter, then the phone slides up into view and sways.
+  const N = 150;
+  for (let i = 0; i < N; i++) {
+    const k = Math.max(0, Math.min(1, (i - 30) / 40));
+    const ease = 1 - Math.pow(1 - k, 3);
+    const y = 60 + (1 - ease) * 420 + Math.sin(i / 9) * 5;
+    const x = 170 + Math.sin(i / 13) * 6;
+    const rot = (1 - ease) * 10 + Math.sin(i / 11) * 1.5;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480">
+      <defs><radialGradient id="bg" cx=".3" cy=".3" r="1"><stop offset="0" stop-color="#6b4a2f"/><stop offset="1" stop-color="#1c130c"/></radialGradient></defs>
+      <rect width="640" height="480" fill="url(#bg)"/>
+      <rect x="0" y="360" width="640" height="120" fill="#2a1d12" opacity=".8"/>
+      <circle cx="520" cy="90" r="70" fill="#f59e0b" opacity=".12"/>
+      <g transform="translate(${x} ${y}) rotate(${rot} 150 180)">
+        <rect x="0" y="0" width="300" height="420" rx="34" fill="#0d0f14"/>
+        <rect x="12" y="14" width="276" height="392" rx="26" fill="#f8fafc"/>
+        <image href="data:image/png;base64,${b64}" x="30" y="40" width="240" height="240"/>
+        <text x="150" y="315" text-anchor="middle" font-family="Menlo, monospace" font-weight="700" font-size="24" fill="#0f172a">${esc(code)}</text>
+        <text x="150" y="350" text-anchor="middle" font-family="Helvetica Neue, Arial" font-size="16" fill="#475569">${esc(caption)}</text>
+      </g>
+      <g transform="translate(${x - 30} ${y + 250}) rotate(${rot})"><ellipse cx="30" cy="60" rx="42" ry="78" fill="#c68b59"/></g>
+    </svg>`;
+    await sharp(Buffer.from(svg)).png().toFile(`${dir}${String(i).padStart(3, '0')}.png`);
+  }
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-framerate', '30', '-i', `${dir}%03d.png`, '-pix_fmt', 'yuv420p', CAMERA_FEED]);
+}
+
 /** Read-only look into the database (a ticket code, an order id). */
 export function dbGet(sql, ...args) {
   const db = new Database(DB_PATH, { readonly: true });
@@ -104,6 +147,7 @@ export const W = 390;
 export const H = 844;
 
 export async function openRecorder(outDir) {
+  if (!fs.existsSync(CAMERA_FEED)) await writeCameraFeed('XXXX-XXXX');
   fs.rmSync(outDir, { recursive: true, force: true });
   fs.mkdirSync(outDir + '/rec', { recursive: true });
   fs.mkdirSync(outDir + '/dbg', { recursive: true });
@@ -112,9 +156,20 @@ export async function openRecorder(outDir) {
   const browser = await puppeteer.launch({
     executablePath: '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
     headless: 'new',
-    args: ['--no-first-run', '--hide-scrollbars', '--lang=en', '--disable-features=Translate', '--autoplay-policy=no-user-gesture-required'],
+    args: [
+      '--no-first-run',
+      '--hide-scrollbars',
+      '--lang=en',
+      '--disable-features=Translate',
+      '--autoplay-policy=no-user-gesture-required',
+      // The counter's camera: a file we write just before each scan.
+      '--use-fake-ui-for-media-stream',
+      '--use-fake-device-for-media-stream',
+      `--use-file-for-fake-video-capture=${CAMERA_FEED}`,
+    ],
   });
   const page = await browser.newPage();
+  await browser.defaultBrowserContext().overridePermissions(BASE, ['camera']);
 
   // No real listing's photo or video ever reaches a frame (see realMedia).
   const masked = new Map();
@@ -175,6 +230,14 @@ export async function openRecorder(outDir) {
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
     else start();
+  });
+
+  // The scanner reads QR codes with jsQR here, as it does on an iPhone (no
+  // BarcodeDetector) — so the recording also proves that path works.
+  await page.evaluateOnNewDocument(() => {
+    try {
+      delete window.BarcodeDetector;
+    } catch {}
   });
 
   // The finger, living inside every page; dev overlays and demo banners hidden.
@@ -404,6 +467,37 @@ export async function openRecorder(outDir) {
       });
       mark('device', { kind, w: dims.width, h: dims.height });
       await sleep(300);
+    },
+    /** Open the camera scanner and keep its view on screen until it reads the code. */
+    async scanWithCamera() {
+      await h.tap('button', 'Scan with camera', { after: 100 });
+      await page.waitForSelector('video', { timeout: 8000 }).catch(() => {});
+      await page.evaluate(() => {
+        // Hide the finger — the camera is the picture now — and bring the camera view up.
+        window.__fhide?.();
+        document.querySelector('video')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
+      await sleep(700);
+      // The camera close up, in slow motion, until the code is read.
+      const vid = await page.$('video');
+      const c = vid ? await h.center(vid) : { x: 195, y: 520 };
+      mark('slow-start');
+      mark('type-start', c);
+      await page.waitForFunction(() => !document.querySelector('video'), { timeout: 15000 }).catch(() => {});
+      await sleep(300);
+      mark('type-end', c);
+      mark('slow-end');
+      // The server's answer (fast-forwarded if it is slow).
+      await h.fastForward(() =>
+        page.waitForFunction(() => !/Checking/.test(document.body.innerText), { timeout: 40000 }).catch(() => {})
+      );
+      await sleep(400);
+      // The result card.
+      await page.evaluate(() => {
+        const r = [...document.querySelectorAll('[class*="result"], .notice')].at(-1);
+        r?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
+      await sleep(2600);
     },
     /** Waiting on the server or the AI: this stretch is fast-forwarded. */
     async fastForward(fn) {

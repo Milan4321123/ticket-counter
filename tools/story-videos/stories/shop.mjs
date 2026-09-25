@@ -2,7 +2,7 @@
 // noodles online and pick them up at the counter — the order lands, a bank
 // transfer is confirmed, the goods are handed over with a scan, the wish list
 // shows what people want next, and insights show what sells.
-import { dbGet } from '../lib.mjs';
+import { dbGet, writeCameraFeed } from '../lib.mjs';
 
 export const meta = {
   id: 'shop',
@@ -140,8 +140,9 @@ export async function run(h, L) {
   h.scene('collect');
   const code = dbGet(`SELECT code FROM tickets WHERE order_id = ? ORDER BY code LIMIT 1`, orderId)?.code ?? '';
   await h.goto(`${P}/checkin`, { settle: 1000 });
-  await h.typeInto('form input', code, { delay: 90 });
-  await h.tap('form button[type=submit]', undefined, { after: 2400 });
+  // The camera sees the customer's phone with this order's QR code on it.
+  await h.fastForward(() => writeCameraFeed(code, 'Basmati rice · Didi’s Kirana'));
+  await h.scanWithCamera();
   await h.dbg('collected');
 
   h.scene('wishes');
