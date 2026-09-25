@@ -35,6 +35,9 @@ const TARGET_LABEL: Record<DemoTarget, string> = {
   live: 'the live door screen',
   appointments: 'today’s appointments',
   'buyer-salon': 'the salon as a customer',
+  'tools-event': 'the event organizer demo',
+  'tools-shop': 'the restaurant demo',
+  'tools-salon': 'the salon demo',
 };
 
 const ERRORS: Record<string, string> = {
@@ -42,6 +45,34 @@ const ERRORS: Record<string, string> = {
   busy: 'A lot of people are trying the demo right now. Please try again in a few minutes.',
   failed: 'Something went wrong while building your demo. Please try again.',
 };
+
+/** The three ready-made businesses in every demo account (lib/demo). */
+const PICKS: { to: DemoTarget; emoji: string; title: string; who: string; points: string[]; tone: string }[] = [
+  {
+    to: 'tools-shop',
+    emoji: '🥟',
+    title: 'Restaurant & food shop',
+    who: 'Didi’s Momo Kitchen',
+    points: ['Online orders with pickup times', 'Kitchen screen: New → Cooking → Ready', 'Order from the table by QR'],
+    tone: 'amber',
+  },
+  {
+    to: 'tools-event',
+    emoji: '🎶',
+    title: 'Event organizer',
+    who: 'Dashain Night — Live Music & Dinner',
+    points: ['Tickets and a real seat map', 'Confirm payments, scan at the door', 'Live screen and sales insights'],
+    tone: 'brand',
+  },
+  {
+    to: 'tools-salon',
+    emoji: '💅',
+    title: 'Salon & appointments',
+    who: 'Glow Threading & Beauty',
+    points: ['Customers book a time slot', 'Today’s appointments on a board', 'Services with options'],
+    tone: 'violet',
+  },
+];
 
 const TOUR: { to: DemoTarget; title: string; line: string }[] = [
   { to: 'checkout', title: 'Pick your seats', line: 'A real hall map: VIP front rows and Standard, part-sold. Tap seats, pay (simulated), get QR tickets with your seats.' },
@@ -78,17 +109,23 @@ export default async function DemoPage({
   const brand = platformNameFromEnv();
   const realSession = viewer !== null && !viewer.isDemo;
 
+  const hidden = (target: DemoTarget) => (
+    <>
+      <input type="hidden" name="to" value={target} />
+      {(realSession || error === 'signed-in') && <input type="hidden" name="confirm" value="1" />}
+    </>
+  );
+
   return (
-    <div className="container container-narrow section">
-      <p className="feed-kicker">Try it yourself</p>
-      <h1 className="page-title" style={{ marginTop: 4 }}>
-        Your own organizer account, ready in a second
-      </h1>
-      <p className="muted" style={{ maxWidth: 640 }}>
-        Press the button and you get a private demo account on {brand}: an upcoming event with four ticket types, a
-        shop with six items and photos, three weeks of orders, customers collecting with QR codes, reviews and a
-        promo code. Every page works — you are using the real software, not screenshots.
-      </p>
+    <div className="container section demo-page">
+      <header className="demo-head">
+        <p className="feed-kicker">Try it yourself · free · no sign-up</p>
+        <h1 className="page-title">Pick a demo</h1>
+        <p className="muted">
+          Your own private seller account on {brand} with real orders already in it. Open one — you can switch to the
+          others inside.
+        </p>
+      </header>
 
       {error === 'signed-in' ? (
         <div className="notice notice-warn">
@@ -99,52 +136,75 @@ export default async function DemoPage({
         <div className="notice notice-error">{ERRORS[error]}</div>
       ) : null}
 
-      {viewer?.isDemo ? (
-        <p>
-          <Link className="btn btn-brand btn-lg" href="/portal">
-            Continue your demo →
-          </Link>
-        </p>
-      ) : (
-        <form action="/api/demo/start" method="post" style={{ margin: '18px 0 8px' }}>
-          <input type="hidden" name="to" value={to} />
-          {(realSession || error === 'signed-in') && <input type="hidden" name="confirm" value="1" />}
-          <DemoSubmit label={to === 'portal' ? 'Start the demo' : `Start the demo and open ${TARGET_LABEL[to]}`} />
+      {/* Arrived from a link to one feature (e.g. /showcase): that first. */}
+      {rawTo && to !== 'portal' && !viewer?.isDemo && (
+        <form action="/api/demo/start" method="post" className="demo-direct">
+          {hidden(to)}
+          <DemoSubmit label={`Open ${TARGET_LABEL[to]} →`} />
+          <span className="muted small">or pick a whole demo below</span>
         </form>
       )}
 
-      <ul className="muted small" style={{ margin: '10px 0 28px', paddingLeft: 18, lineHeight: 1.7 }}>
-        <li>No sign-up and nothing to pay.</li>
-        <li>Only you can see your demo — it never appears on the public site.</li>
-        <li>Payments are simulated and no emails are sent, so try anything.</li>
-        <li>It deletes itself after 24 hours.</li>
-      </ul>
-
-      <h2 className="feed-section-title">Things to try</h2>
-      <div className="demo-tour">
-        {TOUR.map((step) => (
-          <div className="card demo-tour-card" key={step.to}>
-            <div className="tier-name">{step.title}</div>
-            <p className="muted small" style={{ margin: '4px 0 10px' }}>
-              {step.line}
-            </p>
+      <div className="demo-picks">
+        {PICKS.map((p) => (
+          <div key={p.to} className={`demo-pick demo-pick-${p.tone}`}>
+            <span className="demo-pick-emoji" aria-hidden="true">
+              {p.emoji}
+            </span>
+            <h2>{p.title}</h2>
+            <p className="demo-pick-who">{p.who}</p>
+            <ul>
+              {p.points.map((pt) => (
+                <li key={pt}>{pt}</li>
+              ))}
+            </ul>
             {viewer?.isDemo ? (
-              <Link className="inline-link small" href={`/demo?to=${step.to}`}>
+              <Link className="btn btn-brand demo-pick-go" href={`/demo?to=${p.to}`}>
                 Open →
               </Link>
             ) : (
               <form action="/api/demo/start" method="post">
-                <input type="hidden" name="to" value={step.to} />
-                {realSession && <input type="hidden" name="confirm" value="1" />}
-                <DemoSubmit label="Start here →" className="btn btn-sm" />
+                {hidden(p.to)}
+                <DemoSubmit label="Open this demo →" className="btn btn-brand demo-pick-go" />
               </form>
             )}
           </div>
         ))}
       </div>
 
-      <p className="muted small" style={{ marginTop: 28 }}>
-        Want to see everything the platform does first? <Link href="/showcase">Browse all features</Link>.
+      <ul className="demo-facts">
+        <li>✓ Nothing to pay</li>
+        <li>✓ Only you can see it</li>
+        <li>✓ Payments are simulated</li>
+        <li>✓ Deletes itself after 24 h</li>
+      </ul>
+
+      <details className="demo-more">
+        <summary>Or jump straight to one feature</summary>
+        <div className="demo-tour">
+          {TOUR.map((step) => (
+            <div className="demo-tour-row" key={step.to}>
+              <div>
+                <strong>{step.title}</strong>
+                <span>{step.line}</span>
+              </div>
+              {viewer?.isDemo ? (
+                <Link className="btn btn-sm" href={`/demo?to=${step.to}`}>
+                  Open
+                </Link>
+              ) : (
+                <form action="/api/demo/start" method="post">
+                  {hidden(step.to)}
+                  <DemoSubmit label="Open" className="btn btn-sm" />
+                </form>
+              )}
+            </div>
+          ))}
+        </div>
+      </details>
+
+      <p className="muted small" style={{ marginTop: 24 }}>
+        Want the full list first? <Link href="/showcase">Browse all features</Link>.
       </p>
     </div>
   );

@@ -5,7 +5,7 @@
 // and the bazaar grid (usePeekDim).
 import Link from 'next/link';
 import { useRef } from 'react';
-import { usePeekDim } from './usePeekDim';
+import { usePeekDim, useSwipeNudge } from './usePeekDim';
 
 export interface ShopCardData {
   id: string;
@@ -28,6 +28,7 @@ export default function ShopRail({ kicker, title, shops, moreHref, moreLabel, it
 }) {
   const track = useRef<HTMLDivElement>(null);
   usePeekDim(track);
+  useSwipeNudge(track);
   if (shops.length === 0) return null;
 
   const scroll = (dir: 1 | -1) => {

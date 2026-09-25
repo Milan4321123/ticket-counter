@@ -9,7 +9,7 @@
 // somebody touches it. Reduced motion: no auto-advance, no scaling.
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { usePeekDim } from './usePeekDim';
+import { usePeekDim, useSwipeNudge } from './usePeekDim';
 
 export interface BillboardSlide {
   id: string;
@@ -36,6 +36,7 @@ export default function HomeBillboard({ slides }: { slides: BillboardSlide[] }) 
 
   // Lit when in view, dimmed while peeking in from an edge (usePeekDim).
   usePeekDim(track, setCurrent);
+  useSwipeNudge(track);
 
   const goTo = useCallback(
     (k: number) => {

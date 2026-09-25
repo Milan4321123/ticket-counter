@@ -6,7 +6,7 @@
 // columns snap, so a swipe always lands on whole tiles.
 import Link from 'next/link';
 import { useCallback, useRef, useState } from 'react';
-import { usePeekDim } from './usePeekDim';
+import { usePeekDim, useSwipeNudge } from './usePeekDim';
 
 export interface PagerItem {
   key: string;
@@ -56,6 +56,7 @@ export default function BazaarPager({ title, kicker, items, moreHref, moreLabel 
 
   // Tiles swiping in from the edge dim and grow, like the event cards above.
   usePeekDim(track, measure);
+  useSwipeNudge(track, 80);
 
   const page = (dir: 1 | -1) => {
     const el = track.current;

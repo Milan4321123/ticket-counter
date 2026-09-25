@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { readListingName } from '@/lib/exampleShop';
 import PlatformAssistant from '@/components/PlatformAssistant';
 import {
   countOpenQuestionsByEvent,
@@ -155,6 +156,32 @@ export default async function PortalDashboardPage({
     });
   }
 
+  // The demo's three businesses (lib/demo), found the way demoTargetPath finds them.
+  const demoPicks = organizer.isDemo
+    ? [
+        {
+          event: events.find((e) => e.kind === 'shop' && e.slug.endsWith('-momo-kitchen')),
+          emoji: '🥟',
+          title: 'Restaurant',
+          line: 'Orders, pickup times, kitchen screen, table QR',
+          tone: 'amber',
+        },
+        {
+          event: events.find((e) => e.kind !== 'shop'),
+          emoji: '🎶',
+          title: 'Event',
+          line: 'Tickets, seat map, payments, door scanning',
+          tone: 'brand',
+        },
+        {
+          event: events.find((e) => e.kind === 'shop' && e.slug.endsWith('-glow-beauty')),
+          emoji: '💅',
+          title: 'Salon',
+          line: 'Appointments by time slot, booking board',
+          tone: 'violet',
+        },
+      ].flatMap((p) => (p.event ? [{ ...p, id: p.event.id, who: readListingName(p.event.name).name }] : []))
+    : [];
   const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
@@ -181,6 +208,29 @@ export default async function PortalDashboardPage({
             </a>
           </div>
         </header>
+
+        {/* A demo account opens on its three businesses: pick one, land on its
+            tool board, and every page's "All tools" brings you back. */}
+        {demoPicks.length > 0 && (
+          <section className="hub-demo-picks anim-fade-up" aria-label="Pick a demo">
+            <h2 className="hub-board-title" style={{ margin: 0 }}>
+              Pick one to explore
+            </h2>
+            <div className="demo-picks">
+              {demoPicks.map((p) => (
+                <Link key={p.id} href={`/portal/events/${p.id}`} className={`demo-pick demo-pick-${p.tone} hub-demo-pick`}>
+                  <span className="demo-pick-emoji" aria-hidden="true">
+                    {p.emoji}
+                  </span>
+                  <h2>{p.title}</h2>
+                  <p className="demo-pick-who">{p.who}</p>
+                  <span className="hub-demo-pick-line">{p.line}</span>
+                  <span className="btn btn-brand btn-sm demo-pick-go">Open its tools →</span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
 
         {deletedName && (
           <div className="notice notice-success anim-fade-up" role="status" style={{ margin: 0 }}>
@@ -296,7 +346,7 @@ export default async function PortalDashboardPage({
                   event.totalCapacity > 0 ? Math.min(100, Math.round((stats.ticketsSold / event.totalCapacity) * 100)) : 0;
                 return (
                   <article key={event.id} className={`hub-card anim-fade-up${i < 4 ? ` anim-d${i + 1}` : ''}`}>
-                    <Link href={`/portal/events/${event.id}/edit`} className="hub-card-media" aria-label={`Edit ${event.name}`}>
+                    <Link href={`/portal/events/${event.id}`} className="hub-card-media" aria-label={`Edit ${event.name}`}>
                       {thumb ? (
                         // Served by our own /api/media route — next/image is not needed.
                         // eslint-disable-next-line @next/next/no-img-element
@@ -357,7 +407,10 @@ export default async function PortalDashboardPage({
                         </div>
                       </div>
                       <div className="hub-card-actions">
-                        <Link href={`/portal/events/${event.id}/edit`} className="btn btn-brand btn-sm">
+                        <Link href={`/portal/events/${event.id}`} className="btn btn-brand btn-sm">
+                          ▦ All tools
+                        </Link>
+                        <Link href={`/portal/events/${event.id}/edit`} className="btn btn-sm">
                           {tr('hub.edit')}
                         </Link>
                         <Link href={`/portal/events/${event.id}/orders`} className="btn btn-sm">

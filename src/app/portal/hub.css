@@ -995,3 +995,313 @@
   color: var(--amber);
   font-weight: 700;
 }
+
+/* ---------- The open listing's tools, unfolded in the sidebar ---------- */
+.hub-subtools {
+  list-style: none;
+  margin: 4px 0 8px 14px;
+  padding: 0 0 0 10px;
+  border-left: 1px solid var(--border-soft);
+  display: grid;
+  gap: 1px;
+}
+
+.hub-subtool {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 10px;
+  border-radius: 9px;
+  color: var(--text-dim);
+  font-size: 0.86rem;
+  font-weight: 600;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.hub-subtool svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.hub-subtool:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+}
+
+.hub-subtool-on {
+  background: rgba(220, 20, 60, 0.14);
+  color: #fff;
+}
+
+.hub-subtool-on svg {
+  color: #f87171;
+}
+
+/* "All tools" leads the tab strip on every tool page. */
+.hub-tab-pill-home {
+  font-weight: 700;
+}
+
+/* ---------- One listing's tool board (/portal/events/[id]) ---------- */
+.hub-board-head {
+  margin-bottom: 18px;
+}
+
+.hub-board-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 26px;
+}
+
+.hub-board-stats > div {
+  display: grid;
+  gap: 2px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+}
+
+.hub-board-stats strong {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.hub-board-stats span {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+.hub-board-stats .hub-board-stat-warn {
+  border-color: rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.hub-board-stat-warn strong {
+  color: #fbbf24;
+}
+
+.hub-board-title {
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.hub-board-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
+  gap: 12px;
+  margin-bottom: 26px;
+}
+
+.hub-board-tool {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 84px;
+  padding: 16px 40px 16px 16px;
+  border-radius: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  color: var(--text);
+  transition:
+    transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.hub-board-tool:hover {
+  transform: translateY(-2px);
+  border-color: rgba(220, 20, 60, 0.45);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+}
+
+.hub-board-tool:active {
+  transform: scale(0.98);
+}
+
+.hub-board-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  background: rgba(220, 20, 60, 0.12);
+  color: #f87171;
+}
+
+.hub-board-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.hub-board-orders .hub-board-icon,
+.hub-board-checkin .hub-board-icon {
+  background: rgba(16, 185, 129, 0.13);
+  color: #34d399;
+}
+
+.hub-board-insights .hub-board-icon,
+.hub-board-live .hub-board-icon {
+  background: rgba(96, 165, 250, 0.13);
+  color: #60a5fa;
+}
+
+.hub-board-kitchen .hub-board-icon {
+  background: rgba(251, 191, 36, 0.13);
+  color: #fbbf24;
+}
+
+.hub-board-text {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.hub-board-text strong {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.hub-board-text span {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.hub-board-badge {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.16);
+  color: #fbbf24;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.hub-board-go {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  color: var(--text-dim);
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.hub-board-tool:hover .hub-board-go {
+  transform: translateX(3px);
+  color: #fff;
+}
+
+.hub-board-grid-small .hub-board-tool {
+  min-height: 70px;
+  padding: 12px 36px 12px 12px;
+}
+
+.hub-board-grid-small .hub-board-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-dim);
+}
+
+@media (max-width: 720px) {
+  .hub-board-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hub-board-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .hub-board-tool {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    min-height: 0;
+    padding: 14px 14px 16px;
+  }
+
+  .hub-board-go {
+    display: none;
+  }
+
+  .hub-board-badge {
+    top: 12px;
+    right: 10px;
+  }
+
+  .hub-board-text strong {
+    font-size: 0.95rem;
+  }
+
+  .hub-board-text span {
+    font-size: 0.76rem;
+  }
+}
+
+/* The demo account's home: its three businesses first. */
+.hub-demo-picks {
+  display: grid;
+  gap: 12px;
+}
+
+.hub-demo-pick {
+  color: var(--text);
+}
+
+.hub-demo-pick-line {
+  flex: 1;
+  margin-bottom: 14px;
+  color: var(--text-dim);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.hub-demo-picks .demo-pick {
+  padding: 18px;
+}
+
+@media (max-width: 820px) {
+  .hub-demo-picks .demo-picks {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .hub-demo-picks .demo-pick {
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .hub-demo-picks .demo-pick-emoji {
+    width: 38px;
+    height: 38px;
+    font-size: 1.2rem;
+    margin-bottom: 8px;
+  }
+
+  .hub-demo-picks .demo-pick h2 {
+    font-size: 0.95rem;
+  }
+
+  .hub-demo-picks .demo-pick-who,
+  .hub-demo-picks .hub-demo-pick-line {
+    display: none;
+  }
+
+  .hub-demo-picks .demo-pick-go {
+    padding: 6px 8px;
+    font-size: 0.74rem;
+  }
+}

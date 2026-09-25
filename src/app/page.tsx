@@ -219,16 +219,9 @@ function billboardSlides(
       cta: tr('bb.order'),
     });
   }
-  // Events only, so a few running events are never buried under example
-  // goods; the bazaar has its own grid right below. Items stand in only on a
-  // site with no upcoming event to show.
-  if (eventSlides.length > 0) return eventSlides;
-  const slides: BillboardSlide[] = [];
-  for (let k = 0; k < Math.max(eventSlides.length, itemSlides.length); k++) {
-    if (eventSlides[k]) slides.push(eventSlides[k]);
-    if (itemSlides[k]) slides.push(itemSlides[k]);
-  }
-  return slides;
+  // Events first — two side by side on the opening screen — then the
+  // bazaar's goods carry on in the same swipe.
+  return [...eventSlides, ...itemSlides];
 }
 
 /**

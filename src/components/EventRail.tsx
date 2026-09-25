@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSwipeNudge } from './usePeekDim';
 
 export interface EventRailProps {
   /** Accessible name for the scrollable region, e.g. "Happening soon". */
@@ -40,6 +41,8 @@ function Chevron({ direction }: { direction: 'left' | 'right' }) {
  */
 export default function EventRail({ label, children }: EventRailProps) {
   const trackRef = useRef<HTMLDivElement | null>(null);
+  // The same one-time "there is more →" nudge as the homepage's other rows.
+  useSwipeNudge(trackRef);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
 

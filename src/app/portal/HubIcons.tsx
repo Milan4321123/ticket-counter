@@ -115,3 +115,95 @@ export const IconEdit = () => (
     <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16Z" />
   </Svg>
 );
+
+export const IconCook = () => (
+  <Svg>
+    <path d="M6 13h12v5a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-5Z" />
+    <path d="M4 13h16" />
+    <path d="M9 9c0-1.5 1-1.5 1-3M13 9c0-1.5 1-1.5 1-3" />
+  </Svg>
+);
+
+export const IconCalendar = () => (
+  <Svg>
+    <rect x="4" y="5" width="16" height="15" rx="2" />
+    <path d="M4 10h16M9 3v4M15 3v4" />
+  </Svg>
+);
+
+export const IconPulse = () => (
+  <Svg>
+    <path d="M3 12h4l2-5 4 10 2-5h6" />
+  </Svg>
+);
+
+export const IconQr = () => (
+  <Svg>
+    <rect x="4" y="4" width="6" height="6" rx="1" />
+    <rect x="14" y="4" width="6" height="6" rx="1" />
+    <rect x="4" y="14" width="6" height="6" rx="1" />
+    <path d="M14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2" />
+  </Svg>
+);
+
+export const IconRepeat = () => (
+  <Svg>
+    <path d="M4 12a7 7 0 0 1 12-5l2 2M20 12a7 7 0 0 1-12 5l-2-2" />
+    <path d="M18 4v5h-5M6 20v-5h5" />
+  </Svg>
+);
+
+export const IconSeat = () => (
+  <Svg>
+    <path d="M7 11V7a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v4" />
+    <path d="M5 11h14v4H5zM7 15v4M17 15v4" />
+  </Svg>
+);
+
+export const IconEye = () => (
+  <Svg>
+    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+    <circle cx="12" cy="12" r="3" />
+  </Svg>
+);
+
+export const IconGrid = () => (
+  <Svg>
+    <rect x="4" y="4" width="7" height="7" rx="1.5" />
+    <rect x="13" y="4" width="7" height="7" rx="1.5" />
+    <rect x="4" y="13" width="7" height="7" rx="1.5" />
+    <rect x="13" y="13" width="7" height="7" rx="1.5" />
+  </Svg>
+);
+
+/** The icon for a listing tool (./listingTools), by name. */
+export function ToolIconView({ icon }: { icon: import('./listingTools').ToolIcon }) {
+  switch (icon) {
+    case 'grid':
+      return <IconGrid />;
+    case 'edit':
+      return <IconEdit />;
+    case 'inbox':
+      return <IconInbox />;
+    case 'chart':
+      return <IconChart />;
+    case 'cook':
+      return <IconCook />;
+    case 'calendar':
+      return <IconCalendar />;
+    case 'scan':
+      return <IconScan />;
+    case 'pulse':
+      return <IconPulse />;
+    case 'qr':
+      return <IconQr />;
+    case 'repeat':
+      return <IconRepeat />;
+    case 'seat':
+      return <IconSeat />;
+    case 'eye':
+      return <IconEye />;
+    case 'tag':
+      return <IconTag />;
+  }
+}

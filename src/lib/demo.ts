@@ -168,6 +168,9 @@ export const DEMO_TARGETS = [
   'live',
   'appointments',
   'buyer-salon',
+  'tools-event',
+  'tools-shop',
+  'tools-salon',
 ] as const;
 export type DemoTarget = (typeof DEMO_TARGETS)[number];
 
@@ -184,6 +187,12 @@ export function demoTargetPath(organizerId: string, target: DemoTarget): string 
   const shop = rows.find((r) => r.kind === 'shop' && r.slug.endsWith('-momo-kitchen')) ?? rows.find((r) => r.kind === 'shop');
   const salon = rows.find((r) => r.kind === 'shop' && r.slug.endsWith('-glow-beauty'));
   switch (target) {
+    case 'tools-event':
+      return event ? `/portal/events/${event.id}` : '/portal';
+    case 'tools-shop':
+      return shop ? `/portal/events/${shop.id}` : '/portal';
+    case 'tools-salon':
+      return salon ? `/portal/events/${salon.id}` : '/portal';
     case 'event':
       return event ? `/portal/events/${event.id}/edit` : '/portal';
     case 'shop':

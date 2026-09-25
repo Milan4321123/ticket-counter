@@ -23,6 +23,18 @@ export default async function PortalLoginPage() {
         <p className="muted" style={{ textAlign: 'center', marginTop: 0 }}>
           Your events, orders, and door check-in — all in one place.
         </p>
+        {/* Most people on this page have no account yet — the demo is the
+            quickest honest answer to "what would I get?". */}
+        <Link href="/demo" className="login-demo">
+          <span className="login-demo-icon" aria-hidden="true">
+            ▶
+          </span>
+          <span>
+            <strong>Just looking? Try the demo</strong>
+            <span>A ready-made shop, restaurant or event — no sign-up</span>
+          </span>
+          <span aria-hidden="true">→</span>
+        </Link>
         <div className="card glow-card">
           <LoginForm />
         </div>
