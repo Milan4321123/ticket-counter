@@ -525,9 +525,10 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
       <div className="card">
         <SectionHead
           title="Updates"
-          hint="Post news the way you would on a social page — it appears in the Updates feed on your event page."
+          hint="News for everyone who bought — shown on your page, newest first."
         />
         <PageContentPanel
+            kind={event.kind}
           show="updates"
           eventId={event.id}
           media={attachables}
@@ -565,6 +566,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
           revealOn={FAQ_SUGGESTIONS_EVENT}
         >
           <PageContentPanel
+            kind={event.kind}
             show="faq"
             eventId={event.id}
             media={attachables}

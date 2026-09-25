@@ -35,6 +35,8 @@ interface Props {
   /** The event's gallery caps — an update's upload counts against them too. */
   maxPhotos: number;
   maxVideos: number;
+  /** Event or shop — picks the quick-start texts and common questions. */
+  kind?: 'event' | 'shop';
 }
 
 const MAX_FAQS = 12;
@@ -112,6 +114,7 @@ export default function PageContentPanel({
   maxPhotos,
   maxVideos,
   show,
+  kind = 'event',
 }: Props) {
   const router = useRouter();
   // 'post' | 'faqs' | 'compress' | 'upload' | post id
@@ -349,9 +352,23 @@ export default function PageContentPanel({
     setFaqRows((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
   }
 
-  function addFaqRow() {
-    setFaqRows((prev) => (prev.length >= MAX_FAQS ? prev : [...prev, { question: '', answer: '' }]));
+  function addFaqRow(question = '') {
+    setFaqRows((prev) => {
+      if (prev.length >= MAX_FAQS) return prev;
+      // Fill an empty row first rather than leaving a blank one above.
+      const blank = prev.findIndex((r) => !r.question.trim() && !r.answer.trim());
+      if (blank >= 0) return prev.map((r, i) => (i === blank ? { question, answer: '' } : r));
+      return [...prev, { question, answer: '' }];
+    });
   }
+
+  const isShop = kind === 'shop';
+  const STARTERS = isShop
+    ? ['Fresh batch ready for Saturday! ', 'Only a few left — order now. ', 'New on the menu: ', 'Thank you for all your orders! ']
+    : ['Doors open at ', 'Only a few tickets left! ', 'Special guest announced: ', 'Thank you for coming! '];
+  const COMMON_QS = isShop
+    ? ['Is it vegetarian?', 'How long does it keep?', 'Can I pay cash when I collect?', 'Do you deliver?', 'Can I order for a party?']
+    : ['Is there parking?', 'Is there an age limit?', 'Can I buy tickets at the door?', 'Is food available?', 'Is it wheelchair accessible?'];
 
   function removeFaqRow(index: number) {
     setFaqRows((prev) => prev.filter((_, i) => i !== index));
@@ -404,15 +421,23 @@ export default function PageContentPanel({
       {/* ---------------- Updates (posts) ---------------- */}
       {show === 'updates' && (
       <>
-      <p className="muted small" style={{ marginTop: 0 }}>
-        Post updates the way you would on a social page — lineup news, door times, sold-out warnings. Share a photo or a
-        short video straight from your phone, like a post on social media. They appear publicly in an{' '}
-        <strong>Updates</strong> feed on your event page, newest first.
-      </p>
-
-      <form onSubmit={publishPost}>
-        <div className="field">
-          <label htmlFor="pc-post">New update</label>
+      <form onSubmit={publishPost} className="pc-composer">
+        <div className="ks-presets" style={{ marginBottom: 8 }}>
+          {STARTERS.map((st) => (
+            <button
+              key={st}
+              type="button"
+              className="ks-chip ks-chip-sm"
+              onClick={() => {
+                setDraft((d) => (d.trim() ? d : st));
+                document.getElementById('pc-post')?.focus();
+              }}
+            >
+              {st.trim()}
+            </button>
+          ))}
+        </div>
+        <div className="field" style={{ margin: 0 }}>
           <textarea
             id="pc-post"
             className="input"
@@ -420,7 +445,8 @@ export default function PageContentPanel({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             maxLength={2000}
-            placeholder="e.g. Doors now open at 18:30 — and we just added a special guest…"
+            placeholder={isShop ? 'What is new? e.g. Fresh momo this Saturday…' : 'What is new? e.g. Doors now open at 18:30…'}
+            aria-label="New update"
             style={{ resize: 'vertical', fontFamily: 'inherit' }}
           />
         </div>
@@ -433,10 +459,10 @@ export default function PageContentPanel({
           style={{ display: 'none' }}
           aria-label="Add a photo or a short video to this update"
         />
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="pc-bar">
           <button
             type="button"
-            className="btn"
+            className="btn btn-sm"
             onClick={() => fileRef.current?.click()}
             disabled={busy !== null || (photosFull && videosFull)}
           >
@@ -447,11 +473,28 @@ export default function PageContentPanel({
                 ? progress !== null
                   ? `Uploading… ${progress}%`
                   : 'Uploading…'
-                : 'Add photo or video'}
+                : '📷 Photo / video'}
           </button>
-          <span className="muted small">
-            Photos up to 5 MB (big ones are shrunk for you) · videos up to 60 MB, MP4 or WebM.
-          </span>
+          {media.length > 0 && (
+            <select
+              className="input pc-pick"
+              aria-label="Attach something you already uploaded"
+              value={draftMediaId}
+              onChange={(e) => setDraftMediaId(e.target.value)}
+            >
+              <option value="">…or one you uploaded</option>
+              {media.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          )}
+          <span style={{ flex: 1 }} />
+          <button type="submit" className="btn btn-brand btn-sm" disabled={busy !== null || !draft.trim()}>
+            {busy === 'post' ? <span className="spinner" aria-hidden /> : null}
+            {busy === 'post' ? 'Posting…' : 'Post'}
+          </button>
         </div>
 
         {busy === 'upload' && progress !== null && (
@@ -542,34 +585,6 @@ export default function PageContentPanel({
           </div>
         )}
 
-        {media.length > 0 && (
-          <details style={{ marginTop: 12 }}>
-            <summary className="muted small" style={{ cursor: 'pointer' }}>
-              Or choose something you already uploaded
-            </summary>
-            <select
-              className="input"
-              aria-label="Attach a photo or video (optional)"
-              value={draftMediaId}
-              onChange={(e) => setDraftMediaId(e.target.value)}
-              style={{ width: 'auto', minWidth: 180, marginTop: 8 }}
-            >
-              <option value="">No photo or video</option>
-              {media.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </details>
-        )}
-
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 14 }}>
-          <button type="submit" className="btn btn-brand" disabled={busy !== null}>
-            {busy === 'post' ? <span className="spinner" aria-hidden /> : null}
-            {busy === 'post' ? 'Posting…' : 'Post update'}
-          </button>
-        </div>
       </form>
 
       {posts.length > 0 && (
@@ -638,62 +653,65 @@ export default function PageContentPanel({
 
       {/* ---------------- FAQ ---------------- */}
       {show === 'faq' && (
-      <form ref={faqFormRef} onSubmit={saveFaqs}>
+      <form ref={faqFormRef} onSubmit={saveFaqs} className="pc-faq">
+        <div className="ks-presets" style={{ marginBottom: 10 }}>
+          <span className="muted small">Tap to add:</span>
+          {COMMON_QS.filter((q) => !faqRows.some((r) => r.question.trim().toLowerCase() === q.toLowerCase())).map((q) => (
+            <button
+              key={q}
+              type="button"
+              className="ks-chip ks-chip-sm"
+              disabled={busy !== null || faqRows.filter((r) => r.question.trim()).length >= MAX_FAQS}
+              onClick={() => addFaqRow(q)}
+            >
+              + {q}
+            </button>
+          ))}
+        </div>
 
         {faqRows.map((row, i) => (
-          <div
-            key={i}
-            style={{
-              border: '1px solid var(--border)',
-              borderRadius: 10,
-              padding: '12px 14px 4px',
-              marginBottom: 10,
-              background: 'var(--bg-elevated)',
-            }}
-          >
-            <div className="field">
-              <label htmlFor={`pc-faq-q-${i}`}>Question {i + 1}</label>
+          <div key={i} className="pc-faq-row">
+            <button
+              type="button"
+              className="pc-faq-x"
+              aria-label={`Remove question ${i + 1}`}
+              onClick={() => removeFaqRow(i)}
+              disabled={busy !== null}
+            >
+              ✕
+            </button>
+            <div className="field" style={{ margin: 0 }}>
               <input
+                aria-label={`Question ${i + 1}`}
                 id={`pc-faq-q-${i}`}
                 className="input"
                 value={row.question}
                 onChange={(e) => setFaqField(i, 'question', e.target.value)}
                 maxLength={200}
-                placeholder="e.g. Is there an age limit?"
+                placeholder="Question, e.g. Is there an age limit?"
               />
             </div>
-            <div className="field">
-              <label htmlFor={`pc-faq-a-${i}`}>Answer</label>
+            <div className="field" style={{ margin: 0 }}>
               <textarea
+                aria-label={`Answer ${i + 1}`}
                 id={`pc-faq-a-${i}`}
                 className="input"
                 rows={2}
                 value={row.answer}
                 onChange={(e) => setFaqField(i, 'answer', e.target.value)}
                 maxLength={1000}
-                placeholder="Keep it short and friendly."
+                placeholder="Answer — short and friendly."
                 style={{ resize: 'vertical', fontFamily: 'inherit' }}
               />
             </div>
-            <p style={{ margin: '0 0 8px' }}>
-              <button
-                type="button"
-                className="btn-copy"
-                style={{ color: 'var(--red)' }}
-                onClick={() => removeFaqRow(i)}
-                disabled={busy !== null}
-              >
-                Remove this question
-              </button>
-            </p>
           </div>
         ))}
 
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="ks-save">
           <button
             type="button"
             className="btn btn-sm"
-            onClick={addFaqRow}
+            onClick={() => addFaqRow()}
             disabled={busy !== null || faqRows.length >= MAX_FAQS}
           >
             + Add a question
