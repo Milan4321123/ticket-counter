@@ -7825,3 +7825,100 @@ html.tx-wait body {
     width: calc(100% + 28px);
   }
 }
+
+/* Tables that turn into cards on a phone (.table-cards; each <td> carries a
+   data-label). The first cell marked .tc-head becomes the card's title. */
+.ord-count {
+  margin-left: 4px;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 720px) {
+  .table-cards thead {
+    display: none;
+  }
+
+  .table-cards,
+  .table-cards tbody {
+    display: block;
+  }
+
+  .table-cards tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+    margin-bottom: 10px;
+    padding: 12px 14px;
+    border-radius: 16px;
+    background: var(--bg-elevated);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+      0 4px 12px rgba(0, 0, 0, 0.22);
+  }
+
+  .table-cards td {
+    display: flex;
+    min-width: 0;
+    white-space: normal;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 0;
+    border: 0;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+
+  /* Extra lines inside a cell (seats, pickup time) go under, full width. */
+  .table-cards td {
+    flex-wrap: wrap;
+  }
+
+  .table-cards td > div {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+
+  .table-cards td::before {
+    content: attr(data-label);
+    flex: none;
+    color: var(--text-dim);
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-align: left;
+  }
+
+  .table-cards td.tc-head {
+    order: -1;
+    font-size: 1.02rem;
+    font-weight: 700;
+    text-align: left;
+  }
+
+  .table-cards td.tc-head::before,
+  .table-cards td.tc-actions::before {
+    display: none;
+  }
+
+  .table-cards td.tc-actions {
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  /* Action buttons keep their row on a desktop; in a card they wrap. */
+  .table-cards td.tc-actions span,
+  .table-cards td.tc-actions div {
+    flex-wrap: wrap !important;
+    white-space: normal !important;
+  }
+
+  .table-cards td.tc-actions:empty {
+    display: none;
+  }
+
+  .table-cards .table-wrap,
+  .table-wrap:has(.table-cards) {
+    overflow: visible;
+  }
+}

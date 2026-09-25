@@ -53,7 +53,7 @@ export default async function PortalOrdersPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ q?: string | string[] }>;
+  searchParams: Promise<{ q?: string | string[]; show?: string | string[] }>;
 }) {
   const { id } = await params;
   const organizer = await requirePortalOrganizer();
@@ -65,6 +65,7 @@ export default async function PortalOrdersPage({
 
   const sp = await searchParams;
   const query = typeof sp.q === 'string' ? sp.q : '';
+  const show = sp.show === 'todo' || sp.show === 'paid' || sp.show === 'cancelled' ? sp.show : 'all';
 
   // Release seats of transfer reservations whose payment never arrived.
   expireOverdueTransferReservations(event.id);
@@ -73,7 +74,23 @@ export default async function PortalOrdersPage({
   // cannot know which one a given buyer chose — only that this event offered
   // both. That makes "bank transfer" the wrong word here whenever PayPal is on.
   const takesPaypal = effectivePayout(event).paypal.trim() !== '';
-  const orders = listOrders({ eventId: event.id, query });
+  const allOrders = listOrders({ eventId: event.id, query });
+  const isTodo = (o: (typeof allOrders)[number]) => o.paymentMode === 'transfer' && o.status === 'claimed';
+  const isGone = (o: (typeof allOrders)[number]) => o.status === 'cancelled' || o.status === 'failed';
+  const counts = {
+    all: allOrders.length,
+    todo: allOrders.filter(isTodo).length,
+    paid: allOrders.filter((o) => o.status === 'paid').length,
+    cancelled: allOrders.filter(isGone).length,
+  };
+  const orders =
+    show === 'todo'
+      ? allOrders.filter(isTodo)
+      : show === 'paid'
+        ? allOrders.filter((o) => o.status === 'paid')
+        : show === 'cancelled'
+          ? allOrders.filter(isGone)
+          : allOrders;
   // Restaurant pack: collection time / table / choices per order (shops only).
   const kitchenLines = event.kind === 'shop' ? kitchenDetailsBulk(orders.map((o) => o.id), parseSlotConfig(event.pickupSlots).purpose) : new Map<string, { line: string }>();
   // Reserved seating: the seats each order holds, as its extra line.
@@ -93,7 +110,7 @@ export default async function PortalOrdersPage({
   // Gating the export on the filtered list made the button vanish the moment a
   // search matched nothing — exactly when someone is most likely to give up and
   // reach for the download instead.
-  const hasAnyOrders = query ? listOrders({ eventId: event.id, limit: 1 }).length > 0 : orders.length > 0;
+  const hasAnyOrders = query ? listOrders({ eventId: event.id, limit: 1 }).length > 0 : allOrders.length > 0;
 
   return (
     <>
@@ -141,18 +158,15 @@ export default async function PortalOrdersPage({
             {awaiting.length} reservation{awaiting.length === 1 ? '' : 's'} waiting for your confirmation
           </div>
           <p className="muted small" style={{ marginTop: 0 }}>
-            Check {takesPaypal ? 'your bank account and your PayPal' : 'your bank account'} for these
-            payments. When the money is there, click <strong>Payment received</strong> — the QR {v.codes}{' '}
-            are emailed to the buyer automatically.
+            Money arrived in {takesPaypal ? 'your bank or PayPal' : 'your bank'}? Tap <strong>Payment received</strong>{' '}
+            — the buyer gets their {v.codes} by email.
           </p>
           {/* Said once, here, rather than discovered at the moment somebody is
               staring at a PayPal payment with no reference on it and a box
               demanding one. */}
           {takesPaypal && (
             <p className="muted small" style={{ marginTop: 0 }}>
-              A bank transfer carries the reference for you. <strong>PayPal does not</strong> — it has
-              nowhere to put one — so for those, match the <strong>name</strong> the money came from
-              instead. Both work.
+              PayPal payments have no reference — match them by the sender&rsquo;s <strong>name</strong>.
             </p>
           )}
           {/* The stall counter-confirmation hint (stalls plan §7): a buyer
@@ -244,17 +258,33 @@ export default async function PortalOrdersPage({
           name="q"
           className="input"
           defaultValue={query}
-          placeholder="Search by name, email, order ID, or payment reference"
+          placeholder="Search name, email or a reference from your bank statement"
           aria-label="Search orders"
         />
+        {show !== 'all' && <input type="hidden" name="show" value={show} />}
         <button type="submit" className="btn">
           Search
         </button>
       </form>
-      <p className="muted small anim-fade-up anim-d2" style={{ marginBottom: 16 }}>
-        Tip: paste a reference straight from your bank statement (like <span className="mono">TICKETS-AB12CD34</span>)
-        to find its order.
-      </p>
+      <nav className="ks-presets anim-fade-up anim-d2" aria-label="Show orders" style={{ marginBottom: 16 }}>
+        {(
+          [
+            ['all', 'All'],
+            ['todo', 'To confirm'],
+            ['paid', 'Paid'],
+            ['cancelled', 'Cancelled'],
+          ] as const
+        ).map(([key, label]) => (
+          <Link
+            key={key}
+            href={`/portal/events/${event.id}/orders${key === 'all' && !query ? '' : `?${new URLSearchParams({ ...(key === 'all' ? {} : { show: key }), ...(query ? { q: query } : {}) }).toString()}`}`}
+            className={`ks-chip${show === key ? ' is-on' : ''}`}
+            aria-current={show === key ? 'page' : undefined}
+          >
+            {label} <span className="ord-count">{counts[key]}</span>
+          </Link>
+        ))}
+      </nav>
 
       {query && (
         <p className="muted small">
@@ -268,11 +298,15 @@ export default async function PortalOrdersPage({
       <div className="card anim-fade-up anim-d2">
         {orders.length === 0 ? (
           <p className="muted" style={{ margin: 0 }}>
-            {query ? 'No orders match that search.' : 'No orders yet — they show up here the moment someone books.'}
+            {query
+              ? 'No orders match that search.'
+              : show !== 'all' && counts.all > 0
+                ? 'Nothing here right now.'
+                : 'No orders yet — they show up here the moment someone books.'}
           </p>
         ) : (
           <div className="table-wrap">
-            <table className="table table-hover">
+            <table className="table table-hover table-cards">
               <thead>
                 <tr>
                   <th>Created (UTC)</th>
@@ -290,10 +324,10 @@ export default async function PortalOrdersPage({
                   const reference = o.paymentMode === 'transfer' ? o.paymentReference : null;
                   return (
                     <tr key={o.id}>
-                      <td className="mono small">{o.createdAt.slice(0, 16)}</td>
-                      <td>{o.buyerName}</td>
-                      <td className="small">{o.buyerEmail}</td>
-                      <td>
+                      <td className="mono small" data-label="When">{o.createdAt.slice(0, 16)}</td>
+                      <td data-label="Buyer" className="tc-head">{o.buyerName}</td>
+                      <td className="small" data-label="Email">{o.buyerEmail}</td>
+                      <td data-label="Items">
                         {o.itemsSummary}
                         {kitchenLines.get(o.id) && (
                           <div className="small" style={{ color: 'var(--amber)' }}>
@@ -301,8 +335,8 @@ export default async function PortalOrdersPage({
                           </div>
                         )}
                       </td>
-                      <td>{formatMoney(o.totalCents, o.currency)}</td>
-                      <td>
+                      <td data-label="Total">{formatMoney(o.totalCents, o.currency)}</td>
+                      <td data-label="Status">
                         {o.paymentMode === 'transfer' && o.status === 'claimed' ? (
                           <span className="badge badge-amber" style={{ whiteSpace: 'nowrap' }}>
                             {takesPaypal ? 'awaiting payment' : 'awaiting transfer'}
@@ -316,8 +350,8 @@ export default async function PortalOrdersPage({
                           </span>
                         ) : null}
                       </td>
-                      <td>{reference ? <ReferenceTag reference={reference} /> : <span className="muted">—</span>}</td>
-                      <td>
+                      <td data-label="Reference">{reference ? <ReferenceTag reference={reference} /> : <span className="muted">—</span>}</td>
+                      <td className="tc-actions">
                         {o.status === 'paid' ? (
                           <ResendButton orderId={o.id} demo={organizer.isDemo} />
                         ) : o.paymentMode === 'transfer' && o.status === 'claimed' ? (
