@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import SpeechInput from './SpeechInput';
+import { blurOnTouch, focusUnlessTouch, scrollChat } from '@/lib/chatScroll';
 
 const MAX_QUESTION = 500;
 const MIN_QUESTION = 3;
@@ -124,13 +125,13 @@ export default function ChatWidget({ title, subtitle, placeholder, endpoint, ext
   const speechBase = useRef('');
 
   useEffect(() => {
-    if (open) inputRef.current?.focus();
+    // The keyboard only when they tap the box (lib/chatScroll).
+    if (open) focusUnlessTouch(inputRef.current);
   }, [open]);
 
-  // Keep the newest message in view.
+  // Keep the newest answer in view — from its start, under the question.
   useEffect(() => {
-    const el = bodyRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (open) scrollChat(bodyRef.current, '.chat-bubble-user', busy, false);
   }, [messages, busy, open]);
 
   /**
@@ -387,6 +388,7 @@ export default function ChatWidget({ title, subtitle, placeholder, endpoint, ext
         className="chat-input-row"
         onSubmit={(e) => {
           e.preventDefault();
+          blurOnTouch(inputRef.current);
           void send();
         }}
       >

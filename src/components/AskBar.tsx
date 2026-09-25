@@ -13,6 +13,7 @@ import { createPortal } from 'react-dom';
 import type { Lang } from '@/lib/i18n';
 import SpeechInput from './SpeechInput';
 import StoryPlayer from './StoryPlayer';
+import { blurOnTouch, focusUnlessTouch, scrollChat } from '@/lib/chatScroll';
 
 /** "/#watch" in an answer is the customer's story video, played right here. */
 const isWatch = (href: string) => href === '/#watch';
@@ -230,7 +231,8 @@ function AskOverlay({ w, onClose }: { w: (typeof W)['en']; onClose: () => void }
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && window.history.back();
     window.addEventListener('popstate', onPop);
     document.addEventListener('keydown', onKey);
-    window.setTimeout(() => input.current?.focus(), 250);
+    // The keyboard only when they tap the box (lib/chatScroll).
+    window.setTimeout(() => focusUnlessTouch(input.current), 250);
     return () => {
       document.body.style.overflow = prev;
       window.removeEventListener('popstate', onPop);
@@ -240,7 +242,8 @@ function AskOverlay({ w, onClose }: { w: (typeof W)['en']; onClose: () => void }
   }, []);
 
   useEffect(() => {
-    log.current?.scrollTo({ top: log.current.scrollHeight, behavior: msgs.length > 2 ? 'smooth' : 'auto' });
+    // The answer from its start, under the question — not the end of it.
+    scrollChat(log.current, '.ab-me', Boolean(msgs[msgs.length - 1]?.thinking), msgs.length > 2);
   }, [msgs]);
 
   async function ask(text: string) {
@@ -288,7 +291,7 @@ function AskOverlay({ w, onClose }: { w: (typeof W)['en']; onClose: () => void }
       setMsgs((m) => [...m.slice(0, -1), { from: 'bot', text: w.none }]);
     } finally {
       setBusy(false);
-      input.current?.focus();
+      focusUnlessTouch(input.current);
     }
   }
 
@@ -412,6 +415,7 @@ function AskOverlay({ w, onClose }: { w: (typeof W)['en']; onClose: () => void }
         className="ab-input"
         onSubmit={(e) => {
           e.preventDefault();
+          blurOnTouch(input.current);
           void ask(draft);
         }}
       >

@@ -3287,3 +3287,237 @@
   bottom: 12px;
   z-index: 2;
 }
+
+/* ======================================================================
+   The setup assistant as a chat surface (SetupAssistant): over the editor,
+   full screen on a phone. The answers scroll; the composer is one rounded
+   bar at the bottom, like any chat app.
+   ====================================================================== */
+.sa-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(4, 5, 10, 0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: sa-fade 0.18s ease both;
+}
+
+@keyframes sa-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes sa-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+}
+
+.sa-sheet {
+  display: flex;
+  flex-direction: column;
+  width: min(780px, 100%);
+  height: min(88vh, 900px);
+  border-radius: 24px;
+  background:
+    radial-gradient(90% 50% at 0% 0%, rgba(167, 139, 250, 0.14), transparent 60%),
+    radial-gradient(70% 40% at 100% 100%, rgba(220, 20, 60, 0.1), transparent 60%),
+    var(--bg-card);
+  box-shadow:
+    inset 0 0 0 1px rgba(167, 139, 250, 0.3),
+    0 30px 80px rgba(0, 0, 0, 0.6);
+  animation: sa-rise 0.26s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.sa-sheet .sa-head {
+  flex: none;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: none;
+}
+
+.sa-head-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #7c3aed, #db2777);
+  box-shadow: 0 6px 18px rgba(124, 58, 237, 0.4);
+}
+
+.sa-head-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.sa-head-text span {
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+.sa-sheet .sa-close {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sa-sheet .sa-log {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  align-content: start;
+  gap: 14px;
+  padding: 20px 18px 28px;
+  overscroll-behavior: contain;
+  scroll-padding-top: 12px;
+}
+
+.sa-sheet .sa-msg p {
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+
+.sa-sheet .sa-bot > p {
+  padding: 12px 14px;
+}
+
+.sa-sheet .sa-input {
+  flex: none;
+  padding: 10px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  border-top: 0;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.18));
+}
+
+.sa-composer {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 6px 6px 6px 16px;
+  border-radius: 26px;
+  background: var(--bg-elevated);
+  box-shadow: inset 0 0 0 1px var(--border);
+  transition: box-shadow 0.15s ease;
+}
+
+.sa-composer:focus-within {
+  box-shadow:
+    inset 0 0 0 1.5px rgba(167, 139, 250, 0.75),
+    0 0 0 4px rgba(167, 139, 250, 0.12);
+}
+
+.sa-sheet .sa-composer textarea {
+  flex: 1;
+  min-width: 0;
+  max-height: 150px;
+  padding: 9px 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--text);
+  /* 16px: below that, a phone zooms the whole page in when the box is tapped. */
+  font-size: 16px;
+  line-height: 1.4;
+  resize: none;
+  outline: none;
+}
+
+.sa-sheet .sa-composer textarea::placeholder {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sa-composer .mic-btn {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  background: none;
+}
+
+/* "Listening… 4s" floats above the bar instead of squeezing the text box. */
+.sa-composer .speech-hint:not(:empty) {
+  position: absolute;
+  left: 14px;
+  bottom: calc(100% + 6px);
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg-card);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.sa-composer .speech-hint:empty {
+  display: none;
+}
+
+.sa-send {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--brand);
+  color: #fff;
+  cursor: pointer;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+.sa-send:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.sa-send:not(:disabled):active {
+  transform: scale(0.92);
+}
+
+/* Phone: the whole screen — exactly the part the keyboard leaves free. */
+@media (max-width: 720px) {
+  .sa-overlay {
+    top: var(--sa-top, 0px);
+    bottom: auto;
+    height: var(--sa-vh, 100dvh);
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .sa-sheet {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .sa-sheet .sa-head {
+    padding-top: calc(10px + env(safe-area-inset-top, 0px));
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .sa-sheet .sa-log {
+    padding: 16px 14px 24px;
+  }
+
+  .sa-sheet .sa-msg {
+    max-width: 92%;
+  }
+}

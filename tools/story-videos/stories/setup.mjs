@@ -30,8 +30,8 @@ export const scenes = [
 const lastBot = (h) => h.page.evaluate(() => [...document.querySelectorAll('.sa-msg.sa-bot')].at(-1)?.innerText ?? '');
 
 async function say(h, text) {
-  await h.typeInto('.sa-panel textarea, textarea', text, { delay: 32 });
-  await h.tap('button', 'Send', { after: 300 });
+  await h.typeInto('.sa-input textarea', text, { delay: 32 });
+  await h.tap('.sa-send', undefined, { after: 300 });
 }
 
 /** Open an editor section from the section list, like a seller would. */

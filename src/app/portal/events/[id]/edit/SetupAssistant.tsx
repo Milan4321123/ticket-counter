@@ -12,13 +12,20 @@
 //     the AI. A photo and publishing open their own section.
 //
 // Speaks English, German and Nepali (the site's language cookie).
+//
+// It opens as a chat surface over the editor — full screen on a phone — like
+// any chat app: the answers scroll above, a small composer sits at the bottom,
+// and the phone's keyboard only comes up when the seller taps it (and goes
+// away after sending, so the answer can be read).
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import SpeechInput from '@/components/SpeechInput';
 import { formatMoney } from '@/lib/money';
 import { ASSISTANT_AWAY_EVENT, ASSISTANT_RETURN_EVENT, GOTO_TAB_EVENT } from './GoToTab';
 import { saveEvent, type SavedTier } from './save';
 import { fixTypos } from '@/lib/askTypos';
+import { blurOnTouch, focusUnlessTouch, scrollChat, touchScreen } from '@/lib/chatScroll';
 import { categoryLabel } from '@/lib/categories';
 
 type Lang = 'en' | 'de' | 'ne';
@@ -400,6 +407,13 @@ const SWITCHED_SAY: Record<Lang, (k: 'event' | 'shop') => string> = {
   ne: (k) => `यो ${k === 'shop' ? 'पसल वा रेस्टुरेन्ट' : 'कार्यक्रम'} जस्तो छ — मैले यो पेजलाई त्यसैमा बदलें।`,
 };
 
+const HEAD_SUB: Record<Lang, string> = {
+  en: 'AI assistant · fills in your page',
+  de: 'KI-Assistent · füllt deine Seite aus',
+  ne: 'AI सहायक · तपाईंको पेज भर्छ',
+};
+const CONTINUE: Record<Lang, string> = { en: 'Continue the chat', de: 'Chat fortsetzen', ne: 'च्याट जारी राख्नुहोस्' };
+
 const SKIP_RE = /^\s*(skip|later|next|überspringen|später|weiter|छोड्नुहोस्|छोड|पछि|chodnus|chhodnus|chodnu|pachi|pachhi|pachhi garchu)\s*[.!]?\s*$/i;
 const WRITE_IT_RE = /\b(you write|write it|you do it|schreib du|du schreibst|tapai(le)? lekh(nus|idinus|nuhos)|timi(le)? lekh|aafai lekh|lekhidinus)\b|तपाईं लेख्नुहोस्|तपाईं नै लेख्नुहोस्|आफैं लेख्नुहोस्/i;
 
@@ -457,6 +471,9 @@ export default function SetupAssistant({
   const switchedTo = useRef<'event' | 'shop' | null>(null);
   /** Steps the seller said "skip" to in this conversation. */
   const skipped = useRef(new Set<string>());
+  const logRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
 
   async function propose(
     text: string
@@ -843,7 +860,8 @@ export default function SetupAssistant({
    */
   async function openChat() {
     setOpen(true);
-    if (!startedAlready) return;
+    // Back to a conversation already under way: just show it.
+    if (!startedAlready || messages.some((m) => m.from === 'me')) return;
     setBusy(true);
     say({ from: 'bot', text: t.resume });
     await askNext();
@@ -854,6 +872,7 @@ export default function SetupAssistant({
   // at what is left — the photo they just added counts at once.
   useEffect(() => {
     const onReturn = () => {
+      setOpen(true);
       if (asking !== 'photo' && asking !== 'publish') return;
       setBusy(true);
       void askNext().finally(() => setBusy(false));
@@ -862,6 +881,71 @@ export default function SetupAssistant({
     return () => window.removeEventListener(ASSISTANT_RETURN_EVENT, onReturn);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [asking]);
+
+  // Off to a section (a photo, the FAQ…): the chat steps aside, and comes back
+  // with "Return to the chat".
+  useEffect(() => {
+    const away = () => setOpen(false);
+    window.addEventListener(ASSISTANT_AWAY_EVENT, away);
+    window.addEventListener(GOTO_TAB_EVENT, away);
+    return () => {
+      window.removeEventListener(ASSISTANT_AWAY_EVENT, away);
+      window.removeEventListener(GOTO_TAB_EVENT, away);
+    };
+  }, []);
+
+  // While the chat is open: the page under it stays still, Escape closes it,
+  // and on a phone the chat is exactly the part of the screen the keyboard
+  // leaves free — so the composer never hides behind it.
+  useEffect(() => {
+    if (!open) return;
+    const html = document.documentElement;
+    const before = html.style.overflow;
+    html.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    const vv = window.visualViewport;
+    const fit = () => {
+      const el = overlayRef.current;
+      if (!el || !vv) return;
+      el.style.setProperty('--sa-vh', `${vv.height}px`);
+      el.style.setProperty('--sa-top', `${vv.offsetTop}px`);
+    };
+    fit();
+    vv?.addEventListener('resize', fit);
+    vv?.addEventListener('scroll', fit);
+    // A keyboard is never opened for the seller — only a mouse gets the cursor.
+    focusUnlessTouch(inputRef.current);
+    return () => {
+      html.style.overflow = before;
+      window.removeEventListener('keydown', onKey);
+      vv?.removeEventListener('resize', fit);
+      vv?.removeEventListener('scroll', fit);
+    };
+  }, [open]);
+
+  // Like any chat app: after your message, the answer reads down from it —
+  // your question at the top of the screen, not the end of a long reply.
+  useEffect(() => {
+    if (open) scrollChat(logRef.current, '.sa-me', messages[messages.length - 1]?.from === 'me');
+  }, [messages.length, busy, open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The composer grows with what is typed (or spoken), up to a few lines.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    // Empty: one line (the example text is cut short, not wrapped).
+    if (draft) el.style.height = `${Math.min(el.scrollHeight, 150)}px`;
+  }, [draft, open]);
+
+  /** Send from the composer; on a phone the keyboard goes, so the answer shows. */
+  const submit = () => {
+    blurOnTouch(inputRef.current);
+    void send();
+  };
 
   // ?assistant=1 (the "Try the AI assistant" door): open straight away.
   useEffect(() => {
@@ -889,240 +973,266 @@ export default function SetupAssistant({
         ? categoryLabel(String(v)) || String(v)
         : String(v);
 
-  if (!open) {
-    return (
-      <button type="button" className="sa-open" onClick={() => void openChat()}>
-        <span className="sa-open-icon" aria-hidden="true">
-          ✨
-        </span>
-        <span className="sa-open-text">
-          <strong>{t.openTitle}</strong>
-          <span>{t.openLine(kind)}</span>
-        </span>
-      </button>
-    );
-  }
+  // The door stays in the editor; the chat itself opens over everything.
+  const door = (
+    <button type="button" className="sa-open" onClick={() => void openChat()}>
+      <span className="sa-open-icon" aria-hidden="true">
+        ✨
+      </span>
+      <span className="sa-open-text">
+        <strong>{t.openTitle}</strong>
+        <span>{messages.some((m) => m.from === 'me') ? `${CONTINUE[lang] ?? CONTINUE.en} →` : t.openLine(kind)}</span>
+      </span>
+    </button>
+  );
+  if (!open) return door;
 
   const last = messages[messages.length - 1];
 
-  return (
-    <section className="sa" aria-label={t.openTitle}>
-      <header className="sa-head">
-        <strong>✨ {t.openTitle}</strong>
-        <button type="button" className="sa-switch" onClick={showPicker}>
-          {t.switchBtn}
-        </button>
-        <button type="button" className="sa-close" onClick={() => setOpen(false)} aria-label="Close">
-          ×
-        </button>
-      </header>
-      <div className="sa-log" aria-live="polite">
-        {messages.map((m, i) => (
-          <div key={i} className={`sa-msg sa-${m.from}`}>
-            {m.text ? <p style={{ whiteSpace: 'pre-line' }}>{m.links ? withLinks(m.text) : m.text}</p> : null}
-            {m.links && m.links.length > 0 && (
-              <div className="ks-presets" style={{ marginTop: 8 }}>
-                {m.links.map((l) => (
-                  <a key={l.href} href={l.href} target="_blank" rel="noopener" className="btn btn-sm">
-                    <span aria-hidden="true">{l.icon}</span> {l.label} ↗
-                  </a>
-                ))}
-              </div>
-            )}
-            {m.chips && m === last && (
-              <div className="ks-presets" style={{ marginTop: 8 }}>
-                {m.chips.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    className="btn btn-brand btn-sm"
-                    disabled={busy}
-                    onClick={() =>
-                      void send(c === t.makeOneUp ? `${c} — come up with a complete sample ${kind} yourself` : c)
-                    }
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
-            )}
-            {m.picker && (
-              <div className="sa-picker">
-                {listings.map((l) => (
-                  <button
-                    key={l.id}
-                    type="button"
-                    className={`sa-pick${l.id === eventId ? ' is-current' : ''}`}
-                    disabled={l.id === eventId || busy}
-                    onClick={() => openListing(l.id)}
-                  >
-                    <span aria-hidden="true">{l.kind === 'shop' ? '🛍' : '🎟'}</span>
-                    <span className="sa-pick-name">{l.name}</span>
-                    <span className="sa-pick-state">
-                      {l.id === eventId ? t.current : l.status === 'published' ? t.live : t.draft}
-                    </span>
-                  </button>
-                ))}
-                <div className="sa-pick-new">
-                  <button type="button" className="btn btn-brand btn-sm" disabled={busy} onClick={() => void startNew('shop')}>
-                    {t.newShop}
-                  </button>
-                  <button type="button" className="btn btn-sm" disabled={busy} onClick={() => void startNew('event')}>
-                    {t.newEvent}
-                  </button>
-                </div>
-              </div>
-            )}
-            {m.publishNow && m === last && (
-              <button type="button" className="btn btn-brand sa-goto" onClick={() => void publishNow()} disabled={busy}>
-                {t.buttons.publishNow}
-              </button>
-            )}
-            {m.view && (
-              <a href={m.view} target="_blank" rel="noopener" className="btn btn-green btn-sm sa-goto">
-                {m.viewLabel ?? t.buttons.view}
-              </a>
-            )}
-            {m.view && (
-              <a href={`/portal/events/${eventId}`} className="btn btn-sm sa-goto">
-                {t.buttons.tools}
-              </a>
-            )}
-            {m.account && (
-              <a href={`/portal/apply?event=${eventId}`} className="btn btn-brand btn-sm sa-goto">
-                {t.buttons.account}
-              </a>
-            )}
-            {m.progress && (
-              <div className="sa-progress">
-                <p className="sa-progress-h">{(PW[lang] ?? PW.en).done}</p>
-                <div className="sa-progress-done">
-                  {m.progress.filled.map((f) => (
-                    <span key={f} className="sa-chip-done">
-                      ✓ {f}
-                    </span>
+  const chat = (
+    <div
+      className="sa-overlay"
+      ref={overlayRef}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) setOpen(false);
+      }}
+    >
+      <section className="sa sa-sheet" role="dialog" aria-modal="true" aria-label={t.openTitle}>
+        <header className="sa-head">
+          <span className="sa-head-avatar" aria-hidden="true">
+            ✨
+          </span>
+          <span className="sa-head-text">
+            <strong>{t.openTitle}</strong>
+            <span>{HEAD_SUB[lang] ?? HEAD_SUB.en}</span>
+          </span>
+          <button type="button" className="sa-switch" onClick={showPicker}>
+            {t.switchBtn}
+          </button>
+          <button type="button" className="sa-close" onClick={() => setOpen(false)} aria-label="Close">
+            ×
+          </button>
+        </header>
+        <div className="sa-log" ref={logRef} aria-live="polite">
+          {messages.map((m, i) => (
+            <div key={i} className={`sa-msg sa-${m.from}`}>
+              {m.text ? <p style={{ whiteSpace: 'pre-line' }}>{m.links ? withLinks(m.text) : m.text}</p> : null}
+              {m.links && m.links.length > 0 && (
+                <div className="ks-presets" style={{ marginTop: 8 }}>
+                  {m.links.map((l) => (
+                    <a key={l.href} href={l.href} target="_blank" rel="noopener" className="btn btn-sm">
+                      <span aria-hidden="true">{l.icon}</span> {l.label} ↗
+                    </a>
                   ))}
-                  {m.progress.extras
-                    .filter((x) => x.done)
-                    .map((x) => (
-                      <span key={x.label} className="sa-chip-done">
-                        ✓ {x.label}
+                </div>
+              )}
+              {m.chips && m === last && (
+                <div className="ks-presets" style={{ marginTop: 8 }}>
+                  {m.chips.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      className="btn btn-brand btn-sm"
+                      disabled={busy}
+                      onClick={() =>
+                        void send(c === t.makeOneUp ? `${c} — come up with a complete sample ${kind} yourself` : c)
+                      }
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {m.picker && (
+                <div className="sa-picker">
+                  {listings.map((l) => (
+                    <button
+                      key={l.id}
+                      type="button"
+                      className={`sa-pick${l.id === eventId ? ' is-current' : ''}`}
+                      disabled={l.id === eventId || busy}
+                      onClick={() => openListing(l.id)}
+                    >
+                      <span aria-hidden="true">{l.kind === 'shop' ? '🛍' : '🎟'}</span>
+                      <span className="sa-pick-name">{l.name}</span>
+                      <span className="sa-pick-state">
+                        {l.id === eventId ? t.current : l.status === 'published' ? t.live : t.draft}
+                      </span>
+                    </button>
+                  ))}
+                  <div className="sa-pick-new">
+                    <button type="button" className="btn btn-brand btn-sm" disabled={busy} onClick={() => void startNew('shop')}>
+                      {t.newShop}
+                    </button>
+                    <button type="button" className="btn btn-sm" disabled={busy} onClick={() => void startNew('event')}>
+                      {t.newEvent}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {m.publishNow && m === last && (
+                <button type="button" className="btn btn-brand sa-goto" onClick={() => void publishNow()} disabled={busy}>
+                  {t.buttons.publishNow}
+                </button>
+              )}
+              {m.view && (
+                <a href={m.view} target="_blank" rel="noopener" className="btn btn-green btn-sm sa-goto">
+                  {m.viewLabel ?? t.buttons.view}
+                </a>
+              )}
+              {m.view && (
+                <a href={`/portal/events/${eventId}`} className="btn btn-sm sa-goto">
+                  {t.buttons.tools}
+                </a>
+              )}
+              {m.account && (
+                <a href={`/portal/apply?event=${eventId}`} className="btn btn-brand btn-sm sa-goto">
+                  {t.buttons.account}
+                </a>
+              )}
+              {m.progress && (
+                <div className="sa-progress">
+                  <p className="sa-progress-h">{(PW[lang] ?? PW.en).done}</p>
+                  <div className="sa-progress-done">
+                    {m.progress.filled.map((f) => (
+                      <span key={f} className="sa-chip-done">
+                        ✓ {f}
                       </span>
                     ))}
+                    {m.progress.extras
+                      .filter((x) => x.done)
+                      .map((x) => (
+                        <span key={x.label} className="sa-chip-done">
+                          ✓ {x.label}
+                        </span>
+                      ))}
+                  </div>
+                  {m.progress.extras.some((x) => !x.done) ? (
+                    <>
+                      <p className="sa-progress-h">{(PW[lang] ?? PW.en).more}</p>
+                      <div className="sa-progress-more">
+                        {m.progress.extras
+                          .filter((x) => !x.done)
+                          .map((x) => (
+                            <button
+                              key={x.label}
+                              type="button"
+                              className="sa-chip-add"
+                              onClick={() => {
+                                window.dispatchEvent(new CustomEvent(ASSISTANT_AWAY_EVENT));
+                                window.dispatchEvent(new CustomEvent(GOTO_TAB_EVENT, { detail: x.tab }));
+                              }}
+                            >
+                              ＋ {x.label}
+                            </button>
+                          ))}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="sa-progress-h">{(PW[lang] ?? PW.en).ready}</p>
+                  )}
                 </div>
-                {m.progress.extras.some((x) => !x.done) ? (
-                  <>
-                    <p className="sa-progress-h">{(PW[lang] ?? PW.en).more}</p>
-                    <div className="sa-progress-more">
-                      {m.progress.extras
-                        .filter((x) => !x.done)
-                        .map((x) => (
-                          <button
-                            key={x.label}
-                            type="button"
-                            className="sa-chip-add"
-                            onClick={() => {
-                              window.dispatchEvent(new CustomEvent(ASSISTANT_AWAY_EVENT));
-                              window.dispatchEvent(new CustomEvent(GOTO_TAB_EVENT, { detail: x.tab }));
-                            }}
-                          >
-                            ＋ {x.label}
-                          </button>
-                        ))}
-                    </div>
-                  </>
-                ) : (
-                  <p className="sa-progress-h">{(PW[lang] ?? PW.en).ready}</p>
-                )}
-              </div>
-            )}
-            {m.goto && (
-              <button
-                type="button"
-                className="btn btn-brand btn-sm sa-goto"
-                onClick={() => {
-                  // Tell the editor to offer "Return to the chat", then go.
-                  window.dispatchEvent(new CustomEvent(ASSISTANT_AWAY_EVENT));
-                  window.dispatchEvent(new CustomEvent(GOTO_TAB_EVENT, { detail: m.goto!.tab }));
-                }}
-              >
-                {m.goto.label}
-              </button>
-            )}
-            {m.proposal && m === last && (!asking || FREE_CHAT.has(asking)) && (
-              <div className="sa-proposal">
-                {m.suggested && <p className="sa-suggested">{t.suggested}</p>}
-                {Object.entries(m.proposal)
-                  .filter(([k]) => k !== 'tiers')
-                  .map(([k, v]) => (
-                    <label key={k} className="sa-line">
-                      <input type="checkbox" checked={Boolean(ticks[k])} onChange={(e) => setTicks((x) => ({ ...x, [k]: e.target.checked }))} />
-                      <span className="sa-key">{t.labels[k] ?? k}</span>
-                      <span className="sa-val">{fmt(k, v)}</span>
+              )}
+              {m.goto && (
+                <button
+                  type="button"
+                  className="btn btn-brand btn-sm sa-goto"
+                  onClick={() => {
+                    // Tell the editor to offer "Return to the chat", then go.
+                    window.dispatchEvent(new CustomEvent(ASSISTANT_AWAY_EVENT));
+                    window.dispatchEvent(new CustomEvent(GOTO_TAB_EVENT, { detail: m.goto!.tab }));
+                  }}
+                >
+                  {m.goto.label}
+                </button>
+              )}
+              {m.proposal && m === last && (!asking || FREE_CHAT.has(asking)) && (
+                <div className="sa-proposal">
+                  {m.suggested && <p className="sa-suggested">{t.suggested}</p>}
+                  {Object.entries(m.proposal)
+                    .filter(([k]) => k !== 'tiers')
+                    .map(([k, v]) => (
+                      <label key={k} className="sa-line">
+                        <input type="checkbox" checked={Boolean(ticks[k])} onChange={(e) => setTicks((x) => ({ ...x, [k]: e.target.checked }))} />
+                        <span className="sa-key">{t.labels[k] ?? k}</span>
+                        <span className="sa-val">{fmt(k, v)}</span>
+                      </label>
+                    ))}
+                  {(m.proposal.tiers ?? []).map((tier, ti) => (
+                    <label key={`t${ti}`} className="sa-line">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(ticks[`tier:${ti}`])}
+                        onChange={(e) => setTicks((x) => ({ ...x, [`tier:${ti}`]: e.target.checked }))}
+                      />
+                      <span className="sa-key">{unit}</span>
+                      <span className="sa-val">
+                        {tier.name} · {formatMoney(tier.priceCents, currency)}
+                        {tier.cap > 0 ? ` · ${tier.cap} ${t.labels.available}` : ''}
+                        {tier.studentOnly ? ` · ${t.labels.student}` : ''}
+                      </span>
                     </label>
                   ))}
-                {(m.proposal.tiers ?? []).map((tier, ti) => (
-                  <label key={`t${ti}`} className="sa-line">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(ticks[`tier:${ti}`])}
-                      onChange={(e) => setTicks((x) => ({ ...x, [`tier:${ti}`]: e.target.checked }))}
-                    />
-                    <span className="sa-key">{unit}</span>
-                    <span className="sa-val">
-                      {tier.name} · {formatMoney(tier.priceCents, currency)}
-                      {tier.cap > 0 ? ` · ${tier.cap} ${t.labels.available}` : ''}
-                      {tier.studentOnly ? ` · ${t.labels.student}` : ''}
-                    </span>
-                  </label>
-                ))}
-                <button type="button" className="btn btn-brand sa-apply" onClick={() => void apply()} disabled={saving}>
-                  {saving ? t.filling : t.fill}
-                </button>
-                <p className="sa-note">{t.note}</p>
-              </div>
-            )}
-          </div>
-        ))}
-        {busy && (
-          <div className="sa-msg sa-bot">
-            <p className="sa-typing">
-              <span />
-              <span />
-              <span />
-            </p>
-          </div>
-        )}
-      </div>
-      <form
-        className="sa-input"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void send();
-        }}
-      >
-        <textarea
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              void send();
-            }
-          }}
-          rows={2}
-          maxLength={1500}
-          placeholder={asking ? t.typing : t.placeholder(isShop)}
-          aria-label={t.openTitle}
-          autoComplete={asking === 'payoutIban' ? 'off' : undefined}
-        />
-        <div className="sa-actions">
-          <SpeechInput onStart={() => setBase(draft)} onText={(x) => setDraft(`${base ? `${base} ` : ''}${x}`)} label={t.say} />
-          <button className="btn btn-brand btn-sm" disabled={busy || !draft.trim()}>
-            {t.send}
-          </button>
+                  <button type="button" className="btn btn-brand sa-apply" onClick={() => void apply()} disabled={saving}>
+                    {saving ? t.filling : t.fill}
+                  </button>
+                  <p className="sa-note">{t.note}</p>
+                </div>
+              )}
+            </div>
+          ))}
+          {busy && (
+            <div className="sa-msg sa-bot">
+              <p className="sa-typing">
+                <span />
+                <span />
+                <span />
+              </p>
+            </div>
+          )}
         </div>
-      </form>
-    </section>
+        <form
+          className="sa-input"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submit();
+          }}
+        >
+          <div className="sa-composer">
+            <textarea
+              ref={inputRef}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                // A phone's return key makes a new line; its send is the ↑ button.
+                if (e.key === 'Enter' && !e.shiftKey && !touchScreen()) {
+                  e.preventDefault();
+                  submit();
+                }
+              }}
+              rows={1}
+              maxLength={1500}
+              enterKeyHint="send"
+              placeholder={asking ? t.typing : t.placeholder(isShop)}
+              aria-label={t.openTitle}
+              autoComplete={asking === 'payoutIban' ? 'off' : undefined}
+            />
+            <SpeechInput onStart={() => setBase(draft)} onText={(x) => setDraft(`${base ? `${base} ` : ''}${x}`)} label={t.say} />
+            <button className="sa-send" disabled={busy || !draft.trim()} aria-label={t.send} title={t.send}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+
+  return (
+    <>
+      {door}
+      {createPortal(chat, document.body)}
+    </>
   );
 }
