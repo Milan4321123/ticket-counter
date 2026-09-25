@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-type ResendState = 'idle' | 'busy' | 'sent' | 'failed';
+type ResendState = 'idle' | 'busy' | 'sent' | 'failed' | 'demo';
 
 /** Internal reason codes, in words the person fixing it can act on. */
 function explain(reason?: string): string | null {
@@ -18,12 +18,18 @@ function explain(reason?: string): string | null {
   }
 }
 
-export default function ResendButton({ orderId }: { orderId: string }) {
+export default function ResendButton({ orderId, demo = false }: { orderId: string; demo?: boolean }) {
   const [state, setState] = useState<ResendState>('idle');
   const [reason, setReason] = useState<string | null>(null);
 
   async function onResend() {
     if (state === 'busy') return;
+    // A demo sends no email at all (lib/demo) — that is the design, not a
+    // failure, so it is said calmly instead of in red.
+    if (demo) {
+      setState('demo');
+      return;
+    }
     setState('busy');
     setReason(null);
     try {
@@ -51,6 +57,14 @@ export default function ResendButton({ orderId }: { orderId: string }) {
         {state === 'busy' ? 'Sending…' : state === 'sent' ? 'Send again' : 'Resend email'}
       </button>
       {state === 'sent' && <span className="badge badge-green">Sent</span>}
+      {state === 'demo' && (
+        <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 2, whiteSpace: 'normal' }}>
+          <span className="badge badge-amber">Demo</span>
+          <span className="small muted" style={{ maxWidth: 260 }}>
+            No emails in the demo — in a real account the buyer gets their codes again.
+          </span>
+        </span>
+      )}
       {/* The reason shown, not hidden in a tooltip. A red badge saying only
           "Failed" sends the owner to the server logs, which is where an evening
           goes. Hover text is also invisible on a phone. */}

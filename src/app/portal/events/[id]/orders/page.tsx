@@ -319,7 +319,7 @@ export default async function PortalOrdersPage({
                       <td>{reference ? <ReferenceTag reference={reference} /> : <span className="muted">—</span>}</td>
                       <td>
                         {o.status === 'paid' ? (
-                          <ResendButton orderId={o.id} />
+                          <ResendButton orderId={o.id} demo={organizer.isDemo} />
                         ) : o.paymentMode === 'transfer' && o.status === 'claimed' ? (
                           <TransferActions
                             orderId={o.id}
