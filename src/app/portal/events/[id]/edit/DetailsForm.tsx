@@ -46,13 +46,20 @@ interface Props {
 }
 
 /** "Saturday 24 October 2026 · Doors 19:00", from the calendar date and doors time. */
+// Spelled out by hand: the server's and the browser's date formatting disagree
+// ("Saturday 17 October" vs "Saturday, 17 October"), and that difference
+// rendered a different form on each side (a hydration error).
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 function writtenDate(date: string, doors: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return '';
-  const d = new Date(`${date}T12:00:00`);
+  const d = new Date(`${date}T12:00:00Z`);
   if (Number.isNaN(d.getTime())) return '';
-  const day = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const day = `${WEEKDAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
   return doors ? `${day} · Doors ${doors}` : day;
 }
+/** The same date written with or without commas is not "written by hand". */
+const sameWritten = (a: string, b: string) => a.replace(/,/g, '').replace(/\s+/g, ' ').trim() === b.replace(/,/g, '').replace(/\s+/g, ' ').trim();
 
 export default function DetailsForm({ eventId, isDraft, kind, initial }: Props) {
   const router = useRouter();
@@ -73,7 +80,7 @@ export default function DetailsForm({ eventId, isDraft, kind, initial }: Props) 
   const [customDate, setCustomDate] = useState(
     () =>
       initial.dateDisplay.trim() !== '' &&
-      initial.dateDisplay.trim() !== writtenDate(initial.eventDate, initial.dateDisplay.match(/Doors (\d{1,2}:\d{2})/)?.[1] ?? '')
+      !sameWritten(initial.dateDisplay, writtenDate(initial.eventDate, initial.dateDisplay.match(/Doors (\d{1,2}:\d{2})/)?.[1] ?? ''))
   );
   const [venueName, setVenueName] = useState(initial.venueName);
   const [pickupInfo, setPickupInfo] = useState(initial.pickupInfo);

@@ -9,6 +9,7 @@
 // sequence asks the same things, so the page always works.
 import { geminiJson } from './gemini';
 import { askLang, type AskLang } from './askFaq';
+import { chatLang, greetBack, splitGreeting } from './smallTalk';
 
 export interface CreatorFields {
   /** 'custom-design' (a page / site / app) | 'organizer-account' | 'general'. */
@@ -125,19 +126,27 @@ const Q: Record<AskLang, Record<'summary' | 'event' | 'when' | 'name' | 'email' 
  */
 export function scriptedTurn(messages: ChatTurn[], fields: CreatorFields): { reply: string; fields: CreatorFields } {
   const f = { ...fields };
-  const lastMe = [...messages].reverse().find((m) => m.from === 'me')?.text.trim() ?? '';
+  const typed = [...messages].reverse().find((m) => m.from === 'me')?.text.trim() ?? '';
   const lastBot = [...messages].reverse().find((m) => m.from === 'bot')?.text ?? '';
   const lang = askLang(messages.filter((m) => m.from === 'me').map((m) => m.text).join(' ') || 'x');
   const q = Q[lang];
+  // "k cha, sanchai xa?" is a greeting, not the answer: greet back, and keep
+  // only what follows it (lib/smallTalk).
+  const hi = splitGreeting(typed);
+  const lastMe = hi.rest;
+  const hello = hi.greeting ? `${greetBack(chatLang(typed), hi.askedHow)} ` : '';
   const email = lastMe.match(/[^\s@]+@[^\s@]+\.[^\s@]+/)?.[0];
   if (email) f.email = email.slice(0, 200);
   if (lastMe && !email) {
-    if (lastBot === q.summary || (!f.summary && !Object.values(q).includes(lastBot))) f.summary = lastMe.slice(0, 600);
-    else if (lastBot === q.event) f.eventName = lastMe.slice(0, 160);
-    else if (lastBot === q.when) f.eventWhen = lastMe.slice(0, 160);
-    else if (lastBot === q.name) f.name = lastMe.slice(0, 120);
+    // Only a real sentence says what they want — not "ok" or "hmm".
+    if (lastBot.endsWith(q.summary) || (!f.summary && !Object.values(q).some((x) => lastBot.endsWith(x)))) {
+      if (lastMe.split(/\s+/).length >= 3) f.summary = lastMe.slice(0, 600);
+    }
+    else if (lastBot.endsWith(q.event)) f.eventName = lastMe.slice(0, 160);
+    else if (lastBot.endsWith(q.when)) f.eventWhen = lastMe.slice(0, 160);
+    else if (lastBot.endsWith(q.name)) f.name = lastMe.slice(0, 120);
   }
-  const reply = !f.summary
+  const next = !f.summary
     ? q.summary
     : !f.eventName
       ? q.event
@@ -148,7 +157,7 @@ export function scriptedTurn(messages: ChatTurn[], fields: CreatorFields): { rep
           : !EMAIL_RE.test(f.email)
             ? q.email
             : q.ready;
-  return { reply, fields: f };
+  return { reply: hello + next, fields: f };
 }
 
 /** One turn with the AI: its reply, and every field it could fill so far. */
@@ -161,7 +170,11 @@ export async function aiTurn(messages: ChatTurn[], fields: CreatorFields, owner:
     `You are ${owner}'s friendly assistant on MartNepali, a free platform for Nepali events and shops in Germany. ` +
       `A visitor wants to reach ${owner} — usually to have a custom event page, a festival website or an app built, ` +
       'sometimes to get a seller account, sometimes something else. Talk like a warm, brief human: ask ONE short question ' +
-      'at a time, and never ask for something they already told you. Collect, in a natural order: what they want (summary), ' +
+      'at a time, and never ask for something they already told you. Chat like a person: answer greetings and small talk ' +
+      '("k cha, sanchai xa?" → "Sanchai chu, hajur? …"), and answer general questions briefly — selling on MartNepali is free ' +
+      'and anyone can make their own page at /organizers; custom design, festival sites and apps are what ' +
+      `${owner} quotes personally — then steer back with ONE question. ` +
+      'Collect, in a natural order: what they want (summary), ' +
       'their event or business (eventName), when (eventWhen) and where (eventWhere), how many people (expectedPeople), ' +
       'budget or deadline if they have one (budget), pages or looks they like (looks), then their name and email. ' +
       'Organization and phone only if offered. If they are a TICKET BUYER asking about an order, tell them kindly that ' +
@@ -174,15 +187,21 @@ export async function aiTurn(messages: ChatTurn[], fields: CreatorFields, owner:
       'Respond with STRICT JSON only: {"reply":string,"fields":{"kind":"custom-design"|"organizer-account"|"general",' +
       '"summary":string,"eventName":string,"eventWhen":string,"eventWhere":string,"expectedPeople":string,"budget":string,' +
       '"looks":string,"name":string,"email":string,"organization":string,"phone":string}}. Keep every field you already had; ' +
-      'summary is 1-2 sentences in the visitor’s words; empty string for anything unknown.',
-    { timeoutMs: 9000 }
+      'Put into the fields ONLY what the visitor said about their request — never greetings, small talk or questions; ' +
+      'summary stays empty until they say what they want, then it is a clean 1-2 sentence brief of it for ' +
+      `${owner} (in the visitor’s language); empty string for anything unknown.`,
+    // The first model is sometimes over quota; the next one needs a moment.
+    { timeoutMs: 13000 }
   ).catch(() => null)) as { reply?: unknown; fields?: unknown } | null;
   if (!raw || typeof raw.reply !== 'string' || !raw.reply.trim()) return null;
   return { reply: raw.reply.trim().slice(0, 700), fields: cleanFields(raw.fields, fields) };
 }
 
-/** The request as Milan reads it: the fields first, then the whole conversation. */
-export function requestMessage(fields: CreatorFields, messages: ChatTurn[]): string {
+/**
+ * The request as Milan reads it: the brief and what was noted — not the
+ * whole conversation (greetings and small talk are not for him).
+ */
+export function requestMessage(fields: CreatorFields): string {
   const lines = [
     fields.summary,
     '',
@@ -192,7 +211,8 @@ export function requestMessage(fields: CreatorFields, messages: ChatTurn[]): str
     fields.expectedPeople && `People: ${fields.expectedPeople}`,
     fields.budget && `Budget / timing: ${fields.budget}`,
     fields.looks && `Looks they like: ${fields.looks}`,
+    fields.phone && `Phone: ${fields.phone}`,
+    fields.organization && `Organization: ${fields.organization}`,
   ].filter((l): l is string => typeof l === 'string');
-  const convo = messages.map((m) => `${m.from === 'me' ? '›' : '‹'} ${m.text}`).join('\n');
-  return `${lines.join('\n')}\n\n— The conversation (via the chat on /contact) —\n${convo}`.slice(0, 6000);
+  return `${lines.join('\n')}\n\n— Noted by the chat on /contact —`.slice(0, 6000);
 }

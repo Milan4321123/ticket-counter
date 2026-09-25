@@ -29,3 +29,17 @@ export function scrollChat(log: HTMLElement | null, mineSelector: string, waitin
     lastMine && !waiting ? log.scrollTop + lastMine.getBoundingClientRect().top - log.getBoundingClientRect().top - 12 : log.scrollHeight;
   requestAnimationFrame(() => log.scrollTo({ top, behavior: smooth ? 'smooth' : 'auto' }));
 }
+
+/**
+ * Show what just arrived from its start (`first`) — unless that leaves the
+ * newest message (`last`) below the screen; then enough above `last` for
+ * context, with `last` itself in view.
+ */
+export function scrollToArrival(log: HTMLElement, first: HTMLElement, last: HTMLElement) {
+  requestAnimationFrame(() => {
+    const base = log.getBoundingClientRect().top - log.scrollTop;
+    const firstTop = first.getBoundingClientRect().top - base - 12;
+    const lastTop = last.getBoundingClientRect().top - base;
+    log.scrollTo({ top: Math.max(firstTop, lastTop - log.clientHeight * 0.45), behavior: 'smooth' });
+  });
+}

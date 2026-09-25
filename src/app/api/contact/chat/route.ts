@@ -29,7 +29,7 @@ export async function POST(req: Request) {
   const owner = process.env.PLATFORM_OWNER_NAME?.trim() || 'Milan';
 
   // Send: the finished request becomes a contact request — the same record
-  // and the same two emails the form makes — with the conversation attached.
+  // and the same two emails the form makes — with what the chat noted.
   if (body?.send === true) {
     if (body.consent !== true) return NextResponse.json({ error: 'Please tick the privacy box first.' }, { status: 400 });
     if (!isReady(fields)) return NextResponse.json({ error: 'Your name, email and what you would like are still missing.' }, { status: 400 });
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
       name: fields.name,
       email: fields.email,
       organization: fields.organization,
-      message: requestMessage(fields, messages),
+      message: requestMessage(fields),
       kind: fields.kind,
       phone: fields.phone,
       eventKind: fields.eventName,

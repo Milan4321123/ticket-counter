@@ -25,7 +25,9 @@ import { formatMoney } from '@/lib/money';
 import { ASSISTANT_AWAY_EVENT, ASSISTANT_RETURN_EVENT, GOTO_TAB_EVENT } from './GoToTab';
 import { saveEvent, type SavedTier } from './save';
 import { fixTypos } from '@/lib/askTypos';
-import { blurOnTouch, focusUnlessTouch, scrollChat, touchScreen } from '@/lib/chatScroll';
+import { blurOnTouch, focusUnlessTouch, scrollToArrival, touchScreen } from '@/lib/chatScroll';
+import { readLookRequest } from '@/lib/restyle';
+import { chatLang, greetBack, splitGreeting } from '@/lib/smallTalk';
 import { categoryLabel } from '@/lib/categories';
 
 type Lang = 'en' | 'de' | 'ne';
@@ -74,6 +76,8 @@ interface Message {
   picker?: boolean;
   /** "Done so far / could still add" — shown once the required steps are in. */
   progress?: Progress;
+  /** The FAQ the chat just wrote, to edit and add (the latest one only). */
+  faqDraft?: boolean;
   /** Pages mentioned in a general answer, as buttons (open in a new tab). */
   links?: { label: string; href: string; icon: string }[];
 }
@@ -413,6 +417,130 @@ const HEAD_SUB: Record<Lang, string> = {
   ne: 'AI सहायक · तपाईंको पेज भर्छ',
 };
 const CONTINUE: Record<Lang, string> = { en: 'Continue the chat', de: 'Chat fortsetzen', ne: 'च्याट जारी राख्नुहोस्' };
+const BUBBLE: Record<Lang, { tap: string; unread: string; mini: string }> = {
+  en: { tap: 'Tap to continue', unread: 'New reply — tap to read', mini: 'Minimize' },
+  de: { tap: 'Tippen zum Weitermachen', unread: 'Neue Antwort — tippen zum Lesen', mini: 'Minimieren' },
+  ne: { tap: 'जारी राख्न थिच्नुहोस्', unread: 'नयाँ जवाफ — पढ्न थिच्नुहोस्', mini: 'सानो बनाउनुहोस्' },
+};
+
+/** The page looks (lib/restyle), as the chat names them. */
+const LOOK_NAME: Record<string, string> = { classic: 'Classic', poster: 'Poster', festival: 'Festival', editorial: 'Editorial', neon: 'Neon' };
+const lookChips = (lang: Lang, now: string | null) => [
+  ...['festival', 'neon', 'poster', 'editorial']
+    .filter((l) => l !== now)
+    .map((l) => (lang === 'de' ? `${LOOK_NAME[l]}-Look` : `${LOOK_NAME[l]} look`)),
+  lang === 'de' ? 'Mach sie schöner ✨' : 'Make it look cooler ✨',
+];
+const LOOK_OFFER: Record<Lang, string> = {
+  en: 'Want your page to look more special? Pick a look — I redesign it, headline and all:',
+  de: 'Soll deine Seite besonderer aussehen? Wähle einen Look – ich gestalte sie neu, samt Überschrift:',
+  ne: 'पेज अझ विशेष देखाउन चाहनुहुन्छ? एउटा रूप छान्नुहोस् — म शीर्षकसहित नयाँ डिजाइन बनाउँछु:',
+};
+/** A new page, step by step (the questions after a vague start). */
+type Gap = 'name' | 'when' | 'tiers' | 'pickup';
+const INTAKE: Record<Lang, { got: string; allAtOnce: string; summary: string; q: (shop: boolean) => Record<Gap, string> }> = {
+  en: {
+    got: 'Got it ✓',
+    allAtOnce: '(You can also tell me everything at once — I will sort it out.)',
+    summary: 'Here is your page so far — check it, untick anything wrong, then “Fill it in”:',
+    q: (shop) => ({
+      name: shop ? 'What is your shop called, and what is it — in a sentence?' : 'What is your event called, and what is it — in a sentence?',
+      when: 'When and where is it? (day, time, venue and city)',
+      tiers: shop
+        ? 'What do you sell, and for how much? (e.g. chicken momo 9€, veg momo 8€)'
+        : 'Which tickets do you sell, and for how much? (e.g. Standard 25€, VIP 45€, student 15€)',
+      pickup: 'Where and when do people collect their order? (e.g. Saturdays 16–19h, Berlin-Neukölln)',
+    }),
+  },
+  de: {
+    got: 'Verstanden ✓',
+    allAtOnce: '(Du kannst mir auch alles auf einmal sagen — ich sortiere es.)',
+    summary: 'So sieht deine Seite bisher aus — prüfe sie, entferne Falsches, dann „Ausfüllen“:',
+    q: (shop) => ({
+      name: shop ? 'Wie heißt dein Laden, und was ist er – in einem Satz?' : 'Wie heißt dein Event, und was ist es – in einem Satz?',
+      when: 'Wann und wo ist es? (Tag, Uhrzeit, Ort und Stadt)',
+      tiers: shop
+        ? 'Was verkaufst du, und zu welchem Preis? (z. B. Chicken-Momo 9€, Veggie-Momo 8€)'
+        : 'Welche Tickets gibt es, und zu welchem Preis? (z. B. Standard 25€, VIP 45€, Student 15€)',
+      pickup: 'Wo und wann holen die Leute ihre Bestellung ab? (z. B. samstags 16–19 Uhr, Berlin-Neukölln)',
+    }),
+  },
+  ne: {
+    got: 'बुझें ✓',
+    allAtOnce: '(सबै एकैचोटि पनि भन्न सक्नुहुन्छ — म मिलाउँछु।)',
+    summary: 'तपाईंको पेज अहिलेसम्म यस्तो छ — हेर्नुहोस्, गलत हटाउनुहोस्, अनि “भर्नुहोस्”:',
+    q: (shop) => ({
+      name: shop ? 'तपाईंको पसलको नाम के हो, र यो के हो — एक वाक्यमा?' : 'तपाईंको कार्यक्रमको नाम के हो, र यो के हो — एक वाक्यमा?',
+      when: 'कहिले र कहाँ हो? (दिन, समय, ठाउँ र सहर)',
+      tiers: shop ? 'के बेच्नुहुन्छ, र कतिमा? (जस्तै chicken momo 9€, veg momo 8€)' : 'कुन टिकट, र कतिमा? (जस्तै Standard 25€, VIP 45€)',
+      pickup: 'मानिसहरूले अर्डर कहाँ र कहिले लिन्छन्? (जस्तै शनिबार 16–19, Berlin-Neukölln)',
+    }),
+  },
+};
+
+/** What a new page's first answers still leave open, in the order to ask. */
+function intakeGaps(p: Proposal, shop: boolean): Gap[] {
+  const gaps: Gap[] = [];
+  if (!p.name) gaps.push('name');
+  if (shop) {
+    if (!(p.tiers ?? []).length) gaps.push('tiers');
+    if (!p.pickupInfo && !p.city && !p.address) gaps.push('pickup');
+  } else {
+    if ((!p.eventDate && !p.dateDisplay) || (!p.venueName && !p.city)) gaps.push('when');
+    if (!(p.tiers ?? []).length) gaps.push('tiers');
+  }
+  return gaps;
+}
+
+/** "Write my FAQ", "make a FAQ", "questions and answers". */
+const FAQ_RE = /\b(faqs?|f\.a\.q\.?|questions? (?:and|&) answers?|fragen und antworten|häufige fragen)\b|प्रश्नोत्तर/i;
+const FAQ_W: Record<
+  Lang,
+  { ask: string; own: string; ready: string; add: (n: number) => string; added: (n: number) => string; edit: string; none: string; chip: string }
+> = {
+  en: {
+    ask: 'Tell me everything guests might ask about — parking, food, children, doors, what to bring, how to get there. Just write notes; I turn them into questions and answers for you to check.',
+    own: '✏️ Write it myself →',
+    ready: 'Here is your FAQ — change any question or answer, untick what you do not want, then add it:',
+    add: (n) => `Add ${n} to my FAQ ✓`,
+    added: (n) => `Added ${n} question${n === 1 ? '' : 's'} to your FAQ ✓ — your page’s own assistant answers visitors from your notes too. Edit them any time:`,
+    edit: '❓ Edit the FAQ →',
+    none: 'I could not write questions from that just now — you can add them yourself:',
+    chip: 'Write my FAQ ✍️',
+  },
+  de: {
+    ask: 'Erzähl mir alles, was Gäste fragen könnten — Parken, Essen, Kinder, Einlass, was mitbringen, Anfahrt. Einfach Notizen; ich mache daraus Fragen und Antworten zum Prüfen.',
+    own: '✏️ Selbst schreiben →',
+    ready: 'Hier ist dein FAQ — ändere Fragen oder Antworten, entferne, was du nicht willst, dann hinzufügen:',
+    add: (n) => `${n} zum FAQ hinzufügen ✓`,
+    added: (n) => `${n} ${n === 1 ? 'Frage' : 'Fragen'} im FAQ ✓ — der Assistent deiner Seite beantwortet Besucherfragen auch aus deinen Notizen. Jederzeit bearbeiten:`,
+    edit: '❓ FAQ bearbeiten →',
+    none: 'Daraus konnte ich gerade keine Fragen machen — du kannst sie selbst eintragen:',
+    chip: 'Mein FAQ schreiben ✍️',
+  },
+  ne: {
+    ask: 'पाहुनाहरूले सोध्न सक्ने सबै कुरा भन्नुहोस् — पार्किङ, खाना, बच्चा, ढोका खुल्ने समय, के ल्याउने, कसरी आउने। नोट लेख्नुहोस्; म प्रश्न र उत्तर बनाइदिन्छु।',
+    own: '✏️ आफैं लेख्छु →',
+    ready: 'तपाईंको FAQ — कुनै प्रश्न वा उत्तर बदल्नुहोस्, नचाहिने हटाउनुहोस्, अनि थप्नुहोस्:',
+    add: (n) => `${n} वटा FAQ मा थप्नुहोस् ✓`,
+    added: (n) => `${n} वटा प्रश्न FAQ मा थपियो ✓ — जुनसुकै बेला बदल्न सकिन्छ:`,
+    edit: '❓ FAQ बदल्नुहोस् →',
+    none: 'अहिले प्रश्न बनाउन सकिनँ — आफैं थप्न सक्नुहुन्छ:',
+    chip: 'Write my FAQ ✍️',
+  },
+};
+const NEXT_OFFER: Record<Lang, string> = {
+  en: 'What next? I can write your FAQ from a few notes, or give your page a new look:',
+  de: 'Wie geht’s weiter? Ich schreibe dein FAQ aus ein paar Notizen, oder gebe deiner Seite einen neuen Look:',
+  ne: 'अब के? केही नोटबाट म तपाईंको FAQ लेखिदिन्छु, वा पेजलाई नयाँ रूप दिन्छु:',
+};
+
+const LOOK_OWN: Record<Lang, string> = { en: '🎨 Adjust it yourself →', de: '🎨 Selbst anpassen →', ne: '🎨 आफैं मिलाउनुहोस् →' };
+const LOOK_DONE: Record<Lang, (name: string, headline?: string) => string> = {
+  en: (n, h) => `Done — your page has the ${n} look now${h ? `, headlined “${h}”` : ''}. Open it to see, or try another:`,
+  de: (n, h) => `Fertig — deine Seite hat jetzt den ${n}-Look${h ? ` mit „${h}“` : ''}. Schau sie dir an oder probier einen anderen:`,
+  ne: (n, h) => `भयो — तपाईंको पेज अब ${n} रूपमा छ${h ? ` — “${h}”` : ''}। हेर्नुहोस्, वा अर्को छान्नुहोस्:`,
+};
 
 const SKIP_RE = /^\s*(skip|later|next|überspringen|später|weiter|छोड्नुहोस्|छोड|पछि|chodnus|chhodnus|chodnu|pachi|pachhi|pachhi garchu)\s*[.!]?\s*$/i;
 const WRITE_IT_RE = /\b(you write|write it|you do it|schreib du|du schreibst|tapai(le)? lekh(nus|idinus|nuhos)|timi(le)? lekh|aafai lekh|lekhidinus)\b|तपाईं लेख्नुहोस्|तपाईं नै लेख्नुहोस्|आफैं लेख्नुहोस्/i;
@@ -426,6 +554,7 @@ export default function SetupAssistant({
   startedAlready = false,
   slug = '',
   listings = [],
+  notes = '',
 }: {
   eventId: string;
   kind: 'event' | 'shop';
@@ -438,12 +567,26 @@ export default function SetupAssistant({
   slug?: string;
   /** The seller's other listings, for "which one shall we work on?". */
   listings?: ListingChoice[];
+  /** Their notes for the page's assistant (the FAQ is written from them). */
+  notes?: string;
 }) {
   const t = T[lang] ?? T.en;
   const router = useRouter();
   const isShop = kind === 'shop';
   const unit = isShop ? t.labels.item : t.labels.ticket;
   const [open, setOpen] = useState(false);
+  /** Minimized: a bubble in the corner, one tap back into the chat. */
+  const [mini, setMini] = useState(false);
+  const [unread, setUnread] = useState(false);
+  const offeredLook = useRef(false);
+  /** Questions asked so far while a new page is described step by step. */
+  const intakeAsked = useRef(0);
+  const notesRef = useRef(notes);
+  /** The FAQ the chat wrote, being checked (null once added). */
+  const [faqEdit, setFaqEdit] = useState<{ question: string; answer: string; on: boolean }[] | null>(null);
+  const [faqSaving, setFaqSaving] = useState(false);
+  /** What was being asked before "write my FAQ" — back to it afterwards. */
+  const faqReturn = useRef<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([
     { from: 'bot', text: GREETING },
     { from: 'bot', text: t.hello(isShop) },
@@ -529,6 +672,7 @@ export default function SetupAssistant({
       setAsking(null);
       setQueue([]);
       say({ from: 'bot', text: t.allDone, progress: progressRef.current ?? undefined });
+      offerLook();
       return;
     }
     // Only photo / publish left: first ask whether the details are right.
@@ -555,12 +699,140 @@ export default function SetupAssistant({
       setQueue([]);
       say({ from: 'bot', text: t.demoPreview, view: `/e/${slug}`, viewLabel: t.buttons.preview, account: true });
       if (progressRef.current) say({ from: 'bot', text: '', progress: progressRef.current });
+      offerLook();
     } else if (key === 'publish') {
       setAsking('publish');
       say({ from: 'bot', text: t.q.publish, publishNow: true });
     } else {
       setAsking(key);
       say({ from: 'bot', text: t.q[key] });
+    }
+  }
+
+  /** Once the required steps are done: "want a cooler look?" with the looks as buttons. */
+  function offerLook() {
+    if (offeredLook.current) return;
+    offeredLook.current = true;
+    const faqDone = progressRef.current?.extras.some((x) => x.tab === 'faq' && x.done) ?? false;
+    const fw = FAQ_W[lang] ?? FAQ_W.en;
+    say({
+      from: 'bot',
+      text: faqDone ? (LOOK_OFFER[lang] ?? LOOK_OFFER.en) : (NEXT_OFFER[lang] ?? NEXT_OFFER.en),
+      chips: [...(faqDone ? [] : [fw.chip]), ...lookChips(lang, null)],
+    });
+  }
+
+  /**
+   * The FAQ, written from what the seller tells the chat: the notes are kept
+   * (the page's own assistant answers from them too), questions and answers
+   * come back to check and edit right here, and "Add" puts them in the FAQ.
+   */
+  async function writeFaq(more: string) {
+    const fw = FAQ_W[lang] ?? FAQ_W.en;
+    setBusy(true);
+    try {
+      const ctx = [notesRef.current.trim(), more.trim()].filter(Boolean).join('\n').slice(-4000);
+      const saved = await saveEvent(eventId, { assistantContext: ctx });
+      if (saved.ok) notesRef.current = ctx;
+      const res = await fetch(`/api/portal/events/${eventId}/faq-suggest`, { method: 'POST' });
+      const d = (await res.json().catch(() => null)) as { faqs?: { question: string; answer: string }[]; error?: string } | null;
+      if (!d?.faqs?.length) {
+        say({ from: 'bot', text: d?.error ?? fw.none, goto: { tab: 'faq', label: fw.own } });
+      } else {
+        setFaqEdit(d.faqs.slice(0, 8).map((f) => ({ question: f.question, answer: f.answer, on: true })));
+        say({ from: 'bot', text: fw.ready, faqDraft: true });
+      }
+    } catch {
+      say({ from: 'bot', text: t.offline });
+    } finally {
+      setAsking(faqReturn.current);
+      faqReturn.current = null;
+      setBusy(false);
+    }
+  }
+
+  /** Add the ticked questions after the ones already in the FAQ — nothing there is lost. */
+  async function addFaqs() {
+    if (!faqEdit || faqSaving) return;
+    const fw = FAQ_W[lang] ?? FAQ_W.en;
+    const chosen = faqEdit.filter((f) => f.on && f.question.trim() && f.answer.trim());
+    if (!chosen.length) return;
+    setFaqSaving(true);
+    try {
+      const now = (await fetch(`/api/portal/events/${eventId}/faqs`, { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null)) as { faqs?: { question: string; answer: string }[] } | null;
+      if (!now || !Array.isArray(now.faqs)) {
+        say({ from: 'bot', text: t.error });
+        return;
+      }
+      const existing = now.faqs.map((f) => ({ question: f.question, answer: f.answer }));
+      const merged = [...existing, ...chosen.map((f) => ({ question: f.question.trim().slice(0, 200), answer: f.answer.trim().slice(0, 1000) }))].slice(0, 12);
+      const res = await fetch(`/api/portal/events/${eventId}/faqs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ faqs: merged }),
+      });
+      const d = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (!res.ok) {
+        say({ from: 'bot', text: d?.error ?? t.error });
+        return;
+      }
+      setFaqEdit(null);
+      say({
+        from: 'bot',
+        text: fw.added(merged.length - existing.length),
+        goto: { tab: 'faq', label: fw.edit },
+        view: `/e/${slug}`,
+        viewLabel: t.buttons.preview,
+      });
+      router.refresh();
+    } catch {
+      say({ from: 'bot', text: t.offline });
+    } finally {
+      setFaqSaving(false);
+    }
+  }
+
+  /**
+   * "Make it festival style", "neon look", "the page is boring": a new look
+   * (lib/restyle, api/…/restyle), saved at once through the normal editor
+   * save — then back to whatever was being asked.
+   */
+  async function restyle(text: string) {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/portal/events/${eventId}/restyle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      const d = (await res.json().catch(() => null)) as { design?: Record<string, unknown>; error?: string } | null;
+      if (!d?.design) {
+        say({ from: 'bot', text: d?.error ?? t.error });
+        return;
+      }
+      const saved = await saveEvent(eventId, { pageDesign: d.design });
+      if (!saved.ok) {
+        say({ from: 'bot', text: saved.error ?? t.error });
+        return;
+      }
+      const layout = typeof d.design.layout === 'string' ? d.design.layout : 'classic';
+      const headline = typeof d.design.headline === 'string' ? d.design.headline : undefined;
+      const pendingQ = asking ? (t.q as Record<string, string | undefined>)[asking] : undefined;
+      say({
+        from: 'bot',
+        text: (LOOK_DONE[lang] ?? LOOK_DONE.en)(LOOK_NAME[layout] ?? layout, headline) + (pendingQ ? `\n\n${pendingQ}` : ''),
+        view: `/e/${slug}`,
+        viewLabel: t.buttons.preview,
+        chips: lookChips(lang, layout),
+        goto: { tab: 'design', label: LOOK_OWN[lang] ?? LOOK_OWN.en },
+      });
+      router.refresh();
+    } catch {
+      say({ from: 'bot', text: t.offline });
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -691,11 +963,36 @@ export default function SetupAssistant({
     setMessages((m) => [...m, { from: 'me', text: typedText }]);
     setDraft('');
     // Phone typing: "uplaod phtot" is read as "upload photo" (lib/askTypos).
-    const text = fixTypos(typedText);
+    let text = fixTypos(typedText);
     const reask = () => {
       const q = asking ? (t.q as Record<string, string | undefined>)[asking] : undefined;
       if (q) say({ from: 'bot', text: q });
     };
+    // "k cha, sanchai xa?" — a greeting gets one back; what follows it is the
+    // actual message ("… mero momo pasal cha" is a shop, lib/smallTalk).
+    const hi = DONE_RE.test(text) ? null : splitGreeting(text);
+    if (hi?.greeting) {
+      const back = greetBack(chatLang(typedText), hi.askedHow);
+      if (!hi.rest) {
+        const q = asking ? (t.q as Record<string, string | undefined>)[asking] : undefined;
+        const started = startedAlready || filledOnce.current || said.length > 0;
+        say({ from: 'bot', text: `${back} ${q ?? (asking === 'faqNotes' ? (FAQ_W[lang] ?? FAQ_W.en).ask : started ? t.whatChange : t.hello(isShop))}` });
+        return;
+      }
+      say({ from: 'bot', text: back });
+      text = hi.rest;
+    }
+    // The notes for "write my FAQ".
+    if (asking === 'faqNotes') {
+      if (SKIP_RE.test(text) || DONE_RE.test(text)) {
+        setAsking(faqReturn.current);
+        faqReturn.current = null;
+        say({ from: 'bot', text: t.skip });
+        return;
+      }
+      await writeFaq(text);
+      return;
+    }
     // "I uploaded it" — look again at what is still missing.
     if (UPLOADED.test(text)) {
       setBusy(true);
@@ -709,6 +1006,20 @@ export default function SetupAssistant({
       setBusy(true);
       await askNext();
       setBusy(false);
+      return;
+    }
+    // "Write my FAQ": the notes first, then the chat writes it.
+    if (FAQ_RE.test(text) && text.split(/\s+/).length <= 10) {
+      const fw = FAQ_W[lang] ?? FAQ_W.en;
+      faqReturn.current = asking;
+      setAsking('faqNotes');
+      say({ from: 'bot', text: fw.ask, goto: { tab: 'faq', label: fw.own } });
+      return;
+    }
+    // "make it festival style", "neon look", "the page is boring" — a new look
+    // (before the section buttons: "style" alone still opens Design).
+    if (readLookRequest(text)) {
+      await restyle(text);
       return;
     }
     // "Upload photo", "change colours", "add FAQ"… — the button to that section.
@@ -803,16 +1114,39 @@ export default function SetupAssistant({
             confirmed.current = false;
             setAsking('confirm');
             say({ from: 'bot', text: t.whatChange });
+          } else if (intakeAsked.current < 3) {
+            // A new page and nothing to fill in yet ("mero momo pasal cha"):
+            // the first question of the step-by-step, not "I did not catch that".
+            const iw = INTAKE[lang] ?? INTAKE.en;
+            const shopNow = data.switchedKind ? data.switchedKind === 'shop' : isShop;
+            intakeAsked.current += 1;
+            say({
+              from: 'bot',
+              text: `${iw.got} ${iw.q(shopNow)[shopNow ? 'tiers' : 'name']}${intakeAsked.current === 1 ? `\n${iw.allAtOnce}` : ''}`,
+              chips: [t.makeOneUp],
+            });
           } else {
             say({ from: 'bot', text: data.reply ?? t.error, chips: [t.makeOneUp] });
           }
+          return;
+        }
+        // A new page, step by step: after a vague start ("mero momo pasal
+        // cha") the next question — its name, when and where, the tickets or
+        // items — instead of a half-empty form. Everything at once works too;
+        // at most three questions, then the summary to fill in.
+        const shopNow = data.switchedKind ? data.switchedKind === 'shop' : isShop;
+        const gaps = intakeGaps(p, shopNow);
+        const iw = INTAKE[lang] ?? INTAKE.en;
+        if (!startedAlready && !filledOnce.current && !data.suggested && gaps.length && intakeAsked.current < 3 && !DONE_RE.test(text)) {
+          intakeAsked.current += 1;
+          say({ from: 'bot', text: `${iw.got} ${iw.q(shopNow)[gaps[0]]}${intakeAsked.current === 1 ? `\n${iw.allAtOnce}` : ''}` });
           return;
         }
         const tk: Record<string, boolean> = {};
         for (const k of Object.keys(p)) if (k !== 'tiers') tk[k] = true;
         (p.tiers ?? []).forEach((_, i) => (tk[`tier:${i}`] = true));
         setTicks(tk);
-        say({ from: 'bot', text: data.reply ?? '', proposal: p, suggested: Boolean(data.suggested) });
+        say({ from: 'bot', text: data.reply || (intakeAsked.current ? iw.summary : ''), proposal: p, suggested: Boolean(data.suggested) });
       }
     } catch {
       say({ from: 'bot', text: t.offline });
@@ -860,6 +1194,8 @@ export default function SetupAssistant({
    */
   async function openChat() {
     setOpen(true);
+    setMini(false);
+    setUnread(false);
     // Back to a conversation already under way: just show it.
     if (!startedAlready || messages.some((m) => m.from === 'me')) return;
     setBusy(true);
@@ -900,10 +1236,11 @@ export default function SetupAssistant({
   useEffect(() => {
     if (!open) return;
     const html = document.documentElement;
-    const before = html.style.overflow;
+    const before = [html.style.overflow, document.body.style.overflow];
     html.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') minimize();
     };
     window.addEventListener('keydown', onKey);
     const vv = window.visualViewport;
@@ -919,17 +1256,59 @@ export default function SetupAssistant({
     // A keyboard is never opened for the seller — only a mouse gets the cursor.
     focusUnlessTouch(inputRef.current);
     return () => {
-      html.style.overflow = before;
+      html.style.overflow = before[0];
+      document.body.style.overflow = before[1];
       window.removeEventListener('keydown', onKey);
       vv?.removeEventListener('resize', fit);
       vv?.removeEventListener('scroll', fit);
     };
   }, [open]);
 
-  // Like any chat app: after your message, the answer reads down from it —
-  // your question at the top of the screen, not the end of a long reply.
+  // Opening (or coming back): the latest of the conversation.
   useEffect(() => {
-    if (open) scrollChat(logRef.current, '.sa-me', messages[messages.length - 1]?.from === 'me');
+    if (!open) return;
+    requestAnimationFrame(() => {
+      const log = logRef.current;
+      if (log) log.scrollTop = log.scrollHeight;
+    });
+  }, [open]);
+
+  // Like any chat app. While waiting: the end. When messages arrive: from the
+  // first new one — or the question typed just before it — so an answer reads
+  // from its start; messages landing together (a reply, then the next
+  // question) count as one arrival, and the newest is never left below the
+  // screen — after "Fill it in" (a button, nothing typed) the next question
+  // must show without scrolling.
+  const shown = useRef(messages.length);
+  const arrival = useRef<{ index: number; at: number } | null>(null);
+  useEffect(() => {
+    const n = messages.length;
+    const fresh = n - shown.current;
+    shown.current = n;
+    if (!open) {
+      if (fresh > 0 && mini && messages[n - 1]?.from === 'bot') setUnread(true);
+      return;
+    }
+    const log = logRef.current;
+    if (!log) return;
+    const toEnd = () => requestAnimationFrame(() => log.scrollTo({ top: log.scrollHeight, behavior: 'smooth' }));
+    if (messages[n - 1]?.from === 'me') {
+      arrival.current = null;
+      toEnd();
+      return;
+    }
+    if (fresh <= 0) {
+      if (busy) toEnd();
+      return;
+    }
+    let index = n - fresh;
+    if (messages[index - 1]?.from === 'me') index -= 1;
+    const now = Date.now();
+    if (arrival.current && now - arrival.current.at < 3000 && arrival.current.index < index) index = arrival.current.index;
+    arrival.current = { index, at: now };
+    const items = log.querySelectorAll<HTMLElement>(':scope > .sa-msg:not(.sa-typing-row)');
+    if (items[index] && items[n - 1]) scrollToArrival(log, items[index], items[n - 1]);
+    else toEnd();
   }, [messages.length, busy, open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The composer grows with what is typed (or spoken), up to a few lines.
@@ -940,6 +1319,12 @@ export default function SetupAssistant({
     // Empty: one line (the example text is cut short, not wrapped).
     if (draft) el.style.height = `${Math.min(el.scrollHeight, 150)}px`;
   }, [draft, open]);
+
+  /** Out of the way, one tap from coming back (Escape does the same). */
+  function minimize() {
+    setOpen(false);
+    setMini(true);
+  }
 
   /** Send from the composer; on a phone the keyboard goes, so the answer shows. */
   const submit = () => {
@@ -985,35 +1370,56 @@ export default function SetupAssistant({
       </span>
     </button>
   );
-  if (!open) return door;
+  const bw = BUBBLE[lang] ?? BUBBLE.en;
+  if (!open) {
+    return (
+      <>
+        {door}
+        {mini &&
+          createPortal(
+            <button type="button" className={`sa-bubble${unread ? ' has-unread' : ''}`} onClick={() => void openChat()}>
+              <span className="ab-ring" aria-hidden="true" />
+              <span className="sa-bubble-in">
+                <span className={`ab-orb${busy ? ' is-busy' : ''}`} style={{ width: 30, height: 30 }} aria-hidden="true" />
+                <span className="sa-bubble-text">
+                  <strong>{t.openTitle}</strong>
+                  <span>{unread ? bw.unread : bw.tap}</span>
+                </span>
+              </span>
+            </button>,
+            document.body
+          )}
+      </>
+    );
+  }
 
   const last = messages[messages.length - 1];
+  const lastFaqDraft = messages.map((m) => Boolean(m.faqDraft)).lastIndexOf(true);
 
+  // The same surface as the homepage Ask chat: aurora, orb, the colour ring.
   const chat = (
-    <div
-      className="sa-overlay"
-      ref={overlayRef}
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) setOpen(false);
-      }}
-    >
-      <section className="sa sa-sheet" role="dialog" aria-modal="true" aria-label={t.openTitle}>
-        <header className="sa-head">
-          <span className="sa-head-avatar" aria-hidden="true">
-            ✨
-          </span>
+    <div className="sa-overlay ab-overlay" ref={overlayRef} role="dialog" aria-modal="true" aria-label={t.openTitle}>
+      <div className="ab-aurora" aria-hidden="true" />
+      <section className="sa-sheet">
+        <header className="ab-top sa-top">
+          <span className={`ab-orb${busy ? ' is-busy' : ''}`} style={{ width: 30, height: 30 }} aria-hidden="true" />
           <span className="sa-head-text">
             <strong>{t.openTitle}</strong>
             <span>{HEAD_SUB[lang] ?? HEAD_SUB.en}</span>
           </span>
-          <button type="button" className="sa-switch" onClick={showPicker}>
+          <button type="button" className="ab-new" onClick={showPicker}>
             {t.switchBtn}
           </button>
-          <button type="button" className="sa-close" onClick={() => setOpen(false)} aria-label="Close">
-            ×
+          <button type="button" className="ab-x" onClick={minimize} aria-label={bw.mini} title={bw.mini}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M5 12h14" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+            </svg>
+          </button>
+          <button type="button" className="ab-x" onClick={() => setOpen(false)} aria-label="Close" title="Close">
+            ✕
           </button>
         </header>
-        <div className="sa-log" ref={logRef} aria-live="polite">
+        <div className="sa-log ab-log" ref={logRef} aria-live="polite">
           {messages.map((m, i) => (
             <div key={i} className={`sa-msg sa-${m.from}`}>
               {m.text ? <p style={{ whiteSpace: 'pre-line' }}>{m.links ? withLinks(m.text) : m.text}</p> : null}
@@ -1133,7 +1539,46 @@ export default function SetupAssistant({
                   )}
                 </div>
               )}
-              {m.goto && (
+              {m.faqDraft && faqEdit && i === lastFaqDraft && (
+              <div className="sa-faq">
+                {faqEdit.map((f, k) => (
+                  <div key={k} className={`sa-faq-item${f.on ? '' : ' is-off'}`}>
+                    <input
+                      type="checkbox"
+                      checked={f.on}
+                      aria-label="Include"
+                      onChange={(e) => setFaqEdit((x) => x && x.map((y, j) => (j === k ? { ...y, on: e.target.checked } : y)))}
+                    />
+                    <div className="sa-faq-body">
+                      <input
+                        className="sa-faq-q"
+                        value={f.question}
+                        maxLength={200}
+                        aria-label="Question"
+                        onChange={(e) => setFaqEdit((x) => x && x.map((y, j) => (j === k ? { ...y, question: e.target.value } : y)))}
+                      />
+                      <textarea
+                        className="sa-faq-a"
+                        value={f.answer}
+                        maxLength={1000}
+                        rows={2}
+                        aria-label="Answer"
+                        onChange={(e) => setFaqEdit((x) => x && x.map((y, j) => (j === k ? { ...y, answer: e.target.value } : y)))}
+                      />
+                    </div>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="btn btn-brand sa-apply"
+                  onClick={() => void addFaqs()}
+                  disabled={faqSaving || !faqEdit.some((f) => f.on)}
+                >
+                  {faqSaving ? '…' : (FAQ_W[lang] ?? FAQ_W.en).add(faqEdit.filter((f) => f.on).length)}
+                </button>
+              </div>
+            )}
+            {m.goto && (
                 <button
                   type="button"
                   className="btn btn-brand btn-sm sa-goto"
@@ -1182,7 +1627,7 @@ export default function SetupAssistant({
             </div>
           ))}
           {busy && (
-            <div className="sa-msg sa-bot">
+            <div className="sa-msg sa-bot sa-typing-row">
               <p className="sa-typing">
                 <span />
                 <span />
@@ -1192,13 +1637,15 @@ export default function SetupAssistant({
           )}
         </div>
         <form
-          className="sa-input"
+          className="sa-input ab-input"
           onSubmit={(e) => {
             e.preventDefault();
             submit();
           }}
         >
-          <div className="sa-composer">
+          <span className="ab-ring" aria-hidden="true" />
+          <span className="ab-input-in sa-composer">
+            <span className={`ab-orb${busy ? ' is-busy' : ''}`} style={{ width: 26, height: 26 }} aria-hidden="true" />
             <textarea
               ref={inputRef}
               value={draft}
@@ -1218,12 +1665,12 @@ export default function SetupAssistant({
               autoComplete={asking === 'payoutIban' ? 'off' : undefined}
             />
             <SpeechInput onStart={() => setBase(draft)} onText={(x) => setDraft(`${base ? `${base} ` : ''}${x}`)} label={t.say} />
-            <button className="sa-send" disabled={busy || !draft.trim()} aria-label={t.send} title={t.send}>
+            <button className="sa-send ab-send" disabled={busy || !draft.trim()} aria-label={t.send} title={t.send}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
-          </div>
+          </span>
         </form>
       </section>
     </div>

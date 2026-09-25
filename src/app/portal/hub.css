@@ -3289,158 +3289,130 @@
 }
 
 /* ======================================================================
-   The setup assistant as a chat surface (SetupAssistant): over the editor,
-   full screen on a phone. The answers scroll; the composer is one rounded
-   bar at the bottom, like any chat app.
+   The setup assistant as a chat surface (SetupAssistant) — the homepage Ask
+   chat's own look (.ab-overlay, the orb, the colour ring; globals.css), full
+   screen, the answers scrolling above the composer. Minimized, it is a
+   bubble in the corner.
    ====================================================================== */
-.sa-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgba(4, 5, 10, 0.72);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  animation: sa-fade 0.18s ease both;
-}
-
-@keyframes sa-fade {
-  from {
-    opacity: 0;
-  }
-}
-
-@keyframes sa-rise {
-  from {
-    opacity: 0;
-    transform: translateY(18px) scale(0.985);
-  }
+.sa-overlay.ab-overlay {
+  /* Above the editor's own floating buttons and the Ask overlay's layer. */
+  z-index: 230;
 }
 
 .sa-sheet {
+  position: relative;
   display: flex;
+  flex: 1;
   flex-direction: column;
-  width: min(780px, 100%);
-  height: min(88vh, 900px);
-  border-radius: 24px;
-  background:
-    radial-gradient(90% 50% at 0% 0%, rgba(167, 139, 250, 0.14), transparent 60%),
-    radial-gradient(70% 40% at 100% 100%, rgba(220, 20, 60, 0.1), transparent 60%),
-    var(--bg-card);
-  box-shadow:
-    inset 0 0 0 1px rgba(167, 139, 250, 0.3),
-    0 30px 80px rgba(0, 0, 0, 0.6);
-  animation: sa-rise 0.26s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  width: 100%;
+  min-height: 0;
 }
 
-.sa-sheet .sa-head {
-  flex: none;
-  justify-content: flex-start;
-  gap: 10px;
-  padding: 12px 14px;
-  background: none;
-}
-
-.sa-head-avatar {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #7c3aed, #db2777);
-  box-shadow: 0 6px 18px rgba(124, 58, 237, 0.4);
-}
-
-.sa-head-text {
+.sa-top .sa-head-text {
   display: grid;
   flex: 1;
   min-width: 0;
   line-height: 1.25;
 }
 
-.sa-head-text span {
-  color: var(--text-dim);
+.sa-top .sa-head-text strong {
+  font-size: 1.02rem;
+  font-weight: 800;
+}
+
+.sa-top .sa-head-text span {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.6);
   font-size: 0.78rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.sa-sheet .sa-close {
+.sa-overlay .sa-log {
   display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.sa-sheet .sa-log {
-  position: relative;
   flex: 1;
-  min-height: 0;
-  max-height: none;
   align-content: start;
-  gap: 14px;
-  padding: 20px 18px 28px;
-  overscroll-behavior: contain;
-  scroll-padding-top: 12px;
+  gap: 12px;
+  max-height: none;
+  min-height: 0;
+  padding: 12px 16px 28px;
 }
 
-.sa-sheet .sa-msg p {
+.sa-overlay .sa-msg {
+  max-width: 88%;
+  animation: ab-rise 0.3s ease;
+}
+
+.sa-overlay .sa-msg p {
   font-size: 0.98rem;
   line-height: 1.55;
 }
 
-.sa-sheet .sa-bot > p {
-  padding: 12px 14px;
+.sa-overlay .sa-bot > p {
+  padding: 11px 15px;
+  border-radius: 18px 18px 18px 4px;
+  background: rgba(255, 255, 255, 0.07);
 }
 
-.sa-sheet .sa-input {
+.sa-overlay .sa-me > p {
+  padding: 11px 15px;
+  border-radius: 18px 18px 4px 18px;
+  background: linear-gradient(135deg, #be123c, #7c3aed);
+  color: #fff;
+  font-weight: 600;
+}
+
+.sa-overlay .sa-proposal,
+.sa-overlay .sa-progress {
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(6px);
+}
+
+/* The composer: the Ask chat's ring, grown to a few lines when needed. */
+.sa-overlay .sa-input {
+  display: block;
   flex: none;
-  padding: 10px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  /* The ring's width (as .ab-input). */
+  padding: 1.5px;
   border-top: 0;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.18));
+}
+
+.sa-overlay .sa-input,
+.sa-overlay .sa-input .ab-input-in {
+  border-radius: 28px;
 }
 
 .sa-composer {
   position: relative;
-  display: flex;
-  align-items: flex-end;
-  gap: 6px;
-  padding: 6px 6px 6px 16px;
-  border-radius: 26px;
-  background: var(--bg-elevated);
-  box-shadow: inset 0 0 0 1px var(--border);
-  transition: box-shadow 0.15s ease;
+  align-items: flex-end !important;
 }
 
-.sa-composer:focus-within {
-  box-shadow:
-    inset 0 0 0 1.5px rgba(167, 139, 250, 0.75),
-    0 0 0 4px rgba(167, 139, 250, 0.12);
+.sa-composer > .ab-orb {
+  margin-bottom: 6px;
 }
 
-.sa-sheet .sa-composer textarea {
+.sa-overlay .sa-composer textarea {
   flex: 1;
   min-width: 0;
   max-height: 150px;
-  padding: 9px 0;
+  padding: 7px 0;
   border: 0;
   border-radius: 0;
   background: none;
-  color: var(--text);
+  color: #fff;
   /* 16px: below that, a phone zooms the whole page in when the box is tapped. */
+  font: inherit;
   font-size: 16px;
   line-height: 1.4;
   resize: none;
   outline: none;
 }
 
-.sa-sheet .sa-composer textarea::placeholder {
-  white-space: nowrap;
+.sa-overlay .sa-composer textarea::placeholder {
   overflow: hidden;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
   text-overflow: ellipsis;
 }
 
@@ -3449,75 +3421,167 @@
   height: 38px;
   border: 0;
   background: none;
+  color: rgba(255, 255, 255, 0.75);
 }
 
 /* "Listening… 4s" floats above the bar instead of squeezing the text box. */
 .sa-composer .speech-hint:not(:empty) {
   position: absolute;
   left: 14px;
-  bottom: calc(100% + 6px);
+  bottom: calc(100% + 8px);
   padding: 4px 10px;
   border-radius: 999px;
-  background: var(--bg-card);
-  box-shadow: inset 0 0 0 1px var(--border);
+  background: rgba(14, 12, 20, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
 }
 
 .sa-composer .speech-hint:empty {
   display: none;
 }
 
-.sa-send {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 38px;
-  height: 38px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--brand);
-  color: #fff;
-  cursor: pointer;
-  transition:
-    opacity 0.15s ease,
-    transform 0.15s ease;
-}
-
-.sa-send:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
-
 .sa-send:not(:disabled):active {
   transform: scale(0.92);
 }
 
-/* Phone: the whole screen — exactly the part the keyboard leaves free. */
+/* Phone: exactly the part of the screen the keyboard leaves free. */
 @media (max-width: 720px) {
-  .sa-overlay {
+  .sa-overlay.ab-overlay {
     top: var(--sa-top, 0px);
     bottom: auto;
     height: var(--sa-vh, 100dvh);
-    padding: 0;
-    align-items: stretch;
   }
 
-  .sa-sheet {
-    width: 100%;
-    height: 100%;
-    border-radius: 0;
-    box-shadow: none;
+  .sa-overlay .ab-top {
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
   }
 
-  .sa-sheet .sa-head {
-    padding-top: calc(10px + env(safe-area-inset-top, 0px));
-    border-bottom: 1px solid var(--border-soft);
+  .sa-overlay .sa-log {
+    padding: 10px 12px 24px;
   }
 
-  .sa-sheet .sa-log {
-    padding: 16px 14px 24px;
+  .sa-overlay .sa-msg {
+    max-width: 94%;
   }
+}
 
-  .sa-sheet .sa-msg {
-    max-width: 92%;
-  }
+/* ---- Minimized: a bubble, one tap back into the chat ---- */
+.sa-bubble {
+  position: fixed;
+  right: 16px;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  z-index: 215;
+  display: block;
+  max-width: calc(100vw - 32px);
+  padding: 1.5px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  isolation: isolate;
+  animation: ab-rise 0.3s ease;
+}
+
+.sa-bubble-in {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px 8px 9px;
+  border-radius: 999px;
+  background: rgba(14, 12, 20, 0.94);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.sa-bubble-text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.sa-bubble-text strong {
+  font-size: 0.9rem;
+}
+
+.sa-bubble-text span {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.76rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sa-bubble.has-unread .sa-bubble-text span {
+  color: #f0abfc;
+  font-weight: 700;
+}
+
+.sa-bubble:active {
+  transform: scale(0.97);
+}
+
+/* The FAQ the setup chat wrote: each question and answer editable in place. */
+.sa-faq {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.sa-faq-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.sa-faq-item > input[type='checkbox'] {
+  margin-top: 10px;
+  accent-color: #10b981;
+}
+
+.sa-faq-item.is-off .sa-faq-body {
+  opacity: 0.45;
+}
+
+.sa-faq-body {
+  display: grid;
+  gap: 4px;
+}
+
+.sa-faq-q,
+.sa-faq-a {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  resize: vertical;
+}
+
+.sa-faq-q {
+  font-weight: 700;
+}
+
+.sa-faq-a {
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.45;
+}
+
+.sa-faq-q:focus,
+.sa-faq-a:focus {
+  border-color: rgba(167, 139, 250, 0.6);
+  background: rgba(255, 255, 255, 0.04);
+  outline: none;
 }

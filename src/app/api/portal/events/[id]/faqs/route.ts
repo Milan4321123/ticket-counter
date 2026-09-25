@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { warmListingTranslations } from '@/lib/listingI18n';
-import { setEventFaqs } from '@/lib/events';
+import { getEventFaqs, setEventFaqs } from '@/lib/events';
 import { readJsonLimited, BodyTooLargeError } from '@/lib/http';
 import type { ApiErrorResponse } from '@/lib/types';
 import { planGate, requireOrganizerApi, requireOwnedEvent } from '../../../auth';
@@ -14,6 +14,21 @@ class ValidationError extends Error {}
 
 function need(cond: boolean, message: string): asserts cond {
   if (!cond) throw new ValidationError(message);
+}
+
+/**
+ * The FAQ as it is now — the setup chat reads it before adding the questions
+ * it wrote, so nothing already there is lost.
+ */
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const auth = await requireOrganizerApi();
+  if (auth.failure) return auth.failure;
+  const owned = requireOwnedEvent(auth.organizer, id);
+  if (owned.failure) return owned.failure;
+  return NextResponse.json({
+    faqs: getEventFaqs(owned.event.id).map((f) => ({ id: f.id, question: f.question, answer: f.answer })),
+  });
 }
 
 /**
