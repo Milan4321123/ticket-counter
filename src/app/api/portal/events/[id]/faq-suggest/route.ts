@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { faqFromNotes } from '@/lib/faqFallback';
 import { takeAiQuota } from '@/lib/aiQuota';
 import { aiAssistantEnabled, suggestEventFaqs } from '@/lib/ai';
 import { getEventFaqs, getEventTiers } from '@/lib/events';
@@ -45,7 +46,16 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       );
     }
 
+    // No AI (not switched on, over today's quota, or it failed): the FAQ from
+    // the organizer's own notes, question by question (lib/faqFallback).
+    const fromNotes = () => {
+      const faqs = faqFromNotes(event.assistantContext, getEventFaqs(event.id).map((f) => f.question));
+      return faqs.length ? NextResponse.json({ ok: true, faqs, fromNotes: true }) : null;
+    };
+
     if (!aiAssistantEnabled()) {
+      const plain = fromNotes();
+      if (plain) return plain;
       return NextResponse.json(
         {
           error: 'The AI assistant is not switched on for this server — write your FAQ entries by hand instead.',
@@ -70,6 +80,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     }
 
     if (!takeAiQuota([{ key: `faq:org:${organizer.id}`, perDay: 20 }, { key: 'faq:all', perDay: 500 }])) {
+      const plain = fromNotes();
+      if (plain) return plain;
       return NextResponse.json(
         { error: 'That is the limit of AI suggestions for today — write your FAQ below, or try again tomorrow.' } satisfies ApiErrorResponse,
         { status: 429 }
@@ -96,6 +108,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     });
 
     if (!result.ok) {
+      const plain = fromNotes();
+      if (plain) return plain;
       return NextResponse.json({ error: result.error } satisfies ApiErrorResponse, { status: 502 });
     }
     return NextResponse.json({ ok: true, faqs: result.faqs });

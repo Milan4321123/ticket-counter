@@ -188,18 +188,35 @@ const MONTHS: Record<string, number> = {
 export function rulesProposal(said: string, kind: 'event' | 'shop'): SetupProposal {
   const text = said.replace(/\s+/g, ' ');
   const out: Record<string, unknown> = {};
-  // "Standard 25€", "VIP: €45", "momo 9.50 euro"
+  // "Standard 25€", "VIP: €45", "momo 9.50 euro" — read clause by clause, so
+  // the words before a price are that item's, not the whole message's
+  // ("Didi's Momo — home-made momo" on one line, "chicken momo 9€" on the next).
   const tiers: Record<string, unknown>[] = [];
-  const priceRe = /([A-Za-zÀ-ž][A-Za-zÀ-ž0-9 ()'-]{1,40}?)\s*(?:[:\-–]|for|at|für|zu)?\s*(?:€|eur(?:o)?\s*)?\s*(\d{1,5}(?:[.,]\d{1,2})?)\s*(?:€|eur(?:o|os)?\b)/gi;
-  const priceRe2 = /([A-Za-zÀ-ž][A-Za-zÀ-ž0-9 ()'-]{1,40}?)\s*(?:[:\-–]|for|at|für|zu)?\s*€\s*(\d{1,5}(?:[.,]\d{1,2})?)/gi;
-  for (const re of [priceRe, priceRe2]) {
-    for (const m of text.matchAll(re)) {
-      const name = m[1].replace(/^(and|und|,)\s+/i, '').replace(/\b(tickets?|costs?|kostet|is|are)\b/gi, '').trim();
-      if (!name || tiers.some((t) => t.name === name)) continue;
-      tiers.push({ name: name.charAt(0).toUpperCase() + name.slice(1), priceCents: Math.round(Number(m[2].replace(',', '.')) * 100) });
-    }
+  const clauses = said.split(/\n|[,;]|\s[—–]\s|\s+(?:and|und|ra|ani)\s+/i).map((c) => c.trim()).filter(Boolean);
+  const priceRe = /^(.*?[A-Za-zÀ-ž].*?)\s*(?:[:\-–]|for|at|für|zu)?\s*(?:€\s*(\d{1,5}(?:[.,]\d{1,2})?)|(\d{1,5}(?:[.,]\d{1,2})?)\s*(?:€|eur(?:o|os)?\b))/i;
+  for (const clause of clauses) {
+    const m = priceRe.exec(clause);
+    if (!m) continue;
+    const words = m[1]
+      .replace(/\b(tickets?|costs?|kostet|is|are|the|a|an|for|at|um|zu|ko|chha|cha|xa)\b/gi, ' ')
+      .replace(/[^A-Za-zÀ-ž0-9 ()'&+-]/g, ' ')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    const name = words.slice(-5).join(' ');
+    if (!name || name.length > 60 || tiers.some((t) => String(t.name).toLowerCase() === name.toLowerCase())) continue;
+    tiers.push({ name: name.charAt(0).toUpperCase() + name.slice(1), priceCents: Math.round(Number((m[2] ?? m[3]).replace(',', '.')) * 100) });
   }
   if (tiers.length) out.tiers = tiers;
+  // Its name: "called Didi's Momo", "naam Didi's Momo ho", or a short line
+  // like "Didi's Momo — home-made momo from Kathmandu".
+  const called = /\b(?:called|named|name is|heißt|heisst|naam|nam)\s+["“„']?([^,.;!?\n"”]{2,50}?)["”']?(?:\s+(?:ho|hai|cha|chha|xa))?(?=[,.;!?\n]|$)/i.exec(said);
+  const headed = said
+    .split('\n')
+    .map((l) => /^\s*([A-ZÄÖÜ0-9][^—–:\n]{1,40}?)\s+[—–:]\s+\S/.exec(l)?.[1])
+    .find((n) => n && n.split(/\s+/).length <= 5 && !/\d/.test(n));
+  const nm = (called?.[1] ?? headed ?? '').trim();
+  if (nm) out.name = nm;
   // "10 October 2026", "10. Oktober", "October 10"
   const d1 = /(\d{1,2})\.?\s+([A-Za-zä]{3,9})\.?(?:\s+(\d{4}))?/.exec(text);
   const d2 = /([A-Za-zä]{3,9})\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?/.exec(text);

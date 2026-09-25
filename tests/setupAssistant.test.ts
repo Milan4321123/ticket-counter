@@ -53,6 +53,17 @@ describe('setup assistant — fixed rules', () => {
 
   it('says nothing rather than guessing', () => {
     assert.deepEqual(rulesProposal('hello, I want to sell stuff', 'shop'), {});
+    // Line by line: the name from "Name — what it is", each item from its own clause.
+    const shop = rulesProposal("k cha, sanchai xa? mero momo pasal cha\nDidi's Momo — home-made momo from Kathmandu\nchicken momo 9 euro, veg momo 8 euro", 'shop');
+    assert.equal(shop.name, "Didi's Momo");
+    assert.deepEqual(
+      shop.tiers?.map((x) => [x.name, x.priceCents]),
+      [
+        ['Chicken momo', 900],
+        ['Veg momo', 800],
+      ]
+    );
+    assert.equal(rulesProposal('My shop is called Himal Spices, cardamom €4', 'shop').name, 'Himal Spices');
   });
 });
 
