@@ -1,14 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { saveEvent } from './save';
+import { GOTO_TAB_EVENT } from './GoToTab';
 import { vocabFor } from '@/lib/vocab';
 import type { EventKind } from '@/lib/types';
 
 interface ChecklistItem {
   ok: boolean;
   label: string;
+  /** The editor section where it is fixed, or a page for things outside it. */
+  tab?: string;
+  href?: string;
 }
 
 interface Props {
@@ -59,6 +63,9 @@ interface Props {
 // platform is free while it grows, so publishing now waits on nothing but the
 // checklist. The card was removed rather than hidden so this tab can never
 // show a price again by accident.
+/** listingQuality's words for where a fix lives → the editor's section keys. */
+const HINT_TAB: Record<string, string> = { details: 'basics', items: 'tickets', media: 'media' };
+
 export default function PublishPanel({
   eventId,
   kind,
@@ -136,6 +143,23 @@ export default function PublishPanel({
     router.refresh();
   }
 
+  const [copied, setCopied] = useState(false);
+  // The full address is only known in the browser; until then the share link
+  // is the path (never rendered differently on server and client).
+  const [origin, setOrigin] = useState('');
+  useEffect(() => setOrigin(window.location.origin), []);
+  const publicUrl = () => `${origin}/e/${slug}`;
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(publicUrl());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      window.prompt('Copy your link:', publicUrl());
+    }
+  }
+  const goTo = (tab: string) => window.dispatchEvent(new CustomEvent<string>(GOTO_TAB_EVENT, { detail: tab }));
+
   if (status === 'archived') {
     return (
       <p className="muted" style={{ margin: 0 }}>
@@ -168,66 +192,77 @@ export default function PublishPanel({
       )}
 
       {status === 'published' ? (
-        <div>
-          <p style={{ marginTop: 0 }}>
-            <span className="badge badge-green">Live</span>{' '}
-            Your {v.listing} is public — people can find it in the feed and buy {v.units} at{' '}
-            <a href={`/e/${slug}`} style={{ color: 'var(--accent)' }} className="mono small">
-              /e/{slug}
-            </a>
-            .
-          </p>
-          <button type="button" className="btn btn-sm" onClick={() => void setStatus('draft')} disabled={busy}>
-            {busy ? 'Working…' : 'Take offline'}
-          </button>
-          <p className="muted small" style={{ margin: '10px 0 0' }}>
-            Your page comes off the feed and its public link stops working, and you carry on editing
-            it here exactly as before. Publish again whenever you like — going offline and back on
-            costs nothing. {v.Codes} people already bought stay valid either way.
-          </p>
-
-          {/* Only while live: the poster's QR code opens the public page, and a
-              draft's link answers nothing — handing that into a group chat would
-              burn the one moment people were curious. A plain <a>, not a fetch:
-              the route streams a PNG and the browser's own download handling is
-              exactly the right amount of UI. */}
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 20 }}>
-            <div className="card-title" style={{ fontSize: 16 }}>Poster for WhatsApp</div>
-            <p className="muted small" style={{ margin: '6px 0 12px' }}>
-              A picture of your {v.listing} sized for group chats and statuses, with a QR code that
-              opens your page — forward it wherever your buyers already are.
-            </p>
-            <a href={`/api/portal/events/${eventId}/poster`} download className="btn btn-sm">
-              Download poster
-            </a>
+        <div className="ks">
+          {/* ---- Live ---- */}
+          <div className="pb-live">
+            <span className="pb-live-dot" aria-hidden="true" />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <strong>Your {v.listing} is live</strong>
+              <a href={`/e/${slug}`} target="_blank" rel="noopener" className="pb-url mono">
+                /e/{slug}
+              </a>
+            </div>
           </div>
 
-          {/* Only while live, like the poster: the email links to the public
-              page. The audience is ONLY people who ticked "keep me posted" at
-              one of this organizer's checkouts and have not unsubscribed — the
-              server enforces that, and also that nobody hears about one
-              listing twice, however often this button is pressed. */}
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 20 }}>
-            <div className="card-title" style={{ fontSize: 16 }}>Tell your subscribers</div>
-            <p className="muted small" style={{ margin: '6px 0 12px' }}>
-              {announceAudience === 0 && announceStep !== 'sent'
-                ? `Nobody to email yet. Buyers can tick “keep me posted” at your checkouts and confirm it from their inbox — everyone who has (and has not already been told about this ${v.listing}) shows up here.`
-                : `People who ticked “keep me posted” at one of your checkouts and confirmed it from their inbox get one email about this ${v.listing} — at most one per listing, each with a one-button unsubscribe link.`}
-            </p>
-            {announceError && <div className="notice notice-error">{announceError}</div>}
+          <section className="ks-step">
+            <h3 className="ks-q">
+              <span className="ks-num">↗</span> Share it
+            </h3>
+            <div className="pb-actions">
+              <button type="button" className="pb-act" onClick={() => void copyLink()}>
+                <span aria-hidden="true">{copied ? '✓' : '🔗'}</span>
+                {copied ? 'Copied' : 'Copy link'}
+              </button>
+              <a
+                className="pb-act"
+                href={`https://wa.me/?text=${encodeURIComponent(publicUrl())}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <span aria-hidden="true">💬</span>
+                WhatsApp
+              </a>
+              {/* The route streams a PNG; the browser's own download is the UI. */}
+              <a className="pb-act" href={`/api/portal/events/${eventId}/poster`} download>
+                <span aria-hidden="true">🖼</span>
+                Poster
+              </a>
+              <a className="pb-act" href={`/e/${slug}`} target="_blank" rel="noopener">
+                <span aria-hidden="true">👁</span>
+                View page
+              </a>
+            </div>
+          </section>
+
+          {/* Only people who ticked "keep me posted" at one of this organizer's
+              checkouts and have not unsubscribed — the server enforces that,
+              and also that nobody hears about one listing twice. */}
+          <section className="ks-step">
+            <h3 className="ks-q">
+              <span className="ks-num">✉</span> Tell your subscribers
+            </h3>
+            {announceError && (
+              <div className="notice notice-error" style={{ margin: 0 }}>
+                {announceError}
+              </div>
+            )}
             {announceStep === 'sent' ? (
               <p className="small" style={{ margin: 0 }}>
                 <span className="badge badge-green">Done</span> {announceResult}
               </p>
+            ) : announceAudience === 0 ? (
+              <p className="muted small" style={{ margin: 0 }}>
+                Nobody to email yet — buyers who tick &ldquo;keep me posted&rdquo; at your checkout show up here.
+              </p>
             ) : announceStep === 'idle' ? (
-              <button
-                type="button"
-                className="btn btn-sm"
-                onClick={() => setAnnounceStep('confirm')}
-                disabled={announceAudience === 0}
-              >
-                Announce to {announceAudience} subscriber{announceAudience === 1 ? '' : 's'}
-              </button>
+              <div>
+                <button type="button" className="btn btn-sm" onClick={() => setAnnounceStep('confirm')}>
+                  Email {announceAudience} subscriber{announceAudience === 1 ? '' : 's'}
+                </button>
+                <p className="muted small" style={{ margin: '6px 0 0' }}>
+                  One email per {v.listing}, with an unsubscribe link.
+                </p>
+              </div>
             ) : (
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <button
@@ -238,7 +273,7 @@ export default function PublishPanel({
                 >
                   {announceStep === 'sending'
                     ? 'Sending…'
-                    : `Yes — email ${announceAudience} subscriber${announceAudience === 1 ? '' : 's'} now`}
+                    : `Yes — email ${announceAudience} now`}
                 </button>
                 <button
                   type="button"
@@ -250,99 +285,121 @@ export default function PublishPanel({
                 </button>
               </div>
             )}
-          </div>
+          </section>
+
+          {/* A demo could not publish again once offline, so it is not offered. */}
+          {!isDemo && (
+          <p className="muted small" style={{ margin: 0 }}>
+            Need a break?{' '}
+            <button type="button" className="bf-link" onClick={() => void setStatus('draft')} disabled={busy}>
+              {busy ? 'Working…' : 'Take it offline'}
+            </button>{' '}
+            — {v.codes} already bought stay valid, and you can publish again any time.
+          </p>
+          )}
         </div>
       ) : (
-        <div>
-          <div className="notice" style={{ marginTop: 0 }}>
-            <strong>See it before you decide.</strong> Your page is finished enough to look at —
-            open it exactly as visitors will see it, while it is still private. Nobody else can open
-            that link.
-            <div style={{ marginTop: 10 }}>
-              <a href={`/e/${slug}`} className="btn btn-sm" target="_blank" rel="noopener">
-                Preview my page ↗
-              </a>
+        <div className="ks">
+          {/* ---- Draft: what is left, each with the way to fix it ---- */}
+          <div className="ed-progress" style={{ margin: 0 }}>
+            <div className="ed-progress-text">
+              <strong>
+                {ready ? 'Ready to go live ✓' : `${checklist.filter((c) => c.ok).length} of ${checklist.length} ready`}
+              </strong>
+              <span>{ready ? 'Publishing is free.' : 'Fix what is left, then publish — it is free.'}</span>
+            </div>
+            <div className="ed-progress-bar">
+              <span
+                style={{ width: `${Math.max(4, Math.round((checklist.filter((c) => c.ok).length / checklist.length) * 100))}%` }}
+                className={ready ? 'is-full' : ''}
+              />
             </div>
           </div>
 
-          <p className="muted small" style={{ marginTop: 0 }}>
-            Publishing is free and puts your {v.listing} in the public feed right away — buyers can
-            start reserving {v.units}. Here&rsquo;s what it still needs:
-          </p>
-          <ul className="check-list">
+          <ul className="pb-checks">
             {checklist.map((item) => (
-              <li key={item.label} className="check-item">
-                <span
-                  className={`check-dot${item.ok ? ' check-dot-done' : ''}`}
-                  role="img"
-                  aria-label={item.ok ? 'done' : 'still to do'}
-                >
+              <li key={item.label} className={item.ok ? 'is-ok' : ''}>
+                <span className="pb-check" aria-label={item.ok ? 'done' : 'still to do'} role="img">
                   {item.ok ? '✓' : ''}
                 </span>
-                <span className={item.ok ? 'check-label-done' : undefined}>{item.label}</span>
+                <span className="pb-check-label">{item.label}</span>
+                {!item.ok &&
+                  (item.href ? (
+                    <a className="pb-fix" href={item.href}>
+                      Fix →
+                    </a>
+                  ) : item.tab ? (
+                    <button type="button" className="pb-fix" onClick={() => goTo(item.tab!)}>
+                      Fix →
+                    </button>
+                  ) : null)}
               </li>
             ))}
           </ul>
+
           {isDemo ? (
-            <div className="notice">
-              <strong>Demo pages stay private.</strong> They can&rsquo;t go live — who publishes on this
-              platform is decided by hand. Send it as your application instead: once approved, it moves into your
-              real account as a draft.
-              <div style={{ marginTop: 10 }}>
+            <div className="notice" style={{ margin: 0 }}>
+              <strong>Demo pages stay private.</strong> They can&rsquo;t go live — who publishes on this platform is
+              decided by hand. Send it as your application instead: once approved, it moves into your real account
+              as a draft.
+              <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <a href={`/portal/apply?event=${eventId}`} className="btn btn-sm btn-brand">
                   Apply with this page
+                </a>
+                <a href={`/e/${slug}`} className="btn btn-sm" target="_blank" rel="noopener">
+                  Preview my page ↗
                 </a>
               </div>
             </div>
           ) : (
-            <button
-              type="button"
-              className="btn btn-brand"
-              onClick={() => void setStatus('published')}
-              disabled={busy || !ready}
-              title={ready ? undefined : 'Finish the checklist above first'}
-            >
-              {busy ? <span className="spinner" aria-hidden /> : null}
-              {busy ? 'Publishing…' : `Publish ${v.listing}`}
-            </button>
-          )}
-          {!ready && !isDemo && (
-            <p className="muted small" style={{ margin: '10px 0 0' }}>
-              The button unlocks once every item above is done.
-            </p>
+            <div className="pb-go">
+              <a href={`/e/${slug}`} className="btn btn-lg" target="_blank" rel="noopener">
+                👁 Preview
+              </a>
+              <button
+                type="button"
+                className="btn btn-brand btn-lg"
+                onClick={() => void setStatus('published')}
+                disabled={busy || !ready}
+                title={ready ? undefined : 'Fix the list above first'}
+              >
+                {busy ? <span className="spinner" aria-hidden /> : null}
+                {busy ? 'Publishing…' : `🚀 Publish ${v.listing}`}
+              </button>
+            </div>
           )}
         </div>
       )}
 
-      {/* How the shop LOOKS, as opposed to whether it may be published.
-          Deliberately below everything else and deliberately not a checklist
-          with ticks: nothing here blocks anything, and a second list of
-          circles beside the publish gate would read as more rules. Each line
-          says what a shopper sees today, because a seller who is told the
-          consequence can decide for themselves whether they care. */}
+      {/* How the shop LOOKS, as opposed to whether it may be published —
+          advice, never a gate, so it folds away with a count. */}
       {qualityLine && (
-        <div style={{ marginTop: 26, borderTop: '1px solid var(--border)', paddingTop: 18 }}>
-          <div className="card-step-head" style={{ marginBottom: 4 }}>
-            <strong>How your shop looks to a buyer</strong>
-          </div>
-          <p className="muted small" style={{ margin: '0 0 12px' }}>
+        <details className="ks-step ks-more" style={{ marginTop: 18 }}>
+          <summary className="ks-q">
+            <span className="ks-num">💡</span> Tips to sell more{' '}
+            <span className="badge">{quality.length > 0 ? quality.length : '✓'}</span>
+          </summary>
+          <p className="muted small" style={{ margin: '0 0 10px' }}>
             {qualityLine}
           </p>
           {quality.length > 0 && (
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 12 }}>
+            <ul className="pb-checks">
               {quality.map((hint) => (
                 <li key={hint.key}>
-                  <div className="tier-name" style={{ marginBottom: 2 }}>
-                    {hint.label}
-                  </div>
-                  <p className="muted small" style={{ margin: 0 }}>
-                    {hint.why}
-                  </p>
+                  <span className="pb-check-label">
+                    <strong>{hint.label}</strong>
+                    <span className="muted small" style={{ display: 'block' }}>
+                      {hint.why}
+                    </span>
+                  </span>
+                  <button type="button" className="pb-fix" onClick={() => goTo(HINT_TAB[hint.tab] ?? hint.tab)}>
+                    Fix →
+                  </button>
                 </li>
               ))}
             </ul>
           )}
-        </div>
+        </details>
       )}
     </div>
   );

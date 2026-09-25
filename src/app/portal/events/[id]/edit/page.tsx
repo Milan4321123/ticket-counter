@@ -122,10 +122,12 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
   // The listing's own details come from lib/events, which is also what the
   // publish route enforces — the two cannot say different things. Everything
   // after them is about the account rather than the listing.
-  const checklist = [
-    ...listingDetailChecks(event),
-    { ok: tiers.length > 0, label: `Add at least one ${vocabFor(event.kind).unitType}` },
+  // Each item says where it is fixed, so the Publish tab can offer "Fix →".
+  const checklist: { ok: boolean; label: string; tab?: string; href?: string }[] = [
+    ...listingDetailChecks(event).map((c) => ({ ...c, tab: 'basics' })),
+    { ok: tiers.length > 0, label: `Add at least one ${vocabFor(event.kind).unitType}`, tab: 'tickets' },
     {
+      tab: 'basics',
       // EITHER route counts. Demanding an IBAN from an organizer who collects
       // by PayPal blocks a perfectly sellable event, and it was doing exactly
       // that. What publishing actually needs is one working way to be paid —
@@ -138,10 +140,12 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
         ),
       label: 'Add a way to be paid — bank account (holder and IBAN) or PayPal (not needed if everything is free)',
     },
-    {
+    // A demo never publishes, so it is never asked for an authenticator.
+    ...(organizer.isDemo ? [] : [{
       ok: organizerTotpEnabled(organizer.id),
       label: `Set up your authenticator app (Settings) — required before you can sell ${vocabFor(event.kind).units}`,
-    },
+      href: '/portal/settings',
+    }]),
   ];
 
   // The words this listing is described in, and what its kind asks for. Both
@@ -619,15 +623,17 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
       </div>
     ),
     publish: (
-      <EditorSectionGroup initialOpen={firstTodo([{ id: 'publish', done: publishDone }])}>
+      // The only section on this tab, so it is always open — folding the
+      // live listing's share buttons behind a "Done" header hid them.
+      <EditorSectionGroup initialOpen="publish">
         <EditorSection
           id="publish"
           className="glow-card"
-          title={event.status === 'published' ? `Your ${v.listing} is live` : 'Publish'}
+          title={event.status === 'published' ? 'Share & manage' : 'Publish'}
           hint={
             event.status === 'published'
-              ? `Buyers can find your page and reserve ${v.units}.`
-              : 'One last look — the button unlocks when everything below is done.'
+              ? 'Get it in front of people.'
+              : 'Fix what is left, then go live.'
           }
           status={publishDone ? 'done' : 'todo'}
         >
