@@ -3841,3 +3841,81 @@
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* ======================================================================
+   The bazaar's items as a sideways track (components/SwipeRow): two rows
+   high, cards snap, the next column peeks in dimmed.
+   ====================================================================== */
+.swrow {
+  position: relative;
+  margin-top: 12px;
+}
+
+.swrow-arrows {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.swrow-arrows[aria-hidden='true'] {
+  display: none;
+}
+
+.bz-grid.bz-swipe {
+  --sw-cols: 5.3;
+  --sw-gap: var(--bz-gap, 14px);
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(2, auto);
+  grid-template-columns: none;
+  grid-auto-columns: calc((100% - (var(--sw-cols) - 1) * var(--sw-gap)) / var(--sw-cols));
+  gap: var(--sw-gap);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+  outline: none;
+}
+
+.bz-grid.bz-swipe::-webkit-scrollbar {
+  display: none;
+}
+
+.bz-grid.bz-swipe > * {
+  --d: 0;
+  min-width: 0;
+  scroll-snap-align: start;
+  opacity: calc(1 - 0.55 * var(--d));
+  transform: scale(calc(1 - 0.06 * var(--d)));
+  transition:
+    opacity 0.12s linear,
+    transform 0.12s linear;
+}
+
+@media (max-width: 1000px) {
+  .bz-grid.bz-swipe {
+    --sw-cols: 3.3;
+  }
+}
+
+@media (max-width: 640px) {
+  .bz-grid.bz-swipe {
+    --sw-cols: 2.25;
+    --sw-gap: 10px;
+  }
+
+  .swrow-arrows {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bz-grid.bz-swipe > * {
+    transform: none;
+    transition: none;
+  }
+}

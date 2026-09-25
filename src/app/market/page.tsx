@@ -45,6 +45,7 @@ import type { SearchParams } from '@/lib/marketQuery';
 import { platformNameFromEnv } from '@/lib/platform';
 import { vocabFor } from '@/lib/vocab';
 import SwipeFx from '@/components/SwipeFx';
+import SwipeRow from '@/components/SwipeRow';
 
 // The public bazaar, goods-first: every item every published shop sells, on
 // one page, the moment it opens — searchable, filterable and sortable.
@@ -750,7 +751,10 @@ export default async function MarketPage({ searchParams }: Props) {
                 </div>
               ) : (
                 <>
-                  <div className="bz-grid" style={{ marginTop: 12 }}>
+                  {/* Swipes sideways, two rows high, like the homepage's rows —
+                      edges dimmed, a nudge the first time it comes into view,
+                      arrows on a laptop (components/SwipeRow). */}
+                  <SwipeRow className="bz-grid bz-swipe" label="Items">
                     {/* Compact: the shelf badge repeats the chip row above, and
                         the example-shop sentence is said once, under the grid,
                         instead of on every tile. The price, the seller and the
@@ -758,7 +762,7 @@ export default async function MarketPage({ searchParams }: Props) {
                     {pageItems.map((item) => (
                       <ItemTile key={`${item.shop.id}:${item.tier.tierKey}`} item={item} compact />
                     ))}
-                  </div>
+                  </SwipeRow>
 
                   {totalPages > 1 && (
                     <nav aria-label="Result pages">

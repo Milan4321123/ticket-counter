@@ -2,8 +2,6 @@ import Link from 'next/link';
 import { serverT } from '@/lib/i18nServer';
 import { ensureExampleBazaarOnce } from '@/lib/exampleBazaar';
 import { runSubscriptionSweep } from '@/lib/subscriptions';
-import EventCard from '@/components/EventCard';
-import EventRail from '@/components/EventRail';
 import ShopRail from '@/components/ShopRail';
 import type { ShopCardData } from '@/components/ShopRail';
 import { readListingName } from '@/lib/exampleShop';
@@ -52,114 +50,6 @@ function isPast(event: EventRow, today: string): boolean {
   return !!date && /^\d{4}-\d{2}-\d{2}$/.test(date) && date < today;
 }
 
-/** One row of the browse page. */
-interface Row {
-  key: string;
-  kicker: string;
-  title: string;
-  events: EventRow[];
-  past?: boolean;
-  /** A quiet "see all of these" link beside the heading, for rows that are a
-      taste of a fuller page rather than the whole list. */
-  more?: { href: string; label: string };
-}
-
-/**
- * Slice the events into rows.
- *
- * Two rules keep this from turning into a wall of near-identical shelves:
- * a row is only worth its own heading if it is a real cut of the listing
- * (curation, not a duplicate of "everything"), and every event has to land in
- * at least one row. "All events" is that guarantee — it is always last and
- * always complete, so nothing can be lost between the curated rows above it.
- */
-function buildRows(listings: EventRow[]): Row[] {
-  const today = todayIso();
-  // Shops are pulled out before anything else. Every row below is built around
-  // a date — soonest first, near you, already happened — and a shop has none;
-  // dropped into those rows it would sink to the bottom of the undated tail and
-  // never be seen. It gets a shelf of its own instead, which is also the more
-  // honest heading: "what's on" and "what you can order" are different questions.
-  const shops = listings.filter((e) => e.kind === 'shop');
-  const events = listings.filter((e) => e.kind !== 'shop');
-  const upcoming = events.filter((e) => !isPast(e, today));
-  const past = events.filter((e) => isPast(e, today));
-  const rows: Row[] = [];
-
-  // The soonest dated events get the top row — but only when that row says
-  // something the catch-all row below does not. With a handful of events the
-  // two would open with the identical tiles under two different headings,
-  // which reads as a rendering fault rather than as curation.
-  const dated = upcoming.filter((e) => e.eventDate);
-  const soon = upcoming.length >= 4 && dated.length >= 2 ? dated.slice(0, 8) : [];
-  if (soon.length > 0) {
-    rows.push({ key: 'soon', kicker: 'Don’t miss', title: 'Happening soon', events: soon });
-  }
-
-  // City shelves, once there is enough on the site for "events near me" to be
-  // a real question. Biggest cities first, and never more than three — past
-  // that the page is scrolling through shelves rather than events.
-  //
-  // Three events is the floor for a shelf, not two: a row holding two tiles
-  // leaves most of its width empty, which reads as a section that failed to
-  // load rather than as a short list.
-  if (upcoming.length >= 8) {
-    const byCity = new Map<string, EventRow[]>();
-    for (const event of upcoming) {
-      const city = event.city.trim();
-      if (!city) continue;
-      const list = byCity.get(city);
-      if (list) list.push(event);
-      else byCity.set(city, [event]);
-    }
-    const cities = [...byCity.entries()]
-      .filter(([, list]) => list.length >= 3)
-      .sort((a, b) => b[1].length - a[1].length)
-      .slice(0, 3);
-    for (const [city, list] of cities) {
-      rows.push({ key: `city-${city}`, kicker: 'Near you', title: `In ${city}`, events: list });
-    }
-  }
-
-  // The guarantee: whatever the rows above did or did not pick up, everything
-  // still on sale ends up on the page exactly once between here and the top
-  // row. City shelves may repeat an event, but their heading explains why —
-  // two catch-all rows holding the same tiles would not.
-  const soonIds = new Set(soon.map((e) => e.id));
-  const remaining = upcoming.filter((e) => !soonIds.has(e.id));
-  if (remaining.length > 0) {
-    rows.push({
-      key: 'all',
-      kicker: 'Explore',
-      title: soon.length > 0 ? 'More events' : 'What’s on',
-      events: remaining,
-    });
-  }
-
-  // Above the archive, below what is on: a shop is live and orderable today,
-  // so it belongs with the present, not filed after events that have finished.
-  if (shops.length > 0) {
-    rows.push({
-      key: 'shops',
-      kicker: 'Order & collect',
-      title: 'Buy from local sellers',
-      events: shops,
-      // The rail shows whatever is published; the bazaar page is the full
-      // directory, sorted by category, so the row points at it rather than
-      // pretending to be it.
-      more: { href: '/market', label: 'Browse the whole bazaar →' },
-    });
-  }
-
-  // Kept, not hidden: someone who was at the show still follows the link from a
-  // photo or a message, and a page that quietly deletes its past looks smaller
-  // than it is. Last, and labelled, so it can never be mistaken for what is on.
-  if (past.length > 0) {
-    rows.push({ key: 'past', kicker: 'The archive', title: 'Already happened', events: past, past: true });
-  }
-
-  return rows;
-}
 
 // ---------------------------------------------------------------------------
 // Icons — small, single-stroke, and the same weight everywhere.
@@ -302,10 +192,8 @@ export default async function HomePage() {
   // a per-request read and not a cache.
   const snapshot = loadFeedSnapshot(events);
   const platformPosts = listPlatformPosts(3);
-  const rows = buildRows(events);
-  // The bazaar shelf as several short rows, one per department, Netflix-style —
-  // rather than one long row of shop cards. Items, not shops: a visitor sees
-  // what is on sale before they have to pick a seller.
+  // The page, top to bottom: the events carousel, three quick tiles, the
+  // shops, then the bazaar's goods (Top picks).
   const shopItems = listShopItems();
   const slides = billboardSlides(events, snapshot, shopItems, tr);
   const picks = pagerItems(shopItems);
@@ -313,7 +201,6 @@ export default async function HomePage() {
   const upcoming = events.filter((e) => e.kind !== 'shop' && !isPast(e, todayIso()));
   const upcomingCount = upcoming.length;
   const upcomingCities = new Set(upcoming.map((e) => e.city.trim()).filter(Boolean));
-  const cities = new Set(events.map((e) => e.city.trim()).filter(Boolean));
 
   return (
     <>
@@ -380,14 +267,6 @@ export default async function HomePage() {
           the first thing between a visitor and the reason they came, and news
           about the site is never that. Someone who has scrolled the whole
           listing is the one it is actually for. */}
-      <BazaarPager
-        kicker={tr('bb.bazaar')}
-        title={tr('home.picks')}
-        items={picks}
-        moreHref="/market"
-        moreLabel={tr('home.seeAll')}
-      />
-
       <ShopRail
         kicker={tr('sr.kicker')}
         title={tr('sr.title')}
@@ -397,66 +276,33 @@ export default async function HomePage() {
         itemsLabel={tr('sr.items')}
       />
 
-      <div id="events">
-        {events.length === 0 ? (
-          <section className="section">
-            <div className="container">
-              <div
-                className="card anim-fade-up"
-                style={{ maxWidth: 560, margin: '0 auto', textAlign: 'center', padding: 36 }}
-              >
-                <h2 className="card-title" style={{ fontSize: '1.3rem' }}>
-                  The stage is being set
-                </h2>
-                <p className="muted">
-                  New events appear here the very moment an organizer presses publish —
-                  check back soon, or be the reason everyone else does.
-                </p>
-                <p style={{ margin: 0 }}>
-                  <Link href="/portal" className="btn btn-brand">
-                    Organizing an event? Get started
-                  </Link>
-                </p>
-              </div>
+      <BazaarPager
+        kicker={tr('bb.bazaar')}
+        title={tr('home.picks')}
+        items={picks}
+        moreHref="/market"
+        moreLabel={tr('home.seeAll')}
+      />
+
+      {/* Nothing on the site yet: say so, instead of an empty page. The
+          events themselves are the carousel at the top. */}
+      {events.length === 0 && (
+        <section className="section">
+          <div className="container">
+            <div className="card anim-fade-up" style={{ maxWidth: 560, margin: '0 auto', textAlign: 'center', padding: 36 }}>
+              <h2 className="card-title" style={{ fontSize: '1.3rem' }}>
+                The stage is being set
+              </h2>
+              <p className="muted">New events appear here the moment an organizer presses publish — check back soon.</p>
+              <p style={{ margin: 0 }}>
+                <Link href="/portal" className="btn btn-brand">
+                  Organizing an event? Get started
+                </Link>
+              </p>
             </div>
-          </section>
-        ) : (
-          <>
-            {/* The shops have their own rail above; these rows are the events. */}
-            {rows.filter((row) => row.key !== 'shops').map((row) => (
-              <section className="section rail-section" key={row.key}>
-                <div className="container">
-                  <div className="rail-head anim-fade-up">
-                    <p className="feed-kicker">{row.kicker}</p>
-                    <h2 className="feed-section-title">{row.title}</h2>
-                    {row.more && (
-                      <p className="muted small" style={{ margin: '4px 0 0' }}>
-                        <Link href={row.more.href} className="inline-link">
-                          {row.more.label}
-                        </Link>
-                      </p>
-                    )}
-                  </div>
-                  <div className="rail-bleed">
-                    <EventRail label={row.title}>
-                      {row.events.map((event, i) => (
-                        <div className="rail-item" key={event.id}>
-                          <EventCard
-                            event={event}
-                            past={row.past}
-                            delayClass={['', ' anim-d1', ' anim-d2', ' anim-d3'][i % 4]}
-                            snapshot={snapshot}
-                          />
-                        </div>
-                      ))}
-                    </EventRail>
-                  </div>
-                </div>
-              </section>
-            ))}
-          </>
-        )}
-      </div>
+          </div>
+        </section>
+      )}
 
       {platformPosts.length > 0 && (
         <section className="section">
