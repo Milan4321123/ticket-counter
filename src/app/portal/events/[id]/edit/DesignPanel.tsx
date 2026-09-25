@@ -89,8 +89,10 @@ export default function DesignPanel({ eventId, aiEnabled, initial }: Props) {
     router.refresh();
   }
 
-  async function generate() {
+  async function generate(wish?: string) {
     if (busy) return;
+    const ask = wish ?? notes;
+    if (wish !== undefined) setNotes(wish);
     setBusy('generate');
     setError(null);
     setAiNote(null);
@@ -98,7 +100,7 @@ export default function DesignPanel({ eventId, aiEnabled, initial }: Props) {
       const res = await fetch(`/api/portal/events/${eventId}/design`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes }),
+        body: JSON.stringify({ notes: ask }),
       });
       const data = (await res.json().catch(() => null)) as { ok?: boolean; design?: Design; error?: string } | null;
       if (!res.ok || !data?.design) {
@@ -120,191 +122,160 @@ export default function DesignPanel({ eventId, aiEnabled, initial }: Props) {
     }
   }
 
+  const LOOKS = ['Festive and colourful', 'Elegant, dark and gold', 'Bright and family-friendly', 'Clean and simple'];
+
   return (
-    <div>
-      {aiEnabled ? (
-        <div
-          style={{
-            border: '1px solid var(--border)',
-            borderRadius: 10,
-            padding: 14,
-            marginBottom: 18,
-            background: 'var(--bg-elevated)',
-          }}
-        >
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>Generate with AI</div>
-          <p className="muted small" style={{ marginTop: 0 }}>
-            Describe the look you want in your own words — the AI suggests colors and text from your event details.
-            Nothing is saved until you review and hit Save.
-          </p>
-          <div className="field" style={{ marginBottom: 10 }}>
+    <div className="ks">
+      {/* ---- 1. The fast way: one tap ---- */}
+      {aiEnabled && (
+        <section className="ks-step">
+          <h3 className="ks-q">
+            <span className="ks-num">✨</span> Let the AI design it
+          </h3>
+          <div className="ks-presets">
+            {LOOKS.map((l) => (
+              <button key={l} type="button" className="ks-chip" disabled={busy !== null} onClick={() => void generate(l)}>
+                {l}
+              </button>
+            ))}
+          </div>
+          <div className="pc-composer">
             <textarea
               className="input"
-              rows={3}
+              rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               maxLength={2000}
-              placeholder="e.g. dark and moody, gold accents, aimed at an indie-rock crowd"
+              placeholder="…or say it in your words: dark and moody, gold accents"
               style={{ resize: 'vertical', fontFamily: 'inherit' }}
               aria-label="Your wishes for the page design"
             />
-            <div className="speech-row">
+            <div className="pc-bar">
               <SpeechInput
                 label="Dictate your design wishes"
-                hint="Tap the mic and just talk — you can edit the text after."
+                hint="Tap the mic and just talk."
                 onStart={() => {
                   notesSpeechBase.current = notes.trim() ? notes.trimEnd() + ' ' : '';
                 }}
                 onText={(text) => setNotes((notesSpeechBase.current + text).slice(0, 2000))}
               />
+              <span style={{ flex: 1 }} />
+              <button type="button" className="btn btn-brand btn-sm" onClick={() => void generate()} disabled={busy !== null}>
+                {busy === 'generate' ? <span className="spinner" aria-hidden /> : null}
+                {busy === 'generate' ? 'Designing…' : 'Design it'}
+              </button>
             </div>
           </div>
-          <button type="button" className="btn btn-sm" onClick={() => void generate()} disabled={busy !== null}>
-            {busy === 'generate' ? <span className="spinner" aria-hidden /> : null}
-            {busy === 'generate' ? 'Designing…' : 'Generate suggestion'}
-          </button>
           {aiNote && (
-            <div className="notice notice-success small" style={{ marginTop: 10, marginBottom: 0 }}>
-              {aiNote}
+            <div className="notice notice-success small" style={{ margin: 0 }}>
+              {aiNote} Check it below, then Save.
             </div>
           )}
-        </div>
-      ) : (
-        <p className="muted small" style={{ marginTop: 0 }}>
-          The AI designer is not switched on for this server — pick your colors and text below instead.
-        </p>
+        </section>
       )}
 
-      <form onSubmit={submit}>
-        {error && <div className="notice notice-error">{error}</div>}
+      <form onSubmit={submit} className="ks">
+        {error && (
+          <div className="notice notice-error" style={{ margin: 0 }}>
+            {error}
+          </div>
+        )}
 
-        <div className="field">
-          <label>Accent color</label>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {/* ---- 2. Or pick it yourself ---- */}
+        <section className="ks-step">
+          <h3 className="ks-q">
+            <span className="ks-num">🎨</span> {aiEnabled ? 'Or pick it yourself' : 'Pick a look'}
+          </h3>
+          <div className="dz-swatches">
             {ACCENTS.map((a) => (
               <button
                 key={a.key}
                 type="button"
                 onClick={() => setAccent(accent === a.key ? '' : a.key)}
                 aria-pressed={accent === a.key}
-                title={a.label}
-                style={{
-                  position: 'relative',
-                  width: 40,
-                  height: 40,
-                  borderRadius: 10,
-                  cursor: 'pointer',
-                  background: a.color,
-                  border: accent === a.key ? '3px solid var(--text)' : '1px solid var(--border)',
-                }}
+                className={`dz-swatch${accent === a.key ? ' is-on' : ''}`}
+                style={{ ['--sw' as string]: a.color }}
               >
-                <span
-                  style={{
-                    position: 'absolute',
-                    width: 1,
-                    height: 1,
-                    overflow: 'hidden',
-                    clipPath: 'inset(50%)',
-                  }}
-                >
-                  {a.label}
-                </span>
+                <span aria-hidden="true" />
+                {a.label}
               </button>
             ))}
           </div>
-          <p className="muted small" style={{ margin: '6px 0 0' }}>
-            {accent ? `Accent: ${ACCENTS.find((a) => a.key === accent)?.label}` : 'No accent picked — the default look is used.'}
-          </p>
-        </div>
-
-        <div className="field">
-          <label>Vibe</label>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div className="te-seg" role="radiogroup" aria-label="Vibe">
             {VIBES.map((v) => (
               <button
                 key={v.key}
                 type="button"
-                className={`chip${vibe === v.key ? ' chip-active' : ''}`}
+                role="radio"
+                aria-checked={vibe === v.key}
+                className={vibe === v.key ? 'is-on' : ''}
                 onClick={() => setVibe(vibe === v.key ? '' : v.key)}
-                aria-pressed={vibe === v.key}
-                style={{ cursor: 'pointer' }}
+                title={v.hint}
               >
                 {v.label}
-                <span className="muted small">· {v.hint}</span>
               </button>
             ))}
           </div>
-        </div>
+        </section>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', columnGap: 16 }}>
-          <div className="field">
-            <label htmlFor="design-headline">Headline</label>
+        {/* ---- 3. Words — optional ---- */}
+        <details className="ks-step ks-more" open={headline || tagline || aboutTitle || highlights ? true : undefined}>
+          <summary className="ks-q">
+            <span className="ks-num">Aa</span> Words on the page <span className="badge">optional</span>
+          </summary>
+          <div className="bf-row">
             <input
               id="design-headline"
               className="input"
               value={headline}
               onChange={(e) => setHeadline(e.target.value)}
               maxLength={90}
-              placeholder="Defaults to the event name"
+              placeholder="Headline (default: the name)"
+              aria-label="Headline"
             />
-          </div>
-          <div className="field">
-            <label htmlFor="design-about">Heading for the description</label>
             <input
               id="design-about"
               className="input"
               value={aboutTitle}
               onChange={(e) => setAboutTitle(e.target.value)}
               maxLength={60}
-              placeholder='e.g. "About the night"'
+              placeholder='Heading above the description, e.g. "About the night"'
+              aria-label="Heading for the description"
             />
           </div>
-        </div>
-        <div className="field">
-          <label htmlFor="design-tagline">Tagline</label>
           <input
             id="design-tagline"
             className="input"
             value={tagline}
             onChange={(e) => setTagline(e.target.value)}
             maxLength={200}
-            placeholder="One inviting sentence under the headline"
+            placeholder="Tagline — one inviting sentence under the headline"
+            aria-label="Tagline"
+            style={{ marginTop: 10 }}
           />
-        </div>
-        <div className="field">
-          <label htmlFor="design-highlights">Highlights (one per line, up to 5)</label>
           <textarea
             id="design-highlights"
             className="input"
-            rows={4}
+            rows={3}
             value={highlights}
             onChange={(e) => setHighlights(e.target.value)}
-            placeholder={'Live band until midnight\nStreet-food trucks\nFree parking'}
-            style={{ resize: 'vertical', fontFamily: 'inherit' }}
+            placeholder={'Highlights, one per line (up to 5)\nLive band until midnight\nFree parking'}
+            aria-label="Highlights, one per line"
+            style={{ resize: 'vertical', fontFamily: 'inherit', marginTop: 10 }}
           />
-        </div>
+        </details>
 
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <div className="ks-save">
           <button type="submit" className="btn btn-brand" disabled={busy !== null}>
             {busy === 'save' ? <span className="spinner" aria-hidden /> : null}
-            {busy === 'save' ? 'Saving…' : 'Save page design'}
+            {busy === 'save' ? 'Saving…' : 'Save'}
           </button>
           {saved && <span className="badge badge-green">Saved ✓</span>}
+          <span className="muted small" style={{ marginLeft: 'auto' }}>
+            Want us to design it? <a href="/contact" target="_blank" rel="noopener noreferrer">Ask the team</a>
+          </span>
         </div>
       </form>
-
-      <p className="muted small" style={{ margin: '18px 0 0' }}>
-        Prefer us to design it for you?{' '}
-        <a
-          href="/contact"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ color: 'var(--brand-text)', fontWeight: 600 }}
-        >
-          Talk to the team
-        </a>
-        .
-      </p>
     </div>
   );
 }

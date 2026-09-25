@@ -516,7 +516,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
       <div className="card">
         <SectionHead
           title="Page design"
-          hint="Pick colors and words that match the mood of the night."
+          hint="Colours and words that fit your page — one tap with the AI, or pick them yourself."
         />
         <DesignPanel eventId={event.id} aiEnabled={aiDesignerEnabled()} initial={design} />
       </div>
