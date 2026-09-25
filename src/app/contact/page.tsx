@@ -6,17 +6,26 @@ import ContactForm from './ContactForm';
 // The contact address comes from an env var — read it fresh.
 export const dynamic = 'force-dynamic';
 
-export const metadata = {
+const DESIGN = {
   title: 'Talk to us about a custom-designed page',
   description:
     'Want something fancier than the self-service event page? Tell our team what you have in mind and we design your event page for you.',
-  alternates: { canonical: '/contact' },
-  openGraph: {
-    type: 'website',
-    title: 'Talk to us about a custom-designed page',
-    description: 'Want something fancier than the self-service event page? Tell our team what you have in mind and we design your event page for you.',
-    url: '/contact', images: shareImages() },
 };
+const ACCOUNT = {
+  title: 'Apply to sell — free',
+  description: 'Sell tickets, food, goods or bookings on your own page. Free, no commission — tell us what you sell.',
+};
+
+/** The same page answers two questions, so its title follows ?intent. */
+export async function generateMetadata({ searchParams }: { searchParams: Promise<{ intent?: string | string[] }> }) {
+  const raw = (await searchParams).intent;
+  const m = (Array.isArray(raw) ? raw[0] : raw) === 'account' ? ACCOUNT : DESIGN;
+  return {
+    ...m,
+    alternates: { canonical: '/contact' },
+    openGraph: { type: 'website', ...m, url: '/contact', images: shareImages() },
+  };
+}
 
 /**
  * One form, two reasons to arrive here: "Get started" (someone who wants to sell

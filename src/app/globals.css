@@ -7922,3 +7922,392 @@ html.tx-wait body {
     overflow: visible;
   }
 }
+
+/* ======================================================================
+   Shared form kit — question-first steps (.ks-*), rows and switches
+   (.bf-*), segmented control (.te-seg). Used by the seller editor and by
+   public forms (contact / apply).
+   ====================================================================== */
+.ks {
+  display: grid;
+  gap: 20px;
+}
+
+.ks-step {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.ks-q {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.ks-num {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(220, 20, 60, 0.18);
+  color: #f87171;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.ks-modes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ks-mode {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  padding: 14px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--bg-elevated);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 4px 12px rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.2s ease;
+}
+
+.ks-mode:hover {
+  transform: translateY(-1px);
+}
+
+.ks-mode:active {
+  transform: scale(0.98);
+}
+
+.ks-mode.is-on {
+  box-shadow:
+    inset 0 0 0 2px var(--brand, #dc143c),
+    0 8px 22px rgba(220, 20, 60, 0.22);
+}
+
+.ks-mode-icon {
+  font-size: 1.5rem;
+}
+
+.ks-mode span:last-child {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.ks-presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.ks-chip {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    0 2px 6px rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ks-chip:active {
+  transform: scale(0.97);
+}
+
+.ks-chip-sm {
+  padding: 4px 10px;
+  font-size: 0.76rem;
+}
+
+.ks-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ks-day {
+  min-width: 52px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 2px 6px rgba(0, 0, 0, 0.25);
+  color: var(--text-dim);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ks-day.is-on {
+  background: var(--brand, #dc143c);
+  box-shadow: 0 4px 12px rgba(220, 20, 60, 0.3);
+  color: #fff;
+}
+
+.ks-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ks-grid .input {
+  min-width: 0;
+}
+
+.ks-preview {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(16, 185, 129, 0.1);
+  color: #6ee7b7;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ks-preview.is-bad {
+  background: rgba(248, 113, 113, 0.1);
+  color: #fca5a5;
+}
+
+.ks-more {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.ks-more > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.ks-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ks-more > summary::after {
+  content: '▾';
+  margin-left: auto;
+  color: var(--text-dim);
+  transition: transform 0.2s ease;
+}
+
+.ks-more[open] > summary::after {
+  transform: rotate(180deg);
+}
+
+.ks-more[open] > summary {
+  margin-bottom: 4px;
+}
+
+.ks-item {
+  display: grid;
+  gap: 6px;
+}
+
+.ks-item label {
+  margin: 0;
+}
+
+.ks-save {
+  position: sticky;
+  bottom: 12px;
+  z-index: 2;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+@media (max-width: 720px) {
+  .ks-modes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ks-mode {
+    grid-template-columns: auto 1fr;
+    column-gap: 12px;
+  }
+
+  .ks-mode-icon {
+    grid-row: span 2;
+    align-self: center;
+  }
+
+  .ks-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ks-day {
+    flex: 1 0 calc(25% - 6px);
+    min-width: 0;
+  }
+}
+
+/* Basics (edit/DetailsForm), in the same question-first style as .ks. */
+.ks-chip.is-on {
+  background: var(--brand, #dc143c);
+  box-shadow: 0 4px 12px rgba(220, 20, 60, 0.3);
+  color: #fff;
+}
+
+.bf-big {
+  font-size: 1.15rem;
+  font-weight: 700;
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
+.bf-label {
+  margin-bottom: 8px;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.bf-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+  gap: 12px;
+}
+
+.bf-num {
+  width: 110px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+.bf-link {
+  margin-left: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--brand-light, #f87171);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.bf-inline > summary {
+  width: fit-content;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.bf-inline > summary::-webkit-details-marker {
+  display: none;
+}
+
+.bf-inline[open] > summary {
+  margin-bottom: 8px;
+}
+
+.bf-switch {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 14px;
+  cursor: pointer;
+}
+
+.bf-switch input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  accent-color: var(--brand, #dc143c);
+}
+
+.bf-switch > span {
+  display: grid;
+  gap: 2px;
+}
+
+.bf .ks-more .bf-row {
+  margin-top: 4px;
+}
+
+
+.te-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.te-seg button {
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.te-seg button.is-on {
+  background: var(--brand, #dc143c);
+  box-shadow: 0 4px 12px rgba(220, 20, 60, 0.3);
+  color: #fff;
+}
+
+
+/* /contact?intent=account: the demo shortcut above the form. */
+.cf-shortcut {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(124, 58, 237, 0.26), transparent 60%),
+    var(--bg-elevated);
+  box-shadow: inset 0 0 0 1px rgba(167, 139, 250, 0.35);
+}
+
+.cf-shortcut > div {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cf-shortcut .demo-start {
+  flex: none;
+}

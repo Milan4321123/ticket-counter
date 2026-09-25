@@ -1,5 +1,6 @@
 'use client';
 
+import DemoStart from '@/components/DemoStart';
 import { useState } from 'react';
 
 interface Props {
@@ -146,11 +147,57 @@ export default function ContactForm({ contactEmail, intent = 'custom-design' }: 
     );
   }
 
-  return (
-    <form className="anim-fade-up" onSubmit={submit}>
-      {error && <div className="notice notice-error">{error}</div>}
+  const KINDS = [
+    ['Events', '🎟', 'Concerts, nights, festivals'],
+    ['A shop', '🛍', 'Food, sweets, goods'],
+    ['Bookings', '📅', 'Salon, lessons, services'],
+  ] as const;
 
-      <div className="field">
+  return (
+    <>
+    {/* The quickest application is a page that already exists: build it in
+        the demo, then send it from there (portal/apply). */}
+    {wantsAccount && (
+      <div className="cf-shortcut anim-fade-up">
+        <div>
+          <strong>Quicker: build your page first</strong>
+          <span className="muted small">Try the AI helper in the demo, then apply with your finished page.</span>
+        </div>
+        <DemoStart to="assistant" className="btn btn-sm btn-brand">
+          ✨ Start
+        </DemoStart>
+      </div>
+    )}
+    <form className="anim-fade-up ks" onSubmit={submit}>
+      {error && (
+        <div className="notice notice-error" style={{ margin: 0 }}>
+          {error}
+        </div>
+      )}
+
+      {wantsAccount && (
+        <div className="ks-modes" role="radiogroup" aria-label="What do you want to sell?">
+          {KINDS.map(([label, icon, line]) => (
+            <button
+              key={label}
+              type="button"
+              role="radio"
+              aria-checked={eventKind === label}
+              className={`ks-mode${eventKind === label ? ' is-on' : ''}`}
+              onClick={() => setEventKind(eventKind === label ? '' : label)}
+            >
+              <span className="ks-mode-icon" aria-hidden="true">
+                {icon}
+              </span>
+              <strong>{label}</strong>
+              <span>{line}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="bf-row">
+      <div className="field" style={{ margin: 0 }}>
         <label htmlFor="contact-name">Your name</label>
         <input
           id="contact-name"
@@ -177,12 +224,11 @@ export default function ContactForm({ contactEmail, intent = 'custom-design' }: 
           spellCheck={false}
           placeholder="you@example.com"
         />
-        <p className="muted small" style={{ margin: '6px 0 0' }}>
-          This is where our reply goes — we don&rsquo;t add you to any mailing list.
-        </p>
+      </div>
       </div>
 
-      <div className="field">
+      {!wantsAccount && (
+      <div className="field" style={{ margin: 0 }}>
         <label htmlFor="contact-org">
           Organization or promoter <span className="muted">(optional)</span>
         </label>
@@ -197,9 +243,49 @@ export default function ContactForm({ contactEmail, intent = 'custom-design' }: 
           placeholder="e.g. Himalayan Nights Events"
         />
       </div>
+      )}
+
+      <div className="field" style={{ margin: 0 }}>
+        <label htmlFor="contact-message">
+          {wantsAccount ? 'Tell us about it in a few sentences' : 'What would you like?'}
+        </label>
+        <textarea
+          id="contact-message"
+          className="input"
+          rows={4}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          maxLength={2000}
+          placeholder={
+            wantsAccount
+              ? 'e.g. I make momo at home in Munich — people order ahead and collect on Saturdays.'
+              : 'For example: a custom-designed event page for our autumn concert, a landing page for a two-day festival, sponsor logos across the top, help importing our photos and videos…'
+          }
+          style={{ resize: 'vertical', fontFamily: 'inherit' }}
+        />
+        <p className="muted small" style={{ margin: '6px 0 0' }}>
+          {wantsAccount
+            ? 'A person reads it — if it looks right, we email you your sign-in.'
+            : 'Dates, budget, and a link to anything you like the look of all help — but a couple of sentences is a perfectly good start.'}
+        </p>
+      </div>
 
       {wantsAccount && (
-        <>
+        <details className="bf-inline">
+          <summary>+ More details (optional)</summary>
+          <div className="field">
+            <label htmlFor="contact-org">Organization or promoter</label>
+            <input
+              id="contact-org"
+              className="input"
+              type="text"
+              value={organization}
+              onChange={(e) => setOrganization(e.target.value)}
+              maxLength={160}
+              autoComplete="organization"
+              placeholder="e.g. Himalayan Nights Events"
+            />
+          </div>
           <div className="field">
             <label htmlFor="contact-phone">
               Phone <span className="muted">(optional)</span>
@@ -217,21 +303,6 @@ export default function ContactForm({ contactEmail, intent = 'custom-design' }: 
             <p className="muted small" style={{ margin: '6px 0 0' }}>
               Only if you would rather we called than wrote — email works fine too.
             </p>
-          </div>
-
-          <div className="field">
-            <label htmlFor="contact-event-kind">
-              What kind of event <span className="muted">(optional)</span>
-            </label>
-            <input
-              id="contact-event-kind"
-              className="input"
-              type="text"
-              value={eventKind}
-              onChange={(e) => setEventKind(e.target.value)}
-              maxLength={160}
-              placeholder="e.g. Nepali cultural night"
-            />
           </div>
 
           <div
@@ -280,55 +351,18 @@ export default function ContactForm({ contactEmail, intent = 'custom-design' }: 
               maxLength={200}
               placeholder="e.g. Kulturhaus Mitte, Berlin"
             />
-            <p className="muted small" style={{ margin: '6px 0 0' }}>
-              A rough answer is fine everywhere here — nothing is fixed by writing it down, and you
-              can change it all later in your portal.
-            </p>
           </div>
-        </>
+        </details>
       )}
-
-      <div className="field">
-        <label htmlFor="contact-message">
-          {wantsAccount ? 'Tell us about your event or shop' : 'What would you like?'}
-        </label>
-        <textarea
-          id="contact-message"
-          className="input"
-          rows={6}
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          maxLength={2000}
-          placeholder={
-            wantsAccount
-              ? 'For example: we run a Nepali cultural night in Frankfurt twice a year and we want to sell tickets online instead of collecting cash at the door. Or: I make momo and sweets at home in Munich — people order ahead and pick them up from me on Saturdays.'
-              : 'For example: a custom-designed event page for our autumn concert, a landing page for a two-day festival, sponsor logos across the top, help importing our photos and videos…'
-          }
-          style={{ resize: 'vertical', fontFamily: 'inherit' }}
-        />
-        <p className="muted small" style={{ margin: '6px 0 0' }}>
-          {wantsAccount
-            ? 'Who you are, what you are putting on — or, for a shop, what you sell, where you are, and how people collect their orders — and anything that helps us see it is real. A few sentences is plenty. A person reads this, and if it all looks right we set your account up and email you the sign-in details.'
-            : 'Dates, budget, and a link to anything you like the look of all help — but a couple of sentences is a perfectly good start.'}
-        </p>
-      </div>
 
       {/* The equivalent of the checkout's Datenschutz note, for enquiry data:
           what is kept, who reads it, and how to have it removed. Sits directly
           above the send button so it is read before anything is submitted. */}
-      <p className="muted small" style={{ margin: '0 0 14px' }}>
-        What you write here is stored so it cannot be lost in a mail outage, and emailed to our own
-        team — nobody else. We use it to answer you and for nothing else, you are not added to any
-        mailing list, and once your enquiry is dealt with you can ask us to delete it.{' '}
-        <a
-          href="/privacy"
-          target="_blank"
-          rel="noopener"
-          style={{ color: 'var(--brand-text)', fontWeight: 600 }}
-        >
-          More on how we handle your details
-        </a>{' '}
-        (opens in a new tab, so nothing you have typed is lost).
+      <p className="muted small" style={{ margin: 0 }}>
+        Stored and read only by our team to answer you — no mailing list; ask us any time to delete it.{' '}
+        <a href="/privacy" target="_blank" rel="noopener" style={{ color: 'var(--brand-text)', fontWeight: 600 }}>
+          Privacy
+        </a>
       </p>
 
       {/* The consent itself, directly under the note it refers to and directly
@@ -337,7 +371,7 @@ export default function ContactForm({ contactEmail, intent = 'custom-design' }: 
       <label
         className="checkbox-row"
         style={{
-          margin: '0 0 14px',
+          margin: 0,
           padding: '12px 14px',
           border: '1px solid var(--border)',
           borderLeft: '3px solid var(--brand)',
@@ -380,5 +414,6 @@ export default function ContactForm({ contactEmail, intent = 'custom-design' }: 
         {busy ? 'Sending…' : wantsAccount ? 'Send your application' : 'Send your request'}
       </button>
     </form>
+    </>
   );
 }
