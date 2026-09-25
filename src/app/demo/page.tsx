@@ -1,3 +1,4 @@
+import PitchVideo from '@/components/PitchVideo';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
@@ -145,6 +146,8 @@ export default async function DemoPage({
           <span className="muted small">or pick a whole demo below</span>
         </form>
       )}
+
+      <PitchVideo caption="Watch first: the whole thing in about a minute." />
 
       <div className="demo-picks">
         {PICKS.map((p) => (

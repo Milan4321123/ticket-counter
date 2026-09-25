@@ -2,6 +2,7 @@ import Link from 'next/link';
 import LogoutButton from './LogoutButton';
 import DemoPicker from './DemoPicker';
 import LoopCarousel from '@/components/LoopCarousel';
+import PitchVideo from '@/components/PitchVideo';
 import { readListingName } from '@/lib/exampleShop';
 import PlatformAssistant from '@/components/PlatformAssistant';
 import {
@@ -148,6 +149,11 @@ export default async function PortalDashboardPage({
 
         {/* A demo account opens on its three businesses: pick one, land on its
             tool board, and every page's "All tools" brings you back. */}
+        {organizer.isDemo && (
+          <div className="pv-row">
+            <PitchVideo variant="button" />
+          </div>
+        )}
         {demoPicks.length > 0 && <DemoPicker picks={demoPicks} />}
 
         {deletedName && (
