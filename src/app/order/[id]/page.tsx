@@ -153,10 +153,12 @@ export default async function OrderPage({
     const paid = order.status === 'paid';
     const st = kitchenInfo.kitchenStatus;
     const atTable = Boolean(kitchenInfo.tableLabel);
+    // A shop with pickup times cooks (the kitchen pack); any other packs goods.
+    const cooks = parseSlotConfig(event.pickupSlots).enabled || atTable;
     const steps: TrackerStep[] = [
       { label: 'Ordered', at: order.createdAt, done: true },
       { label: paid ? 'Paid' : 'Waiting for your payment', at: order.paidAt, done: paid },
-      { label: 'Being prepared', at: kitchenInfo.cookingAt, done: paid && (st !== 'new' || scanned) },
+      { label: cooks ? 'Being prepared' : 'Being packed', at: kitchenInfo.cookingAt, done: paid && (st !== 'new' || scanned) },
       {
         label: atTable ? 'Ready — on its way to your table' : 'Ready to collect',
         at: kitchenInfo.readyAt,
@@ -167,8 +169,8 @@ export default async function OrderPage({
     const reached = steps.reduce((i, x, k) => (x.done ? k : i), 0);
     const headline = [
       'Order received — waiting for payment',
-      'Paid — the kitchen has your order',
-      'Being prepared',
+      cooks ? 'Paid — the kitchen has your order' : 'Paid — the shop has your order',
+      cooks ? 'Being prepared' : 'Being packed',
       atTable ? 'Ready — coming to your table' : 'Ready! Show your code at the counter',
       atTable ? 'Served — enjoy!' : 'Collected — enjoy!',
     ][reached];

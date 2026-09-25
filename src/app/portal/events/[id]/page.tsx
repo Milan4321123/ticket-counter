@@ -44,7 +44,7 @@ export default async function ListingToolsPage({ params }: { params: Promise<{ i
   // "Coming soon" rows: how many would buy each the day it opens.
   const wishes = listWishTotals(organizer.id).filter((w) => w.eventId === event.id);
   // The story video for this kind of business: each tool plays its chapter.
-  const story = storyForListing(event.kind, isShop ? parseSlotConfig(event.pickupSlots).purpose : null);
+  const story = storyForListing(event.kind, isShop ? parseSlotConfig(event.pickupSlots) : null);
 
   const badge: Record<string, string> = {};
   if (stats.awaitingTransferOrders > 0) badge.orders = `${stats.awaitingTransferOrders} to confirm`;

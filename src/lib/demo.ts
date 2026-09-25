@@ -29,7 +29,10 @@ import sharp from 'sharp';
 import { getDb } from './db';
 import { deleteEventCompletely, getEventById, makeUniqueSlug, newId, type EventRow } from './events';
 import { SoldOutError } from './inventory';
-import { saveEventPhoto } from './media';
+import { mediaFilePath, saveEventPhoto } from './media';
+import { getEventBySlug, getEventMedia } from './events';
+import { setWish } from './wishes';
+import fs from 'fs';
 import { createOrder, finalizePaidOrder, getTicketsForOrder } from './orders';
 import { currentOrganizer, hashPassword, PLAN_NEVER_EXPIRES } from './organizers';
 import { createPromoCode } from './promos';
@@ -361,7 +364,13 @@ export async function createDemoSandbox(): Promise<DemoSandbox> {
     seedShopOrders(shopId);
     seedKitchen(shopId);
     const salonId = await buildDemoSalon(organizerId, short);
-    givePhones([eventId, shopId, ...(typeof salonId === 'string' ? [salonId] : [])]);
+    // A shop that sells goods (no kitchen): the "shop" story, the wish list.
+    const kiranaId = await buildDemoKirana(organizerId, short).catch((e) => {
+      console.error('Demo seed: kirana skipped:', e instanceof Error ? e.message : e);
+      return null;
+    });
+    if (kiranaId) seedKiranaOrders(kiranaId);
+    givePhones([eventId, shopId, ...(typeof salonId === 'string' ? [salonId] : []), ...(kiranaId ? [kiranaId] : [])]);
     createPromoCode(organizerId, {
       code: 'DASHAIN10',
       kind: 'percent',
@@ -521,6 +530,120 @@ async function buildDemoShop(organizerId: string, short: string): Promise<string
     insTier.run(crypto.randomUUID(), id, key, name, price, cap, desc, `${desc} Cooked the morning of collection.`, photo.id, i);
   }
   return id;
+}
+
+// ---------------- The grocery shop ----------------
+
+const KIRANA_ITEMS: [string, string, number, number, string][] = [
+  ['basmati-5kg', 'Basmati rice · 5kg', 1490, 40, 'Long-grain and aged — the everyday rice.'],
+  ['momo-masala-100g', 'Momo masala · 100g', 320, 60, 'The spice mix for momo and its achar.'],
+  ['timur-50g', 'Timur · Nepali Sichuan pepper · 50g', 390, 50, 'Citrusy and tingly — for achar and pickles.'],
+  ['dalle-achar-200g', 'Dalle khursani achar · 200g', 590, 30, 'Round red chillies from the hills. Very hot.'],
+  ['ilam-tea-250g', 'Ilam CTC tea · 250g', 650, 40, 'Strong black tea for milk chiya.'],
+  ['wai-wai-30', 'Wai Wai chicken · box of 30', 1590, 20, 'The noodle snack everybody grew up with.'],
+];
+
+/**
+ * "Didi's Kirana": a grocery shop that hands goods over the counter — no
+ * kitchen, no time slots. Its photos are copies of the site's example Kirana
+ * shop's files when that exists (no picture is drawn here), and a "coming
+ * soon" Dashain box already has wishes on it.
+ */
+async function buildDemoKirana(organizerId: string, short: string): Promise<string> {
+  const db = getDb();
+  const id = crypto.randomUUID();
+  db.prepare(
+    `INSERT INTO events (id, organizer_id, slug, status, kind, name, description, city, currency, total_capacity,
+       sales_open, max_per_order, pay_within_days, bank_account_holder, bank_iban, bank_bic, bank_name, show_remaining,
+       pickup_info, category, payout_locked, pay_transfer, pay_paypal, pay_stripe, address, venue_name, subscribe_pct)
+     VALUES (?, ?, ?, 'published', 'shop', ?, ?, 'Frankfurt', 'EUR', 500, 1, 10, 3, ?, ?, '', 'Demo Bank', 1, ?, 'groceries-spices', 1, 1, 0, 0,
+       'Leipziger Straße 21, 60487 Frankfurt', 'Didi''s Kirana', 10)`
+  ).run(
+    id,
+    organizerId,
+    `demo-${short}-kirana`,
+    "Didi's Kirana",
+    `Rice, dal, spices, achar and noodles from home — order online, pick up at the counter in Bockenheim.\n\n(${DEMO_NOTE})`,
+    'Anita Shrestha',
+    EXAMPLE_IBAN,
+    'Pick up Monday–Saturday, 10:00–19:00, at the shop — Leipziger Straße 21, Frankfurt. Show the QR code at the counter.'
+  );
+  // Photos: the example Kirana shop's own files, copied (read, not drawn).
+  const example = getEventBySlug('kathmandu-kirana-pasal');
+  const exMedia = example ? getEventMedia(example.id) : [];
+  const exTiers = example ? getEventTiers(example.id) : [];
+  const copyPhoto = async (mediaId: string | null | undefined) => {
+    const m = exMedia.find((x) => x.id === mediaId);
+    if (!m || !m.mime.startsWith('image/')) return null;
+    try {
+      return (await saveEventPhoto(id, m.mime, fs.readFileSync(mediaFilePath(m)))).id;
+    } catch {
+      return null;
+    }
+  };
+  const cover = await copyPhoto(example?.coverMediaId);
+  if (cover) db.prepare(`UPDATE events SET cover_media_id = ?, poster_media_id = ?, profile_media_id = ? WHERE id = ?`).run(cover, cover, cover, id);
+  const insTier = db.prepare(
+    `INSERT INTO event_tiers (id, event_id, tier_key, name, price_cents, cap, unlimited, status, student_only,
+       description, details, media_id, sort, seats_per_unit)
+     VALUES (?, ?, ?, ?, ?, ?, 0, ?, 0, ?, ?, ?, ?, 1)`
+  );
+  for (const [i, [key, name, price, cap, desc]] of KIRANA_ITEMS.entries()) {
+    const photo = await copyPhoto(exTiers.find((t) => t.tierKey === key)?.mediaId);
+    insTier.run(crypto.randomUUID(), id, key, name, price, cap, 'on-sale', desc, desc, photo, i);
+  }
+  insTier.run(
+    crypto.randomUUID(),
+    id,
+    'dashain-box',
+    'Dashain gift box',
+    3490,
+    50,
+    'coming-soon',
+    'Tika, jamara seeds, sweets and spices — ready for Dashain.',
+    'Everything for the ten days of Dashain in one box.',
+    null,
+    KIRANA_ITEMS.length
+  );
+  // People already want the Dashain box (lib/wishes): one wish per "device".
+  for (let k = 0; k < 14; k++) setWish(id, 'dashain-box', crypto.randomBytes(16).toString('hex'), true);
+  return id;
+}
+
+/** Two weeks of counter pickups: most collected, a few still waiting for a transfer. */
+function seedKiranaOrders(shopId: string): void {
+  const db = getDb();
+  const keys = KIRANA_ITEMS.map((s) => s[0]);
+  const n = 16;
+  for (let i = 0; i < n; i++) {
+    const name = pick(BUYERS, i * 5 + 3);
+    const a = pick(keys, i * 3);
+    const b = pick(keys, i + 1);
+    const items = a === b ? [{ tierId: a, quantity: 2 }] : [{ tierId: a, quantity: 1 }, { tierId: b, quantity: 1 + (i % 2) }];
+    let order;
+    try {
+      order = createOrder({
+        eventId: shopId,
+        buyerName: name,
+        buyerEmail: demoAddress(name.split(' ')[0].toLowerCase()),
+        items,
+        paymentMode: 'transfer',
+      });
+    } catch (e) {
+      if (e instanceof SoldOutError) continue;
+      throw e;
+    }
+    const ago = spread(i, n, 0.3, 16);
+    db.prepare(`UPDATE orders SET created_at = ? WHERE id = ?`).run(sqliteAgo(ago), order.id);
+    if (i >= n - 2) continue; // awaiting a bank transfer
+    finalizePaidOrder(order.id, null);
+    db.prepare(`UPDATE orders SET paid_at = ?, confirmed_via = 'reference' WHERE id = ?`).run(sqliteAgo(Math.max(0.05, ago - 0.3)), order.id);
+    if (i < n - 5) {
+      for (const t of getTicketsForOrder(order.id)) {
+        db.prepare(`UPDATE tickets SET checked_in_at = ? WHERE code = ?`).run(sqliteAgo(Math.max(0.02, ago - 1)), t.code);
+      }
+    }
+  }
 }
 
 /**

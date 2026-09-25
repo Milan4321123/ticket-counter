@@ -1068,6 +1068,10 @@ export function deleteEventCompletely(eventId: string): DeletedEventSummary {
     db.prepare(`DELETE FROM event_faqs WHERE event_id = ?`).run(eventId);
     db.prepare(`DELETE FROM event_questions WHERE event_id = ?`).run(eventId);
     db.prepare(`DELETE FROM event_tiers WHERE event_id = ?`).run(eventId);
+    // Wishes (lib/wishes) — the table exists only once somebody has wished.
+    if (db.prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'item_wishes'`).get()) {
+      db.prepare(`DELETE FROM item_wishes WHERE event_id = ?`).run(eventId);
+    }
 
     // The payout audit trail. It holds IBANs and PayPal addresses IN FULL — that
     // is deliberate, because a masked forensic record is useless — which makes
