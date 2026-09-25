@@ -138,13 +138,11 @@ export default function QuestionsPanel({ eventId, questions, answeredCount }: Pr
   return (
     <div style={{ display: 'grid', gap: 14 }}>
       <p className="muted small" style={{ margin: 0 }}>
-        The assistant could not answer these from your event details. Publish an answer and it appears in the
-        Questions section of your event page — and the assistant learns it, so the next person who asks gets an
-        instant answer.
+        Answer once — it goes on your page and the assistant learns it for the next person.
       </p>
       {open.map((q) => (
-        <div key={q.id} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 14 }}>
-          <div style={{ fontWeight: 700 }}>{q.question}</div>
+        <div key={q.id} className="qa-card">
+          <div className="qa-bubble">{q.question}</div>
           {LINKY.test(q.question) && (
             <div className="notice notice-warn small" style={{ margin: '8px 0 0' }}>
               <strong>This question contains a link or a web address.</strong> Anyone on the internet
@@ -170,8 +168,8 @@ export default function QuestionsPanel({ eventId, questions, answeredCount }: Pr
             )}
           </div>
           <textarea
-            className="input"
-            rows={3}
+            className="input qa-answer"
+            rows={2}
             maxLength={MAX_ANSWER}
             style={{ marginTop: 10, resize: 'vertical' }}
             placeholder="Write your answer…"
