@@ -1086,15 +1086,26 @@ export default async function EventPage({ params, searchParams }: Params) {
                 // Sold-out rows sink to the end: see tiersInSaleOrder. The
                 // organizer's own order survives inside each group.
                 //
-                // An event's tickets swipe like the homepage's cards — one in
-                // the middle, the others either side, endless — once there is
-                // more than one. A shop keeps its shopfront grid.
-                return !isShop && tierCards.length > 1 ? (
-                  <LoopCarousel label={v.Units} className="tier-lc">
-                    {tierCards}
+                // Everything on one screen: tickets two by two, so four are
+                // seen at once; a shop keeps its shopfront grid of three
+                // across. Only when there are more than a screenful do they
+                // turn into pages — 4 tickets or 9 items each — that swipe
+                // (endless, arrows on a laptop, dots).
+                const perPage = isShop ? 9 : 4;
+                const gridClass = isShop ? 'tier-grid goods-grid' : 'tier-grid tier-grid-2';
+                if (tierCards.length <= perPage) {
+                  return <div className={gridClass}>{tierCards}</div>;
+                }
+                const pages: (typeof tierCards)[] = [];
+                for (let i = 0; i < tierCards.length; i += perPage) pages.push(tierCards.slice(i, i + perPage));
+                return (
+                  <LoopCarousel label={v.Units} className="tier-lc tier-pages">
+                    {pages.map((page, i) => (
+                      <div key={i} className={`${gridClass} tier-page`}>
+                        {page}
+                      </div>
+                    ))}
                   </LoopCarousel>
-                ) : (
-                  <div className={isShop ? 'tier-grid goods-grid' : 'tier-grid'}>{tierCards}</div>
                 );
               })()}
               <p className="muted small">

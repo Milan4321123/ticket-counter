@@ -7648,6 +7648,9 @@ html.tx-wait body {
 }
 
 .lc-track {
+  /* The children's offsetLeft is measured from here (usePeekDim,
+     useInfiniteLoop) — without it they would be off by the padding. */
+  position: relative;
   display: flex;
   gap: 16px;
   margin: 0 -16px;
@@ -7740,4 +7743,85 @@ html.tx-wait body {
 
 .tier-lc .tier-card:hover {
   transform: none;
+}
+
+/* Tickets two by two, so four fit on one screen (/e/[slug]). */
+.tier-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* More than a screenful: pages of 4 tickets / 9 items in a LoopCarousel,
+   each page the full width, no peeking. */
+.lc.tier-pages {
+  --lc-w: 100%;
+}
+
+.lc.tier-pages .lc-track {
+  gap: 16px;
+  padding: 4px 16px 8px;
+}
+
+.lc.tier-pages .lc-slide {
+  opacity: 1;
+  transform: none;
+}
+
+.tier-page {
+  align-content: start;
+  margin: 0;
+}
+
+.lc.tier-pages .lc-prev {
+  left: -20px;
+}
+
+.lc.tier-pages .lc-next {
+  right: -20px;
+}
+
+@media (max-width: 720px) {
+  .lc.tier-pages {
+    --lc-w: 100%;
+  }
+
+  .lc.tier-pages .lc-track {
+    gap: 16px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+/* Phone: two ticket cards side by side stay readable. */
+@media (max-width: 560px) {
+  .tier-grid-2 {
+    gap: 10px;
+  }
+
+  .tier-grid-2 .tier-card {
+    padding: 14px;
+    gap: 6px;
+  }
+
+  .tier-grid-2 .tier-name {
+    font-size: 0.95rem;
+    line-height: 1.3;
+  }
+
+  .tier-grid-2 .tier-price {
+    font-size: 1.35rem;
+  }
+
+  .tier-grid-2 .tier-desc {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+    font-size: 0.82rem;
+  }
+
+  .tier-grid-2 .tier-card-photo {
+    margin: -14px -14px 4px;
+    width: calc(100% + 28px);
+  }
 }

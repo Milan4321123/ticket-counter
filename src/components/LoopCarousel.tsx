@@ -37,7 +37,11 @@ export default function LoopCarousel({
     const el = track.current;
     const card = el?.children[i] as HTMLElement | undefined;
     if (!el || !card) return;
-    el.scrollTo({ left: card.offsetLeft - (el.clientWidth - card.offsetWidth) / 2, behavior: 'smooth' });
+    // Measured on screen rather than by offsetLeft: the track's own negative
+    // margin puts its offsetParent 16px away from its scroll origin.
+    const box = el.getBoundingClientRect();
+    const at = card.getBoundingClientRect();
+    el.scrollTo({ left: el.scrollLeft + (at.left - box.left) - (el.clientWidth - at.width) / 2, behavior: 'smooth' });
   }, []);
 
   const current = n ? pos % n : 0;
