@@ -296,7 +296,15 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
       badge: !isShop && pendingStalls.length > 0 ? `${pendingStalls.length} new` : undefined,
     },
     // The restaurant pack (lib/kitchen): shops only.
-    ...(isShop ? [{ key: 'kitchen', label: 'Kitchen & collection', status: 'neutral' as const }] : []),
+    // Named for what the shop does: a salon books appointments, a kitchen
+    // hands over at pick-up times — neither should read the other's words.
+    ...(isShop
+      ? [
+          parseSlotConfig(event.pickupSlots).enabled && parseSlotConfig(event.pickupSlots).purpose === 'appointment'
+            ? { key: 'kitchen', label: 'Booking times', status: 'neutral' as const, icon: '📅', line: 'Opening hours, appointment length and options' }
+            : { key: 'kitchen', label: 'Pick-up times', status: 'neutral' as const, icon: '🕒', line: 'When people collect, item options and tables' },
+        ]
+      : []),
     ...(isShop ? [{ key: 'subscribe', label: 'Subscribe & save', status: event.subscribePct > 0 ? ('done' as const) : ('neutral' as const) }] : []),
     // Reserved seating (lib/seats): events only.
     ...(!isShop ? [{ key: 'seating', label: 'Seating', status: 'neutral' as const }] : []),

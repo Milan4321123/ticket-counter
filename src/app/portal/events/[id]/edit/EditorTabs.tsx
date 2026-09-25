@@ -21,6 +21,9 @@ export interface EditorTabDef {
    * organizer with it, or the rows land somewhere they cannot see.
    */
   revealOn?: string;
+  /** Overrides the section's usual icon and line (e.g. a salon's booking times). */
+  icon?: string;
+  line?: string;
 }
 
 /** One line and an icon per section, for the card view. */
@@ -180,7 +183,8 @@ export default function EditorTabs({
 
           <div className="ed-cards">
             {tabs.map((t, i) => {
-              const info = CARD_INFO[t.key] ?? { icon: '•', line: '' };
+              const base = CARD_INFO[t.key] ?? { icon: '•', line: '' };
+              const info = { icon: t.icon ?? base.icon, line: t.line ?? base.line };
               const isNext = t.key === nextUp;
               return (
                 <button
@@ -235,7 +239,7 @@ export default function EditorTabs({
             ← All sections
           </button>
           <span className="ed-open-title">
-            <span aria-hidden="true">{CARD_INFO[current.key]?.icon}</span> {current.label}
+            <span aria-hidden="true">{current.icon ?? CARD_INFO[current.key]?.icon}</span> {current.label}
             {current.status === 'done' ? (
               <span className="ed-chip ed-chip-done">✓ Done</span>
             ) : current.status === 'todo' ? (
