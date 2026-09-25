@@ -153,8 +153,8 @@ const T: Record<Lang, Words> = {
       photo: 'Now add at least one photo — tap below, pick one, then “Return to the chat”. You can still type changes here.',
       publish: 'Everything is ready. Publish it now?',
     },
-    buttons: { photo: 'Add a photo →', publish: 'Open the Publish section', publishNow: '🚀 Publish now', view: 'View your page →', preview: 'Preview my page →', account: 'Get a real account' },
-    demoPreview: 'All done ✓ This is a demo, so your page stays private — it can’t go live. Have a look at it here. To sell for real, ask for an account.',
+    buttons: { photo: 'Add a photo →', publish: 'Open the Publish section', publishNow: '🚀 Publish now', view: 'View your page →', preview: 'Preview my page →', account: 'Apply with this page →' },
+    demoPreview: 'All done ✓ This is a demo, so your page stays private — it can’t go live. Have a look at it here — and to sell for real, send this page as your application: once approved, it moves into your own account.',
     published: 'Published 🎉 — your page is live.',
     switchBtn: '⇄ Switch',
     whatChange: 'Sure — what shall I change or add? E.g. “add 4 more items”, “veg momo 7€”, “write a nicer description”. Say “done” when you are happy.',
@@ -215,8 +215,8 @@ const T: Record<Lang, Words> = {
       photo: 'Jetzt mindestens ein Foto – unten tippen, eins wählen, dann „Zurück zum Chat“. Änderungen kannst du hier weiter tippen.',
       publish: 'Alles bereit. Jetzt veröffentlichen?',
     },
-    buttons: { photo: 'Foto hinzufügen →', publish: 'Bereich Veröffentlichen öffnen', publishNow: '🚀 Jetzt veröffentlichen', view: 'Deine Seite ansehen →', preview: 'Vorschau ansehen →', account: 'Echtes Konto anfragen' },
-    demoPreview: 'Fertig ✓ Das ist eine Demo, deine Seite bleibt also privat – sie kann nicht online gehen. Hier kannst du sie ansehen. Um wirklich zu verkaufen, frag ein Konto an.',
+    buttons: { photo: 'Foto hinzufügen →', publish: 'Bereich Veröffentlichen öffnen', publishNow: '🚀 Jetzt veröffentlichen', view: 'Deine Seite ansehen →', preview: 'Vorschau ansehen →', account: 'Mit dieser Seite bewerben →' },
+    demoPreview: 'Fertig ✓ Das ist eine Demo, deine Seite bleibt also privat – sie kann nicht online gehen. Hier kannst du sie ansehen – und um wirklich zu verkaufen, schick diese Seite als Bewerbung: Nach der Freigabe zieht sie in dein eigenes Konto um.',
     published: 'Veröffentlicht 🎉 – deine Seite ist online.',
     switchBtn: '⇄ Wechseln',
     whatChange: 'Klar – was soll ich ändern oder ergänzen? Z. B. „füge 4 Artikel hinzu“, „Veggie-Momo 7€“, „schreib eine schönere Beschreibung“. Sag „fertig“, wenn alles passt.',
@@ -273,8 +273,8 @@ const T: Record<Lang, Words> = {
       photo: 'अब कम्तीमा एउटा फोटो थप्नुहोस् — तल थिच्नुहोस्, फोटो छान्नुहोस्, अनि “Return to the chat”। यहाँ परिवर्तन लेख्न सक्नुहुन्छ।',
       publish: 'सबै तयार छ। अहिले प्रकाशित गर्ने?',
     },
-    buttons: { photo: 'फोटो थप्नुहोस् →', publish: 'प्रकाशन खण्ड खोल्नुहोस्', publishNow: '🚀 अहिले प्रकाशित गर्नुहोस्', view: 'आफ्नो पेज हेर्नुहोस् →', preview: 'पेजको पूर्वावलोकन →', account: 'वास्तविक खाता माग्नुहोस्' },
-    demoPreview: 'सबै सकियो ✓ यो डेमो हो, त्यसैले तपाईंको पेज निजी रहन्छ — लाइभ हुँदैन। यहाँ हेर्नुहोस्। साँच्चै बेच्न खाता माग्नुहोस्।',
+    buttons: { photo: 'फोटो थप्नुहोस् →', publish: 'प्रकाशन खण्ड खोल्नुहोस्', publishNow: '🚀 अहिले प्रकाशित गर्नुहोस्', view: 'आफ्नो पेज हेर्नुहोस् →', preview: 'पेजको पूर्वावलोकन →', account: 'यो पेजसहित आवेदन दिनुहोस् →' },
+    demoPreview: 'सबै सकियो ✓ यो डेमो हो, त्यसैले तपाईंको पेज निजी रहन्छ — लाइभ हुँदैन। यहाँ हेर्नुहोस् — साँच्चै बेच्न यही पेज आवेदनको रूपमा पठाउनुहोस्: स्वीकृत भएपछि यो तपाईंको आफ्नै खातामा सर्छ।',
     published: 'प्रकाशित भयो 🎉 — तपाईंको पेज लाइभ छ।',
     switchBtn: '⇄ अर्को',
     whatChange: 'हुन्छ — के बदल्ने वा थप्ने? जस्तै “arko 4 item thapnus”, “veg momo 7 euro”, “ramro description lekhnus”। सबै ठीक भए “bhayo” भन्नुहोस्।',
@@ -758,7 +758,7 @@ export default function SetupAssistant({
               </a>
             )}
             {m.account && (
-              <a href="/contact?intent=account" className="btn btn-sm sa-goto">
+              <a href={`/portal/apply?event=${eventId}`} className="btn btn-brand btn-sm sa-goto">
                 {t.buttons.account}
               </a>
             )}

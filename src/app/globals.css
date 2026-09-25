@@ -7360,6 +7360,16 @@ html:has(.item-page) {
   text-decoration: underline;
 }
 
+.demo-banner-links a.demo-banner-apply {
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--amber, #fbbf24);
+  box-shadow: 0 3px 10px rgba(251, 191, 36, 0.3);
+  color: #1a1206;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
 .demo-tour {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));

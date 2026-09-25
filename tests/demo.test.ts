@@ -1,8 +1,16 @@
 // Try-it-yourself demo accounts (lib/demo.ts): the wall around them.
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { createDemoSandbox, deleteDemoAccount, demoAddress, demoTargetPath, sweepExpiredDemos } from '../src/lib/demo.ts';
-import { getEventById, listPublishedEvents } from '../src/lib/events.ts';
+import {
+  adoptDemoListing,
+  createDemoSandbox,
+  deleteDemoAccount,
+  demoAddress,
+  demoTargetPath,
+  keepDemoForApplication,
+  sweepExpiredDemos,
+} from '../src/lib/demo.ts';
+import { getEventById, getEventTiers, listPublishedEvents } from '../src/lib/events.ts';
 import { isUndeliverableAddress } from '../src/lib/email.ts';
 import { paymentOptionsFor } from '../src/lib/paymentConnections.ts';
 import { requestStallLink, StallActionError } from '../src/lib/stalls.ts';
@@ -73,6 +81,37 @@ describe('demo accounts', () => {
     const real = makeOrganizer();
     assert.throws(() => deleteDemoAccount(real.id), /real organizer/);
     assert.ok(getOrganizer(real.id));
+  });
+
+  it('an application keeps the demo, and approval moves its page into the real account as a clean draft', async () => {
+    const demo = await createDemoSandbox();
+    keepDemoForApplication(demo.organizerId);
+    db().prepare(`UPDATE organizers SET demo_expires_at = datetime('now', '-1 minute') WHERE id <> ? AND is_demo = 1`).run(demo.organizerId);
+    sweepExpiredDemos(true);
+    assert.ok(getEventById(demo.shopId), 'kept past the usual 24 hours');
+
+    const tiersBefore = getEventTiers(demo.shopId).length;
+    const real = makeOrganizer();
+    assert.equal(adoptDemoListing(demo.shopId, real.id), true);
+    const moved = getEventById(demo.shopId)!;
+    assert.equal(moved.organizerId, real.id);
+    assert.equal(moved.isDemo, false);
+    assert.equal(moved.status, 'draft', 'never live on arrival — publishing stays with the new owner');
+    assert.equal(moved.bankIban, '', "the demo's example bank account does not come along");
+    assert.equal(getEventTiers(demo.shopId).length, tiersBefore, 'the items do');
+    const orders = db().prepare(`SELECT COUNT(*) AS n FROM orders WHERE event_id = ?`).get(demo.shopId) as { n: number };
+    assert.equal(orders.n, 0, 'simulated orders are gone');
+
+    // A real listing can never be taken this way, nor the same page twice.
+    const other = makeEvent({ organizerId: makeOrganizer().id });
+    assert.equal(adoptDemoListing(other.id, real.id), false);
+    assert.equal(adoptDemoListing(demo.shopId, makeOrganizer().id), false);
+
+    // Sweeping the rest of the demo leaves the moved page alone.
+    db().prepare(`UPDATE organizers SET demo_expires_at = datetime('now', '-1 minute') WHERE id = ?`).run(demo.organizerId);
+    sweepExpiredDemos(true);
+    assert.equal(getEventById(demo.eventId), null);
+    assert.ok(getEventById(demo.shopId));
   });
 
   it('never emails a .invalid address', () => {

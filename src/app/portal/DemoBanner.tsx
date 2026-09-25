@@ -25,6 +25,9 @@ export default async function DemoBanner() {
           Simulated payments · no emails · {hoursLeft}h left
         </span>
         <span className="demo-banner-links">
+          <Link href="/portal/apply" className="demo-banner-apply">
+            Apply with my page
+          </Link>
           <Link href="/demo?to=buyer-event">See it as a buyer</Link>
           <Link href="/showcase">All features</Link>
         </span>

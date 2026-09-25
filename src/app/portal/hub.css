@@ -2366,3 +2366,98 @@
     transition: none;
   }
 }
+
+/* Apply with your demo page (portal/apply). */
+.apply-form,
+.apply-done {
+  max-width: 560px;
+  margin-top: 22px;
+}
+
+.apply-form .field {
+  display: block;
+}
+
+.apply-form .field > span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.apply-pick {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 20px;
+  padding: 0;
+  border: 0;
+}
+
+.apply-pick legend {
+  margin-bottom: 8px;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.apply-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--bg-elevated);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 3px 10px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.apply-choice.is-on {
+  box-shadow:
+    inset 0 0 0 2px var(--brand, #dc143c),
+    0 6px 18px rgba(220, 20, 60, 0.2);
+}
+
+.apply-choice.is-sent {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.apply-choice input {
+  accent-color: var(--brand, #dc143c);
+}
+
+.apply-choice-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+
+.apply-done {
+  padding: 26px;
+  border-radius: 20px;
+  background: var(--bg-card);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.apply-done h2 {
+  margin: 0 0 8px;
+}
+
+.apply-done-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 12px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+  font-size: 1.5rem;
+  font-weight: 800;
+}

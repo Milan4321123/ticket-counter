@@ -286,10 +286,11 @@ export default function PublishPanel({
           {isDemo ? (
             <div className="notice">
               <strong>Demo pages stay private.</strong> They can&rsquo;t go live — who publishes on this
-              platform is decided by hand. Use &ldquo;Preview my page&rdquo; above to see it.
+              platform is decided by hand. Send it as your application instead: once approved, it moves into your
+              real account as a draft.
               <div style={{ marginTop: 10 }}>
-                <a href="/contact?intent=account" className="btn btn-sm btn-brand">
-                  Get a real account
+                <a href={`/portal/apply?event=${eventId}`} className="btn btn-sm btn-brand">
+                  Apply with this page
                 </a>
               </div>
             </div>

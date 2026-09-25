@@ -16,6 +16,8 @@ interface ApproveResponse {
   emailed?: boolean;
   emailReason?: string;
   organizer?: { email?: string };
+  /** The demo page sent with the application moved into the new account. */
+  adopted?: boolean;
   error?: string;
 }
 
@@ -24,6 +26,7 @@ interface Created {
   password: string;
   emailed: boolean;
   emailReason?: string;
+  adopted: boolean;
 }
 
 /**
@@ -76,6 +79,7 @@ export default function ApproveAccountButton({ requestId, name, email }: Props) 
         password: data.initialPassword,
         emailed: Boolean(data.emailed),
         emailReason: data.emailReason,
+        adopted: Boolean(data.adopted),
       });
       // Deliberately NOT refreshing here. It used to, and that destroyed the
       // one thing this screen exists to show: refreshing re-rendered the server
@@ -124,6 +128,11 @@ export default function ApproveAccountButton({ requestId, name, email }: Props) 
           </span>
           <CopyButton value={created.password} />
         </div>
+        {created.adopted && (
+          <p className="small" style={{ margin: '0 0 8px' }}>
+            🧪 Their demo page moved into the new account as a private draft.
+          </p>
+        )}
         <p className="muted small" style={{ marginBottom: 0 }}>
           Shown only this once — it is stored hashed and can only be reset, never read again. They
           must change it the moment they sign in.

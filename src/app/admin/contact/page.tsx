@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { isAdminRequest } from '@/lib/auth';
 import { listContactRequests, type ContactRequestRow } from '@/lib/contact';
+import { getEventById, getEventMedia, getEventTiers } from '@/lib/events';
+import { readListingName } from '@/lib/exampleShop';
 import { platformContactEmail } from '@/lib/platform';
 import ApproveAccountButton from './ApproveAccountButton';
 import MarkHandledButton from './MarkHandledButton';
@@ -9,6 +11,26 @@ import MarkHandledButton from './MarkHandledButton';
 export const dynamic = 'force-dynamic';
 
 export const metadata = { title: 'Applications & page requests — Admin', robots: { index: false, follow: false } };
+
+/**
+ * An application sent from inside a demo carries the page the person built.
+ * What the admin needs to judge it without opening the demo: what it is, how
+ * much is in it, and its own words. Null once the demo has been swept.
+ */
+function demoPage(r: ContactRequestRow) {
+  if (!r.demoEventId) return null;
+  const e = getEventById(r.demoEventId);
+  if (!e) return { gone: true as const };
+  return {
+    gone: false as const,
+    name: readListingName(e.name).name,
+    kind: e.kind === 'shop' ? 'Shop' : 'Event',
+    items: getEventTiers(e.id).map((t) => t.name),
+    photos: getEventMedia(e.id).length,
+    description: e.description.slice(0, 220),
+    mine: e.isDemo,
+  };
+}
 
 /** The optional application details, in the order they are asked for. */
 function applicationDetails(r: ContactRequestRow): [string, string][] {
@@ -120,6 +142,7 @@ export default async function AdminContactPage() {
               <tbody>
                 {applications.map((r) => {
                   const details = applicationDetails(r);
+                  const demo = demoPage(r);
                   return (
                     <tr key={r.id}>
                       <td className="mono small" style={{ whiteSpace: 'nowrap' }}>
@@ -127,7 +150,27 @@ export default async function AdminContactPage() {
                       </td>
                       <WhoCells request={r} />
                       <td className="small" style={{ minWidth: 180 }}>
-                        {details.length === 0 ? (
+                        {demo && (
+                          <div className="notice" style={{ margin: '0 0 8px', padding: '8px 10px' }}>
+                            {demo.gone ? (
+                              <span className="muted">Sent with a demo page — it no longer exists.</span>
+                            ) : (
+                              <>
+                                <strong>
+                                  🧪 {demo.kind} page: {demo.name}
+                                </strong>
+                                <div className="muted">
+                                  {demo.items.length} item{demo.items.length === 1 ? '' : 's'} · {demo.photos} photo
+                                  {demo.photos === 1 ? '' : 's'}
+                                  {demo.mine ? ' · moves to the new account as a draft on approval' : ' · moved'}
+                                </div>
+                                {demo.items.length > 0 && <div>{demo.items.slice(0, 8).join(', ')}</div>}
+                                {demo.description && <div className="muted">{demo.description}</div>}
+                              </>
+                            )}
+                          </div>
+                        )}
+                        {details.length === 0 && !demo ? (
                           <span className="muted">They didn&rsquo;t say</span>
                         ) : (
                           details.map(([label, value]) => (

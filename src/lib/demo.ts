@@ -849,3 +849,68 @@ async function buildDemoSalon(organizerId: string, short: string): Promise<strin
   }
   return id;
 }
+
+// ---------------- Applying with a demo page ----------------
+
+/** How long a demo that has been sent as an application waits for an answer. */
+export const DEMO_APPLICATION_KEEP_DAYS = 30;
+
+/**
+ * A demo visitor sent their demo as an account application: keep it (and so
+ * the page they built) for DEMO_APPLICATION_KEEP_DAYS instead of 24 hours, so
+ * it is still there when the platform owner gets round to deciding.
+ */
+export function keepDemoForApplication(organizerId: string): void {
+  getDb()
+    .prepare(
+      `UPDATE organizers SET demo_expires_at = datetime('now', ?) WHERE id = ? AND is_demo = 1`
+    )
+    .run(`+${DEMO_APPLICATION_KEEP_DAYS} days`, organizerId);
+}
+
+/**
+ * Move a page built in a demo into a real, newly approved account, as a
+ * PRIVATE DRAFT — the platform owner approved the person, and publishing is
+ * still theirs to do from their own account.
+ *
+ * What moves: the page itself — texts, items, photos, design, FAQs, posts.
+ * What does not: anything the demo made up or simulated — orders, tickets,
+ * seat holds, reviews, questions, waitlist, codes — and the demo's example
+ * payout account; the new owner enters their own. Returns false (and changes
+ * nothing) when the listing is gone or no longer belongs to a demo.
+ */
+export function adoptDemoListing(eventId: string, organizerId: string): boolean {
+  const db = getDb();
+  const row = db
+    .prepare(
+      `SELECT e.id FROM events e JOIN organizers o ON o.id = e.organizer_id WHERE e.id = ? AND o.is_demo = 1`
+    )
+    .get(eventId);
+  if (!row) return false;
+  const has = (table: string) =>
+    Boolean(db.prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`).get(table));
+  db.transaction(() => {
+    // Reviews point at orders, so they go before the orders do.
+    for (const table of ['event_questions', 'item_reviews', 'waitlist', 'promo_codes', 'payout_changes', 'marketing_sends']) {
+      if (has(table)) db.prepare(`DELETE FROM ${table} WHERE event_id = ?`).run(eventId);
+    }
+    if (has('seat_holds')) db.prepare(`DELETE FROM seat_holds WHERE event_id = ?`).run(eventId);
+    db.prepare(`DELETE FROM tickets WHERE order_id IN (SELECT id FROM orders WHERE event_id = ?)`).run(eventId);
+    db.prepare(`DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE event_id = ?)`).run(eventId);
+    db.prepare(`DELETE FROM orders WHERE event_id = ?`).run(eventId);
+    if (has('event_stalls')) {
+      db.prepare(`DELETE FROM event_stalls WHERE host_event_id = ? OR shop_event_id = ?`).run(eventId, eventId);
+    }
+    db.prepare(`DELETE FROM kv WHERE key = ?`).run(`scan_epoch:${eventId}`);
+    db.prepare(
+      `UPDATE events SET
+         organizer_id = ?, status = 'draft', payout_locked = 0,
+         bank_account_holder = '', bank_iban = '', bank_bic = '', bank_name = '', paypal_account = '',
+         pending_bank_account_holder = NULL, pending_bank_iban = NULL, pending_bank_bic = NULL,
+         pending_bank_name = NULL, pending_paypal_account = NULL, pending_payout_effective_at = NULL,
+         pay_transfer = 1, pay_paypal = 0, pay_stripe = 0
+       WHERE id = ?`
+    ).run(organizerId, eventId);
+  })();
+  return true;
+}

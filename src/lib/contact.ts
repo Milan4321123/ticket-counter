@@ -35,6 +35,8 @@ export interface ContactRequestRow {
   expectedPeople: string;
   /** Set once this application was approved into a real account. */
   organizerId: string | null;
+  /** Sent from inside a demo: the demo page that moves across on approval. */
+  demoEventId: string | null;
 }
 
 const CONTACT_COLS = `
@@ -45,7 +47,8 @@ const CONTACT_COLS = `
   event_when AS eventWhen,
   event_where AS eventWhere,
   expected_people AS expectedPeople,
-  organizer_id AS organizerId
+  organizer_id AS organizerId,
+  demo_event_id AS demoEventId
 `;
 
 /** Store one enquiry and hand back the saved row. */
@@ -60,14 +63,16 @@ export function createContactRequest(params: {
   eventWhen?: string;
   eventWhere?: string;
   expectedPeople?: string;
+  /** Sent from a demo: the demo page to carry over on approval. */
+  demoEventId?: string;
 }): ContactRequestRow {
   const id = crypto.randomUUID();
   getDb()
     .prepare(
       `INSERT INTO contact_requests
          (id, name, email, organization, message, kind,
-          phone, event_kind, event_when, event_where, expected_people)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          phone, event_kind, event_when, event_where, expected_people, demo_event_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       id,
@@ -80,7 +85,8 @@ export function createContactRequest(params: {
       (params.eventKind ?? '').trim(),
       (params.eventWhen ?? '').trim(),
       (params.eventWhere ?? '').trim(),
-      (params.expectedPeople ?? '').trim()
+      (params.expectedPeople ?? '').trim(),
+      params.demoEventId ?? null
     );
   return getDb().prepare(`SELECT ${CONTACT_COLS} FROM contact_requests WHERE id = ?`).get(id) as ContactRequestRow;
 }

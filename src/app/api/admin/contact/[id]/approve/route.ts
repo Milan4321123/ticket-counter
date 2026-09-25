@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { isAdminRequest } from '@/lib/auth';
 import { getContactRequest, linkContactRequestToOrganizer, markContactRequestHandled } from '@/lib/contact';
 import { sendOrganizerCredentialsEmail } from '@/lib/email';
+import { adoptDemoListing } from '@/lib/demo';
 import { createOrganizer, getOrganizer, getOrganizerByEmail } from '@/lib/organizers';
 import type { ApiErrorResponse } from '@/lib/types';
 
@@ -116,6 +117,9 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     // email address first, but the account is real either way, so say so.
     const linked = linkContactRequestToOrganizer(request.id, organizer.id);
     markContactRequestHandled(request.id);
+    // Sent from a demo: the page they built moves into the new account as a
+    // private draft. False when the demo has already been swept.
+    const adopted = request.demoEventId ? adoptDemoListing(request.demoEventId, organizer.id) : false;
 
     // Awaited, not fire-and-forget: the admin has to be told whether these
     // details actually left the building, because if they did not, the password
@@ -130,6 +134,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       emailed: mail.sent,
       emailReason: mail.reason,
       linked,
+      adopted,
     });
   } catch (e) {
     console.error(`POST /api/admin/contact/${id}/approve failed:`, e);

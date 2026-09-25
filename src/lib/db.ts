@@ -906,6 +906,12 @@ function migrateToPlatform(db: Database.Database): void {
   if (!contactCols.includes('organizer_id')) {
     db.exec(`ALTER TABLE contact_requests ADD COLUMN organizer_id TEXT`);
   }
+  // An application sent from inside a demo: the demo page it was built with.
+  // On approval that page moves into the new account as a draft (lib/demo
+  // adoptDemoListing), so nothing typed in the demo has to be typed again.
+  if (!contactCols.includes('demo_event_id')) {
+    db.exec(`ALTER TABLE contact_requests ADD COLUMN demo_event_id TEXT`);
+  }
 
   // A shop standing at an event, with the host organizer's consent.
   // The link is CONSENT + PLACEMENT ONLY. It carries no money: orders stay on
