@@ -53,19 +53,18 @@ export default function SubscribeSavePanel({ eventId, initialPct, blockedBy, sub
       <div>
         <div className="card-title">Subscribe &amp; save</div>
         <p className="muted small" style={{ margin: 0 }}>
-          Regulars can repeat an order every week, 2 weeks or 4 weeks for a little less. Each repeat is a normal
-          order: the items are held and the buyer gets your payment details by email — nothing is charged
-          automatically, and the money goes straight to you.
+          Regulars repeat an order every 1, 2 or 4 weeks for a little less. Nothing is charged automatically — each
+          repeat is a normal order paid to you.
         </p>
       </div>
-      <div role="radiogroup" aria-label="Subscribe & save discount" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+      <div role="radiogroup" aria-label="Subscribe & save discount" className="te-seg" style={{ justifySelf: 'start' }}>
         {CHOICES.map((c) => (
           <button
             key={c}
             type="button"
             role="radio"
             aria-checked={pct === c}
-            className={`btn btn-sm${pct === c ? ' btn-green' : ''}`}
+            className={pct === c ? 'is-on' : ''}
             disabled={busy}
             onClick={() => void save(c)}
           >
