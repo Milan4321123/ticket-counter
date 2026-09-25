@@ -14,7 +14,10 @@ import type { Lang } from './i18n';
 export const MAX_TEXT_LEN = 1200;
 export const MAX_BATCH = 80;
 const DAILY_NEW_LIMIT = 20_000;
-const MODEL_CHUNK = 40;
+// Small batches: a long JSON list is where a reply gets cut off mid-string —
+// and a cut-off reply loses the WHOLE batch, not just its last line.
+const MODEL_CHUNK = 15;
+const PARALLEL = 3;
 
 let ready = false;
 function db() {
@@ -98,16 +101,22 @@ export async function translateTexts(lang: Lang, texts: string[]): Promise<Recor
   );
   const chunks: string[][] = [];
   for (let i = 0; i < missing.length; i += MODEL_CHUNK) chunks.push(missing.slice(i, i + MODEL_CHUNK));
-  await Promise.all(
-    chunks.map(async (chunk) => {
-      const outs = await modelTranslate(lang, chunk);
-      chunk.forEach((src, i) => {
-        const out = outs[i];
-        if (!out) return;
-        result[src] = out;
-        put.run(lang, hashOf(src), src, out);
-      });
-    })
-  );
+  const runChunk = async (chunk: string[]) => {
+    let outs = await modelTranslate(lang, chunk);
+    // A failed batch is tried once more in halves before giving up on it.
+    if (outs.every((o) => !o) && chunk.length > 3) {
+      const half = Math.ceil(chunk.length / 2);
+      outs = [...(await modelTranslate(lang, chunk.slice(0, half))), ...(await modelTranslate(lang, chunk.slice(half)))];
+    }
+    chunk.forEach((src, i) => {
+      const out = outs[i];
+      if (!out) return;
+      result[src] = out;
+      put.run(lang, hashOf(src), src, out);
+    });
+  };
+  for (let i = 0; i < chunks.length; i += PARALLEL) {
+    await Promise.all(chunks.slice(i, i + PARALLEL).map(runChunk));
+  }
   return result;
 }

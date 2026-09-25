@@ -18,6 +18,8 @@
 // JSX, and the reads are counted deliberately — a page of related goods is the
 // classic place a site starts asking the database a question per tile, and
 // this one asks four questions no matter how many tiles come back.
+import { localizeListing } from '@/lib/listingI18n';
+import { currentLang } from '@/lib/i18nServer';
 import { listingOpenTo } from '@/lib/demo';
 import { MixedScript } from '@/components/Np';
 import type { Metadata } from 'next';
@@ -221,7 +223,10 @@ export default async function ItemPage({ params, searchParams }: Params) {
   const { slug, tierKey } = await params;
   const found = await load(slug, decodeURIComponent(tierKey));
   if (!found) notFound();
-  const { event, tier } = found;
+  // This item and its shop in the visitor's language (lib/listingI18n).
+  const localized = localizeListing(found.event, getEventTiers(found.event.id), [], {}, await currentLang());
+  const event = localized.event;
+  const tier = localized.tiers.find((t) => t.tierKey === found.tier.tierKey) ?? found.tier;
 
   // ?ref= rides through to checkout exactly as it does from the listing page —
   // a buyer who arrived on a shared item link must earn the sharer the same
@@ -237,7 +242,7 @@ export default async function ItemPage({ params, searchParams }: Params) {
   const v = vocabFor(event.kind);
   const isShop = event.kind === 'shop';
   const subscribe = subscriptionOffer(event);
-  const tiers = getEventTiers(event.id);
+  const tiers = localized.tiers;
   const availability = getAvailability(event.id);
   const state = ticketState(event, tiers, availability);
   const remaining = Math.max(0, availability.tiers[tier.tierKey]?.remaining ?? 0);

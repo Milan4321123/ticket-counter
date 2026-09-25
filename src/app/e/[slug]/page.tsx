@@ -1,4 +1,6 @@
 import LoopCarousel from '@/components/LoopCarousel';
+import { currentLang } from '@/lib/i18nServer';
+import { localizeListing } from '@/lib/listingI18n';
 import CityCheck from '@/components/CityCheck';
 import Stars from '@/components/Stars';
 import { ratingForShop, ratingsForItems } from '@/lib/reviews';
@@ -225,8 +227,19 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 export default async function EventPage({ params, searchParams }: Params) {
   const { slug } = await params;
-  const event = getEventBySlug(slug);
-  if (!event) notFound();
+  const rawEvent = getEventBySlug(slug);
+  if (!rawEvent) notFound();
+  // The listing's own words in the visitor's language, when a translation of
+  // the current text exists (lib/listingI18n) — rendered here on the server,
+  // so switching language never flashes the English first.
+  const localized = localizeListing(
+    rawEvent,
+    getEventTiers(rawEvent.id),
+    getEventFaqs(rawEvent.id),
+    parsePageDesign(rawEvent.pageDesign),
+    await currentLang()
+  );
+  const event = localized.event;
 
   // ?ref= arrives on shared links (a buyer's own order page and ticket email
   // both append their referral code) and rides every checkout link below as a
@@ -266,11 +279,11 @@ export default async function EventPage({ params, searchParams }: Params) {
   const demo = event.isDemo && isPublished;
   if (demo && !(await listingOpenTo(event))) notFound();
 
-  const design = parsePageDesign(event.pageDesign);
+  const design = localized.design;
   const theme = ACCENT_THEMES[design.accent ?? 'violet'];
   const tuning = vibeTuning(design.vibe);
 
-  const tiers = getEventTiers(event.id);
+  const tiers = localized.tiers;
   const availability = getAvailability(event.id);
   // Every event-page render is also the waitlist's clock. Availability was
   // just computed anyway, and the sweep self-throttles to a Date.now() check
@@ -375,7 +388,7 @@ export default async function EventPage({ params, searchParams }: Params) {
       ? mediaUrl(event.profileMediaId, 'avatar', cropTag(parseCropRect(event.profileCrop)))
       : null;
   const posts = listEventPosts(event.id);
-  const faqs = getEventFaqs(event.id);
+  const faqs = localized.faqs;
   const answeredQuestions = listEventQuestions(event.id, 'answered');
 
   const maps = mapsUrl(event);

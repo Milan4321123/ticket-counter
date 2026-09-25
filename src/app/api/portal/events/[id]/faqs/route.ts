@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { warmListingTranslations } from '@/lib/listingI18n';
 import { setEventFaqs } from '@/lib/events';
 import { readJsonLimited, BodyTooLargeError } from '@/lib/http';
 import type { ApiErrorResponse } from '@/lib/types';
@@ -71,6 +72,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     const faqs = setEventFaqs(event.id, clean);
+    void warmListingTranslations(event.id);
     return NextResponse.json({
       ok: true,
       faqs: faqs.map((f) => ({ id: f.id, question: f.question, answer: f.answer })),

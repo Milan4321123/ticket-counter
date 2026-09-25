@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import { warmListingTranslations } from '@/lib/listingI18n';
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { sendPayoutChangedEmail } from '@/lib/email';
@@ -927,6 +928,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         }
       );
     }
+
+    // German and Nepali copies of what was just written, in the background.
+    void warmListingTranslations(id);
 
     return NextResponse.json({
       ok: true,

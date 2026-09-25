@@ -49,6 +49,8 @@ import { vocabFor } from '@/lib/vocab';
 import { cityLabel, otherShowsByAct, shortDateLabel } from '@/lib/sameAct';
 import GoToTab from './GoToTab';
 import EditorTabs from './EditorTabs';
+import LanguagesPanel from './LanguagesPanel';
+import { listingTranslationRows, warmSoon } from '@/lib/listingI18n';
 import { listingTools } from '../../../listingTools';
 import SetupAssistant from './SetupAssistant';
 import { listEventsForOrganizer } from '@/lib/events';
@@ -269,6 +271,10 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
   const publishDone = event.status === 'published';
   const stepsDone = [basicsDone, ticketsDone, photosDone, publishDone].filter(Boolean).length;
 
+  // A listing made before translations existed gets its German and Nepali
+  // copies the first time its editor is opened.
+  warmSoon(event.id);
+
   const tabs = [
     { key: 'basics', label: 'Basics', status: basicsDone ? ('done' as const) : ('todo' as const) },
     { key: 'tickets', label: v.Units, status: ticketsDone ? ('done' as const) : ('todo' as const) },
@@ -315,10 +321,26 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
     ...(isShop ? [{ key: 'subscribe', label: 'Subscribe & save', status: event.subscribePct > 0 ? ('done' as const) : ('neutral' as const) }] : []),
     // Reserved seating (lib/seats): events only.
     ...(!isShop ? [{ key: 'seating', label: 'Seating', status: 'neutral' as const }] : []),
+    {
+      key: 'languages',
+      label: 'Languages',
+      status: 'neutral' as const,
+      icon: '🌐',
+      line: 'Deutsch & नेपाली — automatic, yours to correct',
+    },
     { key: 'publish', label: 'Publish', status: publishDone ? ('done' as const) : ('todo' as const) },
   ];
 
   const panels = {
+    languages: (
+      <div className="card">
+        <SectionHead title="Languages" hint="Your page in German and Nepali." />
+        <LanguagesPanel
+          eventId={event.id}
+          initial={{ de: listingTranslationRows(event.id, 'de'), ne: listingTranslationRows(event.id, 'ne') }}
+        />
+      </div>
+    ),
     seating: !isShop ? (
       <SeatingPanel
         eventId={event.id}
