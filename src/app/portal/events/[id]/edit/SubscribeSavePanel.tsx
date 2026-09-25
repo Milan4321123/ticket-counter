@@ -92,7 +92,7 @@ export default function SubscribeSavePanel({ eventId, initialPct, blockedBy, sub
           </p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table className="table small">
+            <table className="table small table-cards">
               <thead>
                 <tr>
                   <th>Buyer</th>
@@ -105,11 +105,11 @@ export default function SubscribeSavePanel({ eventId, initialPct, blockedBy, sub
               <tbody>
                 {subscribers.map((s) => (
                   <tr key={s.id}>
-                    <td>{s.name}</td>
-                    <td>{s.items}</td>
-                    <td>{s.every}</td>
-                    <td>{s.status === 'active' ? s.next : s.status}</td>
-                    <td>{s.orders}</td>
+                    <td data-label="Buyer" className="tc-head">{s.name}</td>
+                    <td data-label="Items">{s.items}</td>
+                    <td data-label="How often">{s.every}</td>
+                    <td data-label="Next">{s.status === 'active' ? s.next : s.status}</td>
+                    <td data-label="Orders">{s.orders}</td>
                   </tr>
                 ))}
               </tbody>

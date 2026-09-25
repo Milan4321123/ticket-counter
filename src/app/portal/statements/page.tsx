@@ -123,7 +123,7 @@ export default async function StatementsPage({
                   {section.kind === 'shop' && <span className="badge">Shop</span>}
                 </div>
                 <div className="table-wrap" style={{ marginTop: 10 }}>
-                  <table className="table">
+                  <table className="table table-cards">
                     <thead>
                       <tr>
                         <th>Confirmed</th>
@@ -136,11 +136,11 @@ export default async function StatementsPage({
                     <tbody>
                       {section.lines.map((line) => (
                         <tr key={line.orderId}>
-                          <td>{statementDate(line.confirmedAt)}</td>
-                          <td className="small">{line.reference}</td>
-                          <td>{line.itemsSummary}</td>
-                          <td>{PAYMENT_ROUTE_LABEL[line.paymentRoute]}</td>
-                          <td style={{ textAlign: 'right' }}>
+                          <td data-label="Confirmed" className="tc-head">{statementDate(line.confirmedAt)}</td>
+                          <td data-label="Reference" className="small">{line.reference}</td>
+                          <td data-label="What was bought">{line.itemsSummary}</td>
+                          <td data-label="Payment route">{PAYMENT_ROUTE_LABEL[line.paymentRoute]}</td>
+                          <td data-label="Amount" style={{ textAlign: 'right' }}>
                             {formatMoney(line.amountCents, section.currency)}
                           </td>
                         </tr>

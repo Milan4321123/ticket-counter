@@ -333,7 +333,7 @@ export default async function PortalInsightsPage({ params }: { params: Promise<{
                         </span>
                       </summary>
                       <div className="table-wrap" style={{ marginTop: 10 }}>
-                        <table className="table">
+                        <table className="table table-cards">
                           <thead>
                             <tr>
                               <th>Who they brought</th>
@@ -345,7 +345,7 @@ export default async function PortalInsightsPage({ params }: { params: Promise<{
                           <tbody>
                             {r.bookings.map((b) => (
                               <tr key={b.orderId}>
-                                <td>
+                                <td data-label="Who they brought" className="tc-head">
                                   {b.name}
                                   {/* The chain going one step deeper. Said, not
                                       paid for: the reward rule is unchanged
@@ -359,9 +359,9 @@ export default async function PortalInsightsPage({ params }: { params: Promise<{
                                     </span>
                                   )}
                                 </td>
-                                <td className="small">{b.confirmedOn}</td>
-                                <td>{formatMoney(b.totalCents, event.currency)}</td>
-                                <td>{b.units}</td>
+                                <td data-label="Confirmed" className="small">{b.confirmedOn}</td>
+                                <td data-label="Worth">{formatMoney(b.totalCents, event.currency)}</td>
+                                <td data-label={v.Units}>{b.units}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -436,7 +436,7 @@ export default async function PortalInsightsPage({ params }: { params: Promise<{
             </p>
           ) : (
             <div className="table-wrap">
-              <table className="table">
+              <table className="table table-cards">
                 <thead>
                   <tr>
                     <th>Buyer</th>
@@ -450,12 +450,12 @@ export default async function PortalInsightsPage({ params }: { params: Promise<{
                 <tbody>
                   {buyers.map((b) => (
                     <tr key={b.email}>
-                      <td>{b.name}</td>
-                      <td className="small">{b.email}</td>
-                      <td>{b.orders}</td>
-                      <td>{b.units}</td>
-                      <td>{formatMoney(b.totalPaidCents, event.currency)}</td>
-                      <td>
+                      <td data-label="Buyer" className="tc-head">{b.name}</td>
+                      <td data-label="Email" className="small">{b.email}</td>
+                      <td data-label="Bookings">{b.orders}</td>
+                      <td data-label={v.Units}>{b.units}</td>
+                      <td data-label="Total paid">{formatMoney(b.totalPaidCents, event.currency)}</td>
+                      <td data-label={v.Redeemed}>
                         {b.checkedIn}
                         <span className="muted small">/ {b.units}</span>
                       </td>

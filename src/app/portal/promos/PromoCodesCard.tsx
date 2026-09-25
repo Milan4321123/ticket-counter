@@ -356,7 +356,7 @@ export default function PromoCodesCard({ initialCodes, listings, currency }: Pro
           </p>
         ) : (
           <div className="table-wrap">
-            <table className="table">
+            <table className="table table-cards">
               <thead>
                 <tr>
                   <th>Code</th>
@@ -372,18 +372,18 @@ export default function PromoCodesCard({ initialCodes, listings, currency }: Pro
                   const dormant = dormantReason(promo);
                   return (
                     <tr key={promo.id}>
-                      <td>
+                      <td data-label="Code" className="tc-head">
                         <span className="mono">{promo.code}</span>{' '}
                         {dormant && <span className="badge">{dormant}</span>}
                       </td>
-                      <td>{worth(promo)}</td>
-                      <td>{scope(promo)}</td>
-                      <td>
+                      <td data-label="Worth">{worth(promo)}</td>
+                      <td data-label="Works on">{scope(promo)}</td>
+                      <td data-label="Used">
                         {promo.redeemedCount}
                         {promo.maxRedemptions > 0 ? ` / ${promo.maxRedemptions}` : ''}
                       </td>
-                      <td>{promo.expiresOn ?? '—'}</td>
-                      <td style={{ textAlign: 'right' }}>
+                      <td data-label="Last day">{promo.expiresOn ?? '—'}</td>
+                      <td className="tc-actions" style={{ textAlign: 'right' }}>
                         <button
                           type="button"
                           className="btn btn-sm"

@@ -110,7 +110,7 @@ export default function ShopInsightsPanel({ data, currency }: { data: ShopInsigh
       <div className="card anim-fade-up">
         <div className="card-title">Every item</div>
         <div className="si-scroll">
-          <table className="table small si-items">
+          <table className="table small si-items table-cards">
             <thead>
               <tr>
                 <th>Item</th>
@@ -125,20 +125,20 @@ export default function ShopInsightsPanel({ data, currency }: { data: ShopInsigh
             <tbody>
               {items.map((it) => (
                 <tr key={it.tierKey}>
-                  <td>{it.name}</td>
-                  <td>{it.sold}</td>
-                  <td>{formatMoney(it.revenueCents, currency)}</td>
-                  <td>
+                  <td data-label="Item" className="tc-head">{it.name}</td>
+                  <td data-label="Sold">{it.sold}</td>
+                  <td data-label="Revenue">{formatMoney(it.revenueCents, currency)}</td>
+                  <td data-label="Share">
                     <span className="si-share">
                       <span style={{ width: `${it.share}%` }} />
                     </span>
                     {it.share}%
                   </td>
-                  <td className={it.left !== null && it.left <= 5 ? 'si-low' : undefined}>
+                  <td data-label="Left" className={it.left !== null && it.left <= 5 ? 'si-low' : undefined}>
                     {it.left === null ? '∞' : it.left}
                   </td>
-                  <td>{it.collectedPct === null ? '—' : `${it.collectedPct}%`}</td>
-                  <td>{it.rating ? `★ ${it.rating.average.toFixed(1)} (${it.rating.count})` : '—'}</td>
+                  <td data-label="Collected">{it.collectedPct === null ? '—' : `${it.collectedPct}%`}</td>
+                  <td data-label="Rating">{it.rating ? `★ ${it.rating.average.toFixed(1)} (${it.rating.count})` : '—'}</td>
                 </tr>
               ))}
             </tbody>
