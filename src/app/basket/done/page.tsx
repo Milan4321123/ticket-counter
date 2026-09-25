@@ -7,6 +7,7 @@ import { orderPayout } from '@/lib/payout';
 import { paymentQrDataUrl } from '@/lib/paymentQr';
 import { readListingName } from '@/lib/exampleShop';
 import CopyText from './CopyText';
+import { basketRunOrderIds } from '@/lib/basket';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Pay your orders', robots: { index: false, follow: false } };
@@ -19,9 +20,13 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * app, and PayPal where offered. The money never passes through this site,
  * which is why there is one payment per seller rather than one in total.
  */
-export default async function BasketDone({ searchParams }: { searchParams: Promise<{ o?: string; partial?: string }> }) {
-  const { o = '', partial } = await searchParams;
-  const ids = o.split(',').filter((id) => UUID.test(id)).slice(0, 12);
+export default async function BasketDone({
+  searchParams,
+}: {
+  searchParams: Promise<{ o?: string; run?: string; partial?: string }>;
+}) {
+  const { o = '', run = '', partial } = await searchParams;
+  const ids = (run ? (basketRunOrderIds(run) ?? []) : o.split(',')).filter((id) => UUID.test(id)).slice(0, 20);
   const cards = [];
   for (const id of ids) {
     const order = getOrder(id);
@@ -59,18 +64,42 @@ export default async function BasketDone({ searchParams }: { searchParams: Promi
 
   const total = cards.reduce((n, c) => n + c.order.totalCents, 0);
   const currency = cards[0]?.order.currency ?? 'EUR';
+  // Card payments, one per seller: how many are done, and which one is next.
+  const cardOrders = cards.filter((c) => c.order.paymentMode === 'stripe');
+  const paidCount = cards.filter((c) => c.order.status === 'paid').length;
+  const nextCard = cardOrders.find((c) => c.order.status === 'claimed' && c.order.stripeSessionUrl);
 
   return (
     <div className="container section bk">
       <p className="feed-kicker">Orders placed ✓</p>
       <h1 className="page-title">
-        {cards.length === 1 ? 'One payment to make' : `${cards.length} payments — one per shop or event`}
+        {cards.length > 0 && paidCount === cards.length
+          ? 'All paid — thank you!'
+          : cards.length === 1
+            ? 'One payment to make'
+            : `${cards.length} payments — one per shop or event`}
       </h1>
       <p className="muted bk-sub">
         Your items are held. Pay each one below — straight into the seller’s own account — using the reference shown,
         so they can match your payment. Total {formatMoney(total, currency)}. Every order is also in your email and in{' '}
         <Link href="/account">your account</Link>.
       </p>
+      {cardOrders.length > 0 && (
+        <div className="bk-progress">
+          <div className="bk-progress-bar">
+            <span style={{ width: `${Math.round((paidCount / cards.length) * 100)}%` }} />
+          </div>
+          <span>
+            {paidCount} of {cards.length} paid
+          </span>
+          {nextCard && (
+            <a href={nextCard.order.stripeSessionUrl!} className="btn btn-brand">
+              Pay {formatMoney(nextCard.order.totalCents, nextCard.order.currency)} to{' '}
+              {readListingName(nextCard.event.name).name} by card →
+            </a>
+          )}
+        </div>
+      )}
       {partial && (
         <div className="notice notice-warn">
           Some items could not be ordered — they are still in <Link href="/basket">your basket</Link>.
@@ -90,8 +119,23 @@ export default async function BasketDone({ searchParams }: { searchParams: Promi
             </div>
             {c.order.status === 'paid' ? (
               <p className="notice notice-success" style={{ margin: 0 }}>
-                Already paid — thank you.
+                ✓ Paid — thank you. Your {c.event.kind === 'shop' ? 'collection code' : 'tickets'} are in your email and on{' '}
+                <Link href={`/order/${c.order.id}`}>the order page</Link>.
               </p>
+            ) : c.order.paymentMode === 'stripe' ? (
+              c.order.status === 'claimed' && c.order.stripeSessionUrl ? (
+                <p className="bk-card-pay">
+                  <a href={c.order.stripeSessionUrl} className="btn btn-brand">
+                    Pay {formatMoney(c.order.totalCents, c.order.currency)} by card →
+                  </a>
+                  <span className="muted small">On {readListingName(c.event.name).name}’s own secure Stripe page.</span>
+                </p>
+              ) : (
+                <p className="notice notice-warn" style={{ margin: 0 }}>
+                  This card payment was not completed in time, and the items were released.{' '}
+                  <Link href={`/e/${c.event.slug}/checkout`}>Order them again</Link>.
+                </p>
+              )
             ) : (
               <div className="bk-pay-body">
                 <div className="bk-pay-rows">

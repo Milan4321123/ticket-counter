@@ -24,6 +24,8 @@ export interface BasketLine {
   image: string | null;
   /** One of the site's example shops: shown, never ordered. */
   example?: boolean;
+  /** The seller takes cards instantly on their own Stripe account. */
+  card?: boolean;
 }
 
 const KEY = 'mn_basket_v1';

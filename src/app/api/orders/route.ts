@@ -44,6 +44,7 @@ import { VOUCHER_NOTHING_TO_DISCOUNT, VoucherError } from '@/lib/referrals';
 import { createPaypalOrder } from '@/lib/paypal';
 import { sendMarketingConfirmationEmail, sendSubscriptionEmail, sendTicketEmail, sendTransferInstructionsEmail } from '@/lib/email';
 import { createSubscription, isValidEvery, subscriptionOffer } from '@/lib/subscriptions';
+import { addOrderToBasketRun, BASKET_RUN_RE, basketRunPath } from '@/lib/basket';
 import { subscribeDiscountCents } from '@/lib/money';
 import { clientIp, rateLimit } from '@/lib/ratelimit';
 import { BodyTooLargeError, readJsonLimited } from '@/lib/http';
@@ -524,6 +525,11 @@ export async function POST(req: Request) {
       throw e;
     }
 
+    // Part of a basket checkout: join its run, so the payments page — and a
+    // buyer coming back from a seller's card page — finds every order.
+    const rawRun = (raw as Partial<CreateOrderRequest>).basketRun;
+    const basketRun = typeof rawRun === 'string' && BASKET_RUN_RE.test(rawRun) && addOrderToBasketRun(rawRun, order.id) ? rawRun : null;
+
     if (kitchen) setOrderKitchenDetails(order.id, kitchen);
     if (seatPicks.length > 0) {
       try {
@@ -641,8 +647,9 @@ export async function POST(req: Request) {
           buyerEmail: validated.buyerEmail,
           // Stripe fills in {CHECKOUT_SESSION_ID} itself; the return route
           // verifies the session before anything is minted.
-          successUrl: `${base}/api/orders/${order.id}/stripe-return?session_id={CHECKOUT_SESSION_ID}`,
-          cancelUrl: `${base}/order/${order.id}?stripe=cancelled`,
+          // From a basket: back to its payments page, which offers the next.
+          successUrl: `${base}/api/orders/${order.id}/stripe-return?session_id={CHECKOUT_SESSION_ID}${basketRun ? `&run=${basketRun}` : ''}`,
+          cancelUrl: basketRun ? `${base}${basketRunPath(basketRun)}` : `${base}/order/${order.id}?stripe=cancelled`,
           paymentReference: reference,
         });
         setStripeSession(order.id, session.id, session.url);

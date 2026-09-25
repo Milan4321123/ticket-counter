@@ -58,6 +58,8 @@ export interface CreateOrderRequest {
   voucherCode?: string;
   /** Subscribe & save: repeat this order every N days (7, 14 or 28) at the shop's discount. */
   subscribeEvery?: number;
+  /** One checkout of the cross-seller basket (lib/basket) this order belongs to. */
+  basketRun?: string;
   items: { tierId: string; quantity: number }[];
   /**
    * Optional: which of the listing's offered routes the buyer picked —

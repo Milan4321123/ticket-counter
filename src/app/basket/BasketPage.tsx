@@ -21,6 +21,8 @@ interface Group {
   subtotal: number;
   /** An example shop: shown, never ordered. */
   example: boolean;
+  /** The seller takes cards instantly (their own Stripe). */
+  card: boolean;
 }
 
 export default function BasketPage({ customer }: { customer: { name: string; email: string } | null }) {
@@ -31,6 +33,8 @@ export default function BasketPage({ customer }: { customer: { name: string; ema
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  /** 'card' = each seller's own card checkout, one after another; 'transfer' = bank/PayPal details. */
+  const [payWith, setPayWith] = useState<'card' | 'transfer' | null>(null);
 
   const groups = useMemo(() => {
     const map = new Map<string, Group>();
@@ -45,10 +49,12 @@ export default function BasketPage({ customer }: { customer: { name: string; ema
         lines: [],
         subtotal: 0,
         example: false,
+        card: true,
       };
       g.lines.push(l);
       g.subtotal += l.priceCents * l.qty;
       if (l.example) g.example = true;
+      if (!l.card) g.card = false;
       map.set(l.eventId, g);
     }
     return [...map.values()];
@@ -57,6 +63,8 @@ export default function BasketPage({ customer }: { customer: { name: string; ema
   // Example shops sit in the basket to show how it works; only real ones are ordered.
   const orderable = groups.filter((g) => !g.example);
   const total = orderable.reduce((n, g) => n + g.subtotal, 0);
+  const cardCount = orderable.filter((g) => g.card).length;
+  const method: 'card' | 'transfer' = payWith ?? (cardCount > 0 ? 'card' : 'transfer');
   const currency = orderable[0]?.currency ?? groups[0]?.currency ?? 'EUR';
 
   async function checkout(e: React.FormEvent) {
@@ -71,6 +79,15 @@ export default function BasketPage({ customer }: { customer: { name: string; ema
     setErrors({});
     const placed: string[] = [];
     const failed: Record<string, string> = {};
+    const cardPages: string[] = [];
+    // One run for this checkout, so the payments page finds every order.
+    let runId = '';
+    try {
+      const r = await fetch('/api/basket/run', { method: 'POST' });
+      runId = ((await r.json()) as { runId?: string }).runId ?? '';
+    } catch {
+      runId = '';
+    }
     // One order per seller, one after another (each reserves its own stock).
     for (const g of orderable) {
       try {
@@ -87,12 +104,14 @@ export default function BasketPage({ customer }: { customer: { name: string; ema
             marketingOptIn: false,
             ref: '',
             voucherCode: '',
-            payVia: 'transfer',
+            payVia: method === 'card' && g.card ? 'stripe' : 'transfer',
+            ...(runId ? { basketRun: runId } : {}),
           }),
         });
-        const data = (await res.json().catch(() => null)) as { orderId?: string; error?: string } | null;
+        const data = (await res.json().catch(() => null)) as { orderId?: string; error?: string; redirectUrl?: string | null } | null;
         if (!res.ok || !data?.orderId) throw new Error(data?.error ?? 'This part could not be ordered.');
         placed.push(data.orderId);
+        if (data.redirectUrl) cardPages.push(data.redirectUrl);
         removeLines(g.lines.map((l) => l.key));
       } catch (err) {
         failed[g.eventId] = err instanceof Error ? err.message : 'This part could not be ordered.';
@@ -102,7 +121,13 @@ export default function BasketPage({ customer }: { customer: { name: string; ema
     setErrors(failed);
     if (placed.length > 0) {
       const extra = Object.keys(failed).length ? '&partial=1' : '';
-      router.push(`/basket/done?o=${placed.join(',')}${extra}`);
+      // Paying by card: straight to the first seller's card page; Stripe
+      // brings the buyer back to the payments page, which offers the next.
+      if (cardPages.length > 0) {
+        window.location.href = cardPages[0];
+        return;
+      }
+      router.push(runId ? `/basket/done?run=${runId}${extra}` : `/basket/done?o=${placed.join(',')}${extra}`);
     }
   }
 
@@ -210,6 +235,34 @@ export default function BasketPage({ customer }: { customer: { name: string; ema
             <span>Total</span>
             <span>{formatMoney(total, currency)}</span>
           </div>
+          {cardCount > 0 && (
+            <div className="bk-method" role="radiogroup" aria-label="How to pay">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={method === 'card'}
+                className={method === 'card' ? 'is-on' : ''}
+                onClick={() => setPayWith('card')}
+              >
+                <strong>⚡ Pay now by card</strong>
+                <span>
+                  {cardCount === orderable.length
+                    ? `${cardCount === 1 ? 'One card payment' : `${cardCount} quick card payments, one per seller`}`
+                    : `${cardCount} by card now, the rest by bank transfer`}
+                </span>
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={method === 'transfer'}
+                className={method === 'transfer' ? 'is-on' : ''}
+                onClick={() => setPayWith('transfer')}
+              >
+                <strong>🏦 Bank transfer / PayPal</strong>
+                <span>Details and QR codes on the next page</span>
+              </button>
+            </div>
+          )}
           <label htmlFor="bk-name">Your name</label>
           <input id="bk-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" required maxLength={120} />
           <label htmlFor="bk-email">Email — your order confirmations go here</label>
@@ -237,8 +290,9 @@ export default function BasketPage({ customer }: { customer: { name: string; ema
                   : `Place ${orderable.length} orders`}
           </button>
           <p className="muted small" style={{ margin: 0 }}>
-            Your items are held for you. Next you see each seller’s payment details — bank transfer or PayPal — with a
-            QR code for your banking app. Nothing is charged here.
+            {method === 'card'
+              ? 'Each seller has their own secure card page. Pay one, and you come straight back here for the next — the money goes directly to each seller.'
+              : 'Your items are held for you. Next you see each seller’s payment details — bank transfer or PayPal — with a QR code for your banking app. Nothing is charged here.'}
           </p>
           {!customer && (
             <p className="muted small" style={{ margin: 0 }}>

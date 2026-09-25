@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getBaseUrl } from '@/lib/config';
 import { getOrder } from '@/lib/orders';
 import { settleStripeOrder } from '@/lib/stripeOrders';
+import { BASKET_RUN_RE, basketRunOrderIds, basketRunPath } from '@/lib/basket';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     } catch (e) {
       console.error(`Stripe return for order ${id} failed:`, e);
     }
+  }
+  // Paid from a basket checkout: back to its payments page (the next seller).
+  const run = new URL(req.url).searchParams.get('run') ?? '';
+  if (BASKET_RUN_RE.test(run) && basketRunOrderIds(run)?.includes(order.id)) {
+    return NextResponse.redirect(`${base}${basketRunPath(run)}`, 303);
   }
   return NextResponse.redirect(`${base}/order/${order.id}`, 303);
 }

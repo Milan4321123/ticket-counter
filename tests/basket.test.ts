@@ -41,3 +41,30 @@ describe('what can go in the basket', () => {
     assert.equal(basketLineFor(first(s.id).event, first(s.id).tier, 'A', null), null);
   });
 });
+
+describe('basket runs', async () => {
+  const { addOrderToBasketRun, basketRunOrderIds, createBasketRun, basketRunPath } = await import('../src/lib/basket.ts');
+
+  it('collect the orders of one checkout, once each', () => {
+    const run = createBasketRun();
+    assert.match(run, /^[A-Za-z0-9_-]{24,64}$/);
+    assert.deepEqual(basketRunOrderIds(run), []);
+    assert.equal(addOrderToBasketRun(run, 'order-a'), true);
+    assert.equal(addOrderToBasketRun(run, 'order-b'), true);
+    assert.equal(addOrderToBasketRun(run, 'order-a'), true);
+    assert.deepEqual(basketRunOrderIds(run), ['order-a', 'order-b']);
+    assert.equal(basketRunPath(run), `/basket/done?run=${run}`);
+  });
+
+  it('refuse made-up or malformed runs', () => {
+    assert.equal(basketRunOrderIds('A'.repeat(32)), null, 'unknown');
+    assert.equal(basketRunOrderIds('../../etc'), null, 'malformed');
+    assert.equal(addOrderToBasketRun('A'.repeat(32), 'order-x'), false);
+  });
+
+  it('stop at twenty orders', () => {
+    const run = createBasketRun();
+    for (let i = 0; i < 20; i++) assert.equal(addOrderToBasketRun(run, `o${i}`), true);
+    assert.equal(addOrderToBasketRun(run, 'one-too-many'), false);
+  });
+});
