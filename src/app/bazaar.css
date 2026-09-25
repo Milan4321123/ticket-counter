@@ -2061,6 +2061,7 @@
 }
 
 .pk-track {
+  position: relative;
   display: flex;
   gap: 14px;
   overflow-x: auto;
@@ -2427,7 +2428,8 @@
 }
 
 .bp-track {
-  --bp-cols: 5;
+  position: relative;
+  --bp-cols: 5.3;
   --bp-gap: 14px;
   display: grid;
   grid-auto-flow: column;
@@ -2447,6 +2449,13 @@
 }
 
 .bp-tile {
+  --d: 0;
+  opacity: calc(1 - 0.6 * var(--d));
+  transform: scale(calc(1 - 0.08 * var(--d)));
+  transform-origin: center;
+  transition:
+    opacity 0.12s linear,
+    transform 0.12s linear;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -2563,17 +2572,268 @@
 
 @media (max-width: 1000px) {
   .bp-track {
-    --bp-cols: 4;
+    --bp-cols: 4.3;
   }
 }
 
 @media (max-width: 720px) {
   .bp-track {
-    --bp-cols: 2;
+    --bp-cols: 2.28;
     --bp-gap: 12px;
   }
 
   .bp-arrow {
     display: none;
+  }
+}
+
+/* ---- "Coming up" line over the event carousel ---- */
+.pk-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 18px;
+}
+
+.pk-head .feed-kicker {
+  margin: 0;
+}
+
+.pk-count {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.pk {
+  padding-top: 4px;
+}
+
+/* ======================================================================
+   Quick tiles under the carousel: bazaar, sell with us, demo. Bigger than
+   chips, still one row; each with its own tint.
+   ====================================================================== */
+.qt {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding-top: 18px;
+}
+
+.qt-tile {
+  --qt: 251, 191, 36;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(var(--qt), 0.16), transparent 60%),
+    rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+  color: var(--text);
+  transition:
+    transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.25s ease,
+    background-color 0.25s ease;
+}
+
+.qt-tile:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--qt), 0.4),
+    0 12px 30px rgba(0, 0, 0, 0.35);
+}
+
+.qt-tile:active {
+  transform: scale(0.98);
+}
+
+.qt-org {
+  --qt: 52, 211, 153;
+}
+
+.qt-demo {
+  --qt: 167, 139, 250;
+}
+
+.qt-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(var(--qt), 0.16);
+  color: rgb(var(--qt));
+}
+
+.qt-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.qt-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.qt-text strong {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.qt-text span {
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
+/* Phone: three tiles side by side, icon over two short lines. */
+@media (max-width: 720px) {
+  .qt {
+    gap: 8px;
+    padding-top: 14px;
+  }
+
+  .qt-tile {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .qt-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+  }
+
+  .qt-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .qt-text strong {
+    font-size: 0.84rem;
+  }
+
+  .qt-text span {
+    font-size: 0.7rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+/* ======================================================================
+   Shops rail (components/ShopRail): cover cards that swipe like the rest.
+   ====================================================================== */
+.sr-track {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  padding: 4px max(16px, calc((100vw - 1100px) / 2));
+  scroll-padding-inline: max(16px, calc((100vw - 1100px) / 2));
+  outline: none;
+}
+
+.sr-track::-webkit-scrollbar {
+  display: none;
+}
+
+.sr-card {
+  --d: 0;
+  flex: 0 0 calc((min(100vw, 1100px) - 32px - 36px) / 3.3);
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--bg-card);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  scroll-snap-align: start;
+  color: var(--text);
+  opacity: calc(1 - 0.6 * var(--d));
+  transform: scale(calc(1 - 0.08 * var(--d)));
+  transition:
+    opacity 0.12s linear,
+    transform 0.12s linear;
+}
+
+.sr-cover {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #0d0f16;
+}
+
+.sr-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sr-card:hover .sr-cover img {
+  transform: scale(1.05);
+}
+
+.sr-blank {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.35);
+  background: linear-gradient(135deg, rgba(220, 20, 60, 0.3), rgba(0, 56, 147, 0.3));
+}
+
+.sr-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px 12px;
+}
+
+.sr-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sr-meta {
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+@media (max-width: 720px) {
+  .sr-card {
+    flex-basis: calc((100vw - 32px - 12px) / 1.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bp-tile,
+  .sr-card {
+    transform: none;
+    transition: none;
   }
 }

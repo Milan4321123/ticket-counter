@@ -9,6 +9,7 @@
 // somebody touches it. Reduced motion: no auto-advance, no scaling.
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { usePeekDim } from './usePeekDim';
 
 export interface BillboardSlide {
   id: string;
@@ -33,44 +34,8 @@ export default function HomeBillboard({ slides }: { slides: BillboardSlide[] }) 
   const touched = useRef(0);
   const n = slides.length;
 
-  // Dim and shrink each card by how far it hangs outside the visible window:
-  // fully in view = lit, peeking in from an edge = dimmed. Works for one or
-  // two cards in view alike. Written straight to style — no React render per
-  // scroll frame.
-  const paint = useCallback(() => {
-    const el = track.current;
-    if (!el) return;
-    const pad = parseFloat(getComputedStyle(el).paddingLeft) || 0;
-    const left = el.scrollLeft + pad - 2;
-    const right = el.scrollLeft + el.clientWidth - pad + 2;
-    let first = -1;
-    Array.from(el.children).forEach((child, k) => {
-      const c = child as HTMLElement;
-      const out = Math.max(0, left - c.offsetLeft, c.offsetLeft + c.offsetWidth - right);
-      const d = Math.min(1, out / (c.offsetWidth * 0.6));
-      c.style.setProperty('--d', d.toFixed(3));
-      if (first < 0 && d < 0.5) first = k;
-    });
-    setCurrent(Math.max(0, first));
-  }, []);
-
-  useEffect(() => {
-    const el = track.current;
-    if (!el) return;
-    let raf = 0;
-    const onScroll = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(paint);
-    };
-    paint();
-    el.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
-    return () => {
-      el.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
-      cancelAnimationFrame(raf);
-    };
-  }, [paint]);
+  // Lit when in view, dimmed while peeking in from an edge (usePeekDim).
+  usePeekDim(track, setCurrent);
 
   const goTo = useCallback(
     (k: number) => {

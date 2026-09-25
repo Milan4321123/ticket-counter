@@ -4,8 +4,9 @@ import { ensureExampleBazaarOnce } from '@/lib/exampleBazaar';
 import { runSubscriptionSweep } from '@/lib/subscriptions';
 import EventCard from '@/components/EventCard';
 import EventRail from '@/components/EventRail';
-import ItemRail from '@/components/ItemRail';
-import { SHOP_CATEGORIES } from '@/lib/categories';
+import ShopRail from '@/components/ShopRail';
+import type { ShopCardData } from '@/components/ShopRail';
+import { readListingName } from '@/lib/exampleShop';
 import { listShopItems, sortShopItems } from '@/lib/marketItems';
 import type { ShopItem } from '@/lib/marketItems';
 import PlatformAssistant from '@/components/PlatformAssistant';
@@ -164,38 +165,6 @@ function buildRows(listings: EventRow[]): Row[] {
 // Icons — small, single-stroke, and the same weight everywhere.
 // ---------------------------------------------------------------------------
 
-/** Items per department row on the homepage. The row's "See all" goes to the rest. */
-const HOME_RAIL_MAX = 12;
-
-interface DepartmentRail {
-  key: string;
-  title: string;
-  href: string;
-  items: ShopItem[];
-}
-
-/**
- * One row per department that has enough goods to be a row (ItemRail's own
- * floor is three), in the fixed department order, featured order inside each.
- * Items nobody filed on a shelf get a last "More from the bazaar" row.
- */
-function departmentRails(all: ShopItem[]): DepartmentRail[] {
-  const sorted = sortShopItems(all, 'featured');
-  const rails: DepartmentRail[] = SHOP_CATEGORIES.map((c) => ({
-    key: c.key,
-    title: `${c.np} · ${c.label}`,
-    href: `/market?category=${encodeURIComponent(c.key)}`,
-    items: sorted.filter((i) => i.categoryKey === c.key).slice(0, HOME_RAIL_MAX),
-  }));
-  const known = new Set(SHOP_CATEGORIES.map((c) => c.key));
-  rails.push({
-    key: 'other-shelves',
-    title: 'More from the bazaar',
-    href: '/market',
-    items: sorted.filter((i) => !known.has(i.categoryKey)).slice(0, HOME_RAIL_MAX),
-  });
-  return rails.filter((r) => r.items.length >= 3);
-}
 
 // ---------------------------------------------------------------------------
 
@@ -214,7 +183,7 @@ function billboardSlides(
   const today = todayIso();
   const eventSlides: BillboardSlide[] = [];
   for (const e of events) {
-    if (e.kind === 'shop' || isPast(e, today) || eventSlides.length >= 4) continue;
+    if (e.kind === 'shop' || isPast(e, today) || eventSlides.length >= 8) continue;
     const image = listingCoverUrl(e, snapshot.photos.get(e.id));
     if (!image) continue;
     const min = fromPriceCents(snapshot.tiers.get(e.id) ?? [], snapshot.availability.get(e.id));
@@ -250,6 +219,10 @@ function billboardSlides(
       cta: tr('bb.order'),
     });
   }
+  // Events only, so a few running events are never buried under example
+  // goods; the bazaar has its own grid right below. Items stand in only on a
+  // site with no upcoming event to show.
+  if (eventSlides.length > 0) return eventSlides;
   const slides: BillboardSlide[] = [];
   for (let k = 0; k < Math.max(eventSlides.length, itemSlides.length); k++) {
     if (eventSlides[k]) slides.push(eventSlides[k]);
@@ -294,10 +267,30 @@ function pagerItems(items: ShopItem[]): PagerItem[] {
       shop: it.shopName,
       price: it.priceCents === 0 ? 'Free' : fmt(it.priceCents, it.currency),
       subscribe:
-        pct > 0 && it.priceCents > 0 ? `${fmt(it.priceCents - subscribeDiscountCents(pct, it.priceCents), it.currency)} with subscription` : '',
+        pct > 0 && it.priceCents > 0 ? `${fmt(it.priceCents - subscribeDiscountCents(pct, it.priceCents), it.currency)} on subscription` : '',
       example: it.isExample,
     };
   });
+}
+
+/** The shops rail: real shops first, then the site's example ones. */
+function shopCards(events: EventRow[], snapshot: FeedSnapshot): ShopCardData[] {
+  return events
+    .filter((e) => e.kind === 'shop')
+    .map((e) => {
+      const { name, isExample } = readListingName(e.name);
+      const items = (snapshot.tiers.get(e.id) ?? []).filter((t) => t.status !== 'hidden').length;
+      return {
+        id: e.id,
+        href: `/e/${e.slug}`,
+        image: listingCoverUrl(e, snapshot.photos.get(e.id)),
+        name,
+        place: e.city.trim(),
+        items,
+        example: isExample,
+      };
+    })
+    .sort((a, b) => Number(a.example) - Number(b.example) || Number(Boolean(b.image)) - Number(Boolean(a.image)));
 }
 
 export default async function HomePage() {
@@ -321,9 +314,12 @@ export default async function HomePage() {
   // rather than one long row of shop cards. Items, not shops: a visitor sees
   // what is on sale before they have to pick a seller.
   const shopItems = listShopItems();
-  const bazaarRails = departmentRails(shopItems);
   const slides = billboardSlides(events, snapshot, shopItems, tr);
   const picks = pagerItems(shopItems);
+  const shops = shopCards(events, snapshot);
+  const upcoming = events.filter((e) => e.kind !== 'shop' && !isPast(e, todayIso()));
+  const upcomingCount = upcoming.length;
+  const upcomingCities = new Set(upcoming.map((e) => e.city.trim()).filter(Boolean));
   const cities = new Set(events.map((e) => e.city.trim()).filter(Boolean));
 
   return (
@@ -339,22 +335,51 @@ export default async function HomePage() {
           explanations (how paying works, the FAQ) live on /organizers and on
           each checkout, where someone is actually about to use them. */}
       <h1 className="sr-only">{tr('home.title')}</h1>
+      {upcomingCount > 0 && (
+        <div className="container pk-head">
+          <p className="feed-kicker">{tr('pk.kicker')}</p>
+          <p className="pk-count">
+            {upcomingCount} {tr('pk.events', { n: upcomingCount })}
+            {upcomingCities.size > 1 ? ` · ${tr('home.inCities', { n: upcomingCities.size })}` : ''}
+          </p>
+        </div>
+      )}
       <HomeBillboard slides={slides} />
-      <nav className="home-doors container" aria-label={tr('home.title')}>
-        {events.length > 0 && (
-          <span className="home-doors-count">
-            {events.length} {tr('home.onSale')}
-            {cities.size > 1 ? ` ${tr('home.inCities', { n: cities.size })}` : ''}
+      <nav className="qt container" aria-label={tr('home.title')}>
+        <Link href="/market" className="qt-tile qt-bazaar">
+          <span className="qt-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M5 8h14l-1 11H6L5 8Z" />
+              <path d="M9 10V7a3 3 0 0 1 6 0v3" />
+            </svg>
           </span>
-        )}
-        <Link href="/market" className="bz-quick-chip">
-          {tr('home.shop')}
+          <span className="qt-text">
+            <strong>{tr('qt.bazaar')}</strong>
+            <span>{tr('qt.bazaarSub', { n: shopItems.length })}</span>
+          </span>
         </Link>
-        <Link href="/organizers" className="bz-quick-chip">
-          {tr('home.organizers')}
+        <Link href="/organizers" className="qt-tile qt-org">
+          <span className="qt-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M4 20V9l8-5 8 5v11" />
+              <path d="M9 20v-6h6v6" />
+            </svg>
+          </span>
+          <span className="qt-text">
+            <strong>{tr('qt.sell')}</strong>
+            <span>{tr('qt.sellSub')}</span>
+          </span>
         </Link>
-        <Link href="/demo" className="bz-quick-chip">
-          {tr('home.demo')}
+        <Link href="/demo" className="qt-tile qt-demo">
+          <span className="qt-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7L8 5Z" />
+            </svg>
+          </span>
+          <span className="qt-text">
+            <strong>{tr('qt.demo')}</strong>
+            <span>{tr('qt.demoSub')}</span>
+          </span>
         </Link>
       </nav>
 
@@ -368,6 +393,15 @@ export default async function HomePage() {
         items={picks}
         moreHref="/market"
         moreLabel={tr('home.seeAll')}
+      />
+
+      <ShopRail
+        kicker={tr('sr.kicker')}
+        title={tr('sr.title')}
+        shops={shops}
+        moreHref="/market"
+        moreLabel={tr('home.seeAll')}
+        itemsLabel={tr('sr.items')}
       />
 
       <div id="events">
@@ -395,33 +429,8 @@ export default async function HomePage() {
           </section>
         ) : (
           <>
-            {rows.map((row) =>
-              row.key === 'shops' && bazaarRails.length > 0 ? (
-                <section className="section rail-section" key={row.key}>
-                  <div className="container">
-                    <div className="rail-head anim-fade-up">
-                      <p className="feed-kicker">{row.kicker}</p>
-                      <h2 className="feed-section-title">{row.title}</h2>
-                      {row.more && (
-                        <p className="muted small" style={{ margin: '4px 0 0' }}>
-                          <Link href={row.more.href} className="inline-link">
-                            {row.more.label}
-                          </Link>
-                        </p>
-                      )}
-                    </div>
-                    {bazaarRails.map((rail) => (
-                      <ItemRail
-                        key={rail.key}
-                        title={rail.title}
-                        items={rail.items}
-                        href={rail.href}
-                        hrefLabel="See all"
-                      />
-                    ))}
-                  </div>
-                </section>
-              ) : (
+            {/* The shops have their own rail above; these rows are the events. */}
+            {rows.filter((row) => row.key !== 'shops').map((row) => (
               <section className="section rail-section" key={row.key}>
                 <div className="container">
                   <div className="rail-head anim-fade-up">
@@ -451,8 +460,7 @@ export default async function HomePage() {
                   </div>
                 </div>
               </section>
-              )
-            )}
+            ))}
           </>
         )}
       </div>

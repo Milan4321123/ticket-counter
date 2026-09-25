@@ -5,7 +5,8 @@
 // more on a wide one; a swipe (or the arrows) slides the next set in. The
 // columns snap, so a swipe always lands on whole tiles.
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { usePeekDim } from './usePeekDim';
 
 export interface PagerItem {
   key: string;
@@ -29,33 +30,37 @@ export default function BazaarPager({ title, kicker, items, moreHref, moreLabel 
   const track = useRef<HTMLDivElement>(null);
   const [edge, setEdge] = useState({ start: true, end: false, page: 0, pages: 1 });
 
+  /** Width of one column of tiles, and how many columns make a page. */
+  const geometry = useCallback(() => {
+    const el = track.current;
+    if (!el || el.children.length === 0) return null;
+    const a = el.children[0] as HTMLElement;
+    const b = el.children[3] as HTMLElement | undefined;
+    const step = b ? b.offsetLeft - a.offsetLeft : a.offsetWidth;
+    const cols = Math.max(1, Math.floor(parseFloat(getComputedStyle(el).getPropertyValue('--bp-cols')) || 2));
+    const totalCols = Math.ceil(el.children.length / 3);
+    return { step, cols, pages: Math.max(1, Math.ceil(totalCols / cols)) };
+  }, []);
+
   const measure = useCallback(() => {
     const el = track.current;
-    if (!el) return;
-    const pages = Math.max(1, Math.round(el.scrollWidth / el.clientWidth));
+    const g = geometry();
+    if (!el || !g) return;
     setEdge({
       start: el.scrollLeft < 8,
       end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 8,
-      page: Math.round(el.scrollLeft / el.clientWidth),
-      pages,
+      page: Math.min(g.pages - 1, Math.round(el.scrollLeft / (g.step * g.cols))),
+      pages: g.pages,
     });
-  }, []);
+  }, [geometry]);
 
-  useEffect(() => {
-    const el = track.current;
-    if (!el) return;
-    measure();
-    el.addEventListener('scroll', measure, { passive: true });
-    window.addEventListener('resize', measure);
-    return () => {
-      el.removeEventListener('scroll', measure);
-      window.removeEventListener('resize', measure);
-    };
-  }, [measure]);
+  // Tiles swiping in from the edge dim and grow, like the event cards above.
+  usePeekDim(track, measure);
 
   const page = (dir: 1 | -1) => {
     const el = track.current;
-    if (el) el.scrollBy({ left: dir * el.clientWidth, behavior: 'smooth' });
+    const g = geometry();
+    if (el && g) el.scrollBy({ left: dir * g.step * g.cols, behavior: 'smooth' });
   };
 
   if (items.length === 0) return null;
