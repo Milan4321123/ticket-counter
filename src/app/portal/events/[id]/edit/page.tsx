@@ -48,6 +48,7 @@ import { vocabFor } from '@/lib/vocab';
 import { cityLabel, otherShowsByAct, shortDateLabel } from '@/lib/sameAct';
 import GoToTab from './GoToTab';
 import EditorTabs from './EditorTabs';
+import SetupAssistant from './SetupAssistant';
 import DetailsForm from './DetailsForm';
 import { FAQ_SUGGESTIONS_EVENT } from './faqBridge';
 import MediaPanel from './MediaPanel';
@@ -714,7 +715,30 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
           )}
         </div>
 
-        <EditorTabs tabs={tabs} panels={panels} />
+        <EditorTabs
+          tabs={tabs}
+          panels={panels}
+          intro={
+            <SetupAssistant
+              eventId={event.id}
+              kind={event.kind}
+              currency={event.currency}
+              existingTiers={tiers.map((t) => ({
+                tierKey: t.tierKey,
+                name: t.name,
+                priceCents: t.priceCents,
+                cap: t.cap,
+                unlimited: t.unlimited,
+                status: t.status,
+                studentOnly: t.studentOnly,
+                description: t.description,
+                details: t.details,
+                mediaId: t.mediaId,
+                seatsPerUnit: t.seatsPerUnit,
+              }))}
+            />
+          }
+        />
       </div>
     </>
   );

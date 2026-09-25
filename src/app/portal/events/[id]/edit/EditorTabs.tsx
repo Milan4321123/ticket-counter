@@ -53,9 +53,12 @@ const CARD_INFO: Record<string, { icon: string; line: string }> = {
 export default function EditorTabs({
   tabs,
   panels,
+  intro,
 }: {
   tabs: EditorTabDef[];
   panels: Record<string, ReactNode>;
+  /** Shown above the cards on the overview — the setup assistant. */
+  intro?: ReactNode;
 }) {
   // '' = the card overview.
   const [active, setActive] = useState('');
@@ -110,6 +113,7 @@ export default function EditorTabs({
       {/* ---- Overview: every section as a card ---- */}
       {!current && (
         <div className="ed-overview">
+          {intro}
           <div className="ed-progress" aria-label={`${doneCount} of ${required.length} required steps done`}>
             <div className="ed-progress-text">
               <strong>

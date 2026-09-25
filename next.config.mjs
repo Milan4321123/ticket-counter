@@ -64,8 +64,11 @@ const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'X-DNS-Prefetch-Control', value: 'off' },
-  // Door scanner needs the camera; nothing needs mic or location.
-  { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=(), browsing-topics=()' },
+  // The door scanner needs the camera; voice input (components/SpeechInput)
+  // needs the microphone — both for this site only, never for anything it
+  // embeds. "microphone=()" had switched the mic off for EVERY origin, so the
+  // browser refused it before ever asking and no site setting could undo it.
+  { key: 'Permissions-Policy', value: 'camera=(self), microphone=(self), geolocation=(), browsing-topics=()' },
   // Only meaningful over HTTPS (browsers ignore it on http), so it is safe to
   // send always, but we scope it to production to avoid pinning localhost.
   ...(isProd
