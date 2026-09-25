@@ -30,7 +30,7 @@ export interface AskResult {
 const INTENTS: { re: RegExp; link: AskLink }[] = [
   { re: /\b(basket|cart|warenkorb|korb|tokari)\b|टोकरी|बास्केट/i, link: { label: 'Your basket', href: '/basket', icon: '🧺' } },
   { re: /\b(my (orders?|tickets?|account)|account|sign ?in|log ?in|konto|meine (bestellung|tickets)|anmelden|mero (ticket|order|khata))\b|मेरो (टिकट|अर्डर|खाता)|खाता/i, link: { label: 'Your account & tickets', href: '/account', icon: '👤' } },
-  { re: /\b(sell|seller|organi[sz]er|open (a |my )?(shop|store)|create (an? )?(event|shop)|(put|list|add|post|advertise|promote) (my|our|an?)( own)? (event|shop|restaurant|business|concert|program)|anbieten|verkauf|veranstalter|bech(na|nu|chu)|pasal kholn)\w*|बेच्न|पसल खोल्न/i, link: { label: 'Sell with us — free', href: '/organizers', icon: '🚀' } },
+  { re: /\b(sell|seller|organi[sz]er|open (a |my )?(shop|store)|create (an? )?(event|shop)|(put|list|add|post|advertise|promote) (my|our|an?)( own)? (event|shop|restaurant|business|concert|program)|(event|shop|pasal|karyakram|restaurant)\s+(setup|set up|khol\w*|banau\w*|rakh\w*|suru)|setup garn\w*|anbieten|verkauf|veranstalter|bech(na|nu|chu)|pasal kholn)\w*|बेच्न|पसल खोल्न/i, link: { label: 'Sell with us — free', href: '/organizers', icon: '🚀' } },
   { re: /\b(demo|try (it|the app)|ausprobieren|testen)\b|डेमो/i, link: { label: 'Try the demo', href: '/demo', icon: '▶' } },
   { re: /\b(bazaar|bazar|market|basar|groceries|grocery|food|essen|khana|khaja)\b|बजार|खाना/i, link: { label: 'The bazaar', href: '/market', icon: '🛍' } },
   { re: /\b(portal|seller (login|hub)|organi[sz]er (login|sign))\b/i, link: { label: 'Seller sign-in', href: '/portal/login', icon: '🔑' } },

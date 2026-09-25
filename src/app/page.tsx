@@ -9,7 +9,6 @@ import type { ShopCardData } from '@/components/ShopRail';
 import { readListingName } from '@/lib/exampleShop';
 import { listShopItems, sortShopItems } from '@/lib/marketItems';
 import type { ShopItem } from '@/lib/marketItems';
-import PlatformAssistant from '@/components/PlatformAssistant';
 import { listPublishedEvents, mediaUrl } from '@/lib/events';
 import type { EventRow } from '@/lib/events';
 import { loadFeedSnapshot } from '@/lib/feedSnapshot';
@@ -26,7 +25,6 @@ import { formatMoney } from '@/lib/money';
 import type { FeedSnapshot } from '@/lib/feedSnapshot';
 import { listPlatformPosts } from '@/lib/platformPosts';
 import type { PlatformPostRow } from '@/lib/platformPosts';
-import { platformNameFromEnv } from '@/lib/platform';
 
 // The feed reflects live availability — always render fresh.
 export const dynamic = 'force-dynamic';
@@ -339,7 +337,7 @@ export default async function HomePage() {
         </section>
       )}
 
-      <PlatformAssistant brand={platformNameFromEnv()} />
+      {/* No chat bubble here: the Ask bar at the top is this page's assistant. */}
     </>
   );
 }

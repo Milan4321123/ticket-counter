@@ -9161,3 +9161,14 @@ html.tx-wait body {
   font-weight: 700;
   cursor: pointer;
 }
+
+.ab-langs {
+  margin: 4px 0 0;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.82rem;
+}
+
+.ab-idea.is-roman {
+  box-shadow: inset 0 0 0 1px rgba(240, 171, 252, 0.45);
+  background: rgba(217, 70, 239, 0.12);
+}

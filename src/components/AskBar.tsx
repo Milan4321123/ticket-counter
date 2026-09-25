@@ -24,13 +24,14 @@ interface Msg {
   thinking?: boolean;
 }
 
-const W: Record<Lang, { pill: string; hello: string; sub: string; ph: string; ideas: string[]; none: string; opening: string; events: string; shops: string; items: string; close: string; fresh: string }> = {
+const W: Record<Lang, { pill: string; hello: string; sub: string; ph: string; ideas: string[]; none: string; opening: string; events: string; shops: string; items: string; close: string; fresh: string; langs: string }> = {
   en: {
     pill: 'Ask anything — events, momo, how it works…',
     hello: 'Namaste! What are you looking for?',
     sub: 'Find events, shops and food, or ask how anything works.',
     ph: 'Ask or search…',
-    ideas: ['What is MartNepali?', 'Show me how it works (video)', 'Dashain events', 'Momo in Berlin', 'I want to put my event here', 'How do I pay?', 'Open my basket'],
+    ideas: ['What is MartNepali?', 'Show me how it works (video)', 'Dashain events', 'Ma euta event setup garna chahanchhu', 'Berlin ma momo kaha paincha?', 'I want to put my event here', 'How do I pay?', 'Open my basket'],
+    langs: 'Write in English, Deutsch, नेपाली — or Roman Nepali, like the two above.',
     none: 'Nothing matched that — try a different word, a city, or ask a question.',
     opening: 'Opening',
     events: 'Events', shops: 'Shops', items: 'Food & goods', close: 'Close', fresh: 'New chat',
@@ -40,7 +41,8 @@ const W: Record<Lang, { pill: string; hello: string; sub: string; ph: string; id
     hello: 'Namaste! Wonach suchst du?',
     sub: 'Finde Events, Läden und Essen — oder frag, wie etwas funktioniert.',
     ph: 'Fragen oder suchen…',
-    ideas: ['Was ist MartNepali?', 'Zeig mir, wie es geht (Video)', 'Dashain Events', 'Momo in Berlin', 'Ich möchte mein Event hier anbieten', 'Wie bezahle ich?', 'Öffne meinen Warenkorb'],
+    ideas: ['Was ist MartNepali?', 'Zeig mir, wie es geht (Video)', 'Dashain Events', 'Ma euta event setup garna chahanchhu', 'Berlin ma momo kaha paincha?', 'Ich möchte mein Event hier anbieten', 'Wie bezahle ich?', 'Öffne meinen Warenkorb'],
+    langs: 'Schreib auf Deutsch, Englisch, नेपाली — oder Nepali in lateinischen Buchstaben, wie oben.',
     none: 'Nichts gefunden — versuch ein anderes Wort, eine Stadt oder stell eine Frage.',
     opening: 'Öffne',
     events: 'Events', shops: 'Läden', items: 'Essen & Waren', close: 'Schließen', fresh: 'Neuer Chat',
@@ -50,7 +52,8 @@ const W: Record<Lang, { pill: string; hello: string; sub: string; ph: string; id
     hello: 'नमस्ते! तपाईं के खोज्दै हुनुहुन्छ?',
     sub: 'कार्यक्रम, पसल र खाना खोज्नुहोस्, वा कुनै कुरा कसरी चल्छ सोध्नुहोस्।',
     ph: 'सोध्नुहोस् वा खोज्नुहोस्…',
-    ideas: ['MartNepali के हो?', 'यो कसरी चल्छ देखाउनुहोस् (भिडियो)', 'दशैं कार्यक्रम', 'Berlin मा momo', 'मेरो कार्यक्रम यहाँ राख्न चाहन्छु', 'कसरी भुक्तानी गर्ने?', 'मेरो टोकरी खोल्नुहोस्'],
+    ideas: ['MartNepali के हो?', 'यो कसरी चल्छ देखाउनुहोस् (भिडियो)', 'दशैं कार्यक्रम', 'Ma euta event setup garna chahanchhu', 'Berlin ma momo kaha paincha?', 'मेरो कार्यक्रम यहाँ राख्न चाहन्छु', 'कसरी भुक्तानी गर्ने?', 'मेरो टोकरी खोल्नुहोस्'],
+    langs: 'नेपाली, English, Deutsch — वा Roman Nepali मा पनि लेख्न सक्नुहुन्छ, माथिका जस्तै।',
     none: 'केही भेटिएन — अर्को शब्द, सहर, वा प्रश्न सोध्नुहोस्।',
     opening: 'खोल्दै',
     events: 'कार्यक्रम', shops: 'पसल', items: 'खाना र सामान', close: 'बन्द गर्नुहोस्', fresh: 'नयाँ कुराकानी',
@@ -96,7 +99,7 @@ export default function AskBar({ lang = 'en' }: { lang?: Lang }) {
 
   return (
     <>
-      <button type="button" className="ab-pill" onClick={() => setOpen(true)} aria-label={w.pill}>
+      <button type="button" className="ab-pill" onClick={() => setOpen(true)} aria-label={w.pill} translate="no">
         <span className="ab-ring" aria-hidden="true" />
         <span className="ab-pill-in">
           <Orb />
@@ -211,7 +214,7 @@ function AskOverlay({ w, onClose }: { w: (typeof W)['en']; onClose: () => void }
       .filter((g) => g.list.length);
 
   return createPortal(
-    <div className={`ab-overlay${leaving ? ' is-leaving' : ''}`} role="dialog" aria-modal="true" aria-label={w.hello}>
+    <div className={`ab-overlay${leaving ? ' is-leaving' : ''}`} role="dialog" aria-modal="true" aria-label={w.hello} translate="no">
       <div className="ab-aurora" aria-hidden="true" />
       <div className="ab-top">
         <Orb busy={busy} size={30} />
@@ -232,9 +235,16 @@ function AskOverlay({ w, onClose }: { w: (typeof W)['en']; onClose: () => void }
             <Orb size={64} />
             <h2>{w.hello}</h2>
             <p>{w.sub}</p>
+            <p className="ab-langs">{w.langs}</p>
             <div className="ab-ideas">
               {w.ideas.map((i, k) => (
-                <button key={i} type="button" className="ab-idea" style={{ animationDelay: `${0.15 + k * 0.06}s` }} onClick={() => void ask(i)}>
+                <button
+                  key={i}
+                  type="button"
+                  className={`ab-idea${/^(Ma euta|Berlin ma)/.test(i) ? ' is-roman' : ''}`}
+                  style={{ animationDelay: `${0.15 + k * 0.06}s` }}
+                  onClick={() => void ask(i)}
+                >
                   {i}
                 </button>
               ))}

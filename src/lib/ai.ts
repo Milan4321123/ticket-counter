@@ -103,11 +103,27 @@ export async function answerVisitorQuestion(ctx: AssistantContext, question: str
       (ctx.answeredQuestions.length
         ? `Previously answered visitor questions:\n${ctx.answeredQuestions.map((f) => `Q: ${f.question}\nA: ${f.answer}`).join('\n')}\n`
         : '') +
-      (ctx.posts.length ? `Organizer updates:\n${ctx.posts.map((p) => `- ${p}`).join('\n')}\n` : '');
+      (ctx.posts.length ? `Organizer updates:\n${ctx.posts.map((p) => `- ${p}`).join('\n')}\n` : '') +
+      `\nHOW BUYING WORKS ON THIS SITE (true for every listing — you may use it for general questions):\n` +
+      `- No account needed: pick what you want, enter your name and email, and pay.\n` +
+      `- The organizer or shop is the seller; the money goes straight to their own account. The website only provides the page and the tickets, is free for sellers and takes no commission.\n` +
+      `- After the payment is confirmed, the QR ticket (or collection code for a shop) arrives by email. Show it on the phone or on paper at the door or the counter; each code works once.\n` +
+      `- Bought tickets and orders can also be found later under "Your account" (sign in with the same email).\n` +
+      `- For questions the page does not answer, visitors can ask here and the organizer replies; a WhatsApp button may also be on the page.\n`;
 
     const result = await answerWithBestModel(
-      'You answer visitor questions about ONE specific event, using ONLY the event context provided. ' +
-        'Never invent facts — prices, times, policies — that are not in the context. ' +
+      'You are the helper on ONE listing\'s page (an event or a shop). Answer from the listing context first; ' +
+        'for general questions about buying on this site (how to pay, when the ticket arrives, is it safe, do I need ' +
+        'an account, who gets the money) use the HOW BUYING WORKS section. For short everyday or cultural questions ' +
+        'that are clearly about this listing (e.g. "what is Dashain?" on a Dashain event, "what is jhol momo?" in a ' +
+        'momo shop), you may give a brief common-knowledge answer and tie it back to the listing. ' +
+        'Stay within this page. Questions that have NOTHING to do with this listing or with buying here — the ' +
+        'weather, news, sports, homework, other cities, other events or shops, general trivia — are NOT for the ' +
+        'organizer: for those set confident=true and reply kindly in one sentence, in the visitor\'s language, ' +
+        'that you can only help with this listing here and that the homepage has everything else. Only questions ' +
+        'ABOUT this listing that the context cannot answer get confident=false (they go to the organizer). ' +
+        'Never invent facts about THIS listing — prices, times, dates, policies, what is included — that are not in ' +
+        'the context. ' +
         'BUT do answer broad or vague questions ("what do you know?", "tell me about this", "what is this?", ' +
         '"what can you help with?") by summarising what the context DOES contain: the date, the venue, ' +
         'ticket prices, and the kinds of things you can answer. A general question is a real question — ' +
