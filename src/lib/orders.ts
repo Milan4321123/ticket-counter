@@ -878,8 +878,10 @@ export function checkInTicket(rawCode: string, scope?: { eventId?: string }): Ch
       orderId: row.orderId,
     };
     if (row.orderStatus !== 'paid') return { result: 'not_paid', ticket };
-    // Test-mode tickets must never admit anyone once real payments are on.
-    if (row.paymentMode === 'mock' && getPaymentMode() !== 'mock') {
+    // Test-mode tickets must never admit anyone once real payments are on —
+    // except in a try-it demo account, whose payments are ALL simulated and
+    // whose listings can never be published, so nobody real holds its codes.
+    if (row.paymentMode === 'mock' && getPaymentMode() !== 'mock' && !getEventById(row.eventId)?.isDemo) {
       return { result: 'mock_ticket', ticket };
     }
     if (row.checkedInAt) return { result: 'already_checked_in', checkedInAt: row.checkedInAt, ticket };

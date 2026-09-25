@@ -180,7 +180,12 @@ export async function POST(req: Request) {
     // A try-it-yourself demo listing (lib/demo.ts): whatever address was typed,
     // the order gets one nobody can receive mail at, so a demo can never be
     // used to send tickets, reminders or confirmations to a real inbox.
-    if (event.isDemo) validated.buyerEmail = demoAddress('buyer');
+    if (event.isDemo) {
+      // Tagged with their first name ("sita-…@demo.invalid") so the demo's
+      // own orders list reads like a real one — still undeliverable.
+      const first = validated.buyerName.trim().split(/\s+/)[0].toLowerCase().normalize('NFKD').replace(/[^a-z]/g, '').slice(0, 20);
+      validated.buyerEmail = demoAddress(first || 'buyer');
+    }
 
     // Per-ADDRESS throttle, independent of IP. The free path sends a branded
     // email with QR attachments to whatever address is typed, instantly and

@@ -63,7 +63,58 @@ interface Message {
   chips?: string[];
   /** Show the "which listing?" picker under this message. */
   picker?: boolean;
+  /** "Done so far / could still add" — shown once the required steps are in. */
+  progress?: Progress;
+  /** Pages mentioned in a general answer, as buttons (open in a new tab). */
+  links?: { label: string; href: string; icon: string }[];
 }
+
+/**
+ * A general question, not something for the page: "how do I get paid?",
+ * "is it free?", "what is the kitchen screen?", "wie funktioniert…",
+ * "kasari…". Anything with a number or a price in it is page content
+ * ("can you make momo 10 euro?") and stays with the form filling.
+ */
+const GENERAL_Q =
+  /\?\s*$|^\s*(how|what|why|when|where|who|which|can i|could i|do i|does|is it|is there|are there|will|should i|wie|was|warum|wann|wo|kann ich|gibt es|ist es|kasari|ke |k |kina|kaha|kun|कसरी|के |किन|कहाँ)\b/i;
+/** Asking the assistant to DO something ("can you make one up?") is not a general question. */
+const TO_THE_HELPER = /\b(can you|could you|would you|will you|kannst du|können sie|please|bitte|suggest|make (one |it )?up|come up|sample|dummy|example|fill|garnus|dinus|banaidinus|milaidinus)\b/i;
+const PAGE_DATA = /\d|€|\beuro|\b(change|set|make|add|remove|rename|update|put|write)\b.*\b(price|name|title|date|time|ticket|item|description|address|photo)/i;
+
+/** "[label](/path)" in an answer as real links; the editor stays open. */
+function withLinks(text: string) {
+  const out: (string | React.ReactElement)[] = [];
+  const re = /\[([^\]]{1,60})\]\((\/[^)\s]{0,80})\)|\*\*([^*]{1,80})\*\*/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    out.push(
+      m[1] ? (
+        <a key={m.index} href={m[2]} target="_blank" rel="noopener" className="sa-inline">
+          {m[1]}
+        </a>
+      ) : (
+        <strong key={m.index}>{m[3]}</strong>
+      )
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+
+interface Progress {
+  filled: string[];
+  extras: { tab: string; label: string; done: boolean }[];
+}
+
+/** The progress card's own words (the rest of the chat is in T). */
+const PW: Record<Lang, { done: string; more: string; ready: string }> = {
+  en: { done: 'On your page', more: 'Could still add — optional', ready: 'Everything optional is in too 🎉' },
+  de: { done: 'Auf deiner Seite', more: 'Noch möglich — optional', ready: 'Auch alles Optionale ist drin 🎉' },
+  ne: { done: 'तपाईंको पेजमा', more: 'अझै थप्न सकिन्छ — ऐच्छिक', ready: 'ऐच्छिक सबै पनि भयो 🎉' },
+};
 
 interface ListingChoice {
   id: string;
@@ -374,6 +425,9 @@ export default function SetupAssistant({
   const filledOnce = useRef(false);
   const latest = [...messages].reverse().find((m) => m.proposal)?.proposal ?? null;
   const say = (m: Message) => setMessages((prev) => [...prev, m]);
+  const progressRef = useRef<Progress | null>(null);
+  /** Steps the seller said "skip" to in this conversation. */
+  const skipped = useRef(new Set<string>());
 
   async function propose(text: string): Promise<{ proposal?: Proposal; reply?: string; suggested?: boolean; error?: string } | null> {
     const res = await fetch(`/api/portal/events/${eventId}/setup-assistant`, {
@@ -416,8 +470,9 @@ export default function SetupAssistant({
     if (!pending) {
       try {
         const r = await fetch(`/api/portal/events/${eventId}/setup-assistant`, { cache: 'no-store' });
-        const data = (await r.json()) as { missing?: string[] };
-        pending = ORDER.filter((k) => (data.missing ?? []).includes(k));
+        const data = (await r.json()) as { missing?: string[]; progress?: Progress };
+        pending = ORDER.filter((k) => (data.missing ?? []).includes(k) && !skipped.current.has(k));
+        progressRef.current = data.progress ?? null;
       } catch {
         pending = [];
       }
@@ -425,7 +480,7 @@ export default function SetupAssistant({
     if (pending.length === 0) {
       setAsking(null);
       setQueue([]);
-      say({ from: 'bot', text: t.allDone });
+      say({ from: 'bot', text: t.allDone, progress: progressRef.current ?? undefined });
       return;
     }
     // Only photo / publish left: first ask whether the details are right.
@@ -451,6 +506,7 @@ export default function SetupAssistant({
       setAsking(null);
       setQueue([]);
       say({ from: 'bot', text: t.demoPreview, view: `/e/${slug}`, viewLabel: t.buttons.preview, account: true });
+      if (progressRef.current) say({ from: 'bot', text: '', progress: progressRef.current });
     } else if (key === 'publish') {
       setAsking('publish');
       say({ from: 'bot', text: t.q.publish, publishNow: true });
@@ -500,6 +556,7 @@ export default function SetupAssistant({
       setAsking(null);
       setQueue([]);
       say({ from: 'bot', text: t.published, view: `/e/${r.data?.slug ?? slug}` });
+      if (progressRef.current) say({ from: 'bot', text: '', progress: progressRef.current });
       router.refresh();
     } else {
       // Say exactly what is in the way, and offer the section that has it all.
@@ -592,6 +649,37 @@ export default function SetupAssistant({
     }
     // A bare "edit": ask what, and hold the photo / publish steps until they
     // say "done" again — never loop back to "publish?" without answering.
+    // A general question — answered from the site's own knowledge (the same
+    // as the homepage chat), then back to the page right where we were.
+    if (GENERAL_Q.test(text) && !PAGE_DATA.test(text) && !TO_THE_HELPER.test(text) && !DONE_RE.test(text)) {
+      setBusy(true);
+      try {
+        const res = await fetch('/api/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            q: text,
+            from: 'editor',
+            history: messages.slice(-6).map((m) => ({ from: m.from, text: m.text })),
+          }),
+        });
+        const d = (await res.json().catch(() => null)) as {
+          answer?: string | null;
+          note?: string | null;
+          links?: { label: string; href: string; icon: string }[];
+          error?: string;
+        } | null;
+        say({ from: 'bot', text: d?.answer ?? d?.note ?? d?.error ?? t.error, links: d?.links?.slice(0, 4) });
+        // Back to the page, right where we were.
+        const pendingQ = asking ? (t.q as Record<string, string | undefined>)[asking] : undefined;
+        if (pendingQ) say({ from: 'bot', text: pendingQ });
+      } catch {
+        say({ from: 'bot', text: t.offline });
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     if (EDIT_ONLY_RE.test(text)) {
       confirmed.current = false;
       setAsking('confirm');
@@ -603,6 +691,9 @@ export default function SetupAssistant({
       if (asking && FREE_CHAT.has(asking)) {
         if (DONE_RE.test(text) || SKIP_RE.test(text)) {
           if (asking === 'confirm') confirmed.current = true;
+          // "skip" on the photo / publish step: leave it for later instead of
+          // asking the same thing again.
+          if (SKIP_RE.test(text) && asking !== 'confirm') skipped.current.add(asking);
           await askNext();
           return;
         }
@@ -748,7 +839,16 @@ export default function SetupAssistant({
       <div className="sa-log" aria-live="polite">
         {messages.map((m, i) => (
           <div key={i} className={`sa-msg sa-${m.from}`}>
-            {m.text ? <p>{m.text}</p> : null}
+            {m.text ? <p style={{ whiteSpace: 'pre-line' }}>{m.links ? withLinks(m.text) : m.text}</p> : null}
+            {m.links && m.links.length > 0 && (
+              <div className="ks-presets" style={{ marginTop: 8 }}>
+                {m.links.map((l) => (
+                  <a key={l.href} href={l.href} target="_blank" rel="noopener" className="btn btn-sm">
+                    <span aria-hidden="true">{l.icon}</span> {l.label} ↗
+                  </a>
+                ))}
+              </div>
+            )}
             {m.chips && m === last && (
               <div className="ks-presets" style={{ marginTop: 8 }}>
                 {m.chips.map((c) => (
@@ -812,6 +912,49 @@ export default function SetupAssistant({
               <a href={`/portal/apply?event=${eventId}`} className="btn btn-brand btn-sm sa-goto">
                 {t.buttons.account}
               </a>
+            )}
+            {m.progress && (
+              <div className="sa-progress">
+                <p className="sa-progress-h">{(PW[lang] ?? PW.en).done}</p>
+                <div className="sa-progress-done">
+                  {m.progress.filled.map((f) => (
+                    <span key={f} className="sa-chip-done">
+                      ✓ {f}
+                    </span>
+                  ))}
+                  {m.progress.extras
+                    .filter((x) => x.done)
+                    .map((x) => (
+                      <span key={x.label} className="sa-chip-done">
+                        ✓ {x.label}
+                      </span>
+                    ))}
+                </div>
+                {m.progress.extras.some((x) => !x.done) ? (
+                  <>
+                    <p className="sa-progress-h">{(PW[lang] ?? PW.en).more}</p>
+                    <div className="sa-progress-more">
+                      {m.progress.extras
+                        .filter((x) => !x.done)
+                        .map((x) => (
+                          <button
+                            key={x.label}
+                            type="button"
+                            className="sa-chip-add"
+                            onClick={() => {
+                              window.dispatchEvent(new CustomEvent(ASSISTANT_AWAY_EVENT));
+                              window.dispatchEvent(new CustomEvent(GOTO_TAB_EVENT, { detail: x.tab }));
+                            }}
+                          >
+                            ＋ {x.label}
+                          </button>
+                        ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="sa-progress-h">{(PW[lang] ?? PW.en).ready}</p>
+                )}
+              </div>
             )}
             {m.goto && (
               <button

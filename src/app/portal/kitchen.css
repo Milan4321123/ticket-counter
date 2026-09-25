@@ -443,3 +443,15 @@
     animation: none;
   }
 }
+/* Phone: three narrow columns — the stopwatch is one short line. */
+@media (max-width: 720px) {
+  .kb-timer {
+    display: block;
+    font-size: 0.72rem;
+    line-height: 1.25;
+    margin: 2px 0 4px;
+  }
+  .kb-timer-at {
+    display: none;
+  }
+}

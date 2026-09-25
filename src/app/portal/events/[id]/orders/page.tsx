@@ -355,7 +355,8 @@ export default async function PortalOrdersPage({
                       ) : (
                         <StatusBadge status={o.status} />
                       )}
-                      {o.paymentMode === 'mock' && <span className="badge badge-amber">test</span>}
+                      {/* Every demo payment is simulated — no need to say so on each one. */}
+                      {o.paymentMode === 'mock' && !organizer.isDemo && <span className="badge badge-amber">test</span>}
                     </div>
                   </header>
 

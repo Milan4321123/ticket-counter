@@ -299,11 +299,14 @@ export default function KitchenBoard({
                       const word =
                         mode === 'appointment'
                           ? { new: 'booked', cooking: 'in progress', ready: 'finished', done: '' }[t.status]
-                          : { new: 'waiting', cooking: 'cooking', ready: 'ready, waiting', done: '' }[t.status];
+                          : compact
+                            ? { new: '', cooking: '', ready: '', done: '' }[t.status]
+                            : { new: 'waiting', cooking: 'cooking', ready: 'ready, waiting', done: '' }[t.status];
                       return (
                         <p className={`kb-timer${c.level ? ` kb-timer-${c.level}` : ''}`}>
                           <span>
-                            ⏱ {word} {c.mins < 1 ? 'just now' : `${c.mins} min`}
+                            ⏱ {word ? `${word} ` : ''}
+                            {c.mins < 1 ? 'now' : `${c.mins} min`}
                           </span>
                           <span className="kb-timer-at">ordered {berlinTime(t.createdAt)}</span>
                         </p>

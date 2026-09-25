@@ -3,7 +3,9 @@ import { takeAiQuota } from '@/lib/aiQuota';
 import { BodyTooLargeError, readJsonLimited } from '@/lib/http';
 import { clientIp, rateLimit } from '@/lib/ratelimit';
 import { proposeSetup } from '@/lib/setupAssistant';
-import { getEventMedia, getEventTiers } from '@/lib/events';
+import { getEventFaqs, getEventMedia, getEventTiers, listEventPosts } from '@/lib/events';
+import { parseSlotConfig } from '@/lib/kitchen';
+import { parseSeatMap } from '@/lib/seats';
 import { anyPaymentRoute, paymentOptionsFor } from '@/lib/paymentConnections';
 import type { ApiErrorResponse } from '@/lib/types';
 import { requireOrganizerApi, requireOwnedEvent } from '../../../auth';
@@ -80,5 +82,37 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   // A demo never goes live (the platform decides who publishes): its last
   // step is looking at the private preview instead.
   if (e.status !== 'published') missing.push(auth.organizer.isDemo ? 'preview' : 'publish');
-  return NextResponse.json({ missing });
+
+  // What is on the page so far, and the optional extras still open — so the
+  // assistant can say "done: … · could still add: …" once the musts are in.
+  const isShop = e.kind === 'shop';
+  const tiers = getEventTiers(e.id);
+  const media = getEventMedia(e.id);
+  const photos = media.filter((m) => m.mime.startsWith('image/')).length;
+  const videos = media.filter((m) => m.mime.startsWith('video/')).length;
+  const filled = [
+    e.name.trim() && 'Name',
+    isShop ? e.pickupInfo.trim() && 'Pickup details' : e.eventDate && `Date${e.venueName.trim() ? ' & place' : ''}`,
+    e.description.trim() && 'Description',
+    tiers.length > 0 && `${tiers.length} ${isShop ? (tiers.length === 1 ? 'item' : 'items') : tiers.length === 1 ? 'ticket type' : 'ticket types'}`,
+    photos > 0 && `${photos} photo${photos === 1 ? '' : 's'}`,
+    anyPaymentRoute(paymentOptionsFor(e)) && 'Payment details',
+    e.status === 'published' && 'Published',
+  ].filter(Boolean) as string[];
+  const slots = parseSlotConfig(e.pickupSlots);
+  const extras: { tab: string; label: string; done: boolean }[] = [
+    { tab: 'media', label: videos ? `${videos} video${videos === 1 ? '' : 's'}` : 'A short video', done: videos > 0 },
+    ...(photos < 3 ? [{ tab: 'media', label: 'More photos (3+ sell better)', done: false }] : []),
+    { tab: 'updates', label: 'An update for buyers', done: listEventPosts(e.id).length > 0 },
+    { tab: 'faq', label: 'FAQ — answers before people ask', done: getEventFaqs(e.id).length > 0 },
+    { tab: 'design', label: 'Colours & layout', done: Boolean(e.pageDesign && e.pageDesign !== '{}') },
+    ...(isShop
+      ? [
+          { tab: 'kitchen', label: slots.purpose === 'appointment' ? 'Booking times' : 'Pick-up times & options', done: slots.enabled },
+          { tab: 'subscribe', label: 'Subscribe & save', done: e.subscribePct > 0 },
+        ]
+      : [{ tab: 'seating', label: 'A seat map', done: Boolean(parseSeatMap(e.seatMap)?.enabled) }]),
+    { tab: 'languages', label: 'Deutsch & नेपाली versions', done: false },
+  ];
+  return NextResponse.json({ missing, progress: { filled, extras } });
 }
