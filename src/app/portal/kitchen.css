@@ -60,11 +60,6 @@
   align-items: start;
 }
 
-@media (max-width: 860px) {
-  .kb-cols {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
 
 .kb-col {
   display: grid;
@@ -238,4 +233,178 @@
   justify-content: space-between;
   gap: 10px;
   align-items: center;
+}
+
+
+/* ---------- Phone: three narrow columns, tap to move ----------
+   The whole board fits one screen, like the ticket rail on a pass: a card
+   is tapped and slides into the next column (FLIP in KitchenBoard). */
+.kb-hint {
+  display: none;
+}
+
+.kb-tap-foot {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .kb-bar-title {
+    font-size: 0.95rem;
+  }
+
+  .kb-bar-actions .btn {
+    padding: 6px 10px;
+    font-size: 0.78rem;
+  }
+
+  .kb-hint {
+    display: block;
+    margin: -4px 0 10px;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+  }
+
+  .kb-cols {
+    gap: 6px;
+  }
+
+  .kb-col {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    gap: 6px;
+    padding: 6px;
+    border-radius: 12px;
+    border-top-width: 3px;
+    min-height: 55vh;
+    align-content: start;
+  }
+
+  .kb-col-head {
+    font-size: 0.62rem;
+    letter-spacing: 0.04em;
+    padding: 2px 2px 0;
+  }
+
+  .kb-count {
+    min-width: 0;
+    padding: 1px 7px;
+  }
+
+  .kb-empty {
+    font-size: 0.7rem;
+  }
+
+  .kb-card {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    gap: 4px;
+    padding: 8px;
+    border-radius: 10px;
+    overflow-wrap: anywhere;
+  }
+
+  .kb-card-top,
+  .kb-items li > span:last-child {
+    min-width: 0;
+  }
+
+  .kb-card-tap {
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.12s ease;
+  }
+
+  .kb-card-tap:active {
+    transform: scale(0.96);
+  }
+
+  .kb-card-top {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .kb-when {
+    font-size: 0.82rem;
+    line-height: 1.15;
+  }
+
+  .kb-ref {
+    font-size: 0.66rem;
+  }
+
+  .kb-name {
+    font-size: 0.72rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .kb-items {
+    gap: 2px;
+    font-size: 0.72rem;
+    line-height: 1.25;
+  }
+
+  .kb-items li {
+    gap: 3px;
+  }
+
+  .kb-qty {
+    min-width: 0;
+  }
+
+  .kb-items em {
+    font-size: 0.64rem;
+  }
+
+  .kb-note {
+    padding: 4px 6px;
+    font-size: 0.66rem;
+    border-radius: 6px;
+  }
+
+  .kb-actions {
+    display: none;
+  }
+
+  .kb-tap-foot {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    margin-top: 2px;
+  }
+
+  .kb-tap-go {
+    flex: 1;
+    min-width: 0;
+    padding: 5px 2px;
+    letter-spacing: -0.01em;
+    border-radius: 7px;
+    background: var(--brand-soft, rgba(220, 20, 60, 0.15));
+    color: var(--brand-text, #fda4af);
+    text-align: center;
+    font-size: 0.64rem;
+    font-weight: 800;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .kb-col-ready .kb-tap-go {
+    background: var(--green-soft, rgba(16, 185, 129, 0.15));
+    color: var(--green, #34d399);
+  }
+
+  .kb-tap-back {
+    flex: none;
+    width: 20px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
 }
