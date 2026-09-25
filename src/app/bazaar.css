@@ -3144,3 +3144,299 @@
 .item-visit-shop:hover .item-visit-go {
   transform: translateX(3px);
 }
+
+/* ======================================================================
+   /account — customer sign-in and "my orders".
+   ====================================================================== */
+.acc {
+  max-width: 720px;
+}
+
+.acc-card {
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 26px;
+  border-radius: 22px;
+  background: var(--bg-card);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.acc-card .page-title {
+  margin: 4px 0 6px;
+}
+
+.acc-signin {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.acc-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 46px;
+  border-radius: 12px;
+  background: #fff;
+  color: #1f1f1f;
+  font-weight: 700;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.acc-google:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+}
+
+.acc-google svg {
+  width: 20px;
+  height: 20px;
+}
+
+.acc-or {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+.acc-or::before,
+.acc-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-soft);
+}
+
+.acc-form {
+  display: grid;
+  gap: 8px;
+}
+
+.acc-form label {
+  font-size: 0.88rem;
+  color: var(--text-dim);
+}
+
+.acc-form input {
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+}
+
+.acc-form input:focus {
+  outline: 2px solid rgba(96, 165, 250, 0.7);
+  outline-offset: 1px;
+}
+
+.acc-code {
+  text-align: center;
+  font-size: 1.5rem !important;
+  letter-spacing: 0.4em;
+  font-family: ui-monospace, Menlo, monospace;
+}
+
+.acc-link {
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.acc-error {
+  margin: 0;
+  color: #f87171;
+  font-size: 0.88rem;
+}
+
+.acc-seller {
+  margin: 18px 0 0;
+  text-align: center;
+}
+
+.acc-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.acc-head .page-title {
+  margin: 2px 0 4px;
+}
+
+.acc-head p.muted {
+  margin: 0;
+}
+
+.acc-section {
+  margin-top: 22px;
+}
+
+.acc-section h2 {
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.acc-orders {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.acc-order {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--bg-card);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.acc-order:hover {
+  transform: translateY(-1px);
+  box-shadow: inset 0 0 0 1px rgba(220, 20, 60, 0.4);
+}
+
+.acc-order-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 1.1rem;
+  flex: none;
+}
+
+.acc-order-main {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.acc-order-main strong {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.acc-order-main span {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+.acc-order-side {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  flex: none;
+}
+
+.acc-manage {
+  color: #34d399;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.acc-empty {
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px dashed var(--border);
+  color: var(--text-dim);
+}
+
+.acc-empty p {
+  margin: 0 0 10px;
+}
+
+.acc-empty p:last-child {
+  margin: 0;
+}
+
+.acc-name {
+  display: flex;
+  gap: 8px;
+}
+
+.acc-name input {
+  flex: 1;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font: inherit;
+}
+
+@media (max-width: 480px) {
+  .acc-card {
+    padding: 20px;
+  }
+}
+
+/* The customer account icon in the header, with a dot when signed in. */
+.gn-account {
+  position: relative;
+}
+
+.gn-account-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #34d399;
+  box-shadow: 0 0 0 2px rgba(12, 13, 18, 0.9);
+}
+
+@media (max-width: 380px) {
+  .gn-tools .gn-icon,
+  .gn-tools .gn-org {
+    width: 32px;
+  }
+}
+
+/* Rows given the swipe effect by components/SwipeFx: whatever peeks in from
+   an edge is dimmed and a little smaller, and brightens as it scrolls in. */
+.swipe-fx {
+  position: relative;
+}
+
+.swipe-fx > * {
+  opacity: calc(1 - 0.55 * var(--d, 0));
+  transform: scale(calc(1 - 0.06 * var(--d, 0)));
+  transition:
+    opacity 0.12s linear,
+    transform 0.12s linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .swipe-fx > * {
+    transform: none;
+    transition: none;
+  }
+}

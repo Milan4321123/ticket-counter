@@ -11,6 +11,7 @@ import { expireOverdueTransferReservations } from '@/lib/orders';
 import { getOrganizer } from '@/lib/organizers';
 import { paymentOptionsFor } from '@/lib/paymentConnections';
 import { subscriptionOffer } from '@/lib/subscriptions';
+import { currentCustomer } from '@/lib/customers';
 import { availableSlots, cleanTableLabel, parseChoices, parseSlotConfig } from '@/lib/kitchen';
 import { parseSeatMap, takenSeats } from '@/lib/seats';
 import { currentLang } from '@/lib/i18nServer';
@@ -142,6 +143,7 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
         }
       : null;
 
+  const customer = event.isDemo ? null : await currentCustomer();
   const liveMedia = new Set(getEventMedia(event.id).map((m) => m.id));
 
   return (
@@ -183,6 +185,7 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
       availability={availability}
       kitchen={kitchen}
       subscribe={tableFromQr ? null : subscriptionOffer(event)}
+      customer={customer ? { name: customer.name, email: customer.email } : null}
       lang={await currentLang()}
       seating={seating}
       payment={{

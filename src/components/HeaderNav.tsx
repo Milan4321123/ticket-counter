@@ -16,6 +16,9 @@ interface Props {
   search: string;
   /** The language switch, placed with the other tools on the right. */
   lang?: ReactNode;
+  /** "Your account" — the customer's orders (/account). */
+  account: string;
+  signedIn?: boolean;
 }
 
 function sectionOf(path: string): 0 | 1 | -1 {
@@ -24,7 +27,7 @@ function sectionOf(path: string): 0 | 1 | -1 {
   return -1;
 }
 
-export default function HeaderNav({ events, bazaar, organizer, organizerShort, search, lang }: Props) {
+export default function HeaderNav({ events, bazaar, organizer, organizerShort, search, lang, account, signedIn = false }: Props) {
   const path = usePathname() ?? '/';
   const [active, setActive] = useState(sectionOf(path));
   // Follow real navigation (back button, links elsewhere on the page).
@@ -57,10 +60,18 @@ export default function HeaderNav({ events, bazaar, organizer, organizerShort, s
             <path d="m16 16 4 4" />
           </svg>
         </Link>
-        <Link href="/portal" className="gn-org" aria-label={organizer} title={organizer}>
+        <Link href="/account" className="gn-icon gn-account" aria-label={account} title={account}>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="12" cy="8.5" r="3.5" />
             <path d="M5 19.5a7 7 0 0 1 14 0" />
+          </svg>
+          {signedIn ? <span className="gn-account-dot" aria-hidden="true" /> : null}
+        </Link>
+        <Link href="/portal" className="gn-org" aria-label={organizer} title={organizer}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 9.5 5.5 5h13L20 9.5" />
+            <path d="M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0" />
+            <path d="M5.5 12v7h13v-7M10 19v-4h4v4" />
           </svg>
           <span className="gn-org-label">{organizerShort}</span>
         </Link>

@@ -44,6 +44,7 @@ import {
 import type { SearchParams } from '@/lib/marketQuery';
 import { platformNameFromEnv } from '@/lib/platform';
 import { vocabFor } from '@/lib/vocab';
+import SwipeFx from '@/components/SwipeFx';
 
 // The public bazaar, goods-first: every item every published shop sells, on
 // one page, the moment it opens — searchable, filterable and sortable.
@@ -404,6 +405,9 @@ export default async function MarketPage({ searchParams }: Props) {
 
   return (
     <>
+      {/* The sideways rows (departments, shops, filters, item rails) swipe
+          like the homepage's: edges dimmed, a one-time nudge. */}
+      <SwipeFx selector=".bz-chips, .bz-rail-track" />
       {/* Only on the page Google is allowed to keep. Every filtered slice is
           noindex (see generateMetadata), and handing a crawler a product list
           for a page we have just asked it to forget is noise at best. */}

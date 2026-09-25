@@ -167,6 +167,8 @@ interface Props {
   lang?: Lang;
   /** Subscribe & save (lib/subscriptions): the shop's repeat discount, or null when it offers none. */
   subscribe?: { pct: number } | null;
+  /** The signed-in customer, to pre-fill name and email. */
+  customer?: { name: string; email: string } | null;
 }
 
 export interface CheckoutSlot {
@@ -347,6 +349,7 @@ export default function CheckoutClient({
   seating = null,
   lang = 'en',
   subscribe = null,
+  customer = null,
 }: Props) {
   const tr = translator(lang);
   const router = useRouter();
@@ -364,8 +367,9 @@ export default function CheckoutClient({
       ])
     )
   );
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  // A signed-in customer (lib/customers) starts with their own details filled in.
+  const [name, setName] = useState(customer?.name ?? '');
+  const [email, setEmail] = useState(customer?.email ?? '');
   // ---- Restaurant pack: slot, choices, note (shops only) ----
   const slotsRequired = Boolean(kitchen && kitchen.slots.length > 0 && !kitchen.table);
   const firstOpenDay = kitchen?.slots.find((d) => d.slots.some((sl) => sl.open))?.date ?? kitchen?.slots[0]?.date ?? '';

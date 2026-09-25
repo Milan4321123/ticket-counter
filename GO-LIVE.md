@@ -310,3 +310,22 @@ Why: those listings are published, priced and open for orders, exactly like a re
 The seeding script checks the payment mode once, at the moment it runs, and refuses to seed in any other mode. It has no way to check again afterwards, and these rows are meant to stay up for months. `--clean` is the one action that removes the dependency. It needs no flag, works on production exactly as it does locally, and removes only rows whose id begins with `seed-bazaar-`.
 
 Have a great launch!
+
+## 9. Customer accounts (sign in with email code or Google)
+
+Buyers can open **/account** (the person icon in the header) and sign in with a
+six-digit code sent to their email — this works as soon as email sending works.
+Their account lists every order and ticket made with that address, their
+Subscribe & save subscriptions, and fills in name and email at checkout.
+
+**Google sign-in (optional):**
+
+1. Google Cloud Console → *APIs & Services* → *OAuth consent screen*: app name
+   MartNepali, your support email, scopes `email`, `profile`, `openid`. Publish it.
+2. *Credentials* → *Create credentials* → *OAuth client ID* → *Web application*.
+   Authorised redirect URI: `https://www.martnepali.com/api/account/google/callback`
+3. In Render → Environment, set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+   The "Continue with Google" button appears on /account after the redeploy.
+
+Phone-number sign-in is not built: texting codes to any number needs a paid
+SMS provider (every message costs money), which the free site avoids.

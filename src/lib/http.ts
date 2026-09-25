@@ -60,3 +60,20 @@ export async function readJsonLimited(req: Request, maxBytes = 16 * 1024): Promi
   }
   return JSON.parse(new TextDecoder().decode(buf));
 }
+
+/**
+ * A state-changing request must come from this site: when the browser names
+ * an Origin, it has to be ours (the request's own host or the configured base
+ * URL). No Origin at all is a non-browser client and is left to the route's
+ * other checks, as in api/demo/start.
+ */
+export function fromThisSite(req: Request, baseUrl: string): boolean {
+  const origin = req.headers.get('origin');
+  if (!origin) return true;
+  try {
+    const host = new URL(origin).host;
+    return host === new URL(req.url).host || host === new URL(baseUrl).host;
+  } catch {
+    return false;
+  }
+}

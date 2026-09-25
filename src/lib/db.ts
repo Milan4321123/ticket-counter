@@ -280,6 +280,7 @@ function createDb(): Database.Database {
   migrateKitchen(db);
   migrateSeats(db);
   migrateSubscriptions(db);
+  migrateCustomers(db);
   return db;
 }
 
@@ -1400,6 +1401,30 @@ function migrateSubscriptions(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_subscriptions_due ON subscriptions(status, next_on);
     CREATE INDEX IF NOT EXISTS idx_subscriptions_event ON subscriptions(event_id);
+  `);
+}
+
+/**
+ * Customer accounts (lib/customers.ts): a buyer who signed in with a code sent
+ * to their email, or with Google. The account is the verified ADDRESS — their
+ * orders are the ones carrying it.
+ */
+function migrateCustomers(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS customers (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      name TEXT NOT NULL DEFAULT '',
+      google_sub TEXT UNIQUE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      last_login_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS customer_login_codes (
+      email TEXT PRIMARY KEY COLLATE NOCASE,
+      code_hash TEXT NOT NULL,
+      expires_at INTEGER NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0
+    );
   `);
 }
 

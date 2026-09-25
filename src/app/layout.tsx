@@ -20,6 +20,7 @@ import './bazaar.css';
 import { ServiceWorkerRegistrar } from '@/components/AppInstall';
 import { Suspense } from 'react';
 import HeaderNav from '@/components/HeaderNav';
+import { currentCustomer } from '@/lib/customers';
 import LangSwitch from '@/components/LangSwitch';
 import { translator } from '@/lib/i18n';
 import { currentLang } from '@/lib/i18nServer';
@@ -146,6 +147,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               organizer={tr('nav.organizer')}
               organizerShort={tr('nav.organizer.short')}
               search={tr('nav.search')}
+              account={tr('nav.account')}
+              signedIn={Boolean(await currentCustomer())}
               lang={
                 <div className="lang-switch-header">
                   <Suspense fallback={null}>

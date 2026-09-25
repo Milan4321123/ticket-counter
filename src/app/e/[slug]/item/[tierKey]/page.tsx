@@ -47,6 +47,7 @@ import { readListingName } from '@/lib/exampleShop';
 import { getAvailability } from '@/lib/inventory';
 import { socialImageUrl } from '@/lib/listing';
 import { listShopItems } from '@/lib/marketItems';
+import SwipeFx from '@/components/SwipeFx';
 import { formatMoney, subscribeDiscountCents } from '@/lib/money';
 import { subscriptionOffer } from '@/lib/subscriptions';
 import { getOrganizer } from '@/lib/organizers';
@@ -442,6 +443,7 @@ export default async function ItemPage({ params, searchParams }: Params) {
 
   return (
     <div className="container item-page" style={{ ...theme } as React.CSSProperties}>
+      <SwipeFx selector=".bz-rail-track" />
       <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(productLd)} />
       <script
         type="application/ld+json"

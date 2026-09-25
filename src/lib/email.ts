@@ -3394,3 +3394,31 @@ export async function sendSubscriptionEmail(
     return { sent: false, reason: 'error' };
   }
 }
+
+/** The six-digit sign-in code for a customer account (lib/customers). */
+export async function sendCustomerLoginCodeEmail(email: string, code: string): Promise<{ sent: boolean; reason?: string }> {
+  try {
+    if (!isEmailConfigured()) return { sent: false, reason: 'email-not-configured' };
+    const headline = `${code} is your sign-in code`;
+    const line = `Enter it on ${platformName()} to open your orders. It works for 10 minutes. If you did not ask for it, ignore this email — nothing happens without the code.`;
+    return await sendMailAs('buyers', {
+      replyTo: replyToBuyers(),
+      to: email,
+      subject: headline,
+      text: renderText({ headline, lines: [wrapText(line)] }),
+      html: renderEmail({
+        title: headline,
+        preheader: line,
+        kicker: 'Your account',
+        headline,
+        bodyHtml:
+          `<p style="margin:0 0 18px;font-size:34px;font-weight:800;letter-spacing:8px;font-family:ui-monospace,Menlo,monospace">${code}</p>` +
+          pHtml(escapeHtml(line), 0),
+        footerLines: [escapeHtml(platformName())],
+      }),
+    });
+  } catch (e) {
+    console.error('sendCustomerLoginCodeEmail failed:', e);
+    return { sent: false, reason: 'error' };
+  }
+}

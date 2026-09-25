@@ -1,0 +1,151 @@
+import Link from 'next/link';
+import { currentCustomer, googleSignInConfigured, ordersForCustomer, subscriptionsForCustomer } from '@/lib/customers';
+import { formatMoney } from '@/lib/money';
+import { orderUrlForBuyerEmail } from '@/lib/orders';
+import { readListingName } from '@/lib/exampleShop';
+import { everyLabel } from '@/lib/subscriptions';
+import SignInForm from './SignInForm';
+
+export const dynamic = 'force-dynamic';
+export const metadata = { title: 'Your account', robots: { index: false, follow: false } };
+
+const ERRORS: Record<string, string> = {
+  'google-off': 'Google sign-in is not switched on here yet — use your email instead.',
+  'google-state': 'That Google sign-in took too long or came from another tab — please try again.',
+  'google-token': 'Google did not confirm the sign-in — please try again.',
+  'google-email': 'Your Google account has no verified email address.',
+};
+
+function statusLabel(status: string, mode: string): { text: string; tone: string } {
+  if (status === 'paid') return { text: 'Paid', tone: 'green' };
+  if (mode === 'transfer') return { text: 'Waiting for payment', tone: 'amber' };
+  return { text: 'In progress', tone: 'amber' };
+}
+
+/**
+ * The customer's own page: every order made with their (verified) email,
+ * their Subscribe & save subscriptions, and sign-out. Signed out, it is the
+ * sign-in card — a code by email, or Google.
+ */
+export default async function AccountPage({ searchParams }: { searchParams: Promise<{ error?: string; saved?: string }> }) {
+  const { error, saved } = await searchParams;
+  const customer = await currentCustomer();
+
+  if (!customer) {
+    return (
+      <div className="container section acc">
+        <div className="acc-card anim-fade-up">
+          <p className="feed-kicker">Your account</p>
+          <h1 className="page-title">Sign in</h1>
+          <p className="muted">
+            See every order and ticket in one place, manage subscriptions, and check out faster. No password — we send
+            you a code.
+          </p>
+          {error && ERRORS[error] && <div className="notice notice-error">{ERRORS[error]}</div>}
+          <SignInForm google={googleSignInConfigured()} />
+          <p className="muted small acc-seller">
+            Selling here? <Link href="/portal/login">Organizer sign-in →</Link>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const orders = ordersForCustomer(customer.email);
+  const subs = subscriptionsForCustomer(customer.email);
+  const first = customer.name.split(/\s+/)[0] || '';
+
+  return (
+    <div className="container section acc">
+      <header className="acc-head anim-fade-up">
+        <div>
+          <p className="feed-kicker">Your account</p>
+          <h1 className="page-title">{first ? `Namaste, ${first}` : 'Your orders'}</h1>
+          <p className="muted">{customer.email}</p>
+        </div>
+        <form method="post" action="/api/account/logout">
+          <button className="btn btn-sm">Sign out</button>
+        </form>
+      </header>
+
+      {saved && <div className="notice notice-success">Saved.</div>}
+
+      <section className="acc-section anim-fade-up anim-d1">
+        <h2>Orders &amp; tickets</h2>
+        {orders.length === 0 ? (
+          <div className="acc-empty">
+            <p>Nothing yet. Orders you place with {customer.email} show up here.</p>
+            <p>
+              <Link href="/" className="btn btn-sm">
+                Browse events
+              </Link>{' '}
+              <Link href="/market" className="btn btn-sm">
+                Shop the bazaar
+              </Link>
+            </p>
+          </div>
+        ) : (
+          <ul className="acc-orders">
+            {orders.map((o) => {
+              const st = statusLabel(o.status, o.paymentMode);
+              return (
+                <li key={o.id}>
+                  <a href={orderUrlForBuyerEmail(o.id)} className="acc-order">
+                    <span className="acc-order-icon" aria-hidden="true">
+                      {o.kind === 'shop' ? '🛍' : '🎟'}
+                    </span>
+                    <span className="acc-order-main">
+                      <strong>{readListingName(o.eventName).name}</strong>
+                      <span>
+                        {o.items} {o.kind === 'shop' ? (o.items === 1 ? 'item' : 'items') : o.items === 1 ? 'ticket' : 'tickets'}
+                        {o.kind !== 'shop' && o.dateDisplay ? ` · ${o.dateDisplay}` : ''} · {o.createdAt.slice(0, 10)}
+                      </span>
+                    </span>
+                    <span className="acc-order-side">
+                      <b>{formatMoney(o.totalCents, o.currency)}</b>
+                      <span className={`badge badge-${st.tone}`}>{st.text}</span>
+                    </span>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      {subs.length > 0 && (
+        <section className="acc-section anim-fade-up anim-d2">
+          <h2>Subscribe &amp; save</h2>
+          <ul className="acc-orders">
+            {subs.map((s) => (
+              <li key={s.token}>
+                <Link href={`/subscription/${s.token}`} className="acc-order">
+                  <span className="acc-order-icon" aria-hidden="true">
+                    ↻
+                  </span>
+                  <span className="acc-order-main">
+                    <strong>{readListingName(s.eventName).name}</strong>
+                    <span>
+                      {everyLabel(s.everyDays)} · {s.discountPct}% off · {s.status === 'active' ? `next ${s.nextOn}` : s.status}
+                    </span>
+                  </span>
+                  <span className="acc-order-side">
+                    <span className="acc-manage">Manage →</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="acc-section anim-fade-up anim-d2">
+        <h2>Your name at checkout</h2>
+        <form method="post" action="/api/account/name" className="acc-name">
+          <input name="name" defaultValue={customer.name} placeholder="Your name" maxLength={120} aria-label="Your name" />
+          <button className="btn btn-sm">Save</button>
+        </form>
+      </section>
+    </div>
+  );
+}
