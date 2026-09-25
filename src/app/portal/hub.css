@@ -1852,3 +1852,61 @@
 .hub-board-head {
   margin-bottom: 20px;
 }
+
+/* The demo picker's extra copies exist only for the endless swipe on a phone. */
+@media (min-width: 721px) {
+  .dp-clone {
+    display: none !important;
+  }
+}
+
+/* Phone: the tool board's and editor's cards get the same round arrow as
+   the homepage tiles, in the card's own colour. */
+@media (max-width: 720px) {
+  .hub-board-tool,
+  .ed-card {
+    padding-bottom: 44px !important;
+  }
+
+  .hub-board-tool::after,
+  .ed-card::after {
+    content: '→';
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+    color: var(--text);
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  .hub-board-edit::after {
+    background: rgba(220, 20, 60, 0.16);
+    color: #f87171;
+  }
+
+  .hub-board-orders::after,
+  .hub-board-checkin::after,
+  .ed-card-done::after {
+    background: rgba(16, 185, 129, 0.16);
+    color: #34d399;
+  }
+
+  .hub-board-insights::after,
+  .hub-board-live::after {
+    background: rgba(96, 165, 250, 0.16);
+    color: #60a5fa;
+  }
+
+  .hub-board-kitchen::after,
+  .ed-card-todo::after {
+    background: rgba(251, 191, 36, 0.16);
+    color: #fbbf24;
+  }
+}
