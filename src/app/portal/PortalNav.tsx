@@ -24,35 +24,43 @@ interface Props {
  * Slim portal sub-header shown on every organizer portal page, under the
  * main site header. Rows scroll sideways on small screens.
  */
-export default function PortalNav({ event, tab }: Props) {
-  // The account-wide links (Home, Reviews, Codes, Statements, Settings, Sign
-  // out) live in the hub sidebar now (./HubSidebar, mounted by ./layout). What
-  // is left here is what belongs to ONE page: the demo strip, and — on a
-  // listing's pages — that listing's name and its own tabs.
+export default function PortalNav({ active, event, tab }: Props) {
+  // The hub has no sidebar: the home screen's cards lead everywhere, and this
+  // line is the way back up — plus the demo strip on a demo account.
   return (
     <>
       {/* Server component inside a server component: renders nothing unless the
           signed-in account is a try-it-yourself demo. */}
       <DemoBanner />
+      {/* One slim line up to the level above: a tool → its listing's tool
+          board, the tool board or an account page → Home. The home screen
+          itself is the top and has none. */}
+      {(!event || tab === 'overview') && active !== 'events' && (
+        <div className="hub-listing-head hub-listing-slim">
+          <div className="container hub-slim-row">
+            <Link href="/portal" className="hub-slim-back">
+              ← Home
+            </Link>
+            {event && (
+              <span className="hub-slim-name" title={event.name}>
+                <span className="hub-listing-kind">{event.kind === 'shop' ? 'Shop' : 'Event'}</span> {event.name}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
       {event && tab !== 'overview' && (
-        <div className="hub-listing-head">
-          <div className="container hub-listing-head-row">
-            <div className="hub-listing-title">
-              <span className="hub-listing-kind">{event.kind === 'shop' ? 'Shop' : 'Event'}</span>
-              <span className="hub-listing-title-name" title={event.name}>
-                {event.name}
-              </span>
-              <span className={`badge ${event.published ? 'badge-green' : 'badge-amber'}`}>
-                {event.published ? 'Live' : 'Not published'}
-              </span>
-            </div>
-            {/* The tool board (/portal/events/[id]) holds every tool as a
-                card; a tool page only needs the way back to it. */}
-            <nav className="hub-tabs" aria-label={`Back to ${event.name}`}>
-              <Link href={`/portal/events/${event.id}`} className="hub-tab-pill hub-tab-pill-on hub-tab-pill-home">
-                ← All tools
-              </Link>
-            </nav>
+        // One slim line: the way back to the listing's tool board, and which
+        // listing this is. The page below carries its own title.
+        <div className="hub-listing-head hub-listing-slim">
+          <div className="container hub-slim-row">
+            <Link href={`/portal/events/${event.id}`} className="hub-slim-back">
+              ← All tools
+            </Link>
+            <span className="hub-slim-name" title={event.name}>
+              <span className="hub-listing-kind">{event.kind === 'shop' ? 'Shop' : 'Event'}</span> {event.name}
+            </span>
+            <span className={`hub-slim-dot ${event.published ? 'is-live' : ''}`} aria-label={event.published ? 'Live' : 'Not published'} />
           </div>
         </div>
       )}

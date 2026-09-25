@@ -23,11 +23,32 @@ export interface EditorTabDef {
   revealOn?: string;
 }
 
+/** One line and an icon per section, for the card view. */
+const CARD_INFO: Record<string, { icon: string; line: string }> = {
+  basics: { icon: '📝', line: 'Name, date, place and description' },
+  tickets: { icon: '🎟', line: 'What you sell, prices and how many' },
+  media: { icon: '📸', line: 'Cover photo, gallery and video' },
+  design: { icon: '🎨', line: 'Colours, layout and the AI designer' },
+  updates: { icon: '📣', line: 'News for everyone who bought' },
+  faq: { icon: '❓', line: 'Answers before people ask' },
+  questions: { icon: '💬', line: 'Questions visitors sent you' },
+  stalls: { icon: '🏪', line: 'Stalls and events together' },
+  kitchen: { icon: '🍳', line: 'Pickup times, choices and tables' },
+  subscribe: { icon: '↻', line: 'Repeat orders for regulars' },
+  seating: { icon: '💺', line: 'Seat map, rows and sections' },
+  publish: { icon: '🚀', line: 'Payment details and go live' },
+};
+
 /**
- * Category tabs for the event editor. Every panel stays mounted (hidden with
- * CSS rather than unmounted) so half-typed forms survive a tab switch — an
- * organizer can jump to Tickets to check a price and come back to Basics
- * without losing what they wrote.
+ * The event editor as cards. It opens on every section at a glance — done,
+ * to do, or optional — with a progress bar across the required ones and the
+ * next one to fill gently pulsing. A card opens its section; "All sections"
+ * comes back, and the card is ticked once the save lands (the statuses come
+ * from the server, refreshed after every save).
+ *
+ * Every panel stays mounted (hidden with CSS rather than unmounted) so
+ * half-typed forms survive switching — an organizer can jump to Tickets to
+ * check a price and come back to Basics without losing what they wrote.
  */
 export default function EditorTabs({
   tabs,
@@ -36,15 +57,16 @@ export default function EditorTabs({
   tabs: EditorTabDef[];
   panels: Record<string, ReactNode>;
 }) {
-  const [active, setActive] = useState(tabs[0]?.key ?? '');
+  // '' = the card overview.
+  const [active, setActive] = useState('');
 
-  // Restore the tab from ?tab= so a refresh (or a saved link) lands in place.
+  // Open the section named in ?tab= so a refresh (or a saved link) lands in place.
   useEffect(() => {
     const wanted = new URLSearchParams(window.location.search).get('tab');
     if (wanted && tabs.some((t) => t.key === wanted)) setActive(wanted);
   }, [tabs]);
 
-  // A button anywhere in the editor can send the organizer to a named tab.
+  // A button anywhere in the editor can send the organizer to a named section.
   useEffect(() => {
     const onGoto = (e: Event) => {
       const key = (e as CustomEvent<string>).detail;
@@ -57,8 +79,6 @@ export default function EditorTabs({
     return () => window.removeEventListener(GOTO_TAB_EVENT, onGoto);
   }, [tabs]);
 
-  // Bound once per tab that asks for it; the switch is the whole behaviour, so
-  // there is nothing to clean up beyond the listener itself.
   useEffect(() => {
     const bound = tabs
       .filter((t): t is EditorTabDef & { revealOn: string } => Boolean(t.revealOn))
@@ -73,38 +93,92 @@ export default function EditorTabs({
   function select(key: string) {
     setActive(key);
     const url = new URL(window.location.href);
-    url.searchParams.set('tab', key);
+    if (key) url.searchParams.set('tab', key);
+    else url.searchParams.delete('tab');
     window.history.replaceState({}, '', url);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  const required = tabs.filter((t) => t.status !== 'neutral');
+  const doneCount = required.filter((t) => t.status === 'done').length;
+  const pct = required.length ? Math.round((doneCount / required.length) * 100) : 100;
+  const nextUp = required.find((t) => t.status === 'todo')?.key ?? null;
+  const current = tabs.find((t) => t.key === active);
+
   return (
     <>
-      <div className="editor-tabs" role="tablist" aria-label="Event editor sections">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            role="tab"
-            id={`editor-tab-${t.key}`}
-            aria-selected={active === t.key}
-            aria-controls={`editor-panel-${t.key}`}
-            className={`editor-tab${active === t.key ? ' is-active' : ''}`}
-            onClick={() => select(t.key)}
-          >
-            {t.status !== 'neutral' && (
-              <span
-                className={`editor-tab-dot${t.status === 'done' ? ' is-done' : ''}`}
-                aria-label={t.status === 'done' ? 'Done' : 'Still needs something'}
-              >
-                {t.status === 'done' ? '✓' : ''}
-              </span>
-            )}
-            {t.label}
-            {t.badge ? <span className="badge badge-green editor-tab-badge">{t.badge}</span> : null}
+      {/* ---- Overview: every section as a card ---- */}
+      {!current && (
+        <div className="ed-overview">
+          <div className="ed-progress" aria-label={`${doneCount} of ${required.length} required steps done`}>
+            <div className="ed-progress-text">
+              <strong>
+                {doneCount === required.length ? 'Everything required is done ✓' : `${doneCount} of ${required.length} required steps done`}
+              </strong>
+              <span>{nextUp ? `Next: ${tabs.find((t) => t.key === nextUp)?.label}` : 'Add the optional extras whenever you like'}</span>
+            </div>
+            <div className="ed-progress-bar">
+              <span style={{ width: `${Math.max(pct, 4)}%` }} className={pct === 100 ? 'is-full' : ''} />
+            </div>
+          </div>
+
+          <div className="ed-cards">
+            {tabs.map((t, i) => {
+              const info = CARD_INFO[t.key] ?? { icon: '•', line: '' };
+              const isNext = t.key === nextUp;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  className={`ed-card ed-card-${t.status}${isNext ? ' is-next' : ''}`}
+                  style={{ ['--i' as string]: String(i) }}
+                  onClick={() => select(t.key)}
+                >
+                  <span className="ed-card-icon" aria-hidden="true">
+                    {info.icon}
+                  </span>
+                  <span className="ed-card-text">
+                    <strong>{t.label}</strong>
+                    <span>{info.line}</span>
+                  </span>
+                  <span className="ed-card-chips">
+                    {t.badge ? <span className="ed-chip ed-chip-badge">{t.badge}</span> : null}
+                    {t.status === 'done' ? (
+                      <span className="ed-chip ed-chip-done">✓ Done</span>
+                    ) : t.status === 'todo' ? (
+                      <span className="ed-chip ed-chip-todo">{isNext ? 'Next' : 'To do'}</span>
+                    ) : (
+                      <span className="ed-chip ed-chip-opt">Optional</span>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ---- One section open ---- */}
+      {current && (
+        <div className="ed-open-bar">
+          <button type="button" className="btn btn-sm" onClick={() => select('')}>
+            ← All sections
           </button>
-        ))}
-      </div>
+          <span className="ed-open-title">
+            <span aria-hidden="true">{CARD_INFO[current.key]?.icon}</span> {current.label}
+            {current.status === 'done' ? (
+              <span className="ed-chip ed-chip-done">✓ Done</span>
+            ) : current.status === 'todo' ? (
+              <span className="ed-chip ed-chip-todo">To do</span>
+            ) : (
+              <span className="ed-chip ed-chip-opt">Optional</span>
+            )}
+          </span>
+          <span className="ed-open-mini" aria-hidden="true">
+            <span style={{ width: `${pct}%` }} />
+          </span>
+        </div>
+      )}
 
       {tabs.map((t, i) => {
         const prev = tabs[i - 1];
@@ -113,16 +187,12 @@ export default function EditorTabs({
           <div
             key={t.key}
             id={`editor-panel-${t.key}`}
-            role="tabpanel"
-            aria-labelledby={`editor-tab-${t.key}`}
+            role="region"
+            aria-label={t.label}
             className={`editor-panel${active === t.key ? '' : ' is-hidden'}`}
           >
             {panels[t.key]}
 
-            {/* Where to go once this section is filled in. The next section is
-                named rather than called "Next", so it reads as a plan instead
-                of a mystery — and the count tells someone how much is left,
-                which the tabs alone never did. */}
             <div className="editor-stepper">
               {prev ? (
                 <button type="button" className="btn btn-sm" onClick={() => select(prev.key)}>
@@ -131,15 +201,11 @@ export default function EditorTabs({
               ) : (
                 <span />
               )}
-              <span className="editor-stepper-count">
-                Step {i + 1} of {tabs.length}
-              </span>
+              <button type="button" className="btn btn-sm" onClick={() => select('')}>
+                ▦ All sections
+              </button>
               {next ? (
-                <button
-                  type="button"
-                  className="btn btn-brand btn-sm"
-                  onClick={() => select(next.key)}
-                >
+                <button type="button" className="btn btn-brand btn-sm" onClick={() => select(next.key)}>
                   Next: {next.label} →
                 </button>
               ) : (

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import LogoutButton from './LogoutButton';
 import { readListingName } from '@/lib/exampleShop';
 import PlatformAssistant from '@/components/PlatformAssistant';
 import {
@@ -203,6 +204,8 @@ export default async function PortalDashboardPage({
           <div className="hub-hello-actions">
             {/* Only appears where the browser can install, or on iPhone with the how-to. */}
             <InstallAppButton label="Install the seller app" />
+            {/* Sign-out lives here now that the hub has no sidebar. */}
+            <LogoutButton />
             <a href="#new" className="btn btn-brand">
               {tr('hub.new')}
             </a>

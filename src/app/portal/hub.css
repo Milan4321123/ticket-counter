@@ -1263,3 +1263,395 @@
     font-size: 0.74rem;
   }
 }
+
+/* ======================================================================
+   The event editor as cards (edit/EditorTabs): a progress bar across the
+   required sections, every section a card, the next one pulsing.
+   ====================================================================== */
+.ed-overview {
+  display: grid;
+  gap: 16px;
+  margin-top: 6px;
+}
+
+.ed-progress {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+}
+
+.ed-progress-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.ed-progress-text strong {
+  font-size: 1rem;
+}
+
+.ed-progress-text span {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.ed-progress-bar {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.ed-progress-bar > span {
+  position: relative;
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #dc143c, #f59e0b);
+  transition: width 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: ed-grow 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  overflow: hidden;
+}
+
+.ed-progress-bar > span.is-full {
+  background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+/* A shine that keeps travelling along the filled part: "in progress". */
+.ed-progress-bar > span::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  transform: translateX(-100%);
+  animation: ed-shine 2.4s ease-in-out infinite;
+}
+
+@keyframes ed-grow {
+  from {
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+  to {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+}
+
+@keyframes ed-shine {
+  0%,
+  30% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.ed-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(250px, 100%), 1fr));
+  gap: 12px;
+}
+
+.ed-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 82px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border-soft);
+  background: var(--bg-card);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  animation: ed-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--i) * 45ms);
+  transition:
+    transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.ed-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(220, 20, 60, 0.45);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+}
+
+.ed-card:active {
+  transform: scale(0.98);
+}
+
+@keyframes ed-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.ed-card-done {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.07), transparent 60%), var(--bg-card);
+}
+
+.ed-card-todo {
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+/* The one to fill next breathes, so the eye goes there first. */
+.ed-card.is-next {
+  border-color: rgba(251, 191, 36, 0.7);
+  animation:
+    ed-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both,
+    ed-pulse 2.2s ease-in-out 0.8s infinite;
+}
+
+@keyframes ed-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(251, 191, 36, 0);
+  }
+}
+
+.ed-card-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 1.3rem;
+}
+
+.ed-card-done .ed-card-icon {
+  background: rgba(16, 185, 129, 0.14);
+}
+
+.ed-card-todo .ed-card-icon {
+  background: rgba(251, 191, 36, 0.14);
+}
+
+.ed-card-text {
+  display: grid;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.ed-card-text strong {
+  font-size: 1rem;
+}
+
+.ed-card-text span {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.ed-card-chips {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 4px;
+}
+
+.ed-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.ed-chip-done {
+  background: rgba(16, 185, 129, 0.16);
+  color: #34d399;
+}
+
+.ed-chip-todo {
+  background: rgba(251, 191, 36, 0.16);
+  color: #fbbf24;
+}
+
+.ed-chip-opt {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-dim);
+}
+
+.ed-chip-badge {
+  background: rgba(16, 185, 129, 0.16);
+  color: #34d399;
+}
+
+.ed-card .ed-card-text {
+  padding-right: 64px;
+}
+
+/* ---- The bar over an open section ---- */
+.ed-open-bar {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin: 6px 0 16px;
+  padding-bottom: 12px;
+}
+
+.ed-open-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+
+.ed-open-mini {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.ed-open-mini > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #dc143c, #f59e0b);
+  transition: width 0.6s ease;
+}
+
+@media (max-width: 720px) {
+  .ed-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .ed-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    min-height: 0;
+    padding: 12px;
+  }
+
+  .ed-card .ed-card-text {
+    padding-right: 0;
+  }
+
+  .ed-card-icon {
+    width: 38px;
+    height: 38px;
+    font-size: 1.1rem;
+  }
+
+  .ed-card-text strong {
+    font-size: 0.92rem;
+  }
+
+  .ed-card-text span {
+    font-size: 0.74rem;
+  }
+
+  .ed-card-chips {
+    top: 10px;
+    right: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ed-card,
+  .ed-card.is-next,
+  .ed-progress-bar > span,
+  .ed-progress-bar > span::after {
+    animation: none;
+  }
+}
+
+/* The slim "← All tools · Event · name ●" line over every tool page. */
+.hub-listing-slim {
+  padding: 0;
+}
+
+.hub-slim-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+}
+
+.hub-slim-back {
+  flex: none;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(220, 20, 60, 0.14);
+  color: #fda4af;
+  font-size: 0.85rem;
+  font-weight: 700;
+  transition: background-color 0.15s ease;
+}
+
+.hub-slim-back:hover {
+  background: rgba(220, 20, 60, 0.24);
+}
+
+.hub-slim-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-dim);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.hub-slim-name .hub-listing-kind {
+  margin-right: 4px;
+}
+
+.hub-slim-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #fbbf24;
+}
+
+.hub-slim-dot.is-live {
+  background: #34d399;
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.7);
+}
+
+/* No sidebar, no tab bar: the hub is one column everywhere. */
+.hub.hub-flat {
+  display: block;
+}
+
+.hub.hub-flat .hub-main {
+  padding-bottom: 24px;
+}
