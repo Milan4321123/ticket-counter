@@ -769,6 +769,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const status = body.status;
       need(status === 'draft' || status === 'published', 'Invalid status.');
       if (status === 'published' && event.status !== 'published') {
+        // A try-it-yourself demo never goes live. Who can put a page in front
+        // of the public is the platform's decision — real accounts are made
+        // and approved by hand — so a demo gets a private preview instead.
+        need(
+          !organizer.isDemo,
+          'Demo pages stay private — they can’t go live. Use “Preview my page” to see it; to sell for real, ask for an account.'
+        );
         const tierCount = tiersPlan ? tiersPlan.keep.length : existingTiers.length;
         const v = vocabFor(merged.kind);
         // Which details are compulsory depends on the kind, and that rule lives
@@ -786,12 +793,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const hasPaidTier = plannedTiers.some((t) => t.priceCents > 0);
         const hasBank = Boolean(merged.bankIban.trim() && merged.bankAccountHolder.trim());
         const hasPaypal = Boolean((merged.paypalAccount ?? '').trim());
-        // A try-it-yourself demo (lib/demo) takes no money at all — its only
-        // route is the simulated payment, and its "published" page is shown to
-        // nobody but its owner — so it needs neither a payout account nor the
-        // authenticator below. Everything else about publishing applies.
-        const demo = organizer.isDemo;
-        if (!demo && hasPaidTier && !hasBank && !hasPaypal) {
+        if (hasPaidTier && !hasBank && !hasPaypal) {
           missing.push('add a way to be paid — a bank account (holder and IBAN), or PayPal');
         }
         // Publishing is the moment this account stops being a draft and starts
@@ -806,7 +808,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         // and the one somebody who phished the password can answer. Requiring
         // enrolment BEFORE any money can be taken means a payout change on a
         // selling event always meets the strong factor instead.
-        if (!demo && requireAuthenticatorToPublish() && !organizerTotpEnabled(organizer.id)) {
+        if (requireAuthenticatorToPublish() && !organizerTotpEnabled(organizer.id)) {
           missing.push(`set up your authenticator app in Settings — it is required before you can sell ${v.units}`);
         }
         need(missing.length === 0, `Almost there — before publishing, please ${missing.join(', ')}.`);

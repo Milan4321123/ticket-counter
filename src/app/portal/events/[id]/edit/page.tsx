@@ -627,6 +627,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
             slug={event.slug}
             kind={event.kind}
             checklist={checklist}
+            isDemo={organizer.isDemo}
             // Advice about how the shop reads to a buyer, from the same rows
             // the public pages render from — so it can never point at a
             // problem the bazaar does not actually have.

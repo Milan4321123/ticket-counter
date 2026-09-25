@@ -63,6 +63,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!anyPaymentRoute(paymentOptionsFor(e))) missing.push(auth.organizer.isDemo ? 'payoutDemo' : 'payout');
   if (getEventTiers(e.id).length === 0) missing.push('tiers');
   if (getEventMedia(e.id).length === 0) missing.push('photo');
-  if (e.status !== 'published') missing.push('publish');
+  // A demo never goes live (the platform decides who publishes): its last
+  // step is looking at the private preview instead.
+  if (e.status !== 'published') missing.push(auth.organizer.isDemo ? 'preview' : 'publish');
   return NextResponse.json({ missing });
 }

@@ -17,6 +17,8 @@ interface Props {
   status: 'draft' | 'published' | 'archived';
   slug: string;
   checklist: ChecklistItem[];
+  /** A try-it-yourself demo: it never goes live, the preview is the end. */
+  isDemo?: boolean;
   /**
    * How many subscribers an announcement about THIS listing would reach right
    * now: the organizer's confirmed, not-unsubscribed addresses minus anyone
@@ -63,6 +65,7 @@ export default function PublishPanel({
   status,
   slug,
   checklist,
+  isDemo = false,
   announceAudience,
   quality = [],
   qualityLine = '',
@@ -280,17 +283,29 @@ export default function PublishPanel({
               </li>
             ))}
           </ul>
-          <button
-            type="button"
-            className="btn btn-brand"
-            onClick={() => void setStatus('published')}
-            disabled={busy || !ready}
-            title={ready ? undefined : 'Finish the checklist above first'}
-          >
-            {busy ? <span className="spinner" aria-hidden /> : null}
-            {busy ? 'Publishing…' : `Publish ${v.listing}`}
-          </button>
-          {!ready && (
+          {isDemo ? (
+            <div className="notice">
+              <strong>Demo pages stay private.</strong> They can&rsquo;t go live — who publishes on this
+              platform is decided by hand. Use &ldquo;Preview my page&rdquo; above to see it.
+              <div style={{ marginTop: 10 }}>
+                <a href="/contact?intent=account" className="btn btn-sm btn-brand">
+                  Get a real account
+                </a>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-brand"
+              onClick={() => void setStatus('published')}
+              disabled={busy || !ready}
+              title={ready ? undefined : 'Finish the checklist above first'}
+            >
+              {busy ? <span className="spinner" aria-hidden /> : null}
+              {busy ? 'Publishing…' : `Publish ${v.listing}`}
+            </button>
+          )}
+          {!ready && !isDemo && (
             <p className="muted small" style={{ margin: '10px 0 0' }}>
               The button unlocks once every item above is done.
             </p>

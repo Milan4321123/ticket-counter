@@ -55,6 +55,10 @@ interface Message {
   publishNow?: boolean;
   /** A link to the published page. */
   view?: string;
+  /** The view link's label, when it is not "View your page". */
+  viewLabel?: string;
+  /** A "get a real account" link under this message. */
+  account?: boolean;
   /** Show the "which listing?" picker under this message. */
   picker?: boolean;
 }
@@ -88,7 +92,8 @@ type Words = {
   typing: string;
   placeholder: (shop: boolean) => string;
   q: Record<string, string>;
-  buttons: { photo: string; publish: string; publishNow: string; view: string };
+  buttons: { photo: string; publish: string; publishNow: string; view: string; preview: string; account: string };
+  demoPreview: string;
   published: string;
   switchBtn: string;
   whatChange: string;
@@ -148,7 +153,8 @@ const T: Record<Lang, Words> = {
       photo: 'Now add at least one photo — tap below, pick one, then “Return to the chat”. You can still type changes here.',
       publish: 'Everything is ready. Publish it now?',
     },
-    buttons: { photo: 'Add a photo →', publish: 'Open the Publish section', publishNow: '🚀 Publish now', view: 'View your page →' },
+    buttons: { photo: 'Add a photo →', publish: 'Open the Publish section', publishNow: '🚀 Publish now', view: 'View your page →', preview: 'Preview my page →', account: 'Get a real account' },
+    demoPreview: 'All done ✓ This is a demo, so your page stays private — it can’t go live. Have a look at it here. To sell for real, ask for an account.',
     published: 'Published 🎉 — your page is live.',
     switchBtn: '⇄ Switch',
     whatChange: 'Sure — what shall I change or add? E.g. “add 4 more items”, “veg momo 7€”, “write a nicer description”. Say “done” when you are happy.',
@@ -209,7 +215,8 @@ const T: Record<Lang, Words> = {
       photo: 'Jetzt mindestens ein Foto – unten tippen, eins wählen, dann „Zurück zum Chat“. Änderungen kannst du hier weiter tippen.',
       publish: 'Alles bereit. Jetzt veröffentlichen?',
     },
-    buttons: { photo: 'Foto hinzufügen →', publish: 'Bereich Veröffentlichen öffnen', publishNow: '🚀 Jetzt veröffentlichen', view: 'Deine Seite ansehen →' },
+    buttons: { photo: 'Foto hinzufügen →', publish: 'Bereich Veröffentlichen öffnen', publishNow: '🚀 Jetzt veröffentlichen', view: 'Deine Seite ansehen →', preview: 'Vorschau ansehen →', account: 'Echtes Konto anfragen' },
+    demoPreview: 'Fertig ✓ Das ist eine Demo, deine Seite bleibt also privat – sie kann nicht online gehen. Hier kannst du sie ansehen. Um wirklich zu verkaufen, frag ein Konto an.',
     published: 'Veröffentlicht 🎉 – deine Seite ist online.',
     switchBtn: '⇄ Wechseln',
     whatChange: 'Klar – was soll ich ändern oder ergänzen? Z. B. „füge 4 Artikel hinzu“, „Veggie-Momo 7€“, „schreib eine schönere Beschreibung“. Sag „fertig“, wenn alles passt.',
@@ -266,7 +273,8 @@ const T: Record<Lang, Words> = {
       photo: 'अब कम्तीमा एउटा फोटो थप्नुहोस् — तल थिच्नुहोस्, फोटो छान्नुहोस्, अनि “Return to the chat”। यहाँ परिवर्तन लेख्न सक्नुहुन्छ।',
       publish: 'सबै तयार छ। अहिले प्रकाशित गर्ने?',
     },
-    buttons: { photo: 'फोटो थप्नुहोस् →', publish: 'प्रकाशन खण्ड खोल्नुहोस्', publishNow: '🚀 अहिले प्रकाशित गर्नुहोस्', view: 'आफ्नो पेज हेर्नुहोस् →' },
+    buttons: { photo: 'फोटो थप्नुहोस् →', publish: 'प्रकाशन खण्ड खोल्नुहोस्', publishNow: '🚀 अहिले प्रकाशित गर्नुहोस्', view: 'आफ्नो पेज हेर्नुहोस् →', preview: 'पेजको पूर्वावलोकन →', account: 'वास्तविक खाता माग्नुहोस्' },
+    demoPreview: 'सबै सकियो ✓ यो डेमो हो, त्यसैले तपाईंको पेज निजी रहन्छ — लाइभ हुँदैन। यहाँ हेर्नुहोस्। साँच्चै बेच्न खाता माग्नुहोस्।',
     published: 'प्रकाशित भयो 🎉 — तपाईंको पेज लाइभ छ।',
     switchBtn: '⇄ अर्को',
     whatChange: 'हुन्छ — के बदल्ने वा थप्ने? जस्तै “arko 4 item thapnus”, “veg momo 7 euro”, “ramro description lekhnus”। सबै ठीक भए “bhayo” भन्नुहोस्।',
@@ -295,7 +303,7 @@ const GREETING =
   'e.g. “k cha, sanchai xa? mero momo pasal cha, chicken momo 9 euro, sanibar Berlin ma lina aaunus”.';
 
 /** The order the required pieces are asked for. */
-const ORDER = ['name', 'eventDate', 'venueName', 'address', 'pickupInfo', 'description', 'tiers', 'payout', 'payoutDemo', 'photo', 'publish'];
+const ORDER = ['name', 'eventDate', 'venueName', 'address', 'pickupInfo', 'description', 'tiers', 'payout', 'payoutDemo', 'photo', 'publish', 'preview'];
 
 /** "done" in the languages people type — including Roman Nepali. */
 const DONE_RE = /^\s*(done|ok|okay|yes|yep|ready|ja|fertig|erledigt|passt|bhayo|bhaeo|sakiyo|thik cha|thik xa|thik chha|huncha|hunchha|hunxa|ho|भयो|सकियो|ठीक छ|हो)\s*[.!✓]*\s*$/i;
@@ -413,7 +421,7 @@ export default function SetupAssistant({
       return;
     }
     // Only photo / publish left: first ask whether the details are right.
-    if (!confirmed.current && pending.every((k) => k === 'photo' || k === 'publish' || k === 'payoutDemo')) {
+    if (!confirmed.current && pending.every((k) => k === 'photo' || k === 'publish' || k === 'preview' || k === 'payoutDemo')) {
       if (pending[0] === 'payoutDemo') say({ from: 'bot', text: t.q.payoutDemo });
       setAsking('confirm');
       setQueue(pending.filter((k) => k !== 'payoutDemo'));
@@ -431,6 +439,10 @@ export default function SetupAssistant({
     } else if (key === 'photo') {
       setAsking('photo');
       say({ from: 'bot', text: t.q.photo, goto: { tab: 'media', label: t.buttons.photo } });
+    } else if (key === 'preview') {
+      setAsking(null);
+      setQueue([]);
+      say({ from: 'bot', text: t.demoPreview, view: `/e/${slug}`, viewLabel: t.buttons.preview, account: true });
     } else if (key === 'publish') {
       setAsking('publish');
       say({ from: 'bot', text: t.q.publish, publishNow: true });
@@ -742,7 +754,12 @@ export default function SetupAssistant({
             )}
             {m.view && (
               <a href={m.view} target="_blank" rel="noopener" className="btn btn-green btn-sm sa-goto">
-                {t.buttons.view}
+                {m.viewLabel ?? t.buttons.view}
+              </a>
+            )}
+            {m.account && (
+              <a href="/contact?intent=account" className="btn btn-sm sa-goto">
+                {t.buttons.account}
               </a>
             )}
             {m.goto && (
