@@ -2,6 +2,7 @@ import { shareImages } from '@/lib/seo';
 import Link from 'next/link';
 import { platformContactEmail } from '@/lib/platform';
 import ContactForm from './ContactForm';
+import CreatorChat from '@/components/CreatorChat';
 
 // The contact address comes from an env var — read it fresh.
 export const dynamic = 'force-dynamic';
@@ -41,6 +42,54 @@ export default async function ContactPage({
   const raw = (await searchParams).intent;
   const wantsAccount = (Array.isArray(raw) ? raw[0] : raw) === 'account';
   const contactEmail = platformContactEmail();
+
+  if (!wantsAccount) {
+    // "Talk to the creator": a conversation instead of a form. The assistant
+    // fills the request as it goes and sends it with the chat to the team;
+    // the form stays underneath for anyone who prefers it.
+    return (
+      <section className="section cc-page">
+        <div className="container">
+          <header className="cc-page-head">
+            <p className="feed-kicker anim-fade-up">Talk to the creator</p>
+            <h1 className="anim-fade-up anim-d1">Tell us what you want to build</h1>
+            <p className="feed-hero-sub anim-fade-up anim-d2">
+              A custom event page, a festival website, an app for your shop — or just a question. Chat below; the
+              request fills itself in and goes straight to Milan, who replies by email.
+            </p>
+          </header>
+          <CreatorChat />
+          <div className="cc-under">
+            <p className="muted small">
+              The self-service page is free and already included —{' '}
+              <Link href="/organizers" style={{ color: 'var(--brand-text)', fontWeight: 600 }}>
+                build it yourself in minutes
+              </Link>
+              . Buying tickets? They are in your email and in{' '}
+              <Link href="/account" style={{ color: 'var(--brand-text)', fontWeight: 600 }}>
+                your account
+              </Link>
+              ; questions about an event go to its organizer on the event page.
+            </p>
+            <details className="cc-fallback">
+              <summary>Prefer a form?</summary>
+              <div className="card glow-card" style={{ marginTop: 12 }}>
+                <ContactForm contactEmail={contactEmail} intent="custom-design" />
+              </div>
+            </details>
+            {contactEmail && (
+              <p className="muted small">
+                Or plain email:{' '}
+                <a href={`mailto:${contactEmail}`} style={{ color: 'var(--brand-text)', fontWeight: 700 }}>
+                  {contactEmail}
+                </a>
+              </p>
+            )}
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <>

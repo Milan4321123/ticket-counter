@@ -125,9 +125,9 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    if (message.length > 2000) {
+    if (message.length > 6000) {
       return NextResponse.json(
-        { error: 'That message is a bit long — please keep it under 2000 characters.' } satisfies ApiErrorResponse,
+        { error: 'That message is a bit long — please keep it under 6000 characters.' } satisfies ApiErrorResponse,
         { status: 400 }
       );
     }
