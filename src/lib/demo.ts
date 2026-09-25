@@ -176,6 +176,7 @@ export const DEMO_TARGETS = [
   'tools-salon',
   'assistant',
   'assistant-event',
+  'assistant-restaurant',
 ] as const;
 export type DemoTarget = (typeof DEMO_TARGETS)[number];
 
@@ -193,28 +194,32 @@ export function demoTargetPath(organizerId: string, target: DemoTarget): string 
   const salon = rows.find((r) => r.kind === 'shop' && r.slug.endsWith('-glow-beauty'));
   switch (target) {
     case 'assistant':
-    case 'assistant-event': {
+    case 'assistant-event':
+    case 'assistant-restaurant': {
       const draftKind = target === 'assistant-event' ? 'event' : 'shop';
-      const draftName = draftKind === 'event' ? 'My new event' : 'My new shop';
+      // A restaurant is a shop on the food shelf (then pick-up times & dish
+      // options in Kitchen & collection).
+      const category = target === 'assistant-restaurant' ? 'khaja-food' : '';
+      const draftName = draftKind === 'event' ? 'My new event' : category ? 'My new restaurant' : 'My new shop';
       // A blank shop draft of the demo's own, with the setup assistant open —
       // the whole "describe it, it fills the form" flow from an empty page.
       // Reused while it is still blank, so a second visit does not stack drafts.
       const blank = getDb()
         .prepare(
-          `SELECT id FROM events WHERE organizer_id = ? AND kind = ? AND status = 'draft'
+          `SELECT id FROM events WHERE organizer_id = ? AND kind = ? AND category = ? AND status = 'draft'
              AND description = '' AND id NOT IN (SELECT event_id FROM event_tiers)
            ORDER BY created_at DESC LIMIT 1`
         )
-        .get(organizerId, draftKind) as { id: string } | undefined;
+        .get(organizerId, draftKind, category) as { id: string } | undefined;
       let id = blank?.id;
       if (!id) {
         id = newId();
         getDb()
           .prepare(
-            `INSERT INTO events (id, organizer_id, slug, status, kind, name, currency, total_capacity, sales_open, max_per_order, pay_within_days)
-             VALUES (?, ?, ?, 'draft', ?, ?, 'EUR', 100, 1, 8, 5)`
+            `INSERT INTO events (id, organizer_id, slug, status, kind, name, category, currency, total_capacity, sales_open, max_per_order, pay_within_days)
+             VALUES (?, ?, ?, 'draft', ?, ?, ?, 'EUR', 100, 1, 8, 5)`
           )
-          .run(id, organizerId, makeUniqueSlug(draftName), draftKind, draftName);
+          .run(id, organizerId, makeUniqueSlug(draftName), draftKind, draftName, category);
       }
       return `/portal/events/${id}/edit?assistant=1`;
     }

@@ -65,6 +65,9 @@ export default function OrganizersPage() {
             <DemoStart to="assistant" className="btn btn-lg">
               ✨ Create a shop page
             </DemoStart>
+            <DemoStart to="assistant-restaurant" className="btn btn-lg">
+              ✨ Create a restaurant page
+            </DemoStart>
           </div>
         </div>
         <div className="og-screen og-chat" aria-hidden="true">

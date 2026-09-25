@@ -74,7 +74,7 @@ const W: Record<Lang, { pill: string; hello: string; sub: string; ph: string; id
  * editor, the assistant open — with `ask` (when given) as its first message.
  * A POST, as the demo's own button does (a new account never comes from a link).
  */
-function startSetup(kind: 'event' | 'shop', ask?: string) {
+function startSetup(kind: 'event' | 'shop' | 'restaurant', ask?: string) {
   try {
     if (ask) sessionStorage.setItem('setup:ask', ask);
   } catch {
@@ -86,20 +86,21 @@ function startSetup(kind: 'event' | 'shop', ask?: string) {
   const to = document.createElement('input');
   to.type = 'hidden';
   to.name = 'to';
-  to.value = kind === 'event' ? 'assistant-event' : 'assistant';
+  to.value = kind === 'event' ? 'assistant-event' : kind === 'restaurant' ? 'assistant-restaurant' : 'assistant';
   form.appendChild(to);
   document.body.appendChild(form);
   form.submit();
 }
 
 /** Shop or event, from what the visitor said last in this chat. */
-function guessKind(): 'event' | 'shop' {
+function guessKind(): 'event' | 'shop' | 'restaurant' {
   try {
     const chat = JSON.parse(sessionStorage.getItem('ask:chat:v1') || '[]') as { from: string; text?: string }[];
     const said = chat.filter((m) => m.from === 'me').slice(-3).map((m) => m.text ?? '').join(' ');
     const event = /\b(events?|concerts?|tickets?|party|festival|karyakram|veranstaltung|konzert|night)\b/i.test(said);
     const shop = /\b(shop|store|pasal|restaurant|kitchen|momo|food|menu|items?|laden)\b/i.test(said);
-    return event && !shop ? 'event' : 'shop';
+    if (event && !shop) return 'event';
+    return /\b(restaurant|kitchen|momo|khaja|food|menu|thukpa|khana)\b/i.test(said) ? 'restaurant' : 'shop';
   } catch {
     return 'shop';
   }
@@ -262,7 +263,7 @@ function AskOverlay({ w, onClose }: { w: (typeof W)['en']; onClose: () => void }
       });
       const d = (await res.json().catch(() => null)) as {
         links?: AskLink[]; results?: AskResult[]; answer?: string | null; note?: string | null; go?: boolean; error?: string; filters?: unknown;
-        action?: { type: 'setup'; kind: 'event' | 'shop' };
+        action?: { type: 'setup'; kind: 'event' | 'shop' | 'restaurant' };
       } | null;
       const links = d?.links ?? [];
       const results = d?.results ?? [];

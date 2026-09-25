@@ -196,7 +196,7 @@ export const ASK_CONTEXT = [
  * selling but the request itself. The chat hands it to the setup assistant
  * (in a free demo), which builds the page from exactly these words.
  */
-export function setupRequest(q: string): { kind: 'event' | 'shop' } | null {
+export function setupRequest(q: string): { kind: 'event' | 'shop' | 'restaurant' } | null {
   const t = q.toLowerCase();
   const build =
     /\b(set ?up|setup|create|make|build|open|start|banau\w*|khol\w*|erstell\w*|anleg\w*|eröffne\w*)\b.{0,20}\b(an? |my |our |mero |ein |einen |eine |meine?n? )?(own )?(shop|store|pasal|restaurant|kitchen|stall|event|concert|party|festival|program|programme|karyakram|laden|geschäft|veranstaltung|konzert|page|site|website|listing|seite)(s|en)?\b/i.test(t) ||
@@ -206,16 +206,18 @@ export function setupRequest(q: string): { kind: 'event' | 'shop' } | null {
   if (!build || !details) return null;
   const event = /\b(events?|concerts?|party|festival|program|programme|karyakram|veranstaltung|konzert|night|tickets?)\b/i.test(t);
   const shop = /\b(shop|store|pasal|restaurant|kitchen|stall|laden|geschäft|items?|menu|momo|food|khaja)\b/i.test(t);
-  return { kind: event && !shop ? 'event' : 'shop' };
+  if (event && !shop) return { kind: 'event' };
+  const food = /\b(restaurant|kitchen|momo|khaja|food|menu|thukpa|chowmein|dish|dishes|essen|gericht\w*|khana)\b/i.test(t);
+  return { kind: food ? 'restaurant' : 'shop' };
 }
 
-const SETUP_SAY: Record<AskLang, (kind: 'event' | 'shop') => string> = {
+const SETUP_SAY: Record<AskLang, (kind: 'event' | 'shop' | 'restaurant') => string> = {
   en: (k) => `Let’s build it! I am opening the setup assistant in a free demo with your request — it fills in your ${k} page, and you check it. Nothing goes live without you.`,
-  de: (k) => `Los geht’s! Ich öffne den Einrichtungs-Assistenten in einer kostenlosen Demo mit deiner Anfrage — er füllt deine ${k === 'event' ? 'Event' : 'Laden'}-Seite aus, du prüfst sie. Nichts geht ohne dich online.`,
-  ne: (k) => `बनाऔं! तपाईंको अनुरोधसहित निःशुल्क डेमोमा सेटअप सहायक खोल्दैछु — उसले ${k === 'event' ? 'कार्यक्रम' : 'पसल'} पेज भर्छ, तपाईं जाँच्नुहोस्। तपाईंबिना केही लाइभ हुँदैन।`,
-  rn: (k) => `Banaaun! Tapaiko request sanga free demo ma setup assistant kholdai chu — usle ${k === 'event' ? 'event' : 'pasal'} page bhardincha, tapai check garnus. Tapai bina kei live hudaina.`,
+  de: (k) => `Los geht’s! Ich öffne den Einrichtungs-Assistenten in einer kostenlosen Demo mit deiner Anfrage — er füllt deine ${k === 'event' ? 'Event' : k === 'restaurant' ? 'Restaurant' : 'Laden'}-Seite aus, du prüfst sie. Nichts geht ohne dich online.`,
+  ne: (k) => `बनाऔं! तपाईंको अनुरोधसहित निःशुल्क डेमोमा सेटअप सहायक खोल्दैछु — उसले ${k === 'event' ? 'कार्यक्रम' : k === 'restaurant' ? 'रेस्टुरेन्ट' : 'पसल'} पेज भर्छ, तपाईं जाँच्नुहोस्। तपाईंबिना केही लाइभ हुँदैन।`,
+  rn: (k) => `Banaaun! Tapaiko request sanga free demo ma setup assistant kholdai chu — usle ${k === 'event' ? 'event' : k === 'restaurant' ? 'restaurant' : 'pasal'} page bhardincha, tapai check garnus. Tapai bina kei live hudaina.`,
 };
 
-export function setupSay(q: string, kind: 'event' | 'shop'): string {
+export function setupSay(q: string, kind: 'event' | 'shop' | 'restaurant'): string {
   return SETUP_SAY[askLang(q)](kind);
 }

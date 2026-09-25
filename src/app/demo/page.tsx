@@ -41,6 +41,7 @@ const TARGET_LABEL: Record<DemoTarget, string> = {
   'tools-salon': 'the salon demo',
   assistant: 'the AI setup assistant',
   'assistant-event': 'the AI setup assistant',
+  'assistant-restaurant': 'the AI setup assistant',
 };
 
 const ERRORS: Record<string, string> = {
