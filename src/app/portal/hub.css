@@ -2768,3 +2768,165 @@
 .bf .ks-more .bf-row {
   margin-top: 4px;
 }
+
+/* Items / tickets (edit/TiersEditor): one line each, tap to edit. */
+.te-list {
+  display: grid;
+  gap: 10px;
+}
+
+.te-row {
+  border-radius: 16px;
+  background: var(--bg-elevated);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 4px 12px rgba(0, 0, 0, 0.22);
+}
+
+.te-row.is-open {
+  box-shadow:
+    inset 0 0 0 1.5px rgba(220, 20, 60, 0.6),
+    0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.te-sum {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px 10px 10px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.te-thumb {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 1.3rem;
+}
+
+.te-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.te-sum-text {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.te-sum-text strong {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.te-sum-text span {
+  color: var(--text-dim);
+  font-size: 0.84rem;
+}
+
+.te-chev {
+  color: var(--text-dim);
+  transition: transform 0.2s ease;
+}
+
+.te-row.is-open .te-chev {
+  transform: rotate(180deg);
+}
+
+.te-body {
+  display: grid;
+  gap: 16px;
+  padding: 4px 14px 14px;
+}
+
+.te-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px;
+  gap: 12px;
+}
+
+.te-money {
+  position: relative;
+}
+
+.te-money > span {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  color: var(--text-dim);
+  font-weight: 700;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.te-money .input {
+  padding-left: 28px;
+}
+
+.te-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.te-seg button {
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.te-seg button.is-on {
+  background: var(--brand, #dc143c);
+  box-shadow: 0 4px 12px rgba(220, 20, 60, 0.3);
+  color: #fff;
+}
+
+.te-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.te-remove {
+  padding: 6px 4px;
+  border: 0;
+  background: none;
+  color: #f87171;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 520px) {
+  .te-main {
+    grid-template-columns: minmax(0, 1fr) 110px;
+  }
+}

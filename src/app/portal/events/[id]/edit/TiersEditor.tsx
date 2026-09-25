@@ -77,13 +77,22 @@ export default function TiersEditor({ eventId, kind, initialTiers, photos, soldB
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** The one row opened for editing; the rest stay one-line summaries. */
+  const [openIdx, setOpenIdx] = useState<number | null>(() =>
+    initialTiers.length === 0 ? null : initialTiers.length === 1 && !initialTiers[0].name ? 0 : null
+  );
+  const isShop = kind === 'shop';
 
   function patchRow(index: number, patch: Partial<Row>) {
     setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
   }
 
-  function addRow() {
-    setRows((prev) => [...prev, { tierKey: null, name: '', price: '', cap: '', unlimited: false, status: 'on-sale', studentOnly: false, description: '', details: '', mediaId: null, seatsPerUnit: '1' }]);
+  function addRow(preset: Partial<Row> = {}) {
+    setOpenIdx(rows.length);
+    setRows((prev) => [
+      ...prev,
+      { tierKey: null, name: '', price: '', cap: isShop ? '20' : '100', unlimited: false, status: 'on-sale', studentOnly: false, description: '', details: '', mediaId: null, seatsPerUnit: '1', ...preset },
+    ]);
   }
 
   function removeRow(index: number) {
@@ -99,6 +108,7 @@ export default function TiersEditor({ eventId, kind, initialTiers, photos, soldB
       return;
     }
     setRows((prev) => prev.filter((_, i) => i !== index));
+    setOpenIdx(null);
   }
 
   async function submit(e: React.FormEvent) {
@@ -124,11 +134,13 @@ export default function TiersEditor({ eventId, kind, initialTiers, photos, soldB
       const name = row.name.trim();
       if (!name) {
         setError(`Every ${v.unitType} needs a name.`);
+        setOpenIdx(rows.indexOf(row));
         return;
       }
       const priceNum = Number(row.price.replace(',', '.'));
       if (!Number.isFinite(priceNum) || priceNum < 0) {
         setError(`Please enter a valid price for "${name}" (e.g. 25 or 25.50).`);
+        setOpenIdx(rows.indexOf(row));
         return;
       }
       // An unlimited tier keeps whatever number is in the box (0 if blank) —
@@ -175,305 +187,311 @@ export default function TiersEditor({ eventId, kind, initialTiers, photos, soldB
     // The server assigns keys to new rows — sync them back so saving twice
     // never duplicates a ticket type.
     if (result.data?.tiers) setRows(result.data.tiers.map(toRow));
+    setOpenIdx(null);
     setSaved(true);
     if (savedTimer.current) clearTimeout(savedTimer.current);
     savedTimer.current = setTimeout(() => setSaved(false), 2200);
     router.refresh();
   }
 
-  return (
-    <form onSubmit={submit}>
-      <p className="muted small" style={{ marginTop: 0 }}>
-        Price changes only affect <strong>new</strong> orders — anyone who already reserved or paid keeps the price
-        from when they booked.
-      </p>
-      {error && <div className="notice notice-error">{error}</div>}
+  const STATUS: { key: Row['status']; label: string; hint: string }[] = [
+    { key: 'on-sale', label: 'On sale', hint: 'People can buy it now, until it sells out.' },
+    { key: 'coming-soon', label: 'Coming soon', hint: 'Shown with its price, not buyable yet.' },
+    { key: 'hidden', label: 'Hidden', hint: 'Off the page — use this instead of deleting.' },
+  ];
+  const STOCK = isShop ? [10, 20, 50, 100] : [50, 100, 200, 500];
+  const STARTERS = [
+    { name: 'Early bird', price: '15' },
+    { name: 'Standard', price: '20' },
+    { name: 'VIP', price: '40' },
+    { name: 'Student', price: '12', studentOnly: true },
+    { name: 'Table for 4', price: '80', seatsPerUnit: '4' },
+  ];
+  const photoOf = (id: string | null) => (id ? photos.find((p) => p.id === id)?.url : undefined);
 
-      {rows.length === 0 && (
-        <p className="muted">No {v.unitTypes} yet — add your first one below (you need at least one to publish).</p>
+  return (
+    <form onSubmit={submit} className="ks te">
+      {error && (
+        <div className="notice notice-error" style={{ margin: 0 }}>
+          {error}
+        </div>
       )}
 
-      {rows.map((row, i) => {
-        const sold = row.tierKey ? (soldByTierKey[row.tierKey] ?? 0) : 0;
-        return (
-          <div
-            key={row.tierKey ?? `new-${i}`}
-            style={{
-              border: '1px solid var(--border)',
-              borderRadius: 10,
-              padding: 14,
-              marginBottom: 12,
-              background: 'var(--bg-elevated)',
-            }}
-          >
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                columnGap: 12,
-              }}
-            >
-              <div className="field" style={{ marginBottom: 10 }}>
-                <label htmlFor={`tier-name-${i}`}>Name</label>
-                <input
-                  id={`tier-name-${i}`}
-                  className="input"
-                  value={row.name}
-                  onChange={(e) => patchRow(i, { name: e.target.value })}
-                  maxLength={80}
-                  placeholder="e.g. General Admission"
-                />
-              </div>
-              <div className="field" style={{ marginBottom: 10 }}>
-                <label htmlFor={`tier-price-${i}`}>Price (EUR)</label>
-                <input
-                  id={`tier-price-${i}`}
-                  className="input"
-                  inputMode="decimal"
-                  value={row.price}
-                  onChange={(e) => patchRow(i, { price: e.target.value })}
-                  placeholder="25.00"
-                />
-              </div>
-              <div className="field" style={{ marginBottom: 10 }}>
-                <label htmlFor={`tier-cap-${i}`}>{kind === 'shop' ? 'How many you have' : 'Ticket limit'}</label>
-                <input
-                  id={`tier-cap-${i}`}
-                  className="input"
-                  type="number"
-                  min={0}
-                  value={row.unlimited ? '' : row.cap}
-                  onChange={(e) => patchRow(i, { cap: e.target.value })}
-                  placeholder={row.unlimited ? 'No limit' : '100'}
-                  disabled={row.unlimited}
-                />
-                {/* Right under the box it switches off, so the relationship
-                    between the two is impossible to misread. */}
-                <label className="checkbox-row" style={{ marginTop: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={row.unlimited}
-                    onChange={(e) => patchRow(i, { unlimited: e.target.checked })}
-                  />
+      {rows.length === 0 && (
+        <p className="muted" style={{ margin: 0 }}>
+          No {v.unitTypes} yet — add your first one (you need at least one to publish).
+        </p>
+      )}
+
+      <div className="te-list">
+        {rows.map((row, i) => {
+          const sold = row.tierKey ? (soldByTierKey[row.tierKey] ?? 0) : 0;
+          const open = openIdx === i;
+          const thumb = photoOf(row.mediaId);
+          const priceShown = row.price.trim() ? `€${row.price.replace('.', ',')}` : '€ —';
+          const stockShown = row.unlimited ? 'No limit' : `${row.cap || 0} ${isShop ? 'in stock' : 'tickets'}`;
+          return (
+            <div key={row.tierKey ?? `new-${i}`} className={`te-row${open ? ' is-open' : ''}`}>
+              <button type="button" className="te-sum" onClick={() => setOpenIdx(open ? null : i)} aria-expanded={open}>
+                <span className="te-thumb" aria-hidden="true">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {thumb ? <img src={thumb} alt="" /> : isShop ? '🛍' : '🎟'}
+                </span>
+                <span className="te-sum-text">
+                  <strong>{row.name.trim() || `New ${v.unitType}`}</strong>
                   <span>
-                    Unlimited — sell as many as people want
-                    <span className="muted small" style={{ display: 'block' }}>
-                      No &ldquo;only N left&rdquo; and it never sells out.
-                    </span>
+                    {priceShown} · {stockShown}
+                    {sold > 0 ? ` · ${sold} sold` : ''}
                   </span>
-                </label>
-                {/* One dropdown per ticket type, not a checkbox: an organizer
-                    with an early bird, a standard and a student ticket needs to
-                    say something DIFFERENT about each, and a yes/no could only
-                    ever say two things. Whatever is chosen here is what that row
-                    shows on the event page — no event-wide setting overrules it. */}
-                <div className="field" style={{ marginTop: 10, marginBottom: 0 }}>
-                  <label htmlFor={`tier-status-${i}`} className="small">
-                    This {v.unit} is
-                  </label>
-                  <select
-                    id={`tier-status-${i}`}
-                    className="input"
-                    value={row.status}
-                    onChange={(e) =>
-                      patchRow(i, {
-                        status:
-                          e.target.value === 'coming-soon' || e.target.value === 'hidden'
-                            ? e.target.value
-                            : 'on-sale',
-                      })
-                    }
-                  >
-                    <option value="on-sale">On sale — people can buy it now</option>
-                    <option value="coming-soon">Coming soon — announced, not on sale yet</option>
-                    <option value="hidden">Not available — off the page entirely</option>
-                  </select>
-                  <p className="muted small" style={{ margin: '6px 0 0' }}>
-                    {row.status === 'coming-soon' ? (
-                      <>
-                        On your page with a green <strong>Coming soon</strong> badge and its price, so
-                        people can see what is on the way. Nobody can buy it until you switch this to
-                        On sale.
-                      </>
-                    ) : row.status === 'hidden' ? (
-                      <>
-                        Not shown to anyone and not buyable. Use this instead of deleting a ticket
-                        type you might sell again — deleting one loses the orders attached to it.
-                      </>
-                    ) : (
-                      <>
-                        On sale now, up to its limit. Sells out on its own when the limit is reached.
-                      </>
-                    )}
-                  </p>
-                </div>
-              </div>
-            </div>
-            {/* Optional, and quiet on purpose: almost every tier is one seat per
-                booking, and this only matters for table/group tickets. Buyer
-                pages show the tier as a table the moment it is above 1. */}
-            <div className="field" style={{ marginBottom: 10, maxWidth: 240 }}>
-              <label htmlFor={`tier-seats-${i}`}>
-                {kind === 'shop' ? 'Items per booking' : 'Seats per booking'}
-              </label>
-              <input
-                id={`tier-seats-${i}`}
-                className="input"
-                type="number"
-                min={1}
-                max={20}
-                value={row.seatsPerUnit}
-                onChange={(e) => patchRow(i, { seatsPerUnit: e.target.value })}
-                placeholder="1"
-                // Frozen once anything has sold — the server refuses the change
-                // too, because existing bookings would silently re-weigh
-                // against the room and mint a different number of QR codes.
-                disabled={sold > 0}
-              />
-              <p className="muted small" style={{ margin: '6px 0 0' }}>
-                {sold > 0
-                  ? `Locked — ${sold} already sold at this size. To sell a different size, hide this ${v.unitType} and add a new one.`
-                  : kind === 'shop'
-                    ? 'For bundles: one booking issues this many QR collection codes and uses this much stock.'
-                    : 'For table or group tickets: one booking issues this many QR tickets and uses this many seats.'}
-              </p>
-            </div>
-            <div className="field" style={{ marginBottom: 10 }}>
-              <label htmlFor={`tier-desc-${i}`}>Short description</label>
-              <input
-                id={`tier-desc-${i}`}
-                className="input"
-                value={row.description}
-                onChange={(e) => patchRow(i, { description: e.target.value })}
-                maxLength={300}
-                placeholder={kind === 'shop' ? 'What is in it?' : 'What does this ticket include?'}
-              />
-              <p className="muted small" style={{ margin: '6px 0 0' }}>
-                The one line on the card. Everything longer goes in the write-up below.
-              </p>
-            </div>
-
-            {/* Picture and write-up together, because they are the two things
-                that give this row a page of its own — a shop item always gets
-                one, an event ticket gets one as soon as either of these is
-                filled in. */}
-            <div className="field" style={{ marginBottom: 10 }}>
-              {/* Not a <label>: this labels a grid of buttons, not one form
-                  control, and a label pointing at nothing is worse for a
-                  screen reader than a heading. The buttons carry their own
-                  names. */}
-              <p className="tier-photo-label">Photo</p>
-              {photos.length === 0 ? (
-                /* No empty picker: a grid of nothing looks broken and, worse,
-                   looks like the feature is unavailable. Say where the photos
-                   come from and send them there. */
-                <>
-                  <p className="muted small" style={{ margin: '0 0 8px' }}>
-                    You have not uploaded any photos yet — an item&rsquo;s picture is picked from
-                    them, so add some first and then come back and choose one for each{' '}
-                    {v.unitType}.
-                  </p>
-                  <GoToTab tab="media">Go to Photos &amp; videos →</GoToTab>
-                </>
-              ) : (
-                <>
-                  <div className="tier-photo-picker">
-                    {/* "None" is a real option and it is FIRST: most rows will
-                        never have a picture, and taking one off has to be as
-                        easy as putting one on. */}
-                    <button
-                      type="button"
-                      className={`tier-photo-option tier-photo-none${row.mediaId === null ? ' is-selected' : ''}`}
-                      onClick={() => patchRow(i, { mediaId: null })}
-                      aria-pressed={row.mediaId === null}
-                    >
-                      No photo
-                    </button>
-                    {photos.map((photo) => (
-                      <button
-                        type="button"
-                        key={photo.id}
-                        className={`tier-photo-option${row.mediaId === photo.id ? ' is-selected' : ''}`}
-                        onClick={() => patchRow(i, { mediaId: photo.id })}
-                        aria-pressed={row.mediaId === photo.id}
-                        title={photo.label}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={photo.url} alt={photo.label} loading="lazy" />
-                      </button>
-                    ))}
-                  </div>
-                  <p className="muted small" style={{ margin: '6px 0 0' }}>
-                    Pick one of your own photos. It shows on the card and at the top of this{' '}
-                    {v.unitType}&rsquo;s own page.
-                  </p>
-                </>
-              )}
-            </div>
-
-            <div className="field" style={{ marginBottom: 10 }}>
-              <label htmlFor={`tier-details-${i}`}>About this {v.unit}</label>
-              <textarea
-                id={`tier-details-${i}`}
-                className="input"
-                rows={6}
-                value={row.details}
-                onChange={(e) => patchRow(i, { details: e.target.value.slice(0, MAX_DETAILS) })}
-                maxLength={MAX_DETAILS}
-                placeholder={
-                  kind === 'shop'
-                    ? 'What it is, how it was made, how to use it, how much is in it, how long it keeps…'
-                    : 'What this ticket gets you, who it is for, anything a buyer should know before choosing it…'
-                }
-                style={{ resize: 'vertical', fontFamily: 'inherit' }}
-              />
-              <p
-                className="muted small"
-                style={{
-                  margin: '6px 0 0',
-                  ...(MAX_DETAILS - row.details.length < 200 ? { color: 'var(--red)' } : {}),
-                }}
-              >
-                {MAX_DETAILS - row.details.length} characters left.{' '}
-                {kind === 'shop'
-                  ? 'This is the page a buyer reads before deciding — write it like you would tell somebody at your stall.'
-                  : 'Optional. Fill it in and this ticket gets a page of its own; leave it empty and it stays a card.'}
-              </p>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-              <label className="checkbox-row" style={{ marginBottom: 0 }} htmlFor={`tier-student-${i}`}>
-                <input
-                  id={`tier-student-${i}`}
-                  type="checkbox"
-                  checked={row.studentOnly}
-                  onChange={(e) => patchRow(i, { studentOnly: e.target.checked })}
-                />
-                <span>Students only (checked at the door)</span>
-              </label>
-              <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-                {sold > 0 && (
-                  <span className="muted small">
-                    {sold} sold — can&rsquo;t be removed, set the limit to 0 to stop sales
+                </span>
+                {row.status !== 'on-sale' && (
+                  <span className={`badge${row.status === 'coming-soon' ? ' badge-green' : ''}`}>
+                    {row.status === 'coming-soon' ? 'Coming soon' : 'Hidden'}
                   </span>
                 )}
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  onClick={() => removeRow(i)}
-                  disabled={busy || sold > 0}
-                >
-                  Remove
-                </button>
-              </span>
-            </div>
-          </div>
-        );
-      })}
+                <span className="te-chev" aria-hidden="true">
+                  ▾
+                </span>
+              </button>
 
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button type="button" className="btn btn-sm" onClick={addRow} disabled={busy || rows.length >= 20}>
+              {open && (
+                <div className="te-body">
+                  <div className="te-main">
+                    <div className="field" style={{ margin: 0 }}>
+                      <label htmlFor={`tier-name-${i}`}>Name</label>
+                      <input
+                        id={`tier-name-${i}`}
+                        className="input"
+                        value={row.name}
+                        onChange={(e) => patchRow(i, { name: e.target.value })}
+                        maxLength={80}
+                        placeholder={isShop ? 'e.g. Chicken momo (10 pcs)' : 'e.g. Standard'}
+                        autoFocus={!row.tierKey && !row.name}
+                      />
+                    </div>
+                    <div className="field" style={{ margin: 0 }}>
+                      <label htmlFor={`tier-price-${i}`}>Price</label>
+                      <div className="te-money">
+                        <span aria-hidden="true">€</span>
+                        <input
+                          id={`tier-price-${i}`}
+                          className="input"
+                          inputMode="decimal"
+                          value={row.price}
+                          onChange={(e) => patchRow(i, { price: e.target.value })}
+                          placeholder="0 = free"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="bf-label">{isShop ? 'How many do you have?' : 'How many tickets?'}</div>
+                    <div className="ks-presets">
+                      {STOCK.map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          className={`ks-chip${!row.unlimited && row.cap === String(n) ? ' is-on' : ''}`}
+                          onClick={() => patchRow(i, { cap: String(n), unlimited: false })}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        className={`ks-chip${row.unlimited ? ' is-on' : ''}`}
+                        onClick={() => patchRow(i, { unlimited: true })}
+                      >
+                        ∞ No limit
+                      </button>
+                      {!row.unlimited && (
+                        <input
+                          id={`tier-cap-${i}`}
+                          className="input bf-num"
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          value={row.cap}
+                          onChange={(e) => patchRow(i, { cap: e.target.value })}
+                          aria-label={isShop ? 'How many you have' : 'Ticket limit'}
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="bf-label">Status</div>
+                    <div className="te-seg" role="radiogroup" aria-label={`This ${v.unit} is`}>
+                      {STATUS.map((st) => (
+                        <button
+                          key={st.key}
+                          type="button"
+                          role="radio"
+                          aria-checked={row.status === st.key}
+                          className={row.status === st.key ? 'is-on' : ''}
+                          onClick={() => patchRow(i, { status: st.key })}
+                        >
+                          {st.label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="muted small" style={{ margin: '6px 0 0' }}>
+                      {STATUS.find((st) => st.key === row.status)?.hint}
+                    </p>
+                  </div>
+
+                  <div className="field" style={{ margin: 0 }}>
+                    <label htmlFor={`tier-desc-${i}`}>One line about it</label>
+                    <input
+                      id={`tier-desc-${i}`}
+                      className="input"
+                      value={row.description}
+                      onChange={(e) => patchRow(i, { description: e.target.value })}
+                      maxLength={300}
+                      placeholder={isShop ? 'What is in it?' : 'What does this ticket include?'}
+                    />
+                  </div>
+
+                  <div>
+                    <div className="bf-label">Photo</div>
+                    {photos.length === 0 ? (
+                      <p className="muted small" style={{ margin: 0 }}>
+                        Add photos first, then pick one here. <GoToTab tab="media">Go to Photos →</GoToTab>
+                      </p>
+                    ) : (
+                      <div className="tier-photo-picker">
+                        <button
+                          type="button"
+                          className={`tier-photo-option tier-photo-none${row.mediaId === null ? ' is-selected' : ''}`}
+                          onClick={() => patchRow(i, { mediaId: null })}
+                          aria-pressed={row.mediaId === null}
+                        >
+                          None
+                        </button>
+                        {photos.map((photo) => (
+                          <button
+                            type="button"
+                            key={photo.id}
+                            className={`tier-photo-option${row.mediaId === photo.id ? ' is-selected' : ''}`}
+                            onClick={() => patchRow(i, { mediaId: photo.id })}
+                            aria-pressed={row.mediaId === photo.id}
+                            title={photo.label}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={photo.url} alt={photo.label} loading="lazy" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <details className="bf-inline" open={row.details || row.studentOnly || row.seatsPerUnit !== '1' ? true : undefined}>
+                    <summary>+ More: longer write-up, {isShop ? 'bundles' : 'tables & student tickets'}</summary>
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      <div className="field" style={{ margin: 0 }}>
+                        <label htmlFor={`tier-details-${i}`}>About this {v.unit}</label>
+                        <textarea
+                          id={`tier-details-${i}`}
+                          className="input"
+                          rows={4}
+                          value={row.details}
+                          onChange={(e) => patchRow(i, { details: e.target.value.slice(0, MAX_DETAILS) })}
+                          maxLength={MAX_DETAILS}
+                          placeholder={
+                            isShop
+                              ? 'How it is made, how much is in it, how long it keeps…'
+                              : 'What this ticket gets you, who it is for…'
+                          }
+                          style={{ resize: 'vertical', fontFamily: 'inherit' }}
+                        />
+                        {MAX_DETAILS - row.details.length < 200 && (
+                          <p className="muted small" style={{ margin: '6px 0 0', color: 'var(--red)' }}>
+                            {MAX_DETAILS - row.details.length} characters left.
+                          </p>
+                        )}
+                      </div>
+                      <div className="field" style={{ margin: 0, maxWidth: 260 }}>
+                        <label htmlFor={`tier-seats-${i}`}>{isShop ? 'Items per order (bundle)' : 'Seats per booking (tables)'}</label>
+                        <input
+                          id={`tier-seats-${i}`}
+                          className="input"
+                          type="number"
+                          inputMode="numeric"
+                          min={1}
+                          max={20}
+                          value={row.seatsPerUnit}
+                          onChange={(e) => patchRow(i, { seatsPerUnit: e.target.value })}
+                          placeholder="1"
+                          disabled={sold > 0}
+                        />
+                        <p className="muted small" style={{ margin: '6px 0 0' }}>
+                          {sold > 0
+                            ? `Locked — ${sold} already sold at this size.`
+                            : isShop
+                              ? 'One order gives this many collection codes.'
+                              : 'One booking gives this many QR tickets.'}
+                        </p>
+                      </div>
+                      {!isShop && (
+                        <label className="bf-switch" htmlFor={`tier-student-${i}`} style={{ marginTop: 0 }}>
+                          <input
+                            id={`tier-student-${i}`}
+                            type="checkbox"
+                            checked={row.studentOnly}
+                            onChange={(e) => patchRow(i, { studentOnly: e.target.checked })}
+                          />
+                          <span>
+                            <strong>Students only</strong>
+                            <span className="muted small">Student ID checked at the door.</span>
+                          </span>
+                        </label>
+                      )}
+                    </div>
+                  </details>
+
+                  <div className="te-foot">
+                    <button type="button" className="btn btn-sm" onClick={() => setOpenIdx(null)}>
+                      Done
+                    </button>
+                    {sold > 0 ? (
+                      <span className="muted small">{sold} sold — set it to Hidden to stop selling</span>
+                    ) : (
+                      <button type="button" className="te-remove" onClick={() => removeRow(i)} disabled={busy}>
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="ks-presets">
+        <button type="button" className="btn btn-sm" onClick={() => addRow()} disabled={busy || rows.length >= 20}>
           + Add {v.unitType}
         </button>
+        {!isShop &&
+          STARTERS.filter((st) => !rows.some((r) => r.name.trim().toLowerCase() === st.name.toLowerCase())).map((st) => (
+            <button
+              key={st.name}
+              type="button"
+              className="ks-chip ks-chip-sm"
+              disabled={busy || rows.length >= 20}
+              onClick={() => addRow(st)}
+            >
+              + {st.name}
+            </button>
+          ))}
+      </div>
+
+      <p className="muted small" style={{ margin: 0 }}>
+        Price changes only apply to new orders.
+      </p>
+
+      <div className="ks-save">
         <button type="submit" className="btn btn-brand" disabled={busy}>
           {busy ? <span className="spinner" aria-hidden /> : null}
           {busy ? 'Saving…' : `Save ${v.unitTypes}`}
