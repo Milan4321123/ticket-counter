@@ -2201,3 +2201,48 @@
   color: #ddd6fe;
   font-size: 0.8rem !important;
 }
+
+/* The setup assistant while a section is open: kept, but out of sight. */
+.ed-intro-away {
+  display: none;
+}
+
+.ed-intro {
+  margin-bottom: 16px;
+}
+
+/* "Return to the chat" floats over the section the assistant sent you to. */
+.ed-back-to-chat {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  z-index: 40;
+  padding: 12px 20px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #7c3aed, #db2777);
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 12px 30px rgba(124, 58, 237, 0.5);
+  transform: translateX(-50%);
+  animation: back-chat-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.ed-back-to-chat:active {
+  transform: translateX(-50%) scale(0.97);
+}
+
+@keyframes back-chat-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 16px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}

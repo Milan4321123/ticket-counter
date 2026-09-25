@@ -2,6 +2,10 @@
 
 /** The event a tab listens for to bring itself to the front. */
 export const GOTO_TAB_EVENT = 'nc:goto-tab';
+/** The setup assistant sent the seller to a section and is waiting for them. */
+export const ASSISTANT_AWAY_EVENT = 'nc:assistant-away';
+/** The seller came back to the assistant's chat from that section. */
+export const ASSISTANT_RETURN_EVENT = 'nc:assistant-return';
 
 /**
  * A link that switches the editor to another tab.

@@ -16,7 +16,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import SpeechInput from '@/components/SpeechInput';
 import { formatMoney } from '@/lib/money';
-import { GOTO_TAB_EVENT } from './GoToTab';
+import { ASSISTANT_AWAY_EVENT, ASSISTANT_RETURN_EVENT, GOTO_TAB_EVENT } from './GoToTab';
 import { saveEvent, type SavedTier } from './save';
 
 type Lang = 'en' | 'de' | 'ne';
@@ -497,6 +497,19 @@ export default function SetupAssistant({
     setBusy(false);
   }
 
+  // Back from the section it sent the seller to (photos, publish): look again
+  // at what is left — the photo they just added counts at once.
+  useEffect(() => {
+    const onReturn = () => {
+      if (asking !== 'photo' && asking !== 'publish') return;
+      setBusy(true);
+      void askNext().finally(() => setBusy(false));
+    };
+    window.addEventListener(ASSISTANT_RETURN_EVENT, onReturn);
+    return () => window.removeEventListener(ASSISTANT_RETURN_EVENT, onReturn);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asking]);
+
   // ?assistant=1 (the "Try the AI assistant" door): open straight away.
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('assistant') === '1') void openChat();
@@ -538,7 +551,11 @@ export default function SetupAssistant({
               <button
                 type="button"
                 className="btn btn-brand btn-sm sa-goto"
-                onClick={() => window.dispatchEvent(new CustomEvent(GOTO_TAB_EVENT, { detail: m.goto!.tab }))}
+                onClick={() => {
+                  // Tell the editor to offer "Return to the chat", then go.
+                  window.dispatchEvent(new CustomEvent(ASSISTANT_AWAY_EVENT));
+                  window.dispatchEvent(new CustomEvent(GOTO_TAB_EVENT, { detail: m.goto!.tab }));
+                }}
               >
                 {m.goto.label}
               </button>

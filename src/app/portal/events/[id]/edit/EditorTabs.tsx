@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { GOTO_TAB_EVENT } from './GoToTab';
+import { ASSISTANT_AWAY_EVENT, ASSISTANT_RETURN_EVENT, GOTO_TAB_EVENT } from './GoToTab';
 
 export interface EditorTabDef {
   key: string;
@@ -62,6 +62,13 @@ export default function EditorTabs({
 }) {
   // '' = the card overview.
   const [active, setActive] = useState('');
+  /** The setup assistant sent the seller here; offer the way back to the chat. */
+  const [chatWaiting, setChatWaiting] = useState(false);
+  useEffect(() => {
+    const onAway = () => setChatWaiting(true);
+    window.addEventListener(ASSISTANT_AWAY_EVENT, onAway);
+    return () => window.removeEventListener(ASSISTANT_AWAY_EVENT, onAway);
+  }, []);
 
   /** Open a section from a link inside the editor, with the same history rule as select(). */
   const openFromEvent = (key: string) => {
@@ -152,10 +159,13 @@ export default function EditorTabs({
 
   return (
     <>
+      {/* The setup assistant stays mounted while a section is open (hidden),
+          so its conversation is still there when the seller comes back. */}
+      {intro ? <div className={current ? 'ed-intro-away' : 'ed-intro'}>{intro}</div> : null}
+
       {/* ---- Overview: every section as a card ---- */}
       {!current && (
         <div className="ed-overview">
-          {intro}
           <div className="ed-progress" aria-label={`${doneCount} of ${required.length} required steps done`}>
             <div className="ed-progress-text">
               <strong>
@@ -202,6 +212,20 @@ export default function EditorTabs({
             })}
           </div>
         </div>
+      )}
+
+      {current && chatWaiting && (
+        <button
+          type="button"
+          className="ed-back-to-chat"
+          onClick={() => {
+            setChatWaiting(false);
+            select('');
+            window.dispatchEvent(new CustomEvent(ASSISTANT_RETURN_EVENT));
+          }}
+        >
+          ✨ Return to the chat
+        </button>
       )}
 
       {/* ---- One section open ---- */}
