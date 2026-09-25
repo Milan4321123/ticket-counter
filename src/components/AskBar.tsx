@@ -8,7 +8,7 @@
 // long list of results never pushes the homepage around. ✕, Escape or the
 // phone's back button close it.
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { Lang } from '@/lib/i18n';
 import SpeechInput from './SpeechInput';
@@ -24,38 +24,59 @@ interface Msg {
   thinking?: boolean;
 }
 
-const W: Record<Lang, { pill: string; hello: string; sub: string; ph: string; ideas: string[]; none: string; opening: string; events: string; shops: string; items: string; close: string }> = {
+const W: Record<Lang, { pill: string; hello: string; sub: string; ph: string; ideas: string[]; none: string; opening: string; events: string; shops: string; items: string; close: string; fresh: string }> = {
   en: {
     pill: 'Ask anything — events, momo, how it works…',
     hello: 'Namaste! What are you looking for?',
     sub: 'Find events, shops and food, or ask how anything works.',
     ph: 'Ask or search…',
-    ideas: ['Dashain events', 'Momo in Berlin', 'What can this site do?', 'Open my basket', 'How do I sell tickets?', 'Try the demo'],
+    ideas: ['What is MartNepali?', 'Show me how it works (video)', 'Dashain events', 'Momo in Berlin', 'I want to put my event here', 'How do I pay?', 'Open my basket'],
     none: 'Nothing matched that — try a different word, a city, or ask a question.',
     opening: 'Opening',
-    events: 'Events', shops: 'Shops', items: 'Food & goods', close: 'Close',
+    events: 'Events', shops: 'Shops', items: 'Food & goods', close: 'Close', fresh: 'New chat',
   },
   de: {
     pill: 'Frag einfach — Events, Momo, wie es geht…',
     hello: 'Namaste! Wonach suchst du?',
     sub: 'Finde Events, Läden und Essen — oder frag, wie etwas funktioniert.',
     ph: 'Fragen oder suchen…',
-    ideas: ['Dashain Events', 'Momo in Berlin', 'Was kann diese Seite?', 'Öffne meinen Warenkorb', 'Wie verkaufe ich Tickets?', 'Demo ausprobieren'],
+    ideas: ['Was ist MartNepali?', 'Zeig mir, wie es geht (Video)', 'Dashain Events', 'Momo in Berlin', 'Ich möchte mein Event hier anbieten', 'Wie bezahle ich?', 'Öffne meinen Warenkorb'],
     none: 'Nichts gefunden — versuch ein anderes Wort, eine Stadt oder stell eine Frage.',
     opening: 'Öffne',
-    events: 'Events', shops: 'Läden', items: 'Essen & Waren', close: 'Schließen',
+    events: 'Events', shops: 'Läden', items: 'Essen & Waren', close: 'Schließen', fresh: 'Neuer Chat',
   },
   ne: {
     pill: 'जे पनि सोध्नुहोस् — कार्यक्रम, मम, कसरी चल्छ…',
     hello: 'नमस्ते! तपाईं के खोज्दै हुनुहुन्छ?',
     sub: 'कार्यक्रम, पसल र खाना खोज्नुहोस्, वा कुनै कुरा कसरी चल्छ सोध्नुहोस्।',
     ph: 'सोध्नुहोस् वा खोज्नुहोस्…',
-    ideas: ['दशैं कार्यक्रम', 'Berlin मा momo', 'यो साइटले के गर्छ?', 'मेरो टोकरी खोल्नुहोस्', 'टिकट कसरी बेच्ने?', 'डेमो हेर्नुहोस्'],
+    ideas: ['MartNepali के हो?', 'यो कसरी चल्छ देखाउनुहोस् (भिडियो)', 'दशैं कार्यक्रम', 'Berlin मा momo', 'मेरो कार्यक्रम यहाँ राख्न चाहन्छु', 'कसरी भुक्तानी गर्ने?', 'मेरो टोकरी खोल्नुहोस्'],
     none: 'केही भेटिएन — अर्को शब्द, सहर, वा प्रश्न सोध्नुहोस्।',
     opening: 'खोल्दै',
-    events: 'कार्यक्रम', shops: 'पसल', items: 'खाना र सामान', close: 'बन्द गर्नुहोस्',
+    events: 'कार्यक्रम', shops: 'पसल', items: 'खाना र सामान', close: 'बन्द गर्नुहोस्', fresh: 'नयाँ कुराकानी',
   },
 };
+
+/** Answer text with its "[label](/path)" links made real (site paths only). */
+function rich(text: string, onClose: () => void) {
+  const out: ReactNode[] = [];
+  const re = /\[([^\]]{1,60})\]\((\/[^)\s]{0,80})\)|\*\*([^*]{1,80})\*\*/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    if (m[1]) {
+      out.push(
+        <Link key={m.index} href={m[2]} className="ab-inline" onClick={onClose}>
+          {m[1]}
+        </Link>
+      );
+    } else out.push(<strong key={m.index}>{m[3]}</strong>);
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
 
 function Orb({ busy = false, size = 26 }: { busy?: boolean; size?: number }) {
   return <span className={`ab-orb${busy ? ' is-busy' : ''}`} style={{ width: size, height: size }} aria-hidden="true" />;
@@ -92,8 +113,26 @@ export default function AskBar({ lang = 'en' }: { lang?: Lang }) {
   );
 }
 
+/** The conversation lives for this visit (the tab), like a session cookie. */
+const STORE = 'ask:chat:v1';
+function loadChat(): Msg[] {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(STORE) || '[]') as Msg[];
+    return Array.isArray(saved) ? saved.filter((m) => !m.thinking && !m.going).slice(-40) : [];
+  } catch {
+    return [];
+  }
+}
+
 function AskOverlay({ w, onClose }: { w: (typeof W)['en']; onClose: () => void }) {
-  const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [msgs, setMsgs] = useState<Msg[]>(loadChat);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(STORE, JSON.stringify(msgs.filter((m) => !m.thinking && !m.going).slice(-40)));
+    } catch {
+      // Private mode: the chat simply starts fresh next time.
+    }
+  }, [msgs]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -125,7 +164,7 @@ function AskOverlay({ w, onClose }: { w: (typeof W)['en']; onClose: () => void }
   }, []);
 
   useEffect(() => {
-    log.current?.scrollTo({ top: log.current.scrollHeight, behavior: 'smooth' });
+    log.current?.scrollTo({ top: log.current.scrollHeight, behavior: msgs.length > 2 ? 'smooth' : 'auto' });
   }, [msgs]);
 
   async function ask(text: string) {
@@ -138,7 +177,11 @@ function AskOverlay({ w, onClose }: { w: (typeof W)['en']; onClose: () => void }
       const res = await fetch('/api/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ q }),
+        body: JSON.stringify({
+          q,
+          // The conversation so far, so follow-ups ("explain more") make sense.
+          history: msgs.filter((m) => m.text && !m.thinking).slice(-6).map((m) => ({ from: m.from, text: m.text })),
+        }),
       });
       const d = (await res.json().catch(() => null)) as {
         links?: AskLink[]; results?: AskResult[]; answer?: string | null; note?: string | null; go?: boolean; error?: string;
@@ -173,6 +216,11 @@ function AskOverlay({ w, onClose }: { w: (typeof W)['en']; onClose: () => void }
       <div className="ab-top">
         <Orb busy={busy} size={30} />
         <span className="ab-top-title">Ask</span>
+        {msgs.length > 0 && (
+          <button type="button" className="ab-new" onClick={() => setMsgs([])} disabled={busy}>
+            ＋ {w.fresh}
+          </button>
+        )}
         <button type="button" className="ab-x" onClick={() => window.history.back()} aria-label={w.close}>
           ✕
         </button>
@@ -208,7 +256,7 @@ function AskOverlay({ w, onClose }: { w: (typeof W)['en']; onClose: () => void }
                 </p>
               ) : (
                 <>
-                  {m.text && <p>{m.text}</p>}
+                  {m.text && <p>{rich(m.text, onClose)}</p>}
                   {m.links && m.links.length > 0 && (
                     <div className="ab-links">
                       {m.links.map((l) => (

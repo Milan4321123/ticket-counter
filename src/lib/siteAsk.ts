@@ -30,7 +30,7 @@ export interface AskResult {
 const INTENTS: { re: RegExp; link: AskLink }[] = [
   { re: /\b(basket|cart|warenkorb|korb|tokari)\b|टोकरी|बास्केट/i, link: { label: 'Your basket', href: '/basket', icon: '🧺' } },
   { re: /\b(my (orders?|tickets?|account)|account|sign ?in|log ?in|konto|meine (bestellung|tickets)|anmelden|mero (ticket|order|khata))\b|मेरो (टिकट|अर्डर|खाता)|खाता/i, link: { label: 'Your account & tickets', href: '/account', icon: '👤' } },
-  { re: /\b(sell|seller|organi[sz]er|open (a |my )?(shop|store)|create (an? )?(event|shop)|verkauf|veranstalter|bech(na|nu|chu)|pasal kholn)\w*|बेच्न|पसल खोल्न/i, link: { label: 'Sell with us — free', href: '/organizers', icon: '🚀' } },
+  { re: /\b(sell|seller|organi[sz]er|open (a |my )?(shop|store)|create (an? )?(event|shop)|(put|list|add|post|advertise|promote) (my|our|an?)( own)? (event|shop|restaurant|business|concert|program)|anbieten|verkauf|veranstalter|bech(na|nu|chu)|pasal kholn)\w*|बेच्न|पसल खोल्न/i, link: { label: 'Sell with us — free', href: '/organizers', icon: '🚀' } },
   { re: /\b(demo|try (it|the app)|ausprobieren|testen)\b|डेमो/i, link: { label: 'Try the demo', href: '/demo', icon: '▶' } },
   { re: /\b(bazaar|bazar|market|basar|groceries|grocery|food|essen|khana|khaja)\b|बजार|खाना/i, link: { label: 'The bazaar', href: '/market', icon: '🛍' } },
   { re: /\b(portal|seller (login|hub)|organi[sz]er (login|sign))\b/i, link: { label: 'Seller sign-in', href: '/portal/login', icon: '🔑' } },
@@ -119,4 +119,66 @@ export function askSearch(q: string): AskResult[] {
 function pictureOf(e: EventRow): string | null {
   const id = e.posterMediaId || e.coverMediaId || e.profileMediaId;
   return id ? mediaUrl(id, 'card', null) : null;
+}
+
+
+/**
+ * Every page the chat may send people to, with what it is for — the model
+ * links ONLY to these (anything else is dropped before it reaches the page).
+ */
+export const SITE_PAGES: { path: string; what: string }[] = [
+  { path: '/', what: 'the homepage: upcoming Nepali events and shops' },
+  { path: '/#events', what: 'the homepage section with upcoming events (swipe through them)' },
+  { path: '/#shops', what: 'the homepage section with Nepali shops you can order from' },
+  { path: '/#picks', what: 'the homepage section with popular food and goods' },
+  { path: '/organizers#video', what: 'a 1-minute video of the whole app — the easiest way to understand how it works' },
+  { path: '/market', what: 'the bazaar: order momo, sweets, groceries, clothes and crafts from Nepali shops; collect with a QR code' },
+  { path: '/organizers', what: 'Sell with us: free pages for events, shops, restaurants and bookings; how it works, a video' },
+  { path: '/demo', what: 'try the seller tools yourself in a ready-made demo account, no sign-up' },
+  { path: '/contact?intent=account', what: 'apply for a free organizer / shop account (a person approves it)' },
+  { path: '/portal/login', what: 'organizers and shop owners sign in to their seller hub' },
+  { path: '/account', what: 'buyers: your orders, tickets and QR codes; sign in with email or Google' },
+  { path: '/basket', what: 'your basket — items from several shops, paid shop by shop' },
+  { path: '/showcase', what: 'every feature for sellers, shown one by one' },
+  { path: '/patro', what: 'Nepali calendar (patro) with festival dates' },
+  { path: '/festivals', what: 'Nepali festivals — Dashain, Tihar, Holi, Teej and more — with events for each' },
+  { path: '/contact', what: 'talk to the team; ask for a custom-designed event page or a promo video' },
+  { path: '/privacy', what: 'privacy and how personal data is handled' },
+];
+
+/** How each destination looks as a button under an answer. */
+const BUTTON: Record<string, { icon: string; label: string }> = {
+  '/': { icon: '🏠', label: 'Home' },
+  '/#events': { icon: '🎟', label: 'Upcoming events' },
+  '/#shops': { icon: '🏪', label: 'Shops' },
+  '/#picks': { icon: '🥟', label: 'Popular items' },
+  '/market': { icon: '🛍', label: 'The bazaar' },
+  '/organizers': { icon: '🚀', label: 'Sell with us — free' },
+  '/organizers#video': { icon: '🎬', label: 'Watch the 1-min video' },
+  '/demo': { icon: '▶', label: 'Try the demo' },
+  '/contact?intent=account': { icon: '📝', label: 'Apply for a free account' },
+  '/portal/login': { icon: '🔑', label: 'Seller sign-in' },
+  '/account': { icon: '👤', label: 'Your account & tickets' },
+  '/basket': { icon: '🧺', label: 'Your basket' },
+  '/showcase': { icon: '✨', label: 'All features' },
+  '/patro': { icon: '📅', label: 'Nepali calendar' },
+  '/festivals': { icon: '🪔', label: 'Festivals' },
+  '/contact': { icon: '💬', label: 'Talk to the team' },
+  '/privacy': { icon: '🔒', label: 'Privacy' },
+};
+
+/** Internal links in an answer, "[label](/path)", kept only when they are real pages. */
+export function answerLinks(answer: string): { clean: string; links: AskLink[] } {
+  const allowed = new Set(SITE_PAGES.map((p) => p.path.split('?')[0]));
+  const links: AskLink[] = [];
+  const clean = answer.replace(/\[([^\]]{1,60})\]\(([^)\s]{1,80})\)/g, (all, label: string, href: string) => {
+    const path = href.replace(/^https?:\/\/[^/]+/, '');
+    if (!path.startsWith('/') || !allowed.has(path.split(/[?#]/)[0])) return label;
+    const known = BUTTON[path] ?? BUTTON[path.split('#')[0]];
+    // A label that is just the address reads badly — use the page's name.
+    const words = /^\/|^https?:/.test(label.trim()) ? (known?.label ?? label) : label;
+    if (!links.some((l) => l.href === path)) links.push({ label: known?.label ?? words, href: path, icon: known?.icon ?? '→' });
+    return `[${words}](${path})`;
+  });
+  return { clean, links };
 }

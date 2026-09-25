@@ -60,7 +60,7 @@ export default function OrganizersPage() {
       </section>
 
       {/* ---- 48 seconds of the real app ---- */}
-      <section className="container og-video">
+      <section className="container og-video" id="video">
         <PitchVideo caption="The real app, start to finish — set up, get orders, get paid." />
       </section>
 

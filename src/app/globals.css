@@ -9134,3 +9134,30 @@ html.tx-wait body {
     animation: none;
   }
 }
+
+.ab-inline {
+  color: #f0abfc;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: rgba(240, 171, 252, 0.45);
+  text-underline-offset: 3px;
+}
+
+/* Where the Ask chat's "/#events" links land — clear of the sticky header. */
+.ab-anchor {
+  display: block;
+  scroll-margin-top: 80px;
+}
+
+.ab-new {
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}

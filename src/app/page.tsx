@@ -234,6 +234,8 @@ export default async function HomePage() {
           </p>
         </div>
       )}
+      {/* Anchors the Ask chat links to ("/#events", "/#shops", "/#picks"). */}
+      <span id="events" className="ab-anchor" aria-hidden="true" />
       <HomeBillboard slides={slides} startAt={slidesStart} />
       <nav className="qt container" aria-label={tr('home.title')}>
         <Link href="/market" className="qt-tile qt-bazaar">
@@ -275,6 +277,7 @@ export default async function HomePage() {
           the first thing between a visitor and the reason they came, and news
           about the site is never that. Someone who has scrolled the whole
           listing is the one it is actually for. */}
+      <span id="shops" className="ab-anchor" aria-hidden="true" />
       <ShopRail
         kicker={tr('sr.kicker')}
         title={tr('sr.title')}
@@ -284,6 +287,7 @@ export default async function HomePage() {
         itemsLabel={tr('sr.items')}
       />
 
+      <span id="picks" className="ab-anchor" aria-hidden="true" />
       <BazaarPager
         kicker={tr('bb.bazaar')}
         title={tr('home.picks')}
