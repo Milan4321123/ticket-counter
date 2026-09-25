@@ -1,3 +1,4 @@
+import LoopCarousel from '@/components/LoopCarousel';
 import Stars from '@/components/Stars';
 import { ratingForShop, ratingsForItems } from '@/lib/reviews';
 import { MixedScript } from '@/components/Np';
@@ -897,11 +898,8 @@ export default async function EventPage({ params, searchParams }: Params) {
                   own column counts and its own tile, both of which need the
                   full width to be worth looking at. The event grid keeps the
                   auto-fit it has always had. */}
-              <div className={isShop ? 'tier-grid goods-grid' : 'tier-grid'}>
-                {/* Sold-out rows sink to the bottom of the grid: see
-                    tiersInSaleOrder. The organizer's own order survives inside
-                    each group. */}
-                {tiersInSaleOrder(tiers, availability).map((tier) => {
+              {(() => {
+                const tierCards = tiersInSaleOrder(tiers, availability).map((tier) => {
                   const tierAvail = availability.tiers[tier.tierKey];
                   const remaining = tierAvail?.remaining ?? 0;
                   // The card is the button when this type can actually be
@@ -1084,8 +1082,21 @@ export default async function EventPage({ params, searchParams }: Params) {
                       {card}
                     </div>
                   );
-                })}
-              </div>
+                });
+                // Sold-out rows sink to the end: see tiersInSaleOrder. The
+                // organizer's own order survives inside each group.
+                //
+                // An event's tickets swipe like the homepage's cards — one in
+                // the middle, the others either side, endless — once there is
+                // more than one. A shop keeps its shopfront grid.
+                return !isShop && tierCards.length > 1 ? (
+                  <LoopCarousel label={v.Units} className="tier-lc">
+                    {tierCards}
+                  </LoopCarousel>
+                ) : (
+                  <div className={isShop ? 'tier-grid goods-grid' : 'tier-grid'}>{tierCards}</div>
+                );
+              })()}
               <p className="muted small">
                 Up to {event.maxPerOrder} {v.units} per order.
               </p>

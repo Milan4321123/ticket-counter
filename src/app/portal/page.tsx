@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import LogoutButton from './LogoutButton';
 import DemoPicker from './DemoPicker';
-import LoopCarousel from './LoopCarousel';
+import LoopCarousel from '@/components/LoopCarousel';
 import { readListingName } from '@/lib/exampleShop';
 import PlatformAssistant from '@/components/PlatformAssistant';
 import {
@@ -195,7 +195,7 @@ export default async function PortalDashboardPage({
                 {questions > 0 ? `${questions} open question${questions === 1 ? '' : 's'}` : ''}
               </span>
             </div>
-            <LoopCarousel label={tr('hub.yourListings')}>
+            <LoopCarousel label={tr('hub.yourListings')} className="hub-lc">
               {shownCards.map(({ event, stats, openQuestions, thumb }) => {
                 const v = vocabFor(event.kind);
                 const pct =
