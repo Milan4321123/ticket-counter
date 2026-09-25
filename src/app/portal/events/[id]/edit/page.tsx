@@ -295,8 +295,9 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
       // shops that asked. The stall emails link straight to ?tab=stalls on
       // either editor, so the key must be the same on both sides.
       key: 'stalls',
-      label: isShop ? 'Events' : 'Stalls',
+      label: isShop ? 'Sell at events' : 'Shop stalls',
       status: 'neutral' as const,
+      line: isShop ? 'Put your shop up as a stall at an event' : 'Shops that sell at your event',
       // Green and on the tab, like Questions: a pending request is a person
       // waiting on this organizer's decision.
       badge: !isShop && pendingStalls.length > 0 ? `${pendingStalls.length} new` : undefined,
