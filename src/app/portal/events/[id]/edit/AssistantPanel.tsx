@@ -146,18 +146,31 @@ export default function AssistantPanel({ eventId, aiEnabled, initial }: Props) {
 
       <form onSubmit={save}>
         <p className="muted small" style={{ marginTop: 0 }}>
-          The assistant on your event page already knows your date, venue, prices, updates and FAQ. Everything else it
-          has to hear from you — parking, food, age limits, dress code, the cloakroom, when the doors really open.
-          Write it here like you would tell a friend. Visitors never see this text; it only helps the assistant answer
-          them instead of passing the question to you.
+          It already knows your date, place, prices and FAQ. Add what else people ask — only the assistant reads this.
         </p>
 
+        <div className="ks-presets" style={{ marginBottom: 8 }}>
+          {['🚗 Parking: ', '🍽 Food & drinks: ', '👶 Age limit: ', '🚪 Doors open at ', '🧥 Cloakroom: ', '♿ Access: '].map((topic) => (
+            <button
+              key={topic}
+              type="button"
+              className="ks-chip ks-chip-sm"
+              onClick={() => {
+                setText((t) => (t.trim() ? `${t.trimEnd()}\n${topic}` : topic).slice(0, MAX_CONTEXT));
+                document.getElementById('assistant-context')?.focus();
+              }}
+            >
+              + {topic.replace(/[:]? $/, '').replace(/ at$/, '')}
+            </button>
+          ))}
+        </div>
+
         <div className="field">
-          <label htmlFor="assistant-context">What else should it know?</label>
           <textarea
             id="assistant-context"
             className="input"
-            rows={12}
+            rows={5}
+            aria-label="What else should the assistant know?"
             value={text}
             onChange={(e) => setText(e.target.value.slice(0, MAX_CONTEXT))}
             maxLength={MAX_CONTEXT}
@@ -174,9 +187,11 @@ export default function AssistantPanel({ eventId, aiEnabled, initial }: Props) {
               onText={(spoken) => setText((speechBase.current + spoken).slice(0, MAX_CONTEXT))}
             />
           </div>
-          <p className="muted small" style={{ margin: '6px 0 0', ...(remaining < 200 ? { color: 'var(--red)' } : {}) }}>
-            {remaining} characters left. Whatever you dictate lands in the box above and stays yours to edit.
-          </p>
+          {remaining < 200 && (
+            <p className="muted small" style={{ margin: '6px 0 0', color: 'var(--red)' }}>
+              {remaining} characters left.
+            </p>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -195,7 +210,7 @@ export default function AssistantPanel({ eventId, aiEnabled, initial }: Props) {
 
         <p className="muted small" style={{ margin: '10px 0 0' }}>
           {aiEnabled
-            ? 'The AI can turn these notes into ready-made FAQ entries (it saves them first). You review every one before anything goes on your page — and it writes in the language you wrote your notes in, so write them in the language your buyers read.'
+            ? '“Suggest FAQ answers” turns your notes into FAQ entries for you to check — in the language you wrote them in.'
             : 'The AI assistant is not switched on for this server, so there are no automatic FAQ suggestions — your notes are still saved, and the FAQ below is yours to write.'}
         </p>
       </form>
