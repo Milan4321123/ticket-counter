@@ -4377,3 +4377,38 @@
     transform: translate(-50%, 0);
   }
 }
+
+/* ======================================================================
+   Laptop and desktop: everything fits the screen at 100% zoom.
+   On a phone a row that runs off the edge is a swipe; on a laptop it reads
+   as a page cut off at the side. So from 1000px the chip rows wrap, the item
+   rows show whole cards only (the arrows page them), and a tile is shorter —
+   a 4:3 picture and a one-line subscribe price — so two rows of items fit
+   under the filters. The seller line is untouched (see .bz-tile-seller).
+   ====================================================================== */
+@media (min-width: 1000px) {
+  .bz-chips,
+  .bz-chips-inline {
+    flex-wrap: wrap;
+    overflow: visible;
+    white-space: normal;
+  }
+
+  .bz-grid.bz-swipe {
+    --sw-cols: 5;
+  }
+
+  .bz-swipe .bz-tile-media {
+    aspect-ratio: 4 / 3;
+  }
+
+  .bz-swipe .bz-tile-body {
+    padding: 9px 11px 10px;
+  }
+
+  .bz-tile-sub {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
