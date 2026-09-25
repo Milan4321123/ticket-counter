@@ -154,7 +154,7 @@ export default async function OrderPage({
     const st = kitchenInfo.kitchenStatus;
     const atTable = Boolean(kitchenInfo.tableLabel);
     // A shop with pickup times cooks (the kitchen pack); any other packs goods.
-    const cooks = parseSlotConfig(event.pickupSlots).enabled || atTable;
+    const cooks = parseSlotConfig(event.pickupSlots).enabled || atTable || event.category === 'khaja-food';
     const steps: TrackerStep[] = [
       { label: 'Ordered', at: order.createdAt, done: true },
       { label: paid ? 'Paid' : 'Waiting for your payment', at: order.paidAt, done: paid },

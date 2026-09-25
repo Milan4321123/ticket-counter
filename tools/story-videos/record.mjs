@@ -8,8 +8,11 @@ const story = await import(`./stories/${id}.mjs`);
 const OUT = new URL(`./out/${id}`, import.meta.url).pathname.replace(/%20/g, ' ');
 
 const h = await openRecorder(OUT);
-const L = await h.enterDemo();
-console.log('demo', L.organizerId);
+// Seller stories run in a fresh demo account; the customer's runs on the
+// public site and warms its own pages.
+const L = story.meta.demo === false ? {} : await h.enterDemo();
+if (L.organizerId) console.log('demo', L.organizerId);
+for (const p of story.meta.warm ?? []) await h.warm(p);
 
 // Warm every page the story visits (dev compiles on the first visit).
 for (const l of [L.restaurant, L.event, L.grocery].filter(Boolean)) {

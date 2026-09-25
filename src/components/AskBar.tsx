@@ -12,6 +12,10 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { Lang } from '@/lib/i18n';
 import SpeechInput from './SpeechInput';
+import StoryPlayer from './StoryPlayer';
+
+/** "/#watch" in an answer is the customer's story video, played right here. */
+const isWatch = (href: string) => href === '/#watch';
 
 interface AskLink { label: string; href: string; icon: string }
 interface AskResult { kind: 'event' | 'shop' | 'item' | 'offer'; title: string; sub: string; href: string; image: string | null }
@@ -112,7 +116,9 @@ function rich(text: string, onClose: () => void) {
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
     if (m.index > last) out.push(text.slice(last, m.index));
-    if (m[1]) {
+    if (m[1] && isWatch(m[2])) {
+      out.push(<StoryPlayer key={m.index} storyId="customer" label={m[1]} variant="inline" />);
+    } else if (m[1]) {
       out.push(
         <Link
           key={m.index}
@@ -349,7 +355,10 @@ function AskOverlay({ w, onClose }: { w: (typeof W)['en']; onClose: () => void }
                   {m.text && <p>{rich(m.text, onClose)}</p>}
                   {m.links && m.links.length > 0 && (
                     <div className="ab-links">
-                      {m.links.map((l) => (
+                      {m.links.map((l) =>
+                        isWatch(l.href) ? (
+                          <StoryPlayer key={l.href} storyId="customer" label={`${l.label} · 1½ min`} />
+                        ) : (
                         <Link
                           key={l.href}
                           href={l.href}
@@ -365,7 +374,8 @@ function AskOverlay({ w, onClose }: { w: (typeof W)['en']; onClose: () => void }
                         >
                           <span aria-hidden="true">{l.icon}</span> {l.label} →
                         </Link>
-                      ))}
+                        )
+                      )}
                     </div>
                   )}
                   {m.results &&

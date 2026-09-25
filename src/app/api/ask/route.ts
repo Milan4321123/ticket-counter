@@ -163,7 +163,8 @@ export async function POST(req: Request) {
           'here, warmly invite them: it is free, no commission, the money goes straight to their own account, and an ' +
           'AI helper fills in their page — and link to /organizers, /demo and /contact?intent=account. ' +
           'For greetings or vague messages, say in one line what the site is and what they can do next, with links. ' +
-          'When someone wants to understand how it works, suggest the 1-minute video (/organizers#video). When they ask ' +
+          'When someone wants to understand how it works, suggest a video: for buyers the 1½-minute customer video (/#watch), ' +
+          'for sellers or organizers the 1-minute seller video (/organizers#video). When they ask ' +
           'about a part of the homepage (the events, the shops, the popular items), link that section (/#events, /#shops, /#picks). ' +
           'End with one short follow-up question they might want to ask next, when it helps. ' +
           'Link labels are words (e.g. [try the demo](/demo)), never the address itself. ' +

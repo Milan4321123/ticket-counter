@@ -108,16 +108,16 @@
   <div id="outro">
     <div class="logo el" data-d="0">Mart<span>Nepali</span></div>
     <div class="big el" data-d="0.12" id="o-t"></div>
-    <div class="chips">
+    <div class="chips" id="o-chips">
       <div class="chip el" data-d="0.35">€0 fees · no commission</div>
       <div class="chip el" data-d="0.45">Paid straight to your own account</div>
       <div class="chip el" data-d="0.55">English · Deutsch · नेपाली</div>
     </div>
     <div class="row">
-      <div class="cta el" data-d="0.75">▶ Try it free</div>
-      <div class="url el" data-d="0.85">martnepali.com/demo</div>
+      <div class="cta el" data-d="0.75" id="o-cta">▶ Try it free</div>
+      <div class="url el" data-d="0.85" id="o-url">martnepali.com/demo</div>
     </div>
-    <div class="vid el" data-d="1.3">🎬 <b>Want a video like this for your page?</b><span class="mail">support@eventsticketbuy.com</span></div>
+    <div class="vid el" data-d="1.3" id="o-vid">🎬 <b>Want a video like this for your page?</b><span class="mail">support@eventsticketbuy.com</span></div>
   </div>
 </div>
 <script>
@@ -136,6 +136,12 @@ window.setup = (tl, frames) => {
   $('i-t').innerHTML = tl.meta.intro.title;
   $('i-s').textContent = tl.meta.intro.sub;
   $('o-t').innerHTML = tl.meta.outro.title;
+  // A story may speak to someone else than a seller (the customer's).
+  const o = tl.meta.outro;
+  if (o.chips) $('o-chips').innerHTML = o.chips.map((c, i) => `<div class="chip el" data-d="${0.35 + i * 0.1}">${c}</div>`).join('');
+  if (o.cta) $('o-cta').textContent = o.cta;
+  if (o.url) $('o-url').textContent = o.url;
+  if (o.vid === false) $('o-vid').remove();
   $('steps').innerHTML = tl.chapters.map((c, i) => `<div class="st" data-i="${i}"><i>${i + 1}</i><span>${c.chapter}</span></div>`).join('');
 };
 

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { currentLang, serverT } from '@/lib/i18nServer';
 import AskBar from '@/components/AskBar';
+import StoryPlayer from '@/components/StoryPlayer';
 import { ensureExampleBazaarOnce } from '@/lib/exampleBazaar';
 import { runSubscriptionSweep } from '@/lib/subscriptions';
 import ShopRail from '@/components/ShopRail';
@@ -222,6 +223,10 @@ export default async function HomePage() {
       {/* Ask anything — opens a full-screen chat over the page. */}
       <div className="container ab-wrap">
         <AskBar lang={await currentLang()} />
+        {/* The customer's story video: find, ask, order, pay, collect. */}
+        <p className="ab-watch">
+          <StoryPlayer storyId="customer" label="How it works · watch in 1½ min" />
+        </p>
       </div>
       {upcomingCount > 0 && (
         <div className="container pk-head">

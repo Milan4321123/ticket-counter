@@ -9806,3 +9806,24 @@ html.tx-wait body {
   justify-content: center;
   gap: 14px;
 }
+.ab-watch {
+  margin: 10px 0 0;
+  text-align: center;
+}
+.ab-watch .sp-chip {
+  font-size: 0.85rem;
+  padding: 6px 12px;
+}
+/* A story link inside a sentence (the Ask chat). */
+.sp-inline {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #f0abfc;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

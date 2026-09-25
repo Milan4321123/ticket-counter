@@ -6,6 +6,7 @@ import puppeteer from 'puppeteer-core';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 
 const require = createRequire(new URL('../../package.json', import.meta.url));
 const Database = require('better-sqlite3');
@@ -24,6 +25,20 @@ export function demoListings() {
     salon: rows.find((r) => r.kind === 'shop' && r.slug.endsWith('-glow-beauty')),
     grocery: rows.find((r) => r.kind === 'shop' && r.slug.endsWith('-kirana')),
   };
+}
+
+/**
+ * The seller's side, off camera (seller-side.ts): 'paid' confirms the
+ * transfer, 'kitchen' moves the order to cooking / ready.
+ */
+export function seller(what, orderId, status = '') {
+  const root = fileURLToPath(new URL('../../', import.meta.url));
+  const out = execFileSync(
+    'node',
+    ['--experimental-transform-types', '--disable-warning=ExperimentalWarning', '--import', './tests/register.mjs', 'tools/story-videos/seller-side.ts', what, orderId, status],
+    { cwd: root, encoding: 'utf8' }
+  );
+  console.log(out.trim());
 }
 
 /** Read-only look into the database (a ticket code, an order id). */
@@ -233,7 +248,7 @@ export async function openRecorder(outDir) {
       }, el);
     },
     /** Finger to it, press, really tap it. */
-    async tap(sel, text, { hold = 110, after = 700, nav = false, el: given } = {}) {
+    async tap(sel, text, { hold = 110, after = 700, nav = false, el: given, ff = false } = {}) {
       const el = given ?? (await h.find(sel, text));
       await h.reveal(el);
       const { x, y } = await h.center(el);
@@ -245,7 +260,10 @@ export async function openRecorder(outDir) {
       const navP = nav ? page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 60000 }).catch(() => {}) : null;
       await page.touchscreen.tap(x, y);
       await page.evaluate((xx, yy) => window.__fpress(xx, yy, false), x, y).catch(() => {});
+      // ff: a slow page (a reservation, a payment) — the wait is fast-forwarded.
+      if (navP && ff) mark('ff-start');
       if (navP) await navP;
+      if (navP && ff) mark('ff-end');
       await sleep(after);
       return el;
     },

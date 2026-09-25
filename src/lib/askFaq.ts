@@ -53,16 +53,16 @@ const FREE: Answers = {
 const HOW: Answers = {
   en:
     'Pick an event or a shop, choose your tickets or items, and pay the seller directly — bank transfer, PayPal or card, whatever they offer. Your QR code arrives by email: show it at the door, or when you collect your order. ' +
-    'The [1-minute video](/organizers#video) walks through it, or [try the seller side yourself](/demo).',
+    '[Watch it in 1½ minutes](/#watch) — or, if you sell, see [the seller side](/organizers#video).',
   de:
     'Wähle ein Event oder einen Laden, such dir Tickets oder Artikel aus und bezahle direkt beim Verkäufer — Überweisung, PayPal oder Karte, je nach Angebot. Dein QR-Code kommt per E-Mail: am Einlass zeigen oder beim Abholen. ' +
-    'Das [1-Minuten-Video](/organizers#video) zeigt es, oder [probier die Verkäuferseite selbst aus](/demo).',
+    '[In 1½ Minuten ansehen](/#watch) — oder, wenn du verkaufst, [die Verkäuferseite](/organizers#video).',
   ne:
     'कार्यक्रम वा पसल छान्नुहोस्, टिकट वा सामान रोज्नुहोस्, र बेच्नेलाई सिधै तिर्नुहोस् — बैंक ट्रान्सफर, PayPal वा कार्ड, जे उपलब्ध छ। QR कोड इमेलमा आउँछ: ढोकामा वा सामान लिँदा देखाउनुहोस्। ' +
-    '[१ मिनेटको भिडियो](/organizers#video) हेर्नुहोस्, वा [आफैं डेमो चलाउनुहोस्](/demo)।',
+    '[१½ मिनेटमा हेर्नुहोस्](/#watch) — बेच्नुहुन्छ भने [बेच्नेको भाग](/organizers#video)।',
   rn:
     'Event wa pasal channus, ticket wa saman rojnus, ani bechne lai sidhai tirnus — bank transfer, PayPal wa card, je cha. QR code email ma aaucha: dhoka ma wa saman lina jada dekhaunus. ' +
-    '[1 minute ko video](/organizers#video) hernus, wa [aafai demo chalaunus](/demo).',
+    '[1½ minute ma hernus](/#watch) — bechnu huncha bhane [bechne ko bhag](/organizers#video).',
 };
 
 const SELL: Answers = {
@@ -101,7 +101,7 @@ const HELP: Answers = {
     '🎟 **Go out** — [upcoming Nepali events](/#events): concerts, Dashain and Tihar nights, tickets straight to your phone.\n' +
     '🥟 **Eat & shop** — [the bazaar](/market): momo, sweets, groceries and crafts to collect with a QR code. Try “items under 10 euro”.\n' +
     '🚀 **Sell** — put your own event, shop or restaurant here, free: [try the demo](/demo).\n' +
-    'Just tell me which one — or ask anything.',
+    '▶ Or [watch how it all works](/#watch) in 1½ minutes. Just tell me which one — or ask anything.',
   de:
     'Kein Problem — das kannst du hier machen:\n' +
     '🎟 **Ausgehen** — [kommende nepalesische Events](/#events): Konzerte, Dashain- und Tihar-Abende, Tickets direkt aufs Handy.\n' +

@@ -20,7 +20,7 @@ export default function StoryPlayer({
   start?: number;
   end?: number;
   label?: string;
-  variant?: 'chip' | 'mini' | 'card';
+  variant?: 'chip' | 'mini' | 'card' | 'inline';
 }) {
   const story = storyById(storyId);
   const [open, setOpen] = useState(false);
@@ -49,7 +49,7 @@ export default function StoryPlayer({
       ) : (
         <button
           type="button"
-          className={variant === 'mini' ? 'sp-mini' : 'sp-chip'}
+          className={variant === 'mini' ? 'sp-mini' : variant === 'inline' ? 'sp-inline' : 'sp-chip'}
           onClick={(e) => {
             // Inside a tool card that is itself a link: only the video opens.
             e.preventDefault();
