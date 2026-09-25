@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { mediaUrl } from '@/lib/events';
 import { allowedImageMime, saveEventPhoto, MAX_IMAGE_BYTES } from '@/lib/media';
 import type { ApiErrorResponse } from '@/lib/types';
-import { planGate, requireOrganizerApi, requireOwnedEvent, demoGate } from '../../../auth';
+import { clientIp } from '@/lib/ratelimit';
+import { planGate, requireOrganizerApi, requireOwnedEvent, demoPhotoGate } from '../../../auth';
 
 /**
  * Upload one event photo (multipart form, field name "file"). Ownership is
@@ -18,7 +19,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const blocked = planGate(organizer);
     if (blocked) return blocked;
-    const demoBlocked = demoGate(organizer, 'uploading photos');
+    // Demos may add photos, within a limit (they go with the demo after 24 h).
+    const demoBlocked = demoPhotoGate(organizer, clientIp(req));
     if (demoBlocked) return demoBlocked;
 
     const owned = requireOwnedEvent(organizer, id);

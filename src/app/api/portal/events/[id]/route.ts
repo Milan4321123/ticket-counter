@@ -786,7 +786,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const hasPaidTier = plannedTiers.some((t) => t.priceCents > 0);
         const hasBank = Boolean(merged.bankIban.trim() && merged.bankAccountHolder.trim());
         const hasPaypal = Boolean((merged.paypalAccount ?? '').trim());
-        if (hasPaidTier && !hasBank && !hasPaypal) {
+        // A try-it-yourself demo (lib/demo) takes no money at all — its only
+        // route is the simulated payment, and its "published" page is shown to
+        // nobody but its owner — so it needs neither a payout account nor the
+        // authenticator below. Everything else about publishing applies.
+        const demo = organizer.isDemo;
+        if (!demo && hasPaidTier && !hasBank && !hasPaypal) {
           missing.push('add a way to be paid — a bank account (holder and IBAN), or PayPal');
         }
         // Publishing is the moment this account stops being a draft and starts
@@ -801,7 +806,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         // and the one somebody who phished the password can answer. Requiring
         // enrolment BEFORE any money can be taken means a payout change on a
         // selling event always meets the strong factor instead.
-        if (requireAuthenticatorToPublish() && !organizerTotpEnabled(organizer.id)) {
+        if (!demo && requireAuthenticatorToPublish() && !organizerTotpEnabled(organizer.id)) {
           missing.push(`set up your authenticator app in Settings — it is required before you can sell ${v.units}`);
         }
         need(missing.length === 0, `Almost there — before publishing, please ${missing.join(', ')}.`);
@@ -831,7 +836,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         Boolean(merged.bankIban.trim() && merged.bankAccountHolder.trim()) ||
         Boolean((merged.paypalAccount ?? '').trim());
       need(
-        merged.status !== 'published' || !hasPaidTierNow || payable,
+        merged.status !== 'published' || !hasPaidTierNow || payable || organizer.isDemo,
         'This listing is live with a priced ticket, so it needs a way to be paid first — add a bank account (holder and IBAN) or PayPal, then set the price.'
       );
     }

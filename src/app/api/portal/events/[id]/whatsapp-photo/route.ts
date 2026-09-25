@@ -4,7 +4,8 @@ import { NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { setEventWhatsappPhoto } from '@/lib/events';
 import type { ApiErrorResponse } from '@/lib/types';
-import { planGate, requireOrganizerApi, requireOwnedEvent, demoGate } from '../../../auth';
+import { clientIp } from '@/lib/ratelimit';
+import { planGate, requireOrganizerApi, requireOwnedEvent, demoPhotoGate } from '../../../auth';
 
 const MAX_BYTES = 5 * 1024 * 1024;
 
@@ -47,7 +48,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const blocked = planGate(organizer);
     if (blocked) return blocked;
-    const demoBlocked = demoGate(organizer, 'uploading photos');
+    // Demos may add photos, within a limit (they go with the demo after 24 h).
+    const demoBlocked = demoPhotoGate(organizer, clientIp(req));
     if (demoBlocked) return demoBlocked;
 
     const owned = requireOwnedEvent(organizer, id);
