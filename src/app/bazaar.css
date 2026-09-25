@@ -2824,9 +2824,11 @@
   font-size: 0.78rem;
 }
 
+/* Phone: one shop in the middle, a slice of each neighbour on both sides. */
 @media (max-width: 720px) {
   .sr-card {
-    flex-basis: calc((100vw - 32px - 12px) / 1.6);
+    flex-basis: 74vw;
+    scroll-snap-align: center;
   }
 }
 

@@ -9,7 +9,7 @@
 // somebody touches it. Reduced motion: no auto-advance, no scaling.
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { usePeekDim, useSwipeNudge } from './usePeekDim';
+import { useInfiniteLoop, usePeekDim, useSwipeNudge } from './usePeekDim';
 
 export interface BillboardSlide {
   id: string;
@@ -28,34 +28,51 @@ export interface BillboardSlide {
 
 const INTERVAL_MS = 5000;
 
-export default function HomeBillboard({ slides }: { slides: BillboardSlide[] }) {
+export default function HomeBillboard({ slides, startAt = 0 }: { slides: BillboardSlide[]; startAt?: number }) {
   const track = useRef<HTMLDivElement>(null);
-  const [current, setCurrent] = useState(0);
+  /** Which card (in the whole track, all three copies) is first in view. */
+  const [pos, setPos] = useState(0);
   const touched = useRef(0);
   const n = slides.length;
+  // Endless: the slides are laid out three times and the row keeps the
+  // visitor in the middle copy (useInfiniteLoop), opening on `startAt`.
+  const loop = n >= 2;
+  const copies = loop ? 3 : 1;
+  const current = n ? pos % n : 0;
 
+  useInfiniteLoop(track, loop ? n : 0, startAt);
   // Lit when in view, dimmed while peeking in from an edge (usePeekDim).
-  usePeekDim(track, setCurrent);
+  usePeekDim(track, setPos);
   useSwipeNudge(track);
 
+  /** Scroll so the card at physical index `i` leads the view. */
+  const scrollToIndex = useCallback((i: number) => {
+    const el = track.current;
+    const target = el?.children[i] as HTMLElement | undefined;
+    if (!el || !target) return;
+    const pad = parseFloat(getComputedStyle(el).paddingLeft) || 0;
+    el.scrollTo({ left: target.offsetLeft - pad, behavior: 'smooth' });
+  }, []);
+
+  /** To slide k — via whichever copy of it is nearest. */
   const goTo = useCallback(
     (k: number) => {
-      const el = track.current;
-      if (!el) return;
-      const target = el.children[((k % n) + n) % n] as HTMLElement | undefined;
-      if (!target) return;
-      const pad = parseFloat(getComputedStyle(el).paddingLeft) || 0;
-      el.scrollTo({ left: target.offsetLeft - pad, behavior: 'smooth' });
+      if (!n) return;
+      const options = Array.from({ length: copies }, (_, c) => c * n + k);
+      const nearest = options.reduce((best, i) => (Math.abs(i - pos) < Math.abs(best - pos) ? i : best), options[0]);
+      scrollToIndex(nearest);
     },
-    [n]
+    [n, copies, pos, scrollToIndex]
   );
 
-  /** One card along — or back to the start once the last one is in view. */
   const next = useCallback(() => {
-    const el = track.current;
-    if (el && el.scrollLeft + el.clientWidth >= el.scrollWidth - 4) goTo(0);
-    else goTo(current + 1);
-  }, [current, goTo]);
+    if (loop) scrollToIndex(pos + 1);
+    else goTo((current + 1) % Math.max(n, 1));
+  }, [loop, pos, current, n, goTo, scrollToIndex]);
+  const prev = useCallback(() => {
+    if (loop) scrollToIndex(Math.max(0, pos - 1));
+    else goTo((current - 1 + n) % Math.max(n, 1));
+  }, [loop, pos, current, n, goTo, scrollToIndex]);
 
   // Advance by itself, but never within a few seconds of the visitor's own touch.
   useEffect(() => {
@@ -77,27 +94,31 @@ export default function HomeBillboard({ slides }: { slides: BillboardSlide[] }) 
   return (
     <section className="pk" aria-roledescription="carousel" aria-label="Featured">
       <div className="pk-track" ref={track} onPointerDown={hold} onWheel={hold} onTouchStart={hold} onMouseMove={hold}>
-        {slides.map((s, k) => (
+        {Array.from({ length: copies }, (_, copy) =>
+          slides.map((s, k) => (
           <Link
-            key={s.id}
+            key={`${copy}-${s.id}`}
             href={s.href}
             className={`pk-card${s.art ? ' pk-product' : ''}`}
             aria-roledescription="slide"
             aria-label={`${k + 1} of ${n}: ${s.title}`}
+            // The first and last copies are there only for the endless swipe.
+            aria-hidden={loop && copy !== 1 ? true : undefined}
+            tabIndex={loop && copy !== 1 ? -1 : undefined}
             draggable={false}
           >
             {s.image ? (
               <picture>
                 {s.imageTall ? <source media="(max-width: 720px)" srcSet={s.imageTall} /> : null}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="pk-img" src={s.image} alt="" loading={k < 3 ? 'eager' : 'lazy'} draggable={false} />
+                <img className="pk-img" src={s.image} alt="" loading={copy === (loop ? 1 : 0) && k < 3 ? 'eager' : 'lazy'} draggable={false} />
               </picture>
             ) : (
               <span className="pk-img pk-img-blank" />
             )}
             {s.art ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img className="pk-art" src={s.art} alt="" loading={k < 3 ? 'eager' : 'lazy'} draggable={false} />
+              <img className="pk-art" src={s.art} alt="" loading={copy === (loop ? 1 : 0) && k < 3 ? 'eager' : 'lazy'} draggable={false} />
             ) : null}
             <span className="pk-shade" />
             <span className="pk-body">
@@ -110,7 +131,8 @@ export default function HomeBillboard({ slides }: { slides: BillboardSlide[] }) 
               </span>
             </span>
           </Link>
-        ))}
+          ))
+        )}
       </div>
       {n > 1 && (
         <>
@@ -120,7 +142,7 @@ export default function HomeBillboard({ slides }: { slides: BillboardSlide[] }) 
             aria-label="Previous"
             onClick={() => {
               hold();
-              goTo(current - 1);
+              prev();
             }}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">

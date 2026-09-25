@@ -6,7 +6,7 @@
 // columns snap, so a swipe always lands on whole tiles.
 import Link from 'next/link';
 import { useCallback, useRef, useState } from 'react';
-import { usePeekDim, useSwipeNudge } from './usePeekDim';
+import { useInfiniteLoop, usePeekDim, useSwipeNudge } from './usePeekDim';
 
 export interface PagerItem {
   key: string;
@@ -29,8 +29,12 @@ export default function BazaarPager({ title, kicker, items, moreHref, moreLabel 
 }) {
   const track = useRef<HTMLDivElement>(null);
   const [edge, setEdge] = useState({ start: true, end: false, page: 0, pages: 1 });
+  // Endless: whole columns only (three tiles each), laid out three times over;
+  // the row keeps the visitor in the middle copy (useInfiniteLoop).
+  const loop = items.length >= 6;
+  const base = loop ? items.slice(0, Math.floor(items.length / 3) * 3) : items;
 
-  /** Width of one column of tiles, and how many columns make a page. */
+  /** Width of one column of tiles, how many make a page, and one copy's width. */
   const geometry = useCallback(() => {
     const el = track.current;
     if (!el || el.children.length === 0) return null;
@@ -38,23 +42,25 @@ export default function BazaarPager({ title, kicker, items, moreHref, moreLabel 
     const b = el.children[3] as HTMLElement | undefined;
     const step = b ? b.offsetLeft - a.offsetLeft : a.offsetWidth;
     const cols = Math.max(1, Math.floor(parseFloat(getComputedStyle(el).getPropertyValue('--bp-cols')) || 2));
-    const totalCols = Math.ceil(el.children.length / 3);
-    return { step, cols, pages: Math.max(1, Math.ceil(totalCols / cols)) };
-  }, []);
+    const totalCols = Math.ceil(base.length / 3);
+    return { step, cols, copy: totalCols * step, pages: Math.max(1, Math.ceil(totalCols / cols)) };
+  }, [base.length]);
 
   const measure = useCallback(() => {
     const el = track.current;
     const g = geometry();
     if (!el || !g) return;
+    const x = loop ? ((el.scrollLeft % g.copy) + g.copy) % g.copy : el.scrollLeft;
     setEdge({
-      start: el.scrollLeft < 8,
-      end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 8,
-      page: Math.min(g.pages - 1, Math.round(el.scrollLeft / (g.step * g.cols))),
+      start: !loop && el.scrollLeft < 8,
+      end: !loop && el.scrollLeft + el.clientWidth >= el.scrollWidth - 8,
+      page: Math.min(g.pages - 1, Math.round(x / (g.step * g.cols)) % g.pages),
       pages: g.pages,
     });
-  }, [geometry]);
+  }, [geometry, loop]);
 
   // Tiles swiping in from the edge dim and grow, like the event cards above.
+  useInfiniteLoop(track, loop ? base.length : 0, 0);
   usePeekDim(track, measure);
   useSwipeNudge(track, 80);
 
@@ -91,8 +97,15 @@ export default function BazaarPager({ title, kicker, items, moreHref, moreLabel 
           </div>
         </div>
         <div className="bp-track" ref={track} role="region" aria-label={title} tabIndex={0}>
-          {items.map((it) => (
-            <Link key={it.key} href={it.href} className="bp-tile">
+          {(loop ? [0, 1, 2] : [0]).flatMap((copy) =>
+            base.map((it) => (
+            <Link
+              key={`${copy}-${it.key}`}
+              href={it.href}
+              className="bp-tile"
+              aria-hidden={loop && copy !== 1 ? true : undefined}
+              tabIndex={loop && copy !== 1 ? -1 : undefined}
+            >
               <span className="bp-photo">
                 {it.image ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -107,7 +120,8 @@ export default function BazaarPager({ title, kicker, items, moreHref, moreLabel 
               <span className="bp-shop">{it.shop}</span>
               {it.subscribe ? <span className="bp-sub">↻ {it.subscribe}</span> : null}
             </Link>
-          ))}
+            ))
+          )}
         </div>
         {edge.pages > 1 && (
           <div className="bp-dots" aria-hidden="true">

@@ -63,27 +63,29 @@ export function attachNudge(el: HTMLElement, distance = 64): () => void {
   el.addEventListener('wheel', markTouched, { passive: true });
 
   const play = () => {
-    if (touched || el.scrollLeft > 4 || el.scrollWidth <= el.clientWidth + 8) return;
+    if (touched || el.scrollWidth <= el.clientWidth + 8) return;
+    const from = el.scrollLeft;
     const snap = el.style.scrollSnapType;
     const behavior = el.style.scrollBehavior;
     el.style.scrollSnapType = 'none';
     el.style.scrollBehavior = 'auto';
-    const reach = Math.min(distance, el.scrollWidth - el.clientWidth);
+    const reach = Math.min(distance, el.scrollWidth - el.clientWidth - from);
+    if (reach < 8) return;
     const start = performance.now();
     const out = 420;
     const back = 520;
     const ease = (t: number) => 1 - Math.pow(1 - t, 3);
     const finish = () => {
-      if (!touched) el.scrollLeft = 0;
+      if (!touched) el.scrollLeft = from;
       el.style.scrollSnapType = snap;
       el.style.scrollBehavior = behavior;
     };
     const step = (now: number) => {
       if (touched) return finish();
       const t = now - start;
-      if (t < out) el.scrollLeft = reach * ease(t / out);
-      else if (t < out + 120) el.scrollLeft = reach;
-      else if (t < out + 120 + back) el.scrollLeft = reach * (1 - ease((t - out - 120) / back));
+      if (t < out) el.scrollLeft = from + reach * ease(t / out);
+      else if (t < out + 120) el.scrollLeft = from + reach;
+      else if (t < out + 120 + back) el.scrollLeft = from + reach * (1 - ease((t - out - 120) / back));
       else return finish();
       raf = requestAnimationFrame(step);
     };
@@ -126,4 +128,58 @@ export function useSwipeNudge(track: RefObject<HTMLElement | null>, distance = 6
     if (!el) return;
     return attachNudge(el, distance);
   }, [track, distance]);
+}
+
+/**
+ * An endless row. The track holds the cards THREE times over (the caller
+ * renders them so); it opens on the middle copy at `start`, and whenever a
+ * swipe settles in the first or last copy it jumps — invisibly, by exactly one
+ * copy — back into the middle. The visitor can swipe either way forever.
+ */
+export function useInfiniteLoop(track: RefObject<HTMLElement | null>, count: number, start = 0) {
+  useEffect(() => {
+    const el = track.current;
+    if (!el || count < 2 || el.children.length < count * 3) return;
+    const pad = () => parseFloat(getComputedStyle(el).paddingLeft) || 0;
+    const copyWidth = () => {
+      const a = el.children[0] as HTMLElement;
+      const b = el.children[count] as HTMLElement;
+      return a && b ? b.offsetLeft - a.offsetLeft : 0;
+    };
+    const jump = (to: number) => {
+      const behavior = el.style.scrollBehavior;
+      const snap = el.style.scrollSnapType;
+      el.style.scrollBehavior = 'auto';
+      el.style.scrollSnapType = 'none';
+      el.scrollLeft = to;
+      void el.offsetWidth; // apply before snap comes back
+      el.style.scrollSnapType = snap;
+      el.style.scrollBehavior = behavior;
+    };
+    const first = el.children[count + Math.max(0, start)] as HTMLElement | undefined;
+    // Cards that snap to the centre (one-at-a-time rows) open centred.
+    if (first) {
+      const centred = getComputedStyle(first).scrollSnapAlign.includes('center');
+      jump(centred ? first.offsetLeft - (el.clientWidth - first.offsetWidth) / 2 : first.offsetLeft - pad());
+    }
+    el.dispatchEvent(new Event('scroll'));
+
+    let timer = 0;
+    const settle = () => {
+      const w = copyWidth();
+      if (!w) return;
+      const x = el.scrollLeft - ((el.children[0] as HTMLElement).offsetLeft - pad());
+      if (x < w * 0.5) jump(el.scrollLeft + w);
+      else if (x >= w * 1.5) jump(el.scrollLeft - w);
+    };
+    const onScroll = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(settle, 180);
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      window.clearTimeout(timer);
+    };
+  }, [track, count, start]);
 }

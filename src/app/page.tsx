@@ -70,7 +70,7 @@ function billboardSlides(
   snapshot: FeedSnapshot,
   items: ShopItem[],
   tr: Awaited<ReturnType<typeof serverT>>
-): BillboardSlide[] {
+): { slides: BillboardSlide[]; startAt: number } {
   const today = todayIso();
   const eventSlides: BillboardSlide[] = [];
   for (const e of events) {
@@ -112,7 +112,9 @@ function billboardSlides(
   }
   // Events first — two side by side on the opening screen — then the
   // bazaar's goods carry on in the same swipe.
-  return [...eventSlides, ...itemSlides];
+  // The events first, then the goods. The row is endless (HomeBillboard), so
+  // it opens on the events with goods to swipe to on BOTH sides.
+  return { slides: [...eventSlides, ...itemSlides], startAt: 0 };
 }
 
 /**
@@ -196,8 +198,10 @@ export default async function HomePage() {
   // The page, top to bottom: the events carousel, three quick tiles, the
   // shops, then the bazaar's goods (Top picks).
   const shopItems = listShopItems();
-  const slides = billboardSlides(events, snapshot, shopItems, tr);
+  const { slides, startAt: slidesStart } = billboardSlides(events, snapshot, shopItems, tr);
   const picks = pagerItems(shopItems);
+  // Real shops first; the row is endless, so it opens on them with the
+  // others to swipe to on both sides.
   const shops = shopCards(events, snapshot);
   const upcoming = events.filter((e) => e.kind !== 'shop' && !isPast(e, todayIso()));
   const upcomingCount = upcoming.length;
@@ -225,7 +229,7 @@ export default async function HomePage() {
           </p>
         </div>
       )}
-      <HomeBillboard slides={slides} />
+      <HomeBillboard slides={slides} startAt={slidesStart} />
       <nav className="qt container" aria-label={tr('home.title')}>
         <Link href="/market" className="qt-tile qt-bazaar">
           <span className="qt-icon" aria-hidden="true">
