@@ -38,10 +38,14 @@ export interface CheckoutTier {
    * the room's remaining is weighted by this.
    */
   seatsPerUnit: number;
+  /** The item's photo (shops), for the "add more" grid. */
+  image?: string | null;
 }
 
 export interface CheckoutConfig {
   eventName: string;
+  /** The listing's address, for "back to the shop". */
+  slug?: string;
   artist: string;
   dateDisplay: string;
   venue: string;
@@ -1032,6 +1036,17 @@ export default function CheckoutClient({
   // ---------------- Render ----------------
 
   const selectedTiers = config.tiers.filter((t) => (qty[t.id] ?? 0) > 0);
+  // A shop's checkout is a basket: what was picked, with steppers — and the
+  // rest of the shop underneath, one "Add" away. Items leave the basket for
+  // the grid when stepped down to zero, and come back when added.
+  const basket = isShop ? selectedTiers : config.tiers;
+  const others = isShop ? config.tiers.filter((t) => (qty[t.id] ?? 0) === 0) : [];
+  const canAddOne = (tier: CheckoutTier) =>
+    !working &&
+    (qty[tier.id] ?? 0) < tierMax(tier.id) &&
+    totalQty < config.maxTicketsPerOrder &&
+    totalSeats + tier.seatsPerUnit <= availability.totalRemaining &&
+    (availability.tiers[tier.id]?.remaining ?? 0) > 0;
   /**
    * Where and when, as the buyer will have to remember it.
    *
@@ -1105,8 +1120,17 @@ export default function CheckoutClient({
 
       <div className="card anim-fade-up anim-d1">
         <h2 className="card-title">{isShop ? tr('co.yourOrder') : tr('co.yourTickets')}</h2>
+        {isShop && config.slug && (
+          <p className={styles.basketBack}>
+            <a href={`/e/${config.slug}`}>← Back to the shop</a>
+            <a href={`/market?shop=${encodeURIComponent(config.slug)}`}>Browse in the bazaar</a>
+          </p>
+        )}
+        {isShop && basket.length === 0 && (
+          <p className={`muted ${styles.basketEmpty}`}>Your basket is empty — add something from the shop below.</p>
+        )}
         <div className={styles.qtyList}>
-          {config.tiers.map((tier) => {
+          {basket.map((tier) => {
             const remaining = availability.tiers[tier.id]?.remaining ?? 0;
             const q = qty[tier.id] ?? 0;
             const canAdd =
@@ -1116,8 +1140,12 @@ export default function CheckoutClient({
               // One more booking of THIS tier has to fit in the room whole.
               totalSeats + tier.seatsPerUnit <= availability.totalRemaining;
             return (
-              <div className="qty-row" key={tier.id}>
-                <div>
+              <div className={`qty-row${isShop ? ` ${styles.basketRow}` : ''}`} key={tier.id}>
+                {isShop && tier.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img className={styles.basketThumb} src={tier.image} alt="" />
+                ) : null}
+                <div className={isShop ? styles.basketInfo : undefined}>
                   <div className="tier-name">
                     {tier.name}{' '}
                     {/* Sold out is shown FIRST and regardless of the countdown
@@ -1181,6 +1209,42 @@ export default function CheckoutClient({
           Up to {config.maxTicketsPerOrder}{' '}
           {config.tiers.some((t) => t.seatsPerUnit > 1) ? 'bookings' : v.units} per order.
         </p>
+
+        {/* ---- The rest of the shop, one tap from the basket ---- */}
+        {others.length > 0 && (
+          <div className={styles.addMore}>
+            <div className={styles.addMoreHead}>＋ Add more from this shop</div>
+            <div className={styles.addGrid}>
+              {others.map((t) => {
+                const ok = canAddOne(t);
+                return (
+                  <button
+                    type="button"
+                    key={t.id}
+                    className={styles.addTile}
+                    onClick={() => changeQty(t.id, 1)}
+                    disabled={!ok}
+                    aria-label={`Add ${t.name}, ${t.priceCents === 0 ? 'free' : formatMoney(t.priceCents, config.currency)}`}
+                  >
+                    {t.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={t.image} alt="" loading="lazy" />
+                    ) : (
+                      <span className={styles.addBlank}>{t.name.charAt(0)}</span>
+                    )}
+                    <span className={styles.addName}>{t.name}</span>
+                    <span className={styles.addFoot}>
+                      <span>{t.priceCents === 0 ? 'Free' : formatMoney(t.priceCents, config.currency)}</span>
+                      <span className={styles.addBtn}>
+                        {(availability.tiers[t.id]?.remaining ?? 0) === 0 ? 'Sold out' : '+ Add'}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* ---- Item choices (restaurant pack) ---- */}
         {kitchen &&

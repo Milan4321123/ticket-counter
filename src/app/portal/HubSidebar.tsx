@@ -10,15 +10,13 @@ import type { ReactNode } from 'react';
 import Logo from '@/components/Logo';
 import LogoutButton from './LogoutButton';
 import { translator, type Lang } from '@/lib/i18n';
-import { IconExternal, IconGear, IconHome, IconPlus, IconReceipt, IconShop, IconStar, IconTag, IconTicket, ToolIconView } from './HubIcons';
-import type { ToolIcon } from './listingTools';
+import { IconExternal, IconGear, IconHome, IconPlus, IconReceipt, IconShop, IconStar, IconTag, IconTicket } from './HubIcons';
 
 export interface HubListing {
   id: string;
   name: string;
   kind: 'event' | 'shop';
   status: string;
-  tools: { key: string; href: string; label: string; icon: ToolIcon }[];
 }
 
 interface Props {
@@ -113,23 +111,6 @@ export default function HubSidebar({ name, listings, isDemo, lang = 'en' }: Prop
                       aria-label={l.status === 'published' ? 'Live' : l.status === 'draft' ? 'Draft' : 'Archived'}
                     />
                   </Link>
-                  {/* The open listing unfolds into its tools, so Insights,
-                      Kitchen, Check-in… are one tap away from anywhere. */}
-                  {activeListing === l.id && (
-                    <ul className="hub-subtools">
-                      {l.tools.map((t) => {
-                        const on = t.key === 'overview' ? path === t.href : path.startsWith(t.href.split('?')[0]);
-                        return (
-                          <li key={t.key}>
-                            <Link href={t.href} className={`hub-subtool${on ? ' hub-subtool-on' : ''}`} aria-current={on ? 'page' : undefined}>
-                              <ToolIconView icon={t.icon} />
-                              <span>{t.label}</span>
-                            </Link>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
                 </li>
               ))}
             </ul>

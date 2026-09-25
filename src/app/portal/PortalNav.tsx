@@ -1,7 +1,5 @@
 import Link from 'next/link';
 import DemoBanner from './DemoBanner';
-import { getEventById } from '@/lib/events';
-import { listingTools } from './listingTools';
 import type { EventKind } from '@/lib/types';
 
 interface PortalNavEvent {
@@ -27,9 +25,6 @@ interface Props {
  * main site header. Rows scroll sideways on small screens.
  */
 export default function PortalNav({ event, tab }: Props) {
-  // The same tool list as the tool board and the sidebar (./listingTools).
-  const full = event ? getEventById(event.id) : null;
-  const tools = full ? listingTools(full) : [];
   // The account-wide links (Home, Reviews, Codes, Statements, Settings, Sign
   // out) live in the hub sidebar now (./HubSidebar, mounted by ./layout). What
   // is left here is what belongs to ONE page: the demo strip, and — on a
@@ -39,7 +34,7 @@ export default function PortalNav({ event, tab }: Props) {
       {/* Server component inside a server component: renders nothing unless the
           signed-in account is a try-it-yourself demo. */}
       <DemoBanner />
-      {event && (
+      {event && tab !== 'overview' && (
         <div className="hub-listing-head">
           <div className="container hub-listing-head-row">
             <div className="hub-listing-title">
@@ -51,21 +46,12 @@ export default function PortalNav({ event, tab }: Props) {
                 {event.published ? 'Live' : 'Not published'}
               </span>
             </div>
-            <nav className="hub-tabs" aria-label={`Sections for ${event.name}`}>
-              {tools
-                .filter((t) => t.primary || t.key === 'view')
-                .map((t) => (
-                  <Link
-                    key={t.key}
-                    href={t.href}
-                    className={`hub-tab-pill${tab === t.key ? ' hub-tab-pill-on' : ''}${t.key === 'overview' ? ' hub-tab-pill-home' : ''}${t.external ? ' hub-tab-pill-quiet' : ''}`}
-                    aria-current={tab === t.key ? 'page' : undefined}
-                  >
-                    {t.key === 'overview' ? '▦ ' : t.key === 'live' ? '● ' : ''}
-                    {t.label}
-                    {t.external ? ' ↗' : ''}
-                  </Link>
-                ))}
+            {/* The tool board (/portal/events/[id]) holds every tool as a
+                card; a tool page only needs the way back to it. */}
+            <nav className="hub-tabs" aria-label={`Back to ${event.name}`}>
+              <Link href={`/portal/events/${event.id}`} className="hub-tab-pill hub-tab-pill-on hub-tab-pill-home">
+                ← All tools
+              </Link>
             </nav>
           </div>
         </div>

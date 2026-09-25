@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { listEventsForOrganizer } from '@/lib/events';
 import { currentOrganizer } from '@/lib/organizers';
 import HubSidebar from './HubSidebar';
-import { listingTools } from './listingTools';
 import { currentLang } from '@/lib/i18nServer';
 import './hub.css';
 
@@ -22,10 +21,6 @@ export default async function PortalLayout({ children }: { children: ReactNode }
       name: e.name,
       kind: e.kind,
       status: e.status,
-      // The listing's own tools, shown under it in the sidebar while it is open.
-      tools: listingTools(e)
-        .filter((t) => t.primary)
-        .map((t) => ({ key: t.key, href: t.href, label: t.label, icon: t.icon })),
     }));
 
   return (

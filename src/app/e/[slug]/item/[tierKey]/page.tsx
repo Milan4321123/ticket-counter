@@ -721,6 +721,24 @@ export default async function ItemPage({ params, searchParams }: Params) {
               ? 'Your order is placed with them, and your payment goes straight to their own account — it never passes through us.'
               : 'Tickets for this event are sold by them, and your payment goes straight to their own account — it never passes through us.'}
           </p>
+          {/* The shop behind this item, one tap away: its whole range in the
+              bazaar, so a shopper who came for one achar can fill a basket. */}
+          {isShop && (
+            <Link href={`/market?shop=${encodeURIComponent(event.slug)}`} className="item-visit-shop">
+              <span className="item-visit-icon" aria-hidden="true">
+                🛍
+              </span>
+              <span className="item-visit-text">
+                <strong>Visit {listing.name}</strong>
+                <span>
+                  All {visibleTiers(tiers).length} items from this shop in the bazaar
+                </span>
+              </span>
+              <span className="item-visit-go" aria-hidden="true">
+                →
+              </span>
+            </Link>
+          )}
         </div>
 
         {galleryItems.length >= 2 && (

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { listingOpenTo } from '@/lib/demo';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getEventBySlug, getEventTiers } from '@/lib/events';
+import { getEventBySlug, getEventMedia, getEventTiers, mediaUrl } from '@/lib/events';
 import { getAvailability } from '@/lib/inventory';
 import { ticketState, tiersInSaleOrder } from '@/lib/ticketState';
 import { cityLabel, otherShowsByAct, shortDateLabel } from '@/lib/sameAct';
@@ -142,12 +142,15 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
         }
       : null;
 
+  const liveMedia = new Set(getEventMedia(event.id).map((m) => m.id));
+
   return (
     <CheckoutClient
       eventId={event.id}
       preselectTier={preselectTier}
       config={{
         eventName: event.name,
+        slug: event.slug,
         artist: event.artist,
         dateDisplay: event.dateDisplay,
         venue: [event.venueName, event.city].filter(Boolean).join(', '),
@@ -172,6 +175,9 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
             studentOnly: t.studentOnly,
             description: t.description,
             seatsPerUnit: t.seatsPerUnit,
+            // The item's own photo, for the shop checkout's "add more" grid —
+            // only when that picture still exists on this listing.
+            image: t.mediaId && liveMedia.has(t.mediaId) ? mediaUrl(t.mediaId, 'card', null) : null,
           })),
       }}
       availability={availability}

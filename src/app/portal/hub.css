@@ -996,48 +996,6 @@
   font-weight: 700;
 }
 
-/* ---------- The open listing's tools, unfolded in the sidebar ---------- */
-.hub-subtools {
-  list-style: none;
-  margin: 4px 0 8px 14px;
-  padding: 0 0 0 10px;
-  border-left: 1px solid var(--border-soft);
-  display: grid;
-  gap: 1px;
-}
-
-.hub-subtool {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 6px 10px;
-  border-radius: 9px;
-  color: var(--text-dim);
-  font-size: 0.86rem;
-  font-weight: 600;
-  transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.hub-subtool svg {
-  width: 16px;
-  height: 16px;
-  flex: none;
-}
-
-.hub-subtool:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text);
-}
-
-.hub-subtool-on {
-  background: rgba(220, 20, 60, 0.14);
-  color: #fff;
-}
-
-.hub-subtool-on svg {
-  color: #f87171;
-}
-
 /* "All tools" leads the tab strip on every tool page. */
 .hub-tab-pill-home {
   font-weight: 700;
