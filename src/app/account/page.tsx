@@ -27,8 +27,15 @@ function statusLabel(status: string, mode: string): { text: string; tone: string
  * their Subscribe & save subscriptions, and sign-out. Signed out, it is the
  * sign-in card — a code by email, or Google.
  */
-export default async function AccountPage({ searchParams }: { searchParams: Promise<{ error?: string; saved?: string }> }) {
-  const { error, saved } = await searchParams;
+export default async function AccountPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; saved?: string; back?: string }>;
+}) {
+  const { error, saved, back: rawBack } = await searchParams;
+  // Where to go after signing in: a same-site path the link asked for (e.g.
+  // the checkout), otherwise the homepage.
+  const back = rawBack && rawBack.startsWith('/') && !rawBack.startsWith('//') ? rawBack : '/';
   const customer = await currentCustomer();
 
   if (!customer) {
@@ -42,7 +49,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             you a code.
           </p>
           {error && ERRORS[error] && <div className="notice notice-error">{ERRORS[error]}</div>}
-          <SignInForm google={googleSignInConfigured()} />
+          <SignInForm google={googleSignInConfigured()} back={back} />
           <p className="muted small acc-seller">
             Selling here? <Link href="/portal/login">Organizer sign-in →</Link>
           </p>
@@ -67,6 +74,37 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
           <button className="btn btn-sm">Sign out</button>
         </form>
       </header>
+
+      {/* Where a signed-in customer goes next — the same tiles as the homepage. */}
+      <nav className="qt acc-go" aria-label="Go shopping">
+        <Link href="/" className="qt-tile qt-events">
+          <span className="qt-icon" aria-hidden="true">
+            🎟
+          </span>
+          <span className="qt-text">
+            <strong>Browse events</strong>
+            <span>Tickets for what is coming up</span>
+          </span>
+        </Link>
+        <Link href="/market" className="qt-tile qt-bazaar">
+          <span className="qt-icon" aria-hidden="true">
+            🛍
+          </span>
+          <span className="qt-text">
+            <strong>The bazaar</strong>
+            <span>Goods from Nepali shops</span>
+          </span>
+        </Link>
+        <Link href="/basket" className="qt-tile qt-org">
+          <span className="qt-icon" aria-hidden="true">
+            🧺
+          </span>
+          <span className="qt-text">
+            <strong>Your basket</strong>
+            <span>Everything you picked, ready to order</span>
+          </span>
+        </Link>
+      </nav>
 
       {saved && <div className="notice notice-success">Saved.</div>}
 

@@ -32,7 +32,7 @@ export async function GET(req: Request) {
   const code = url.searchParams.get('code');
   const state = url.searchParams.get('state');
   const saved = (await cookies()).get(STATE_COOKIE)?.value ?? '';
-  const [savedState, back = '/account'] = saved.split('|');
+  const [savedState, back = '/'] = saved.split('|');
   if (!code || !state || !savedState || state.length !== savedState.length || !crypto.timingSafeEqual(Buffer.from(state), Buffer.from(savedState))) {
     return fail('google-state');
   }

@@ -45,16 +45,66 @@ export default function OrganizersPage() {
           <Link href="/demo" className="btn btn-brand btn-lg">
             ▶ Try the demo
           </Link>
-          <Link href="/contact?intent=account" className="btn btn-lg">
-            Get an account
+          <Link href="/demo?to=assistant" className="btn btn-lg">
+            ✨ Try the AI assistant
           </Link>
         </div>
         <ul className="og-chips anim-fade-up anim-d3">
           <li>€0 fees · no commission</li>
           <li>Paid to your bank</li>
           <li>Live in minutes</li>
+          <li>AI fills in your page</li>
         </ul>
       </section>
+
+      {/* ---- The AI setup assistant: one sentence in, a filled form out ---- */}
+      <InView as="section" className="container og-ai">
+        <div className="og-ai-copy">
+          <p className="feed-kicker">New · AI assistant</p>
+          <h2>
+            Say it in one sentence.
+            <br />
+            <span>We fill in the rest.</span>
+          </h2>
+          <p className="muted">
+            Type or speak what you sell — in English, German or Nepali — and the assistant fills in your page: name,
+            items, prices, collection times. It asks for anything missing, and you check it all before anything goes
+            live.
+          </p>
+          <div className="og-cta og-cta-left">
+            <Link href="/demo?to=assistant" className="btn btn-brand btn-lg">
+              ✨ Try the AI assistant
+            </Link>
+          </div>
+        </div>
+        <div className="og-screen og-chat" aria-hidden="true">
+          <div className="og-chat-me">
+            <span className="og-chat-type">Momo shop in Berlin — chicken 9€, veg 8€, collect Saturdays 4–7pm</span>
+          </div>
+          <div className="og-chat-dots">
+            <span />
+            <span />
+            <span />
+          </div>
+          <ul className="og-chat-form">
+            <li>
+              <b>✓</b> Name <i>Didi’s Momo Kitchen</i>
+            </li>
+            <li>
+              <b>✓</b> Item <i>Chicken momo · €9.00</i>
+            </li>
+            <li>
+              <b>✓</b> Item <i>Veg momo · €8.00</i>
+            </li>
+            <li>
+              <b>✓</b> Collection <i>Saturdays 16–19h</i>
+            </li>
+            <li>
+              <b>✓</b> City <i>Berlin</i>
+            </li>
+          </ul>
+        </div>
+      </InView>
 
       {/* ---- Six things you can do, shown not told ---- */}
       <section className="container og-scenes">

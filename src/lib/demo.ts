@@ -27,7 +27,7 @@
 import crypto from 'crypto';
 import sharp from 'sharp';
 import { getDb } from './db';
-import { deleteEventCompletely, getEventById, type EventRow } from './events';
+import { deleteEventCompletely, getEventById, makeUniqueSlug, newId, type EventRow } from './events';
 import { SoldOutError } from './inventory';
 import { saveEventPhoto } from './media';
 import { createOrder, finalizePaidOrder, getTicketsForOrder } from './orders';
@@ -171,6 +171,7 @@ export const DEMO_TARGETS = [
   'tools-event',
   'tools-shop',
   'tools-salon',
+  'assistant',
 ] as const;
 export type DemoTarget = (typeof DEMO_TARGETS)[number];
 
@@ -187,6 +188,29 @@ export function demoTargetPath(organizerId: string, target: DemoTarget): string 
   const shop = rows.find((r) => r.kind === 'shop' && r.slug.endsWith('-momo-kitchen')) ?? rows.find((r) => r.kind === 'shop');
   const salon = rows.find((r) => r.kind === 'shop' && r.slug.endsWith('-glow-beauty'));
   switch (target) {
+    case 'assistant': {
+      // A blank shop draft of the demo's own, with the setup assistant open —
+      // the whole "describe it, it fills the form" flow from an empty page.
+      // Reused while it is still blank, so a second visit does not stack drafts.
+      const blank = getDb()
+        .prepare(
+          `SELECT id FROM events WHERE organizer_id = ? AND kind = 'shop' AND status = 'draft'
+             AND description = '' AND id NOT IN (SELECT event_id FROM event_tiers)
+           ORDER BY created_at DESC LIMIT 1`
+        )
+        .get(organizerId) as { id: string } | undefined;
+      let id = blank?.id;
+      if (!id) {
+        id = newId();
+        getDb()
+          .prepare(
+            `INSERT INTO events (id, organizer_id, slug, status, kind, name, currency, total_capacity, sales_open, max_per_order, pay_within_days)
+             VALUES (?, ?, ?, 'draft', 'shop', 'My new shop', 'EUR', 100, 1, 8, 5)`
+          )
+          .run(id, organizerId, makeUniqueSlug('My new shop'));
+      }
+      return `/portal/events/${id}/edit?assistant=1`;
+    }
     case 'tools-event':
       return event ? `/portal/events/${event.id}` : '/portal';
     case 'tools-shop':

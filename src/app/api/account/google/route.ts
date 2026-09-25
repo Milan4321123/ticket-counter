@@ -24,7 +24,8 @@ export async function GET(req: Request) {
   });
   const res = NextResponse.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`, 303);
   // Only same-site paths may be returned to (no open redirect).
-  const safeBack = back.startsWith('/') && !back.startsWith('//') ? back : '/account';
+  // Only same-site paths; home by default — signing in is a way in, not a destination.
+  const safeBack = back.startsWith('/') && !back.startsWith('//') ? back : '/';
   res.cookies.set(STATE_COOKIE, `${state}|${safeBack}`, {
     httpOnly: true,
     sameSite: 'lax',

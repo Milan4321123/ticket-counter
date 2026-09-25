@@ -13,7 +13,7 @@
 //
 // Speaks English, German and Nepali (the site's language cookie).
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import SpeechInput from '@/components/SpeechInput';
 import { formatMoney } from '@/lib/money';
 import { GOTO_TAB_EVENT } from './GoToTab';
@@ -484,6 +484,12 @@ export default function SetupAssistant({
     await askNext();
     setBusy(false);
   }
+
+  // ?assistant=1 (the "Try the AI assistant" door): open straight away.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('assistant') === '1') void openChat();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fmt = (k: string, v: unknown): string =>
     k === 'totalCapacity' ? `${v} ${isShop ? t.labels.items : t.labels.people}` : String(v);

@@ -5,7 +5,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-export default function SignInForm({ google, back = '/account' }: { google: boolean; back?: string }) {
+export default function SignInForm({ google, back = '/' }: { google: boolean; back?: string }) {
   const router = useRouter();
   const [step, setStep] = useState<'email' | 'code'>('email');
   const [email, setEmail] = useState('');
