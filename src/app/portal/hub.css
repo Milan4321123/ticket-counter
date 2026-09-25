@@ -2192,3 +2192,12 @@
     max-width: 96%;
   }
 }
+
+.sa-suggested {
+  margin: 0 0 4px !important;
+  padding: 6px 10px !important;
+  border-radius: 10px !important;
+  background: rgba(167, 139, 250, 0.14);
+  color: #ddd6fe;
+  font-size: 0.8rem !important;
+}

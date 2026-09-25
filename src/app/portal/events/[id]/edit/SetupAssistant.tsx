@@ -38,6 +38,8 @@ interface Message {
   from: 'bot' | 'me';
   text: string;
   proposal?: Proposal;
+  /** The assistant invented this (the seller asked it to). */
+  suggested?: boolean;
 }
 
 const LABELS: Record<string, string> = {
@@ -101,7 +103,12 @@ export default function SetupAssistant({
         // Everything said so far, so a later message refines the same picture.
         body: JSON.stringify({ text: [...said, text].join('\n') }),
       });
-      const data = (await res.json().catch(() => null)) as { proposal?: Proposal; reply?: string; error?: string } | null;
+      const data = (await res.json().catch(() => null)) as {
+        proposal?: Proposal;
+        reply?: string;
+        error?: string;
+        suggested?: boolean;
+      } | null;
       if (!res.ok || !data?.proposal) {
         setMessages([...next, { from: 'bot', text: data?.error ?? 'Something went wrong — please try again.' }]);
       } else {
@@ -110,7 +117,10 @@ export default function SetupAssistant({
         for (const k of Object.keys(p)) if (k !== 'tiers') t[k] = true;
         (p.tiers ?? []).forEach((_, i) => (t[`tier:${i}`] = true));
         setTicks(t);
-        setMessages([...next, { from: 'bot', text: data.reply ?? 'Here is what I would fill in.', proposal: p }]);
+        setMessages([
+          ...next,
+          { from: 'bot', text: data.reply ?? 'Here is what I would fill in.', proposal: p, suggested: Boolean(data.suggested) },
+        ]);
       }
     } catch {
       setMessages([...next, { from: 'bot', text: 'Could not reach the server — please try again.' }]);
@@ -210,6 +220,9 @@ export default function SetupAssistant({
             <p>{m.text}</p>
             {m.proposal && m === messages[messages.length - 1] && (
               <div className="sa-proposal">
+                {m.suggested && (
+                  <p className="sa-suggested">✨ Suggestions — made up for you. Change or untick anything before filling in.</p>
+                )}
                 {Object.entries(m.proposal)
                   .filter(([k]) => k !== 'tiers')
                   .map(([k, v]) => (

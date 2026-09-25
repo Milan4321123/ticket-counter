@@ -41,13 +41,15 @@ export interface SetupProposal {
 
 export interface SetupAnswer {
   proposal: SetupProposal;
+  /** True when the seller asked the assistant to invent the content itself. */
+  suggested: boolean;
   /** What the assistant says back, in one or two sentences. */
   reply: string;
   /** 'ai' or the plain-rules fallback. */
   source: 'ai' | 'rules';
 }
 
-const MAX_TIERS = 10;
+const MAX_TIERS = 20;
 
 function str(v: unknown, max: number): string | undefined {
   if (typeof v !== 'string') return undefined;
@@ -119,14 +121,29 @@ export function normaliseProposal(raw: unknown, kind: 'event' | 'shop'): SetupPr
   return out;
 }
 
+/**
+ * Did the seller ask the assistant to come up with the content itself ("come
+ * up with your own idea", "make a demo", "you decide", "suggest 10 items")?
+ * Then — and only then — it may invent names, prices and descriptions, and
+ * the reply says they are suggestions.
+ */
+export function wantsSuggestions(said: string): boolean {
+  return /\b(come up with|your own (idea|one)|make (it|one|a|me) up|make up|invent|suggest|you decide|up to you|surprise me|example|sample|demo|dummy|just (give|make|create)|create (me )?(a|an) )/i.test(said);
+}
+
 function prompt(kind: 'event' | 'shop', said: string): string {
   const today = todayBerlin();
   const cats = SHOP_CATEGORIES.map((c) => `${c.key} (${c.label})`).join(', ');
   return `You fill in a form for a Nepali ${kind === 'shop' ? 'shop selling goods' : 'event selling tickets'} in Germany, from what the seller wrote.
 Today is ${today} (Europe/Berlin).
 
-STRICT RULES:
-- Use ONLY facts the seller stated. Never invent a price, date, time, address, capacity or name. If something was not said, leave that key out.
+${wantsSuggestions(said) ? `SUGGESTION MODE — the seller asked you to come up with the content yourself:
+- Invent a complete, realistic, appealing ${kind === 'shop' ? 'Nepali shop in Germany' : 'Nepali event in Germany'}: a name, a warm "description" (2–3 sentences), ${kind === 'shop' ? `a "category", "pickupInfo" (e.g. collection days and times, WITHOUT a street address)` : '"artist", a "dateDisplay" and future "eventDate", a "venueName" (a generic hall name)'} and ${kind === 'shop' ? 'items' : 'ticket types'} in "tiers" — as many as the seller asked for (default 6, at most 20), each with a real-sounding name, a realistic price in cents${kind === 'shop' ? ' (typical Nepali goods: €2–€40)' : ' (€10–€60)'}, "cap" 20–100 and a one-line "description".
+- Use what the seller DID say (city, theme, count) and fill the rest yourself.
+- Never invent a street address or anything about payment or bank details.
+- "reply": say these are suggestions to check and change before filling in.
+` : ''}STRICT RULES:
+- ${wantsSuggestions(said) ? 'Apart from the suggestion mode above, use' : 'Use'} ONLY facts the seller stated. Never invent a price, date, time, address, capacity or name. If something was not said, leave that key out.
 - Money: convert to integer cents (e.g. "25€", "25 euro", "EUR 25" -> 2500).
 - ${kind === 'event' ? '"eventDate": the event day as YYYY-MM-DD (resolve words like "next Saturday" from today); "dateDisplay": that day written out, with doors/start time if said, e.g. "Saturday, 10 October 2026 · Doors 18:00".' : 'No dates. "pickupInfo": where/when buyers collect, only if said.'}
 - ${kind === 'event' ? '"tiers" are ticket types' : '"tiers" are the items for sale'}: [{"name","priceCents","cap","description","studentOnly"}]; "cap" only if a quantity was said.
@@ -194,13 +211,22 @@ export function rulesProposal(said: string, kind: 'event' | 'shop'): SetupPropos
 
 /** Turn what the seller said into a proposal (AI first, plain rules as the fallback). */
 export async function proposeSetup(said: string, kind: 'event' | 'shop'): Promise<SetupAnswer> {
-  const raw = (await geminiJson(prompt(kind, said), { maxOutputTokens: 2000, timeoutMs: 20_000 })) as Record<string, unknown> | null;
+  const suggested = wantsSuggestions(said);
+  const raw = (await geminiJson(prompt(kind, said), {
+    maxOutputTokens: suggested ? 6000 : 2000,
+    timeoutMs: suggested ? 30_000 : 20_000,
+  })) as Record<string, unknown> | null;
   if (raw && typeof raw === 'object') {
     const proposal = normaliseProposal(raw, kind);
     if (Object.keys(proposal).length > 0) {
+      // A suggestion never carries an address, whatever came back.
+      if (suggested) delete proposal.address;
       return {
         proposal,
-        reply: str(raw.reply, 300) ?? 'Here is what I can fill in — untick anything that is not right.',
+        suggested,
+        reply:
+          str(raw.reply, 300) ??
+          (suggested ? 'Here is a complete suggestion — change anything you like before filling it in.' : 'Here is what I can fill in — untick anything that is not right.'),
         source: 'ai',
       };
     }
@@ -208,8 +234,11 @@ export async function proposeSetup(said: string, kind: 'event' | 'shop'): Promis
   const proposal = rulesProposal(said, kind);
   return {
     proposal,
+    suggested: false,
     reply: Object.keys(proposal).length
       ? 'I picked out what I could — check each line, untick anything wrong, and add the rest in the chat or the form.'
+      : suggested
+        ? 'The AI helper is busy right now, so I cannot invent a shop for you this minute — try again shortly, or tell me your items and prices.'
       : 'I could not pick out details from that. Try something like: “Dashain party on 10 October in Berlin, 200 people, standard 25€, VIP 45€”.',
     source: 'rules',
   };

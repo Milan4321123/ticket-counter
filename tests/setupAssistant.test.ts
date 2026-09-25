@@ -55,3 +55,14 @@ describe('setup assistant — fixed rules', () => {
     assert.deepEqual(rulesProposal('hello, I want to sell stuff', 'shop'), {});
   });
 });
+
+describe('setup assistant — when it may invent', () => {
+  it('only when the seller asks it to', async () => {
+    const { wantsSuggestions } = await import('../src/lib/setupAssistant.ts');
+    assert.equal(wantsSuggestions('You can come up with your own idea, just give me final'), true);
+    assert.equal(wantsSuggestions('create me a demo shop with 10 items'), true);
+    assert.equal(wantsSuggestions('you decide the prices'), true);
+    assert.equal(wantsSuggestions('Momo 9€ and sel roti 6€, collect in Berlin on Saturdays'), false);
+    assert.equal(wantsSuggestions('Dashain Night on 10 October at Kulturhaus, standard 25€'), false);
+  });
+});
