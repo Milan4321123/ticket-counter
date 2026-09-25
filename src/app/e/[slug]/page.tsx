@@ -1,4 +1,5 @@
 import LoopCarousel from '@/components/LoopCarousel';
+import CityCheck from '@/components/CityCheck';
 import Stars from '@/components/Stars';
 import { ratingForShop, ratingsForItems } from '@/lib/reviews';
 import { MixedScript } from '@/components/Np';
@@ -862,6 +863,17 @@ export default async function EventPage({ params, searchParams }: Params) {
           {/* Under the button, not buried in the body: this is the last thing
               between a visitor and a checkout for the wrong country. */}
           <OtherCityNotice city={heroCity} shows={otherCities} />
+          {/* …and the moment they tap to buy, one clear question. */}
+          {otherCities.length > 0 && !preview && (
+            <CityCheck
+              slug={event.slug}
+              city={heroCity}
+              dateLabel={heroWhen}
+              venue={event.venueName}
+              act={event.artist}
+              others={otherCities}
+            />
+          )}
         </div>
       </section>
 
