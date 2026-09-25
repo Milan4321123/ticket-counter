@@ -103,6 +103,9 @@ export default function CityCheck({
     if (mode === 'gate' && others.length > 0 && !confirmed()) setPending('gate');
   }, [mode, others.length, confirmed]);
 
+  /** The element being repeated after "yes" — let exactly that click through. */
+  const passRef = useRef<Element | null>(null);
+
   useEffect(() => {
     if (others.length === 0 || mode === 'gate') return;
     const paths = [`/e/${slug}/checkout`, `/e/${slug}/item/`];
@@ -110,8 +113,12 @@ export default function CityCheck({
     // prevented click never reaches next/link's navigation.
     const onClick = (e: MouseEvent) => {
       if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-      if (confirmed()) return;
       const target = e.target as Element | null;
+      if (passRef.current && target && passRef.current.contains(target)) {
+        passRef.current = null;
+        return;
+      }
+      if (confirmed()) return;
       const marked = target?.closest?.('[data-city-check]');
       const a = target?.closest?.('a[href]') as HTMLAnchorElement | null;
       let hit: Element | null = marked ?? null;
@@ -146,15 +153,27 @@ export default function CityCheck({
   if (!pending) return null;
 
   const go = () => {
-    try {
-      sessionStorage.setItem(storeKey, '1');
-    } catch {
-      // Private mode: they are simply asked again next time.
-    }
     const what = pending;
+    // Only an answer given at a BUY step counts for the rest of the visit.
+    // "See this ticket" merely opens the ticket's page — its own Get tickets /
+    // Add to basket must still ask, right where the money starts moving.
+    const isBuy =
+      what === 'gate' ||
+      (what instanceof Element &&
+        (what.hasAttribute('data-city-check') || /\/checkout(\?|$)/.test(new URL((what as HTMLAnchorElement).href ?? '', window.location.href).pathname)));
+    if (isBuy) {
+      try {
+        sessionStorage.setItem(storeKey, '1');
+      } catch {
+        // Private mode: they are simply asked again next time.
+      }
+    }
     setPending(null);
     // Do what they tapped, now that the answer is on record.
-    if (what instanceof HTMLElement) what.click();
+    if (what instanceof HTMLElement) {
+      passRef.current = what;
+      what.click();
+    }
   };
 
   const [lead, place] = w.title(city);
