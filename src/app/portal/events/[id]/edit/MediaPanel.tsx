@@ -62,6 +62,11 @@ export default function MediaPanel({
   const [notice, setNotice] = useState<string | null>(null);
   const [video, setVideo] = useState(videoUrl);
   const [videoProgress, setVideoProgress] = useState<number | null>(null);
+  /** "2 of 5" while several photos go up. */
+  const [uploading, setUploading] = useState('');
+  /** The photo tapped in the grid — its actions show under the grid. */
+  const [selected, setSelected] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const videoFileRef = useRef<HTMLInputElement>(null);
 
@@ -73,8 +78,7 @@ export default function MediaPanel({
     if (videoFileRef.current) videoFileRef.current.value = '';
   }
 
-  async function upload(file: File) {
-    setBusy('upload');
+  async function upload(file: File): Promise<boolean> {
     try {
       const form = new FormData();
       form.append('file', file);
@@ -82,40 +86,50 @@ export default function MediaPanel({
       const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
       if (!res.ok) {
         setError(data?.error ?? 'The photo could not be uploaded — please try again.');
-        return;
+        return false;
       }
-      setNotice('Photo added.');
-      router.refresh();
+      return true;
     } catch {
       setError('Could not reach the server — please check your connection and try again.');
-    } finally {
-      setBusy(null);
-      resetPhotoInput();
+      return false;
     }
   }
 
-  /** Shrink oversized phone photos in the browser, then upload. */
-  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || busy) return;
+  /** Several photos at once (picked or dropped): shrink big phone photos, then upload one by one. */
+  async function addPhotos(list: File[]) {
+    const files = list.filter((f) => f.type.startsWith('image/')).slice(0, Math.max(0, maxPhotos - media.length));
+    if (files.length === 0 || busy) return;
     setError(null);
     setNotice(null);
+    let added = 0;
+    for (let i = 0; i < files.length; i++) {
+      setUploading(files.length > 1 ? `${i + 1} of ${files.length}` : '');
+      let ready = files[i];
+      if (ready.size > MAX_IMAGE_BYTES) {
+        setBusy('photo-compress');
+        ready = await compressImage(ready, { maxBytes: MAX_IMAGE_BYTES });
+      }
+      if (ready.size > MAX_IMAGE_BYTES) {
+        setError(
+          `A photo is ${formatMb(ready.size)} MB — the limit is ${formatMb(MAX_IMAGE_BYTES)} MB. ` +
+            'On your phone, share it at a smaller size (or take a screenshot of it), then try again.'
+        );
+        continue;
+      }
+      setBusy('upload');
+      if (await upload(ready)) added++;
+    }
+    setBusy(null);
+    setUploading('');
+    resetPhotoInput();
+    if (added) {
+      setNotice(added === 1 ? 'Photo added.' : `${added} photos added.`);
+      router.refresh();
+    }
+  }
 
-    let ready = file;
-    if (file.size > MAX_IMAGE_BYTES) {
-      setBusy('photo-compress');
-      ready = await compressImage(file, { maxBytes: MAX_IMAGE_BYTES });
-    }
-    if (ready.size > MAX_IMAGE_BYTES) {
-      setError(
-        `This photo is ${formatMb(ready.size)} MB — the limit is ${formatMb(MAX_IMAGE_BYTES)} MB. ` +
-          'On your phone, share it at a smaller size (or take a screenshot of it), then try again.'
-      );
-      setBusy(null);
-      resetPhotoInput();
-      return;
-    }
-    void upload(ready);
+  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    await addPhotos(Array.from(e.target.files ?? []));
   }
 
   async function removePhoto(item: MediaItem) {
@@ -344,54 +358,156 @@ export default function MediaPanel({
     );
   }
 
+  const sel = media.find((m) => m.id === selected) ?? null;
+  const roles = (id: string) =>
+    [id === coverMediaId && 'Cover', id === posterMediaId && 'Tile', id === profileMediaId && 'Profile'].filter(
+      Boolean
+    ) as string[];
+
   return (
-    <div>
-      {error && <div className="notice notice-error">{error}</div>}
-      {!error && notice && <div className="notice notice-success">{notice}</div>}
+    <div className="ks mp">
+      {error && (
+        <div className="notice notice-error" style={{ margin: 0 }}>
+          {error}
+        </div>
+      )}
+      {!error && notice && (
+        <div className="notice notice-success" style={{ margin: 0 }}>
+          {notice}
+        </div>
+      )}
 
-      <p className="muted small" style={{ marginTop: 0 }}>
-        Three photos do three different jobs, and they do not have to be the same picture:
-      </p>
-      <ul className="muted small" style={{ margin: '0 0 12px', paddingLeft: 20 }}>
-        <li>
-          <strong>Cover</strong> — the wide band across the top of your own event page, and the first thing a visitor
-          sees. It can be a photo or a video; a video cover plays by itself, quietly and on a loop.
-        </li>
-        <li>
-          <strong>Listing photo</strong> — the tall tile your event shows on the{' '}
-          <strong>Browse events</strong> page, next to everyone else&rsquo;s. This is the one that has to win a
-          glance. {posterMediaId
-            ? 'You have picked one, so it is what browsers see.'
-            : 'You have not picked one yet, so your cover is being squeezed into that tall shape — pick a photo below if it deserves better.'}
-        </li>
-        <li>
-          <strong>Profile photo</strong> — the round avatar under the cover and beside your updates, like on a social
-          page.
-        </li>
-      </ul>
-      <p className="muted small" style={{ marginTop: 0 }}>
-        Each of those three has a fixed shape and is always filled — you choose which part of the photo is in frame.
-        Everything else you upload shows in the gallery.
-      </p>
+      {/* ---- Add ---- */}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        multiple
+        onChange={(e) => void onFileChange(e)}
+        style={{ display: 'none' }}
+        aria-label="Upload photos"
+      />
+      <button
+        type="button"
+        className={`mp-drop${dragOver ? ' is-over' : ''}`}
+        onClick={() => fileRef.current?.click()}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          void addPhotos(Array.from(e.dataTransfer.files));
+        }}
+        disabled={busy !== null || media.length >= maxPhotos}
+      >
+        <span className="mp-drop-icon" aria-hidden="true">
+          {busy === 'upload' || busy === 'photo-compress' ? <span className="spinner" /> : '＋'}
+        </span>
+        <strong>
+          {busy === 'photo-compress'
+            ? 'Shrinking…'
+            : busy === 'upload'
+              ? `Uploading${uploading ? ` ${uploading}` : ''}…`
+              : media.length === 0
+                ? 'Add photos'
+                : 'Add more photos'}
+        </strong>
+        <span>
+          Pick several at once — or drop them here ·{' '}
+          {media.length} of {maxPhotos}
+        </span>
+      </button>
 
-      {/* Exactly what visitors get, and the place to change it. Each of these
-          frames is a real slot on the site at its real shape, always full — and
-          what sits inside the frame is precisely what the server renders, so
-          nobody has to imagine the result or accept our guess at it. */}
+      {/* ---- Photos: tap one to give it a job ---- */}
+      {media.length > 0 && (
+        <section className="ks-step">
+          <p className="muted small" style={{ margin: 0 }}>
+            Tap a photo to make it the <strong>cover</strong> (top of your page), the <strong>tile</strong> on Browse,
+            or the round <strong>profile</strong> photo.
+          </p>
+          <div className="mp-grid">
+            {media.map((item) => {
+              const r = roles(item.id);
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`mp-tile${selected === item.id ? ' is-on' : ''}${item.id === coverMediaId ? ' is-cover' : ''}`}
+                  onClick={() => setSelected(selected === item.id ? null : item.id)}
+                  aria-pressed={selected === item.id}
+                >
+                  {/* Served by our own /api/media route — next/image is not needed here. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={item.url} alt="Photo" loading="lazy" />
+                  {r.length > 0 && (
+                    <span className="mp-roles">
+                      {r.map((x) => (
+                        <span key={x} className="badge badge-accent">
+                          {x}
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {sel && (
+            <div className="mp-actions" role="toolbar" aria-label="This photo">
+              <button
+                type="button"
+                className={`ks-chip${sel.id === coverMediaId ? ' is-on' : ''}`}
+                disabled={busy !== null || sel.id === coverMediaId}
+                onClick={() => void setCover(sel)}
+              >
+                🖼 Cover
+              </button>
+              <button
+                type="button"
+                className={`ks-chip${sel.id === posterMediaId ? ' is-on' : ''}`}
+                disabled={busy !== null}
+                onClick={() => void (sel.id === posterMediaId ? clearPoster(sel) : setPoster(sel))}
+              >
+                🗂 Tile on Browse
+              </button>
+              <button
+                type="button"
+                className={`ks-chip${sel.id === profileMediaId ? ' is-on' : ''}`}
+                disabled={busy !== null || sel.id === profileMediaId}
+                onClick={() => void setProfile(sel)}
+              >
+                ◯ Profile
+              </button>
+              <button
+                type="button"
+                className="te-remove"
+                disabled={busy !== null}
+                onClick={() => {
+                  setSelected(null);
+                  void removePhoto(sel);
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ---- Framing ---- */}
       {(coverPhotoId || profileMediaId || posterMediaId) && (
-        <div
-          style={{
-            display: 'flex',
-            gap: 18,
-            alignItems: 'flex-start',
-            flexWrap: 'wrap',
-            padding: 14,
-            marginBottom: 16,
-            border: '1px solid var(--border)',
-            borderRadius: 10,
-            background: 'var(--bg-elevated)',
-          }}
-        >
+        <details className="ks-step ks-more">
+          <summary className="ks-q">
+            <span className="ks-num">⤧</span> Adjust the framing <span className="badge">optional</span>
+          </summary>
+          <p className="muted small" style={{ margin: '0 0 8px' }}>
+            Each spot has a fixed shape. Press Reposition and drag to choose what stays in frame — or leave it, we
+            pick the part with the subject in it.
+          </p>
+          <div className="mp-crops">
           {coverPhotoId && (
             <CoverCropper
               key={`cover-${coverPhotoId}`}
@@ -435,118 +551,18 @@ export default function MediaPanel({
               saved={crops.poster}
             />
           )}
-          <p className="muted small" style={{ flex: '1 1 100%', margin: 0 }}>
-            Any photo works, whatever shape it is. Each space above is a fixed shape and is always
-            filled, so press <strong>Reposition</strong> and drag the photo to choose what stays in
-            frame. Leave it alone and we pick the part with the subject in it.
-          </p>
-        </div>
+          </div>
+        </details>
       )}
 
-      <div style={{ fontWeight: 600, marginBottom: 8 }}>Photos</div>
-
-      {media.length > 0 && (
-        <div style={gridStyle}>
-          {media.map((item) => (
-            <div key={item.id} style={tileStyle(item.id)}>
-              <div style={{ position: 'relative' }}>
-                {/* Served by our own /api/media route — next/image is not needed here. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={item.url}
-                  alt="Event photo"
-                  style={{ width: '100%', height: 110, objectFit: 'cover', display: 'block' }}
-                />
-                <CoverFlag id={item.id} />
-                <ListingFlag id={item.id} />
-              </div>
-              <div style={{ padding: 8, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                <CoverButton item={item} />
-                {item.id === posterMediaId ? (
-                  <>
-                    <span className="badge badge-accent">Listing photo</span>
-                    <button
-                      type="button"
-                      className="btn-copy"
-                      onClick={() => void clearPoster(item)}
-                      disabled={busy !== null}
-                      title="Go back to using your cover on the Browse events page"
-                    >
-                      {busy === item.id ? '…' : 'Use cover instead'}
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn-copy"
-                    onClick={() => void setPoster(item)}
-                    disabled={busy !== null}
-                  >
-                    {busy === item.id ? '…' : 'Set as listing photo'}
-                  </button>
-                )}
-                {item.id === profileMediaId ? (
-                  <span className="badge badge-accent">Profile</span>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn-copy"
-                    onClick={() => void setProfile(item)}
-                    disabled={busy !== null}
-                  >
-                    {busy === item.id ? '…' : 'Set as profile photo'}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="btn-copy"
-                  style={{ color: 'var(--red)' }}
-                  onClick={() => void removePhoto(item)}
-                  disabled={busy !== null}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 20 }}>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          onChange={(e) => void onFileChange(e)}
-          style={{ display: 'none' }}
-          aria-label="Upload a photo"
-        />
-        <button
-          type="button"
-          className="btn"
-          onClick={() => fileRef.current?.click()}
-          disabled={busy !== null || media.length >= maxPhotos}
-        >
-          {busy === 'upload' || busy === 'photo-compress' ? <span className="spinner" aria-hidden /> : null}
-          {busy === 'photo-compress' ? 'Compressing…' : busy === 'upload' ? 'Uploading…' : 'Upload photo'}
-        </button>
-        <span className="muted small">
-          {media.length} of {maxPhotos} photos · JPEG, PNG, or WebP. Big ones are shrunk automatically.
-        </span>
-        <p className="muted small" style={{ flex: '1 1 100%', margin: 0 }}>
-          Gallery photos can be any shape — upload them as they are. For the three spaces above, a
-          cover of <strong>1600 × 740</strong> and a profile photo of <strong>400 × 400</strong> fit
-          perfectly, but any photo works: pick one and drag it where you want it.
+      {/* ---- Videos ---- */}
+      <details className="ks-step ks-more" open={videos.length > 0 || Boolean(videoUrl) || undefined}>
+        <summary className="ks-q">
+          <span className="ks-num">▶</span> Videos <span className="badge">optional</span>
+        </summary>
+        <p className="muted small" style={{ margin: '0 0 8px' }}>
+          Up to {maxVideos} clips, 60 MB each. A video can be the cover — it plays quietly on a loop.
         </p>
-      </div>
-
-      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-        <div style={{ fontWeight: 600, marginBottom: 4 }}>Videos (optional)</div>
-        <p className="muted small" style={{ margin: '0 0 12px' }}>
-          Up to {maxVideos} clips, max 60 MB each. Any of them can be the cover — a moving cover really stands out at
-          the top of your page. Phones export big files: share/export at 720p, or trim the clip, if one is refused.
-        </p>
-
         {videos.length > 0 && (
           <div style={gridStyle}>
             {videos.map((item, i) => (
@@ -664,7 +680,7 @@ export default function MediaPanel({
             </button>
           </form>
         </details>
-      </div>
+      </details>
     </div>
   );
 }
