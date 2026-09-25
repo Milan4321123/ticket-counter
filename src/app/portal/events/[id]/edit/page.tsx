@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { aiAssistantEnabled, aiDesignerEnabled } from '@/lib/ai';
 import {
@@ -48,6 +49,7 @@ import { vocabFor } from '@/lib/vocab';
 import { cityLabel, otherShowsByAct, shortDateLabel } from '@/lib/sameAct';
 import GoToTab from './GoToTab';
 import EditorTabs from './EditorTabs';
+import { listingTools } from '../../../listingTools';
 import SetupAssistant from './SetupAssistant';
 import { listEventsForOrganizer } from '@/lib/events';
 import { currentLang } from '@/lib/i18nServer';
@@ -719,16 +721,26 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
           )}
           <span className="badge badge-accent">{stepsDone} of 4 steps done</span>
           <span style={{ flex: 1 }} />
-          {event.status === 'published' && (
-            <a href={`/e/${event.slug}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm">
-              View page ↗
-            </a>
-          )}
+          <a href={`/e/${event.slug}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm">
+            {event.status === 'published' ? 'View page ↗' : 'Preview ↗'}
+          </a>
+          {/* The editor is where the AI assistant lands a new seller, and from
+              here nothing said the orders, insights, check-in or kitchen
+              existed. One clear way to all of them, on every section. */}
+          <Link href={`/portal/events/${event.id}`} className="btn btn-sm btn-brand ed-toolhome">
+            ▦ Tool home
+          </Link>
         </div>
 
         <EditorTabs
           tabs={tabs}
           panels={panels}
+          toolHome={{
+            href: `/portal/events/${event.id}`,
+            names: listingTools(event)
+              .filter((t) => t.primary && t.key !== 'overview' && t.key !== 'edit')
+              .map((t) => t.label),
+          }}
           intro={
             <SetupAssistant
               lang={await currentLang()}

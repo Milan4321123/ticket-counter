@@ -57,11 +57,14 @@ export default function EditorTabs({
   tabs,
   panels,
   intro,
+  toolHome,
 }: {
   tabs: EditorTabDef[];
   panels: Record<string, ReactNode>;
   /** Shown above the cards on the overview — the setup assistant. */
   intro?: ReactNode;
+  /** The listing's tool board, and the names of what is on it. */
+  toolHome?: { href: string; names: string[] };
 }) {
   // '' = the card overview.
   const [active, setActive] = useState('');
@@ -181,6 +184,24 @@ export default function EditorTabs({
             </div>
           </div>
 
+          {/* The way out to everything that is not setting up: orders,
+              insights, check-in, the kitchen… A seller who arrived through the
+              AI assistant would otherwise never learn they exist. */}
+          {toolHome && (
+            <a href={toolHome.href} className="ed-toolcard">
+              <span className="ed-toolcard-icon" aria-hidden="true">
+                ▦
+              </span>
+              <span className="ed-toolcard-text">
+                <strong>Tool home</strong>
+                <span>{toolHome.names.slice(0, 5).join(' · ')}{toolHome.names.length > 5 ? ' · more' : ''}</span>
+              </span>
+              <span className="ed-toolcard-go" aria-hidden="true">
+                →
+              </span>
+            </a>
+          )}
+
           <div className="ed-cards">
             {tabs.map((t, i) => {
               const base = CARD_INFO[t.key] ?? { icon: '•', line: '' };
@@ -275,9 +296,16 @@ export default function EditorTabs({
               ) : (
                 <span />
               )}
-              <button type="button" className="btn btn-sm" onClick={() => select('')}>
-                ▦ All sections
-              </button>
+              <span className="editor-stepper-mid">
+                <button type="button" className="btn btn-sm" onClick={() => select('')}>
+                  ▦ All sections
+                </button>
+                {toolHome && (
+                  <a href={toolHome.href} className="btn btn-sm">
+                    Tool home
+                  </a>
+                )}
+              </span>
               {next ? (
                 <button type="button" className="btn btn-brand btn-sm" onClick={() => select(next.key)}>
                   Next: {next.label} →

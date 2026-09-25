@@ -3050,3 +3050,77 @@
   gap: 18px;
   align-items: flex-start;
 }
+
+/* Editor → the listing's tool board (orders, insights, check-in…). */
+.ed-toolcard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(124, 58, 237, 0.28), transparent 60%),
+    var(--bg-elevated);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 0 0 1px rgba(167, 139, 250, 0.35),
+    0 8px 22px rgba(0, 0, 0, 0.3);
+  color: var(--text);
+  text-decoration: none;
+  transition: transform 0.15s ease;
+}
+
+.ed-toolcard:hover {
+  transform: translateY(-1px);
+}
+
+.ed-toolcard:active {
+  transform: scale(0.99);
+}
+
+.ed-toolcard-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: rgba(167, 139, 250, 0.2);
+  color: #c4b5fd;
+  font-size: 1.3rem;
+}
+
+.ed-toolcard-text {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ed-toolcard-text span {
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 0.84rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ed-toolcard-go {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: rgba(167, 139, 250, 0.2);
+  color: #ddd6fe;
+  font-weight: 700;
+}
+
+.editor-stepper-mid {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
