@@ -455,8 +455,20 @@ export function setKitchenStatus(eventId: string, orderId: string, status: Kitch
 }
 
 /** Kitchen details for many orders in one read — for the portal's orders list. */
-export function kitchenDetailsBulk(orderIds: string[], purpose: SlotConfig['purpose'] = 'collection'): Map<string, { line: string }> {
-  const out = new Map<string, { line: string }>();
+export interface KitchenLine {
+  line: string;
+  /** "Collect Today, 05:30" / "Appointment …" — '' when none. */
+  when?: string;
+  /** "3" for Table 3 — '' when none. */
+  table?: string;
+  /** Per item: "Hot · Timur". */
+  picks?: string[];
+  /** What the buyer wrote. */
+  note?: string;
+}
+
+export function kitchenDetailsBulk(orderIds: string[], purpose: SlotConfig['purpose'] = 'collection'): Map<string, KitchenLine> {
+  const out = new Map<string, KitchenLine>();
   if (orderIds.length === 0) return out;
   const db = getDb();
   for (let i = 0; i < orderIds.length; i += 400) {
@@ -475,7 +487,14 @@ export function kitchenDetailsBulk(orderIds: string[], purpose: SlotConfig['purp
       const chosen = Object.values(picks).map((p) => Object.values(p).join(' · ')).filter(Boolean);
       if (chosen.length) parts.push(chosen.join(' | '));
       if (r.note) parts.push(`“${r.note}”`);
-      if (parts.length) out.set(r.id, { line: parts.join(' — ') });
+      if (parts.length)
+        out.set(r.id, {
+          line: parts.join(' — '),
+          when: !r.tableLabel && r.slot ? `${purpose === 'appointment' ? 'Appointment' : 'Collect'} ${slotLabel(r.slot)}` : '',
+          table: r.tableLabel,
+          picks: chosen,
+          note: r.note,
+        });
     }
   }
   return out;

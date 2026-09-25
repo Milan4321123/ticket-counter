@@ -40,6 +40,7 @@ const HEADERS = [
   'Status',
   'Buyer name',
   'Buyer email',
+  'Buyer phone',
   'Tickets',
   'What they bought',
   'Total',
@@ -81,6 +82,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           cell(o.status),
           cell(o.buyerName),
           cell(o.buyerEmail),
+          cell(o.buyerPhone),
           cell(o.ticketCount),
           cell(o.itemsSummary),
           // Plain decimal, not a formatted money string: spreadsheets should

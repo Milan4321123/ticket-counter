@@ -1,4 +1,4 @@
-import { kitchenDetailsBulk, parseSlotConfig } from '@/lib/kitchen';
+import { kitchenDetailsBulk, parseSlotConfig, type KitchenLine } from '@/lib/kitchen';
 import { parseSeatMap, seatSummary, seatsForOrders } from '@/lib/seats';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
@@ -92,7 +92,7 @@ export default async function PortalOrdersPage({
           ? allOrders.filter(isGone)
           : allOrders;
   // Restaurant pack: collection time / table / choices per order (shops only).
-  const kitchenLines = event.kind === 'shop' ? kitchenDetailsBulk(orders.map((o) => o.id), parseSlotConfig(event.pickupSlots).purpose) : new Map<string, { line: string }>();
+  const kitchenLines = event.kind === 'shop' ? kitchenDetailsBulk(orders.map((o) => o.id), parseSlotConfig(event.pickupSlots).purpose) : new Map<string, KitchenLine>();
   // Reserved seating: the seats each order holds, as its extra line.
   const seatMap = event.kind === 'event' ? parseSeatMap(event.seatMap) : null;
   if (seatMap) {
@@ -190,6 +190,11 @@ export default async function PortalOrdersPage({
                       {o.itemsSummary} · reserved {o.createdAt.slice(0, 10)}
                     </div>
                     {kitchenLines.get(o.id) && <div className="small" style={{ color: 'var(--amber)' }}>{kitchenLines.get(o.id)!.line}</div>}
+                    {o.buyerPhone && !o.buyerErasedAt && (
+                      <a className="small" href={`tel:${o.buyerPhone.replace(/[^\d+]/g, '')}`} translate="no">
+                        📞 {o.buyerPhone}
+                      </a>
+                    )}
                     {/* The buyer told us the money would come from someone
                         else. Worth its own line: an organizer scanning a
                         statement for "Ramesh Thapa" will never find the
@@ -258,7 +263,7 @@ export default async function PortalOrdersPage({
           name="q"
           className="input"
           defaultValue={query}
-          placeholder="Search name, email or a reference from your bank statement"
+          placeholder="Search name, email, phone or a bank reference"
           aria-label="Search orders"
         />
         {show !== 'all' && <input type="hidden" name="show" value={show} />}
@@ -295,7 +300,7 @@ export default async function PortalOrdersPage({
         </p>
       )}
 
-      <div className="card anim-fade-up anim-d2">
+      <div className={orders.length === 0 ? 'card anim-fade-up anim-d2' : 'anim-fade-up anim-d2'}>
         {orders.length === 0 ? (
           <p className="muted" style={{ margin: 0 }}>
             {query
@@ -305,79 +310,125 @@ export default async function PortalOrdersPage({
                 : 'No orders yet — they show up here the moment someone books.'}
           </p>
         ) : (
-          <div className="table-wrap">
-            <table className="table table-hover table-cards">
-              <thead>
-                <tr>
-                  <th>Created (UTC)</th>
-                  <th>Buyer</th>
-                  <th>Email</th>
-                  <th>Items</th>
-                  <th>Total</th>
-                  <th>Status</th>
-                  <th>Reference</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((o) => {
-                  const reference = o.paymentMode === 'transfer' ? o.paymentReference : null;
-                  return (
-                    <tr key={o.id}>
-                      <td className="mono small" data-label="When">{o.createdAt.slice(0, 16)}</td>
-                      <td data-label="Buyer" className="tc-head" translate="no">{o.buyerName}</td>
-                      <td className="small" data-label="Email" translate="no">{o.buyerEmail}</td>
-                      <td data-label="Items">
-                        {o.itemsSummary}
-                        {kitchenLines.get(o.id) && (
-                          <div className="small" style={{ color: 'var(--amber)' }}>
-                            {kitchenLines.get(o.id)!.line}
-                          </div>
+          /* One card per order: who, how to reach them, what they want and
+             when, what they wrote — readable at a glance on a phone at the
+             counter, with Call one tap away. */
+          <div className="oc-list">
+            {orders.map((o) => {
+              const reference = o.paymentMode === 'transfer' ? o.paymentReference : null;
+              const k = kitchenLines.get(o.id);
+              const items = o.itemsSummary.split(/,\s(?=\d+×)/).map((line) => {
+                const m = /^(\d+)×\s*(.*)$/.exec(line);
+                return m ? { qty: m[1], name: m[2] } : { qty: '', name: line };
+              });
+              const awaitingPay = o.paymentMode === 'transfer' && o.status === 'claimed';
+              const gone = o.status === 'cancelled' || o.status === 'failed';
+              const phone = o.buyerErasedAt ? '' : o.buyerPhone;
+              const dial = phone.replace(/[^\d+]/g, '');
+              const wa = /^(\+|00)/.test(dial) ? dial.replace(/^\+|^00/, '') : '';
+              const initials = o.buyerName
+                .split(/\s+/)
+                .map((w) => w[0] ?? '')
+                .join('')
+                .slice(0, 2)
+                .toUpperCase();
+              return (
+                <article key={o.id} className={`oc${awaitingPay ? ' oc-todo' : gone ? ' oc-gone' : ''}`}>
+                  <header className="oc-top">
+                    <span className="oc-avatar" aria-hidden="true" translate="no">
+                      {initials || '?'}
+                    </span>
+                    <div className="oc-who">
+                      <strong translate="no">{o.buyerName}</strong>
+                      <span className="oc-when">{o.createdAt.slice(5, 16).replace('-', '/').replace(' ', ' · ')} UTC</span>
+                    </div>
+                    <div className="oc-sum">
+                      <span className="oc-total">{formatMoney(o.totalCents, o.currency)}</span>
+                      {awaitingPay ? (
+                        <span className="badge badge-amber">{takesPaypal ? 'awaiting payment' : 'awaiting transfer'}</span>
+                      ) : (
+                        <StatusBadge status={o.status} />
+                      )}
+                      {o.paymentMode === 'mock' && <span className="badge badge-amber">test</span>}
+                    </div>
+                  </header>
+
+                  {(k?.when || k?.table || (k && !k.when && !k.table && !k.note && !k.picks?.length)) && (
+                    <p className="oc-slot">
+                      {k.table ? `🍽 Table ${k.table}` : k.when ? `🕔 ${k.when}` : `💺 ${k.line}`}
+                    </p>
+                  )}
+
+                  <ul className="oc-items">
+                    {items.map((it, i) => (
+                      <li key={i}>
+                        {it.qty && <span className="oc-qty">{it.qty}×</span>}
+                        <span>{it.name}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {k?.picks && k.picks.length > 0 && <p className="oc-picks">{k.picks.join('  |  ')}</p>}
+                  {k?.note && (
+                    <blockquote className="oc-note" translate="no">
+                      <span aria-hidden="true">💬</span> {k.note}
+                    </blockquote>
+                  )}
+                  {o.payerName.trim() && (
+                    <p className="oc-payer small">
+                      Paying as <strong translate="no">{o.payerName.trim()}</strong>
+                    </p>
+                  )}
+
+                  <div className="oc-contact">
+                    {phone ? (
+                      <>
+                        <a className="oc-call" href={`tel:${dial}`} translate="no">
+                          <span aria-hidden="true">📞</span> {phone}
+                        </a>
+                        {wa && (
+                          <a className="oc-btn" href={`https://wa.me/${wa}`} target="_blank" rel="noopener">
+                            WhatsApp
+                          </a>
                         )}
-                      </td>
-                      <td data-label="Total">{formatMoney(o.totalCents, o.currency)}</td>
-                      <td data-label="Status">
-                        {o.paymentMode === 'transfer' && o.status === 'claimed' ? (
-                          <span className="badge badge-amber" style={{ whiteSpace: 'nowrap' }}>
-                            {takesPaypal ? 'awaiting payment' : 'awaiting transfer'}
-                          </span>
-                        ) : (
-                          <StatusBadge status={o.status} />
-                        )}
-                        {o.paymentMode === 'mock' ? (
-                          <span className="badge badge-amber" style={{ marginLeft: 6 }}>
-                            test
-                          </span>
-                        ) : null}
-                      </td>
-                      <td data-label="Reference">{reference ? <ReferenceTag reference={reference} /> : <span className="muted">—</span>}</td>
-                      <td className="tc-actions">
-                        {o.status === 'paid' ? (
-                          <ResendButton orderId={o.id} demo={organizer.isDemo} />
-                        ) : o.paymentMode === 'transfer' && o.status === 'claimed' ? (
-                          <TransferActions
-                            orderId={o.id}
-                            buyerName={o.buyerName}
-                            payerName={o.payerName}
-                            amountDisplay={formatMoney(o.totalCents, o.currency)}
-                            reference={o.paymentReference}
-                          />
-                        ) : o.paymentMode === 'transfer' && (o.status === 'cancelled' || o.status === 'failed') ? (
-                          <TransferActions
-                            variant="late"
-                            orderId={o.id}
-                            buyerName={o.buyerName}
-                            payerName={o.payerName}
-                            amountDisplay={formatMoney(o.totalCents, o.currency)}
-                            reference={o.paymentReference}
-                          />
-                        ) : null}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </>
+                    ) : (
+                      <span className="oc-nophone muted small">No phone given</span>
+                    )}
+                    {!o.buyerErasedAt && (
+                      <a className="oc-btn" href={`mailto:${o.buyerEmail}`} title={o.buyerEmail} translate="no">
+                        ✉ {o.buyerEmail}
+                      </a>
+                    )}
+                  </div>
+
+                  <footer className="oc-foot">
+                    {reference ? <ReferenceTag reference={reference} /> : <span />}
+                    <div className="oc-actions">
+                      {o.status === 'paid' ? (
+                        <ResendButton orderId={o.id} demo={organizer.isDemo} />
+                      ) : awaitingPay ? (
+                        <TransferActions
+                          orderId={o.id}
+                          buyerName={o.buyerName}
+                          payerName={o.payerName}
+                          amountDisplay={formatMoney(o.totalCents, o.currency)}
+                          reference={o.paymentReference}
+                        />
+                      ) : o.paymentMode === 'transfer' && gone ? (
+                        <TransferActions
+                          variant="late"
+                          orderId={o.id}
+                          buyerName={o.buyerName}
+                          payerName={o.payerName}
+                          amountDisplay={formatMoney(o.totalCents, o.currency)}
+                          reference={o.paymentReference}
+                        />
+                      ) : null}
+                    </div>
+                  </footer>
+                </article>
+              );
+            })}
           </div>
         )}
       </div>

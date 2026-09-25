@@ -9295,3 +9295,170 @@ html.tx-wait body {
   white-space: nowrap;
   color: var(--brand-text);
 }
+
+/* ---------- Seller orders as cards (portal/events/[id]/orders) ---------- */
+.oc-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  gap: 14px;
+}
+.oc {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--card, rgba(255, 255, 255, 0.03));
+}
+.oc-todo {
+  border-color: rgba(245, 158, 11, 0.55);
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2) inset;
+}
+.oc-gone {
+  opacity: 0.6;
+}
+.oc-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.oc-avatar {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #fff;
+  background: linear-gradient(135deg, var(--brand, #dc143c), var(--accent));
+}
+.oc-who {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+.oc-who strong {
+  font-size: 1.05rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.oc-when {
+  font-size: 0.78rem;
+  opacity: 0.6;
+}
+.oc-sum {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+}
+.oc-total {
+  font-weight: 800;
+  font-size: 1.15rem;
+}
+.oc-slot {
+  margin: 0;
+  align-self: flex-start;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.92rem;
+  background: rgba(245, 158, 11, 0.14);
+  color: var(--amber, #f59e0b);
+}
+.oc-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.oc-items li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.oc-qty {
+  flex: none;
+  min-width: 34px;
+  padding: 1px 8px;
+  border-radius: 8px;
+  text-align: center;
+  font-weight: 800;
+  background: rgba(139, 92, 246, 0.18);
+  color: #c4b5fd;
+}
+.oc-picks {
+  margin: 0;
+  font-size: 0.88rem;
+  opacity: 0.8;
+}
+.oc-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 4px 14px 14px 14px;
+  background: rgba(59, 130, 246, 0.14);
+  border-left: 3px solid #60a5fa;
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+.oc-payer {
+  margin: 0;
+}
+.oc-contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.oc-call {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight: 700;
+  color: #fff;
+  background: #16a34a;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.oc-call:hover {
+  background: #15803d;
+}
+.oc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: inherit;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.oc-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.oc-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

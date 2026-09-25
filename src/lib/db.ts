@@ -1369,6 +1369,9 @@ function migrateKitchen(db: Database.Database): void {
   if (!orderCols.includes('pickup_slot')) db.exec(`ALTER TABLE orders ADD COLUMN pickup_slot TEXT`);
   if (!orderCols.includes('table_label')) db.exec(`ALTER TABLE orders ADD COLUMN table_label TEXT NOT NULL DEFAULT ''`);
   if (!orderCols.includes('order_note')) db.exec(`ALTER TABLE orders ADD COLUMN order_note TEXT NOT NULL DEFAULT ''`);
+  // Optional: so a seller can call about an order ("your momo are ready",
+  // "we are out of jhol"). Erased with the name and email (lib/retention).
+  if (!orderCols.includes('buyer_phone')) db.exec(`ALTER TABLE orders ADD COLUMN buyer_phone TEXT NOT NULL DEFAULT ''`);
   if (!orderCols.includes('item_choices')) db.exec(`ALTER TABLE orders ADD COLUMN item_choices TEXT`);
   if (!orderCols.includes('kitchen_status')) db.exec(`ALTER TABLE orders ADD COLUMN kitchen_status TEXT NOT NULL DEFAULT ''`);
   if (!orderCols.includes('kitchen_updated_at')) db.exec(`ALTER TABLE orders ADD COLUMN kitchen_updated_at TEXT`);

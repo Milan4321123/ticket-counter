@@ -52,6 +52,8 @@ export interface OrderRow {
   status: OrderStatus;
   buyerName: string;
   buyerEmail: string;
+  /** Optional, typed at checkout so the seller can call; '' when not given. */
+  buyerPhone: string;
   /**
    * Whose name the money will actually arrive under, when the buyer said it
    * would not be their own — a partner's account, a parent's, a shared one.
@@ -402,6 +404,7 @@ const ORDER_COLS = `
   status,
   buyer_name AS buyerName,
   buyer_email AS buyerEmail,
+  buyer_phone AS buyerPhone,
   payer_name AS payerName,
   confirmed_via AS confirmedVia,
   total_cents AS totalCents,
@@ -983,8 +986,12 @@ export function listOrders(
     // student form "TICKETS-S-AB12CD34") as-is — the hex part matches the
     // order id (LIKE is case-insensitive for ASCII).
     const q = `%${opts.query.trim().replace(/^TICKETS-(S-)?/i, '')}%`;
-    conditions.push(`(buyer_name LIKE ? OR buyer_email LIKE ? OR id LIKE ?)`);
-    args.push(q, q, q);
+    // A phone number is matched on its digits, however it was typed.
+    const digits = opts.query.replace(/\D/g, '');
+    conditions.push(
+      `(buyer_name LIKE ? OR buyer_email LIKE ? OR id LIKE ?${digits.length >= 4 ? ` OR replace(replace(replace(buyer_phone, ' ', ''), '-', ''), '/', '') LIKE ?` : ''})`
+    );
+    args.push(q, q, q, ...(digits.length >= 4 ? [`%${digits}%`] : []));
   }
   if (opts.filter && opts.filter !== 'all') {
     conditions.push(`(${FILTER_SQL[opts.filter]})`);
@@ -1631,4 +1638,19 @@ export function purgeMockOrders(): { orders: number; tickets: number } {
     return { orders: ids.length, tickets };
   });
   return tx();
+}
+
+/**
+ * A phone number as typed at checkout, tidied: digits, one leading +, and the
+ * usual separators. '' for anything that is not plausibly a phone number.
+ */
+export function cleanPhone(raw: unknown): string {
+  if (typeof raw !== 'string') return '';
+  const t = raw.replace(/[^\d+()\-/ ]/g, '').replace(/\s+/g, ' ').trim().slice(0, 30);
+  const digits = t.replace(/\D/g, '');
+  return digits.length >= 6 && digits.length <= 16 ? t : '';
+}
+
+export function setOrderPhone(orderId: string, phone: string): void {
+  if (phone) getDb().prepare(`UPDATE orders SET buyer_phone = ? WHERE id = ?`).run(phone, orderId);
 }

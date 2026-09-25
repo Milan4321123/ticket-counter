@@ -248,7 +248,7 @@ export function runBuyerDataRetentionSweep(force = false): { erased: number } {
     // DUE_SQL for why each clock starts where it does.
     const erase = db.prepare(
       `UPDATE orders
-       SET buyer_name = ?, buyer_email = ?, buyer_erased_at = datetime('now')
+       SET buyer_name = ?, buyer_email = ?, buyer_phone = '', buyer_erased_at = datetime('now')
        WHERE id = ? AND buyer_erased_at IS NULL`
     );
     const eraseBatch = db.transaction((ids: string[]) => {

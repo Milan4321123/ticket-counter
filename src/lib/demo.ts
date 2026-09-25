@@ -356,7 +356,8 @@ export async function createDemoSandbox(): Promise<DemoSandbox> {
     seedSeating(eventId);
     seedShopOrders(shopId);
     seedKitchen(shopId);
-    await buildDemoSalon(organizerId, short);
+    const salonId = await buildDemoSalon(organizerId, short);
+    givePhones([eventId, shopId, ...(typeof salonId === 'string' ? [salonId] : [])]);
     createPromoCode(organizerId, {
       code: 'DASHAIN10',
       kind: 'percent',
@@ -516,6 +517,22 @@ async function buildDemoShop(organizerId: string, short: string): Promise<string
     insTier.run(crypto.randomUUID(), id, key, name, price, cap, desc, `${desc} Cooked the morning of collection.`, photo.id, i);
   }
   return id;
+}
+
+/**
+ * Most demo buyers left a phone number, so the orders list shows its Call
+ * button. Numbers from the block Germany's Bundesnetzagentur reserves for
+ * fiction (030 23125 000–999): they can never reach a real person.
+ */
+function givePhones(listingIds: string[]): void {
+  const db = getDb();
+  const rows = db
+    .prepare(`SELECT id FROM orders WHERE event_id IN (${listingIds.map(() => '?').join(',')}) ORDER BY created_at`)
+    .all(...listingIds) as { id: string }[];
+  const set = db.prepare(`UPDATE orders SET buyer_phone = ? WHERE id = ?`);
+  rows.forEach((r, i) => {
+    if (i % 4 !== 3) set.run(`+49 30 23125 ${String(100 + ((i * 37) % 900)).padStart(3, '0')}`, r.id);
+  });
 }
 
 /** ~30 ticket orders over the last three weeks: most paid, a few awaiting a transfer. */

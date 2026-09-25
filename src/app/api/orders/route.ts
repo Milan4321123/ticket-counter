@@ -32,7 +32,9 @@ import {
   heldUnpaidTicketsForEmail,
   markOrderFailed,
   paymentReference,
+  cleanPhone,
   setOrderPaymentConnection,
+  setOrderPhone,
   setPaypalOrderId,
   setStripeSession,
   type PaymentMethod,
@@ -531,6 +533,7 @@ export async function POST(req: Request) {
     const basketRun = typeof rawRun === 'string' && BASKET_RUN_RE.test(rawRun) && addOrderToBasketRun(rawRun, order.id) ? rawRun : null;
 
     if (kitchen) setOrderKitchenDetails(order.id, kitchen);
+    setOrderPhone(order.id, cleanPhone((raw as { phone?: unknown }).phone));
     if (seatPicks.length > 0) {
       try {
         holdSeats(event.id, order.id, seatPicks);

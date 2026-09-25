@@ -419,6 +419,7 @@ export default function CheckoutClient({
   const [pickupSlot, setPickupSlot] = useState('');
   const [picks, setPicks] = useState<Record<string, Record<string, string>>>({});
   const [orderNote, setOrderNote] = useState('');
+  const [phone, setPhone] = useState('');
   // ---- Reserved seating ----
   const seatedTiers = new Set((seating?.map.sections ?? []).map((sec) => sec.tierKey));
   const [seats, setSeats] = useState<string[]>([]);
@@ -569,6 +570,7 @@ export default function CheckoutClient({
       Object.entries(picks).filter(([k]) => (latestRef.current.qty[k] ?? 0) > 0)
     ),
     note: orderNote.trim() || undefined,
+    phone: phone.trim() || undefined,
     seats: seats.length ? seats : undefined,
     subscribeEvery: subscribing ? subscribeEvery : undefined,
   });
@@ -1755,6 +1757,29 @@ export default function CheckoutClient({
             Your QR-code {v.codes} will be emailed to this address.
           </p>
         </div>
+        {/* Optional — for the seller to call about THIS order ("ready early",
+            "out of jhol momo, swap?"). Kept with the order and erased with the
+            name and email; never used for anything else. */}
+        <div className="field">
+          <label htmlFor="buyer-phone">
+            Phone <span className="muted small">(optional)</span>
+          </label>
+          <input
+            id="buyer-phone"
+            type="tel"
+            className="input"
+            autoComplete="tel"
+            inputMode="tel"
+            maxLength={30}
+            placeholder="+49 170 1234567"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            disabled={working}
+          />
+          <p className={`muted small ${styles.hint}`}>
+            Only so the {isShop ? 'seller' : 'organizer'} can call you about this order.
+          </p>
+        </div>
         {/* The seller matches your payment by its reference. A bank transfer
             carries that reference for you; PayPal often does not — so when the
             money turns up under a name they have never seen, there is nothing
@@ -1831,7 +1856,7 @@ export default function CheckoutClient({
             the only mode where the account is provably the organizer's own. */}
         <div className={styles.privacyNote}>
           <p style={{ margin: 0 }}>
-            <strong>Your name and email go to the {isShop ? 'seller' : 'organizer of this event'}</strong> —
+            <strong>Your name and email (and phone, if you give it) go to the {isShop ? 'seller' : 'organizer of this event'}</strong> —
             they are who your {v.code} is issued by, and how you get a new copy if it goes missing.
             {isFreeOrder
               ? ' Nothing is charged and no payment details exist here at all.'
