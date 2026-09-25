@@ -15,15 +15,20 @@
 import { useEffect } from 'react';
 import type { Lang } from '@/lib/i18n';
 
-/** Pages full of buyers' names, orders and codes: never translated. */
-const SKIP_ROUTE = /^\/(admin|scan)(\/|$)|^\/portal\/events\/[^/]+\/(orders|checkin|kitchen|live|insights)(\/|$)|^\/portal\/statements/;
+/**
+ * Pages never translated: the platform's own admin and the staff door
+ * scanner. The seller's orders, kitchen, check-in, live screen, insights and
+ * statements ARE translated — every buyer name, email, note and reference on
+ * them is marked translate="no", so only the page's own words are sent.
+ */
+const SKIP_ROUTE = /^\/(admin|scan)(\/|$)/;
 const SKIP_INSIDE =
   'script,style,noscript,textarea,input,code,pre,kbd,samp,svg,[translate="no"],.notranslate,[contenteditable="true"],.mono';
 const ATTRS = ['placeholder', 'title', 'aria-label'] as const;
 const LETTER = /\p{L}/u;
 const DEVANAGARI = /[ऀ-ॿ]/;
 const PRIVATE = /@|https?:\/\/|www\.|\b[A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){3,}/;
-const CODE_LIKE = /^[#A-Z0-9-]{2,14}$/;
+const CODE_LIKE = /^[#A-Z0-9-]{2,40}$/;
 const STORE_MAX = 5000;
 
 export default function AutoTranslate({ lang }: { lang: Lang }) {

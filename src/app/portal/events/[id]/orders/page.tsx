@@ -37,7 +37,7 @@ function StatusBadge({ status }: { status: OrderStatus }) {
 
 function ReferenceTag({ reference }: { reference: string }) {
   return (
-    <span className="mono small" style={{ whiteSpace: 'nowrap' }}>
+    <span className="mono small" style={{ whiteSpace: 'nowrap' }} translate="no">
       <strong>{reference}</strong>
       {reference.includes('-S-') && (
         <span className="badge badge-student" style={{ marginLeft: 6 }}>
@@ -185,7 +185,7 @@ export default async function PortalOrdersPage({
               return (
                 <div key={o.id} className="action-row">
                   <div className="action-row-who">
-                    <div style={{ fontWeight: 700 }}>{o.buyerName}</div>
+                    <div style={{ fontWeight: 700 }} translate="no">{o.buyerName}</div>
                     <div className="muted small">
                       {o.itemsSummary} · reserved {o.createdAt.slice(0, 10)}
                     </div>
@@ -196,7 +196,7 @@ export default async function PortalOrdersPage({
                         payment his mother sent. */}
                     {o.payerName.trim() && (
                       <div className="small" style={{ marginTop: 2 }}>
-                        Paying as <strong>{o.payerName.trim()}</strong>
+                        Paying as <strong translate="no">{o.payerName.trim()}</strong>
                       </div>
                     )}
                   </div>
@@ -325,8 +325,8 @@ export default async function PortalOrdersPage({
                   return (
                     <tr key={o.id}>
                       <td className="mono small" data-label="When">{o.createdAt.slice(0, 16)}</td>
-                      <td data-label="Buyer" className="tc-head">{o.buyerName}</td>
-                      <td className="small" data-label="Email">{o.buyerEmail}</td>
+                      <td data-label="Buyer" className="tc-head" translate="no">{o.buyerName}</td>
+                      <td className="small" data-label="Email" translate="no">{o.buyerEmail}</td>
                       <td data-label="Items">
                         {o.itemsSummary}
                         {kitchenLines.get(o.id) && (

@@ -142,7 +142,7 @@ export default function QuestionsPanel({ eventId, questions, answeredCount }: Pr
       </p>
       {open.map((q) => (
         <div key={q.id} className="qa-card">
-          <div className="qa-bubble">{q.question}</div>
+          <div className="qa-bubble" translate="no">{q.question}</div>
           {LINKY.test(q.question) && (
             <div className="notice notice-warn small" style={{ margin: '8px 0 0' }}>
               <strong>This question contains a link or a web address.</strong> Anyone on the internet
@@ -153,7 +153,7 @@ export default function QuestionsPanel({ eventId, questions, answeredCount }: Pr
           )}
           <div className="muted small" style={{ marginTop: 2 }}>
             Asked {q.askedAt.slice(0, 10)}
-            {q.askerName ? ` by ${q.askerName}` : ''}
+            {q.askerName ? <> by <span translate="no">{q.askerName}</span></> : ''}
           </div>
           {/* Whether an answer will travel changes how you write it — a reply
               going to one person's inbox reads differently from one published

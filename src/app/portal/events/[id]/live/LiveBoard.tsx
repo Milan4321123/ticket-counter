@@ -131,7 +131,7 @@ export default function LiveBoard({ eventId, name, currency, isShop }: { eventId
             <ul className="live-feed">
               {data.recent.map((r, i) => (
                 <li key={`${r.at}-${i}`}>
-                  <span className="live-feed-name">{r.name}</span>
+                  <span className="live-feed-name" translate="no">{r.name}</span>
                   <span className="live-feed-tier">{r.tier}</span>
                   <span className="live-feed-at">{ago(r.at)}</span>
                 </li>

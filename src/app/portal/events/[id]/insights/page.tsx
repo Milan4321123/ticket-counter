@@ -325,7 +325,7 @@ export default async function PortalInsightsPage({ params }: { params: Promise<{
                       style={{ borderTop: '1px solid var(--border-soft)', padding: '8px 0' }}
                     >
                       <summary style={{ cursor: 'pointer' }}>
-                        <strong>{r.name}</strong>
+                        <strong translate="no">{r.name}</strong>
                         <span className="muted small">
                           {' '}
                           — {r.referredOrders} booking{r.referredOrders === 1 ? '' : 's'} ·{' '}
@@ -346,7 +346,7 @@ export default async function PortalInsightsPage({ params }: { params: Promise<{
                             {r.bookings.map((b) => (
                               <tr key={b.orderId}>
                                 <td data-label="Who they brought" className="tc-head">
-                                  {b.name}
+                                  <span translate="no">{b.name}</span>
                                   {/* The chain going one step deeper. Said, not
                                       paid for: the reward rule is unchanged
                                       (direct referrals only), and the note
@@ -450,8 +450,8 @@ export default async function PortalInsightsPage({ params }: { params: Promise<{
                 <tbody>
                   {buyers.map((b) => (
                     <tr key={b.email}>
-                      <td data-label="Buyer" className="tc-head">{b.name}</td>
-                      <td data-label="Email" className="small">{b.email}</td>
+                      <td data-label="Buyer" className="tc-head" translate="no">{b.name}</td>
+                      <td data-label="Email" className="small" translate="no">{b.email}</td>
                       <td data-label="Bookings">{b.orders}</td>
                       <td data-label={v.Units}>{b.units}</td>
                       <td data-label="Total paid">{formatMoney(b.totalPaidCents, event.currency)}</td>

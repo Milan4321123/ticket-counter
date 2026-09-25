@@ -105,7 +105,7 @@ export default function SubscribeSavePanel({ eventId, initialPct, blockedBy, sub
               <tbody>
                 {subscribers.map((s) => (
                   <tr key={s.id}>
-                    <td data-label="Buyer" className="tc-head">{s.name}</td>
+                    <td data-label="Buyer" className="tc-head" translate="no">{s.name}</td>
                     <td data-label="Items">{s.items}</td>
                     <td data-label="How often">{s.every}</td>
                     <td data-label="Next">{s.status === 'active' ? s.next : s.status}</td>

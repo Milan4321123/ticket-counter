@@ -208,11 +208,11 @@ export default function TransferActions({
           used to name only the reference, which is exactly the thing a PayPal
           payment does not carry. */}
       <p className="small" style={{ marginTop: 0, marginBottom: 10 }}>
-        Confirm <strong>{amountDisplay}</strong> from <strong>{buyerName}</strong>
+        Confirm <strong>{amountDisplay}</strong> from <strong translate="no">{buyerName}</strong>
         {payerName.trim() ? (
           <>
             {' '}
-            (paying as <strong>{payerName.trim()}</strong>)
+            (paying as <strong translate="no">{payerName.trim()}</strong>)
           </>
         ) : null}
         , reference <span className="mono">{reference}</span>

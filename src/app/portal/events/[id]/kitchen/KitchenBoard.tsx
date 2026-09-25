@@ -264,7 +264,7 @@ export default function KitchenBoard({
                       </span>
                       <span className="kb-ref">#{t.reference}</span>
                     </div>
-                    <div className="kb-name">{t.buyerName}</div>
+                    <div className="kb-name" translate="no">{t.buyerName}</div>
                     <ul className="kb-items">
                       {t.items.map((it) => (
                         <li key={it.name}>
@@ -276,7 +276,7 @@ export default function KitchenBoard({
                         </li>
                       ))}
                     </ul>
-                    {t.note && <p className="kb-note">“{t.note}”</p>}
+                    {t.note && <p className="kb-note" translate="no">“{t.note}”</p>}
                     {compact && (
                       <div className="kb-tap-foot">
                         {PREV[t.status] && (
@@ -333,7 +333,7 @@ export default function KitchenBoard({
             {done.map((t) => (
               <li key={t.orderId}>
                 <span>
-                  #{t.reference} · {t.buyerName} · {t.items.map((i) => `${i.quantity}× ${i.name}`).join(', ')}
+                  #{t.reference} · <span translate="no">{t.buyerName}</span> · {t.items.map((i) => `${i.quantity}× ${i.name}`).join(', ')}
                   {t.collected ? ' · code scanned' : ''}
                 </span>
                 {!t.collected && (

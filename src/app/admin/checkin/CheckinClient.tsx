@@ -288,7 +288,7 @@ export default function CheckinClient({
             <div className={styles.resultTitle}>{isShop ? 'VALID — hand it over!' : 'VALID — welcome!'}</div>
             <div className={styles.resultDetail}>
               {result.ticket?.tierName}
-              {result.ticket?.buyerName ? ` · ${result.ticket.buyerName}` : ''}
+              {result.ticket?.buyerName ? <> · <span translate="no">{result.ticket.buyerName}</span></> : ''}
             </div>
             {result.ticket?.code && <div className={`mono small ${styles.resultDetail}`}>{result.ticket.code}</div>}
           </div>
@@ -298,7 +298,7 @@ export default function CheckinClient({
             <div className={styles.resultTitle}>ALREADY USED</div>
             <div className={styles.resultDetail}>
               {isShop ? 'Collected' : 'Checked in'} at {result.checkedInAt} (UTC)
-              {result.ticket?.buyerName ? ` · ${result.ticket.buyerName}` : ''}
+              {result.ticket?.buyerName ? <> · <span translate="no">{result.ticket.buyerName}</span></> : ''}
             </div>
             {result.ticket?.code && <div className={`mono small ${styles.resultDetail}`}>{result.ticket.code}</div>}
           </div>
@@ -309,7 +309,7 @@ export default function CheckinClient({
         {!netError && result?.result === 'customer_card' && result.card && (
           <div key={resultKey} className={`notice ${styles.result}`}>
             <div className={styles.resultTitle}>
-              CUSTOMER CARD{result.card.holderName ? ` — ${result.card.holderName}` : ''}
+              CUSTOMER CARD{result.card.holderName ? <> — <span translate="no">{result.card.holderName}</span></> : ''}
             </div>
             <div className={styles.resultDetail}>
               {result.card.confirmedOrders}{' '}
@@ -345,7 +345,7 @@ export default function CheckinClient({
             <div className={styles.resultTitle}>Order not paid</div>
             <div className={styles.resultDetail}>
               This {v.code} belongs to an unpaid order
-              {result.ticket?.buyerName ? ` (${result.ticket.buyerName})` : ''}.
+              {result.ticket?.buyerName ? <> (<span translate="no">{result.ticket.buyerName}</span>)</> : ''}.
             </div>
           </div>
         )}
@@ -364,7 +364,7 @@ export default function CheckinClient({
             </div>
             <div className={styles.resultDetail}>
               This {v.code} came from test mode; no real payment was made
-              {result.ticket?.buyerName ? ` (${result.ticket.buyerName})` : ''}.
+              {result.ticket?.buyerName ? <> (<span translate="no">{result.ticket.buyerName}</span>)</> : ''}.
             </div>
           </div>
         )}
