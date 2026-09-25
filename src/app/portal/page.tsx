@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import LogoutButton from './LogoutButton';
 import DemoPicker from './DemoPicker';
+import LoopCarousel from './LoopCarousel';
 import { readListingName } from '@/lib/exampleShop';
 import PlatformAssistant from '@/components/PlatformAssistant';
 import {
@@ -194,13 +195,13 @@ export default async function PortalDashboardPage({
                 {questions > 0 ? `${questions} open question${questions === 1 ? '' : 's'}` : ''}
               </span>
             </div>
-            <section className="hub-cards">
-              {shownCards.map(({ event, stats, openQuestions, thumb }, i) => {
+            <LoopCarousel label={tr('hub.yourListings')}>
+              {shownCards.map(({ event, stats, openQuestions, thumb }) => {
                 const v = vocabFor(event.kind);
                 const pct =
                   event.totalCapacity > 0 ? Math.min(100, Math.round((stats.ticketsSold / event.totalCapacity) * 100)) : 0;
                 return (
-                  <article key={event.id} className={`hub-card anim-fade-up${i < 4 ? ` anim-d${i + 1}` : ''}`}>
+                  <article key={event.id} className="hub-card">
                     <Link href={`/portal/events/${event.id}`} className="hub-card-media" aria-label={`Edit ${event.name}`}>
                       {thumb ? (
                         // Served by our own /api/media route — next/image is not needed.
@@ -282,7 +283,7 @@ export default async function PortalDashboardPage({
                   </article>
                 );
               })}
-            </section>
+            </LoopCarousel>
           </>
         )}
 
