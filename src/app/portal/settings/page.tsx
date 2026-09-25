@@ -9,6 +9,7 @@ import PortalNav from '../PortalNav';
 import { requirePortalOrganizer } from '../guard';
 import ChangePasswordForm from './ChangePasswordForm';
 import TotpPanel from './TotpPanel';
+import SettingsRow from './SettingsRow';
 import RemindersCard from './RemindersCard';
 import ReferralRewardsCard from './ReferralRewardsCard';
 import PaymentConnectionsPanel from './PaymentConnectionsPanel';
@@ -53,90 +54,94 @@ export default async function PortalSettingsPage() {
             Settings
           </h1>
           <p className="muted small" style={{ margin: '4px 0 0' }}>
-            Your account, instant payments, payment reminders, referral rewards, and password.
+            Tap a row to change it.
           </p>
         </div>
 
-      <div className="card anim-fade-up">
-        <div className="card-title">Your account</div>
-        <div className="summary-row">
-          <span className="muted">Name</span>
-          <span>{organizer.name}</span>
-        </div>
-        <div className="summary-row">
-          <span className="muted">Email</span>
-          <span>{organizer.email}</span>
-        </div>
-        <div className="summary-row">
-          <span className="muted">Account</span>
-          <span>
-            {planActive ? (
-              <>
-                <span className="badge badge-green">active</span>{' '}
-                <span className="muted small">free — no expiry</span>
-              </>
-            ) : (
-              <span className="badge badge-red">disabled</span>
-            )}
-          </span>
-        </div>
-        <div className="summary-row">
-          <span className="muted">Pricing</span>
-          <span>Free — publishing costs nothing</span>
-        </div>
-        <p className="muted small" style={{ margin: '10px 0 0' }}>
-          The account costs nothing to keep, publishing costs nothing, and there is never any
-          commission on ticket sales — buyers pay you directly. Your email address is managed by the
-          platform team; get in touch with them to change it.
-        </p>
-      </div>
+      <div className="st-list anim-fade-up">
+        <SettingsRow
+          id="account"
+          icon="👤"
+          title="Your account"
+          status={`${organizer.name} · ${planActive ? 'free, no expiry' : 'switched off'}`}
+          tone={planActive ? 'plain' : 'warn'}
+        >
+          <div className="summary-row">
+            <span className="muted">Name</span>
+            <span>{organizer.name}</span>
+          </div>
+          <div className="summary-row">
+            <span className="muted">Email</span>
+            <span>{organizer.email}</span>
+          </div>
+          <div className="summary-row">
+            <span className="muted">Account</span>
+            <span>
+              {planActive ? <span className="badge badge-green">active</span> : <span className="badge badge-red">disabled</span>}
+            </span>
+          </div>
+          <p className="muted small" style={{ margin: '10px 0 0' }}>
+            Free — no fees, no commission; buyers pay you directly. To change your email, ask the platform team.
+          </p>
+          <p className="muted small" style={{ margin: '8px 0 0' }}>
+            Your buyers are yours: every order is on its listing&rsquo;s Orders page. We use their details only to send
+            tickets and the reminders you switch on — never to sell or advertise.
+          </p>
+        </SettingsRow>
 
-      <div className="card anim-fade-up anim-d1">
-        <div className="card-title">You own your own data</div>
-        <p className="muted small" style={{ marginTop: 0 }}>
-          Ticket money goes straight to the bank account you put on each event — we never hold it,
-          so there is no payout to wait for. Your buyers are yours too: every order, with the name
-          and email they gave you, is on that event&rsquo;s Orders page and stays searchable. We use
-          those details to send their tickets and the payment reminders you switch on below, and for
-          nothing else — we don&rsquo;t sell them and we don&rsquo;t market to them. When an event
-          is over, you can delete it and its data from the portal yourself, whenever you like.
-        </p>
-      </div>
+        <SettingsRow
+          id="instant-payments"
+          icon="⚡"
+          title="Get paid instantly"
+          status={
+            connections.length
+              ? `${connections.map((c) => (c.provider === 'paypal' ? 'PayPal' : 'Stripe')).join(' & ')} connected`
+              : 'Not connected — optional'
+          }
+          tone={connections.length ? 'on' : 'plain'}
+        >
+          <PaymentConnectionsPanel
+            connections={connections}
+            currency={organizerCurrency(organizer.id)}
+            exampleCents={exampleCents}
+          />
+        </SettingsRow>
 
-      <div className="card anim-fade-up anim-d2">
-        <div className="card-title">Get paid instantly (optional)</div>
-        <PaymentConnectionsPanel
-          connections={connections}
-          currency={organizerCurrency(organizer.id)}
-          exampleCents={exampleCents}
-        />
-      </div>
+        <SettingsRow
+          id="reminders"
+          icon="⏰"
+          title="Payment reminders"
+          status={reminders.enabled ? `On · ${reminders.days.map((d) => `day ${d}`).join(', ') || 'default days'}` : 'Off'}
+          tone={reminders.enabled ? 'on' : 'plain'}
+        >
+          <RemindersCard initialEnabled={reminders.enabled} initialDays={reminders.days} recommended={recommended} />
+        </SettingsRow>
 
-      <div className="card anim-fade-up anim-d2">
-        <div className="card-title">Payment reminders</div>
-        <RemindersCard
-          initialEnabled={reminders.enabled}
-          initialDays={reminders.days}
-          recommended={recommended}
-        />
-      </div>
+        <SettingsRow
+          id="referrals"
+          icon="🎁"
+          title="Thank people who bring friends"
+          status={referral.threshold > 0 && referral.rewardCents > 0 ? `On · reward after ${referral.threshold} friends` : 'Off'}
+          tone={referral.threshold > 0 && referral.rewardCents > 0 ? 'on' : 'plain'}
+        >
+          <ReferralRewardsCard
+            initialThreshold={referral.threshold}
+            initialRewardCents={referral.rewardCents}
+            currency={organizerCurrency(organizer.id)}
+          />
+        </SettingsRow>
 
-      <div className="card anim-fade-up anim-d2">
-        <div className="card-title">Thank people who bring friends</div>
-        <ReferralRewardsCard
-          initialThreshold={referral.threshold}
-          initialRewardCents={referral.rewardCents}
-          currency={organizerCurrency(organizer.id)}
-        />
-      </div>
-
-      <div className="card anim-fade-up anim-d3">
-        <div className="card-title">Change password</div>
-        <ChangePasswordForm />
-
-        {/* Sits with the password, because it is the other half of the same
-            question: who is allowed into this account. */}
-        <TotpPanel enabled={organizerTotpEnabled(organizer.id)} unfinished={organizerTotpPending(organizer.id)} />
+        <SettingsRow
+          id="security"
+          icon="🔒"
+          title="Password & sign-in"
+          status={organizerTotpEnabled(organizer.id) ? 'Authenticator on' : 'Password only — add an authenticator'}
+          tone={organizerTotpEnabled(organizer.id) ? 'on' : 'warn'}
+        >
+          <ChangePasswordForm />
+          {/* The other half of the same question: who may get into this account. */}
+          <TotpPanel enabled={organizerTotpEnabled(organizer.id)} unfinished={organizerTotpPending(organizer.id)} />
+        </SettingsRow>
       </div>
       </div>
     </>

@@ -3389,3 +3389,86 @@
     inset 0 0 0 2px var(--sw),
     0 4px 14px rgba(0, 0, 0, 0.35);
 }
+
+/* Settings as a phone-style list (settings/SettingsRow). */
+.st-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.st-body {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.st-row {
+  border-radius: 18px;
+  background: var(--bg-card);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 4px 14px rgba(0, 0, 0, 0.22);
+  scroll-margin-top: 90px;
+}
+
+.st-row > summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.st-row > summary::-webkit-details-marker {
+  display: none;
+}
+
+.st-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 1.2rem;
+}
+
+.st-text {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.st-status {
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 0.84rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.st-status.st-on {
+  color: #6ee7b7;
+}
+
+.st-status.st-warn {
+  color: #fbbf24;
+}
+
+.st-chev {
+  color: var(--text-dim);
+  font-size: 1.4rem;
+  transition: transform 0.2s ease;
+}
+
+.st-row[open] .st-chev {
+  transform: rotate(90deg);
+}
+
+.st-body {
+  padding: 0 16px 16px;
+}
