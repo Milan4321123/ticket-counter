@@ -4,6 +4,7 @@ import { shareImages } from '@/lib/seo';
 import ContactBand from './ContactBand';
 import { FEATURE_COUNT, FEATURE_GROUPS } from './features';
 import styles from './showcase.module.css';
+import DemoStart from '@/components/DemoStart';
 
 const title = 'Everything this platform does';
 const description =
@@ -29,9 +30,9 @@ export default function ShowcasePage() {
             on a live page, or in a private demo account of your own.
           </p>
           <p className="feed-hero-actions anim-fade-up anim-d3">
-            <Link href="/demo" className="btn btn-brand">
+            <DemoStart className="btn btn-brand">
               Try the organizer demo
-            </Link>
+            </DemoStart>
             <Link href="/built" className="btn btn-green">
               How it&rsquo;s built
             </Link>
@@ -73,17 +74,23 @@ export default function ShowcasePage() {
                   <h3 className={styles.cardTitle}>{f.title}</h3>
                   <p className={styles.cardBody}>{f.benefit}</p>
                   <p className={styles.cardLinks}>
-                    {f.links.map((l) => (
-                      <Link
-                        key={l.href + l.label}
-                        href={l.href}
-                        className={l.kind === 'demo' ? styles.linkDemo : styles.linkLive}
-                        // The demo creates a private account: never prefetch it.
-                        prefetch={l.kind === 'demo' ? false : undefined}
-                      >
-                        {l.label} →
-                      </Link>
-                    ))}
+                    {f.links.map((l) =>
+                      l.kind === 'demo' ? (
+                        // Starts the demo on that very page — no picker in between.
+                        <DemoStart
+                          key={l.href + l.label}
+                          to={new URLSearchParams(l.href.split('?')[1] ?? '').get('to') ?? 'portal'}
+                          plain
+                          className={styles.linkDemo}
+                        >
+                          {l.label} →
+                        </DemoStart>
+                      ) : (
+                        <Link key={l.href + l.label} href={l.href} className={styles.linkLive}>
+                          {l.label} →
+                        </Link>
+                      )
+                    )}
                   </p>
                 </li>
               ))}

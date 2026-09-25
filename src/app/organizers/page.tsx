@@ -3,6 +3,7 @@ import { shareImages } from '@/lib/seo';
 import { platformNameFromEnv } from '@/lib/platform';
 import PlatformAssistant from '@/components/PlatformAssistant';
 import InView from '@/components/InView';
+import DemoStart from '@/components/DemoStart';
 import './organizers.css';
 
 // The brand name comes from an env var — read it fresh on every request.
@@ -42,12 +43,12 @@ export default function OrganizersPage() {
           Your page, your orders, your door — and the money goes straight into your own account.
         </p>
         <div className="og-cta anim-fade-up anim-d2">
-          <Link href="/demo" className="btn btn-brand btn-lg">
+          <DemoStart className="btn btn-brand btn-lg">
             ▶ Try the demo
-          </Link>
-          <Link href="/demo?to=assistant" className="btn btn-lg">
+          </DemoStart>
+          <DemoStart to="assistant" className="btn btn-lg">
             ✨ Try the AI assistant
-          </Link>
+          </DemoStart>
         </div>
         <ul className="og-chips anim-fade-up anim-d3">
           <li>€0 fees · no commission</li>
@@ -72,9 +73,9 @@ export default function OrganizersPage() {
             live.
           </p>
           <div className="og-cta og-cta-left">
-            <Link href="/demo?to=assistant" className="btn btn-brand btn-lg">
+            <DemoStart to="assistant" className="btn btn-brand btn-lg">
               ✨ Try the AI assistant
-            </Link>
+            </DemoStart>
           </div>
         </div>
         <div className="og-screen og-chat" aria-hidden="true">
@@ -126,7 +127,7 @@ export default function OrganizersPage() {
           <div className="og-caption">
             <h2>Build your page</h2>
             <p>Photos, prices, dates — live in minutes. No tech skills.</p>
-            <Link href="/demo?to=event">Open the editor in the demo →</Link>
+            <DemoStart to="event" plain className="og-demo-link">Open the editor in the demo →</DemoStart>
           </div>
         </InView>
 
@@ -151,7 +152,7 @@ export default function OrganizersPage() {
           <div className="og-caption">
             <h2>Get paid directly</h2>
             <p>Bank transfer, PayPal or card — always into your own account.</p>
-            <Link href="/demo?to=orders">Confirm a payment in the demo →</Link>
+            <DemoStart to="orders" plain className="og-demo-link">Confirm a payment in the demo →</DemoStart>
           </div>
         </InView>
 
@@ -178,7 +179,7 @@ export default function OrganizersPage() {
           <div className="og-caption">
             <h2>Run the kitchen</h2>
             <p>Orders with pickup times on one live board: New → Cooking → Ready.</p>
-            <Link href="/demo?to=kitchen">Open the kitchen in the demo →</Link>
+            <DemoStart to="kitchen" plain className="og-demo-link">Open the kitchen in the demo →</DemoStart>
           </div>
         </InView>
 
@@ -197,7 +198,7 @@ export default function OrganizersPage() {
           <div className="og-caption">
             <h2>Scan at the door</h2>
             <p>Any phone becomes the scanner. Each ticket works exactly once.</p>
-            <Link href="/demo?to=checkin">Try check-in in the demo →</Link>
+            <DemoStart to="checkin" plain className="og-demo-link">Try check-in in the demo →</DemoStart>
           </div>
         </InView>
 
@@ -213,7 +214,7 @@ export default function OrganizersPage() {
           <div className="og-caption">
             <h2>Seats &amp; bookings</h2>
             <p>A real seat map, table bookings, or appointment times.</p>
-            <Link href="/demo?to=checkout">Pick seats in the demo →</Link>
+            <DemoStart to="checkout" plain className="og-demo-link">Pick seats in the demo →</DemoStart>
           </div>
         </InView>
 
@@ -241,7 +242,7 @@ export default function OrganizersPage() {
           <div className="og-caption">
             <h2>See your numbers</h2>
             <p>What sells, on which days, and who brought their friends.</p>
-            <Link href="/demo?to=insights">Open insights in the demo →</Link>
+            <DemoStart to="insights" plain className="og-demo-link">Open insights in the demo →</DemoStart>
           </div>
         </InView>
       </section>
@@ -270,9 +271,9 @@ export default function OrganizersPage() {
         <h2>See it for yourself</h2>
         <p className="muted">The demo opens in a second. No sign-up.</p>
         <div className="og-cta">
-          <Link href="/demo" className="btn btn-brand btn-lg">
+          <DemoStart className="btn btn-brand btn-lg">
             ▶ Try the demo
-          </Link>
+          </DemoStart>
           <Link href="/contact?intent=account" className="btn btn-lg">
             Get an account
           </Link>

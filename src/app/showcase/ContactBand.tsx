@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import styles from './showcase.module.css';
+import DemoStart from '@/components/DemoStart';
 
 /**
  * The closing band on /showcase and /built. Plain wording on purpose: it
@@ -22,9 +23,9 @@ export default function ContactBand() {
             <Link href="/contact" className="btn btn-brand">
               Get in touch →
             </Link>
-            <Link href="/demo" className="btn">
+            <DemoStart className="btn">
               Try the demo first
-            </Link>
+            </DemoStart>
           </div>
         </div>
       </div>

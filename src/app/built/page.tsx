@@ -4,6 +4,7 @@ import { shareImages } from '@/lib/seo';
 import ContactBand from '../showcase/ContactBand';
 import { FEATURE_COUNT } from '../showcase/features';
 import styles from './built.module.css';
+import DemoStart from '@/components/DemoStart';
 
 const title = 'How it’s built';
 const description =
@@ -97,9 +98,9 @@ export default function BuiltPage() {
             <Link href="/showcase" className="btn btn-green">
               See every feature
             </Link>
-            <Link href="/demo" className="btn btn-brand">
+            <DemoStart className="btn btn-brand">
               Try the organizer demo
-            </Link>
+            </DemoStart>
           </p>
         </div>
       </section>

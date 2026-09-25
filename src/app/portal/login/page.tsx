@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import DemoStart from '@/components/DemoStart';
 import { redirect } from 'next/navigation';
 import Logo from '@/components/Logo';
 import { currentOrganizer } from '@/lib/organizers';
@@ -25,7 +26,7 @@ export default async function PortalLoginPage() {
         </p>
         {/* Most people on this page have no account yet — the demo is the
             quickest honest answer to "what would I get?". */}
-        <Link href="/demo" className="login-demo">
+        <DemoStart plain className="login-demo">
           <span className="login-demo-icon" aria-hidden="true">
             ▶
           </span>
@@ -34,7 +35,7 @@ export default async function PortalLoginPage() {
             <span>A ready-made shop, restaurant or event — no sign-up</span>
           </span>
           <span aria-hidden="true">→</span>
-        </Link>
+        </DemoStart>
         <div className="card glow-card">
           <LoginForm />
         </div>

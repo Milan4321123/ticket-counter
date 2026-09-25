@@ -72,7 +72,7 @@ export async function GET(req: Request) {
   if (!email || claims.email_verified !== true || !claims.sub) return fail('google-email');
 
   const customer = upsertCustomer(email, { name: claims.name, googleSub: claims.sub });
-  const res = NextResponse.redirect(`${getBaseUrl()}${back}`, 303);
+  const res = NextResponse.redirect(`${getBaseUrl()}${back}${back.includes('?') ? '&' : '?'}signedin=1`, 303);
   res.cookies.set(CUSTOMER_COOKIE_NAME, createCustomerSessionToken(customer.id), customerCookieOptions);
   res.cookies.set(STATE_COOKIE, '', { path: '/api/account/google', maxAge: 0 });
   return res;

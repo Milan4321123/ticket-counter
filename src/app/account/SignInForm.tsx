@@ -47,7 +47,7 @@ export default function SignInForm({ google, back = '/' }: { google: boolean; ba
     setBusy(false);
     if (err) setError(err);
     else {
-      router.replace(back);
+      router.replace(`${back}${back.includes('?') ? '&' : '?'}signedin=1`);
       router.refresh();
     }
   }

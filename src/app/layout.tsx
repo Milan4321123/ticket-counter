@@ -20,6 +20,7 @@ import './bazaar.css';
 import { ServiceWorkerRegistrar } from '@/components/AppInstall';
 import { Suspense } from 'react';
 import HeaderNav from '@/components/HeaderNav';
+import SignedInToast from '@/components/SignedInToast';
 import { currentCustomer } from '@/lib/customers';
 import LangSwitch from '@/components/LangSwitch';
 import { translator } from '@/lib/i18n';
@@ -160,6 +161,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             />
           </div>
         </header>
+        <SignedInToast />
         <main id="main" className="anim-fade-up">
           {children}
         </main>
