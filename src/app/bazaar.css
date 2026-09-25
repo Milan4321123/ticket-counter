@@ -4157,3 +4157,105 @@
     transition: none !important;
   }
 }
+
+/* ======================================================================
+   Every button looks pressable — site-wide, and so on every demo page.
+   Plain buttons get a raised resting shadow and a lit top edge (they were
+   flat until hovered); coloured ones keep their glow and gain the same
+   edge; all of them sink when pressed.
+   ====================================================================== */
+.btn:not(.btn-brand):not(.btn-primary):not(.btn-green):not(.btn-danger) {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.btn {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 1px 2px rgba(0, 0, 0, 0.45),
+    0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.btn:hover:not(:disabled) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 2px 4px rgba(0, 0, 0, 0.4),
+    0 10px 22px rgba(0, 0, 0, 0.4);
+}
+
+.btn-brand,
+.btn-primary {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.22),
+    0 6px 18px -6px var(--brand-glow, rgba(220, 20, 60, 0.6));
+}
+
+.btn-brand:hover:not(:disabled),
+.btn-primary:hover:not(:disabled) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.22),
+    0 12px 28px -8px var(--brand-glow, rgba(220, 20, 60, 0.7));
+}
+
+.btn-green {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.18),
+    0 10px 26px -12px rgba(16, 185, 129, 0.85);
+}
+
+.btn:active:not(:disabled),
+.btn-brand:active:not(:disabled),
+.btn-primary:active:not(:disabled),
+.btn-green:active:not(:disabled) {
+  transform: translateY(1px) scale(0.98);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.35),
+    0 1px 1px rgba(0, 0, 0, 0.3);
+}
+
+/* The smaller controls around the site, same idea. */
+.hub-slim-back,
+.hub-tab-pill,
+.qty-stepper button,
+.bk-method button,
+.bp-arrow,
+.pk-arrow,
+.acc-google,
+.bk-copy-btn,
+.gn-org,
+.bz-quick-chip {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 1px 2px rgba(0, 0, 0, 0.45),
+    0 3px 8px rgba(0, 0, 0, 0.28) !important;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease !important;
+}
+
+.hub-slim-back:active,
+.hub-tab-pill:active,
+.qty-stepper button:active:not(:disabled),
+.bk-method button:active,
+.bp-arrow:active:not(:disabled),
+.pk-arrow:active,
+.acc-google:active,
+.bk-copy-btn:active,
+.gn-org:active,
+.bz-quick-chip:active {
+  transform: translateY(1px) scale(0.97) !important;
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* The coloured "Open →" and kitchen "Cook →" labels inside tappable cards. */
+.dp-go,
+.kb-tap-go,
+.pk-cta {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.2),
+    0 4px 12px -4px rgba(0, 0, 0, 0.5);
+}
