@@ -13,7 +13,7 @@
 //
 // Speaks English, German and Nepali (the site's language cookie).
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import SpeechInput from '@/components/SpeechInput';
 import { formatMoney } from '@/lib/money';
 import { ASSISTANT_AWAY_EVENT, ASSISTANT_RETURN_EVENT, GOTO_TAB_EVENT } from './GoToTab';
@@ -51,6 +51,10 @@ interface Message {
   suggested?: boolean;
   /** A button under the message that opens an editor section. */
   goto?: { tab: string; label: string };
+  /** Offer "Publish now" right in the chat. */
+  publishNow?: boolean;
+  /** A link to the published page. */
+  view?: string;
 }
 
 type Words = {
@@ -75,7 +79,8 @@ type Words = {
   typing: string;
   placeholder: (shop: boolean) => string;
   q: Record<string, string>;
-  buttons: { photo: string; publish: string };
+  buttons: { photo: string; publish: string; publishNow: string; view: string };
+  published: string;
   labels: Record<string, string>;
 };
 
@@ -122,10 +127,12 @@ const T: Record<Lang, Words> = {
       payoutIban: 'And the IBAN of that account?',
       payoutDemo:
         'This is a demo account, so its payment details are fixed — in a real account I would ask for your IBAN here. Moving on.',
-      photo: 'Add at least one photo — tap below, pick one, then come back and say “done”.',
-      publish: 'Last step: publish. Tap below to check everything and put it live.',
+      confirm: 'All the details are in ✓ — anything to change? Tell me (e.g. “veg momo 7€ instead”), or say “done” when you are happy.',
+      photo: 'Now add at least one photo — tap below, pick one, then “Return to the chat”. You can still type changes here.',
+      publish: 'Everything is ready. Publish it now?',
     },
-    buttons: { photo: 'Add a photo →', publish: 'Go to Publish →' },
+    buttons: { photo: 'Add a photo →', publish: 'Open the Publish section', publishNow: '🚀 Publish now', view: 'View your page →' },
+    published: 'Published 🎉 — your page is live.',
     labels: {
       name: 'Name', artist: 'Artists', description: 'Description', dateDisplay: 'Date (as shown)', eventDate: 'Calendar date',
       venueName: 'Venue', address: 'Address', city: 'City', totalCapacity: 'Capacity', pickupInfo: 'Collection',
@@ -173,10 +180,12 @@ const T: Record<Lang, Words> = {
       payoutIban: 'Und die IBAN dieses Kontos?',
       payoutDemo:
         'Das ist ein Demo-Konto, die Zahlungsdaten sind fest – in einem echten Konto würde ich hier nach deiner IBAN fragen. Weiter.',
-      photo: 'Füge mindestens ein Foto hinzu – unten tippen, eins wählen, dann zurückkommen und „fertig“ sagen.',
-      publish: 'Letzter Schritt: veröffentlichen. Unten tippen, alles prüfen und live stellen.',
+      confirm: 'Alle Angaben sind drin ✓ – noch etwas ändern? Sag es mir (z. B. „Veggie-Momo doch 7€“) oder „fertig“, wenn alles passt.',
+      photo: 'Jetzt mindestens ein Foto – unten tippen, eins wählen, dann „Zurück zum Chat“. Änderungen kannst du hier weiter tippen.',
+      publish: 'Alles bereit. Jetzt veröffentlichen?',
     },
-    buttons: { photo: 'Foto hinzufügen →', publish: 'Zum Veröffentlichen →' },
+    buttons: { photo: 'Foto hinzufügen →', publish: 'Bereich Veröffentlichen öffnen', publishNow: '🚀 Jetzt veröffentlichen', view: 'Deine Seite ansehen →' },
+    published: 'Veröffentlicht 🎉 – deine Seite ist online.',
     labels: {
       name: 'Name', artist: 'Künstler', description: 'Beschreibung', dateDisplay: 'Datum (Anzeige)', eventDate: 'Kalenderdatum',
       venueName: 'Ort', address: 'Adresse', city: 'Stadt', totalCapacity: 'Kapazität', pickupInfo: 'Abholung',
@@ -220,10 +229,12 @@ const T: Record<Lang, Words> = {
       payoutHolder: 'पैसा कहाँ जाने? पहिले: बैंक खातामा भएको नाम। वा आफ्नो PayPal.me लिङ्क पठाउनुहोस्।',
       payoutIban: 'अनि त्यो खाताको IBAN?',
       payoutDemo: 'यो डेमो खाता हो, भुक्तानी विवरण परिवर्तन हुँदैन — साँचो खातामा म यहाँ IBAN सोध्थें। अगाडि बढौं।',
-      photo: 'कम्तीमा एउटा फोटो थप्नुहोस् — तल थिच्नुहोस्, फोटो छान्नुहोस्, अनि फर्केर “भयो” भन्नुहोस्।',
-      publish: 'अन्तिम काम: प्रकाशित गर्नुहोस्। तल थिचेर सबै जाँच्नुहोस् र लाइभ गर्नुहोस्।',
+      confirm: 'सबै विवरण भरियो ✓ — केही बदल्नु छ? भन्नुहोस् (जस्तै “veg momo 7 euro”), वा सबै ठीक भए “bhayo” भन्नुहोस्।',
+      photo: 'अब कम्तीमा एउटा फोटो थप्नुहोस् — तल थिच्नुहोस्, फोटो छान्नुहोस्, अनि “Return to the chat”। यहाँ परिवर्तन लेख्न सक्नुहुन्छ।',
+      publish: 'सबै तयार छ। अहिले प्रकाशित गर्ने?',
     },
-    buttons: { photo: 'फोटो थप्नुहोस् →', publish: 'प्रकाशनमा जानुहोस् →' },
+    buttons: { photo: 'फोटो थप्नुहोस् →', publish: 'प्रकाशन खण्ड खोल्नुहोस्', publishNow: '🚀 अहिले प्रकाशित गर्नुहोस्', view: 'आफ्नो पेज हेर्नुहोस् →' },
+    published: 'प्रकाशित भयो 🎉 — तपाईंको पेज लाइभ छ।',
     labels: {
       name: 'नाम', artist: 'कलाकार', description: 'विवरण', dateDisplay: 'मिति (देखिने)', eventDate: 'क्यालेन्डर मिति',
       venueName: 'ठाउँ', address: 'ठेगाना', city: 'शहर', totalCapacity: 'क्षमता', pickupInfo: 'लिन आउने',
@@ -245,6 +256,11 @@ const GREETING =
 /** The order the required pieces are asked for. */
 const ORDER = ['name', 'eventDate', 'venueName', 'address', 'pickupInfo', 'description', 'tiers', 'payout', 'payoutDemo', 'photo', 'publish'];
 
+/** "done" in the languages people type — including Roman Nepali. */
+const DONE_RE = /^\s*(done|ok|okay|yes|yep|ready|ja|fertig|erledigt|passt|bhayo|bhaeo|sakiyo|thik cha|thik xa|thik chha|huncha|hunchha|hunxa|ho|भयो|सकियो|ठीक छ|हो)\s*[.!✓]*\s*$/i;
+/** Questions during which the seller can keep chatting changes. */
+const FREE_CHAT = new Set(['confirm', 'photo', 'publish']);
+
 const SKIP_RE = /^\s*(skip|later|next|überspringen|später|weiter|छोड्नुहोस्|छोड|पछि|chodnus|chhodnus|chodnu|pachi|pachhi|pachhi garchu)\s*[.!]?\s*$/i;
 const WRITE_IT_RE = /\b(you write|write it|you do it|schreib du|du schreibst|tapai(le)? lekh(nus|idinus|nuhos)|timi(le)? lekh|aafai lekh|lekhidinus)\b|तपाईं लेख्नुहोस्|तपाईं नै लेख्नुहोस्|आफैं लेख्नुहोस्/i;
 
@@ -255,6 +271,7 @@ export default function SetupAssistant({
   existingTiers,
   lang = 'en',
   startedAlready = false,
+  slug = '',
 }: {
   eventId: string;
   kind: 'event' | 'shop';
@@ -263,6 +280,8 @@ export default function SetupAssistant({
   lang?: Lang;
   /** The listing already has content — open on what is still missing. */
   startedAlready?: boolean;
+  /** Its address, for "View your page" after publishing. */
+  slug?: string;
 }) {
   const t = T[lang] ?? T.en;
   const router = useRouter();
@@ -282,6 +301,8 @@ export default function SetupAssistant({
   const [asking, setAsking] = useState<string | null>(null);
   const [queue, setQueue] = useState<string[]>([]);
   const [holder, setHolder] = useState('');
+  /** The seller said the details are right; photo and publish come next. */
+  const confirmed = useRef(false);
   const [tiers, setTiers] = useState<SavedTier[]>(existingTiers);
 
   const said = messages.filter((m) => m.from === 'me').map((m) => m.text);
@@ -341,6 +362,14 @@ export default function SetupAssistant({
       say({ from: 'bot', text: t.allDone });
       return;
     }
+    // Only photo / publish left: first ask whether the details are right.
+    if (!confirmed.current && pending.every((k) => k === 'photo' || k === 'publish' || k === 'payoutDemo')) {
+      if (pending[0] === 'payoutDemo') say({ from: 'bot', text: t.q.payoutDemo });
+      setAsking('confirm');
+      setQueue(pending.filter((k) => k !== 'payoutDemo'));
+      say({ from: 'bot', text: t.q.confirm });
+      return;
+    }
     const [key, ...rest] = pending;
     setQueue(rest);
     if (key === 'payout') {
@@ -349,12 +378,32 @@ export default function SetupAssistant({
     } else if (key === 'payoutDemo') {
       say({ from: 'bot', text: t.q.payoutDemo });
       await askNext(rest);
-    } else if (key === 'photo' || key === 'publish') {
-      setAsking(key);
-      say({ from: 'bot', text: t.q[key], goto: { tab: key === 'photo' ? 'media' : 'publish', label: t.buttons[key] } });
+    } else if (key === 'photo') {
+      setAsking('photo');
+      say({ from: 'bot', text: t.q.photo, goto: { tab: 'media', label: t.buttons.photo } });
+    } else if (key === 'publish') {
+      setAsking('publish');
+      say({ from: 'bot', text: t.q.publish, publishNow: true });
     } else {
       setAsking(key);
       say({ from: 'bot', text: t.q[key] });
+    }
+  }
+
+  /** "Publish now" in the chat: the normal save, so every publishing rule applies. */
+  async function publishNow() {
+    if (busy) return;
+    setBusy(true);
+    const r = await saveEvent(eventId, { status: 'published' });
+    setBusy(false);
+    if (r.ok) {
+      setAsking(null);
+      setQueue([]);
+      say({ from: 'bot', text: t.published, view: `/e/${r.data?.slug ?? slug}` });
+      router.refresh();
+    } else {
+      // Say exactly what is in the way, and offer the section that has it all.
+      say({ from: 'bot', text: r.error ?? t.error, goto: { tab: 'publish', label: t.buttons.publish } });
     }
   }
 
@@ -438,7 +487,14 @@ export default function SetupAssistant({
     setDraft('');
     setBusy(true);
     try {
-      if (asking) {
+      if (asking && FREE_CHAT.has(asking)) {
+        if (DONE_RE.test(text) || SKIP_RE.test(text)) {
+          if (asking === 'confirm') confirmed.current = true;
+          await askNext();
+          return;
+        }
+        // Anything else is a change to make — the normal proposal below.
+      } else if (asking) {
         await answer(asking, text);
         return;
       }
@@ -547,6 +603,16 @@ export default function SetupAssistant({
         {messages.map((m, i) => (
           <div key={i} className={`sa-msg sa-${m.from}`}>
             {m.text ? <p>{m.text}</p> : null}
+            {m.publishNow && m === last && (
+              <button type="button" className="btn btn-brand sa-goto" onClick={() => void publishNow()} disabled={busy}>
+                {t.buttons.publishNow}
+              </button>
+            )}
+            {m.view && (
+              <a href={m.view} target="_blank" rel="noopener" className="btn btn-green btn-sm sa-goto">
+                {t.buttons.view}
+              </a>
+            )}
             {m.goto && (
               <button
                 type="button"
@@ -560,7 +626,7 @@ export default function SetupAssistant({
                 {m.goto.label}
               </button>
             )}
-            {m.proposal && m === last && !asking && (
+            {m.proposal && m === last && (!asking || FREE_CHAT.has(asking)) && (
               <div className="sa-proposal">
                 {m.suggested && <p className="sa-suggested">{t.suggested}</p>}
                 {Object.entries(m.proposal)

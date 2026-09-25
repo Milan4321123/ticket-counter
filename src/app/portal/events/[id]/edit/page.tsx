@@ -723,6 +723,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
             <SetupAssistant
               lang={await currentLang()}
               startedAlready={Boolean(event.description.trim()) || tiers.length > 0}
+              slug={event.slug}
               eventId={event.id}
               kind={event.kind}
               currency={event.currency}
