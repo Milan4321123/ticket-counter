@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { takeAiQuota } from '@/lib/aiQuota';
 import { aiAssistantEnabled, suggestEventFaqs } from '@/lib/ai';
 import { getEventFaqs, getEventTiers } from '@/lib/events';
 import { formatMoney } from '@/lib/money';
@@ -64,6 +65,13 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     if (!rateLimit('portal-faq-suggest:all', GLOBAL_PER_WINDOW, WINDOW_MS)) {
       return NextResponse.json(
         { error: 'The AI is very busy right now — please try again in a few minutes.' } satisfies ApiErrorResponse,
+        { status: 429 }
+      );
+    }
+
+    if (!takeAiQuota([{ key: `faq:org:${organizer.id}`, perDay: 20 }, { key: 'faq:all', perDay: 500 }])) {
+      return NextResponse.json(
+        { error: 'That is the limit of AI suggestions for today — write your FAQ below, or try again tomorrow.' } satisfies ApiErrorResponse,
         { status: 429 }
       );
     }

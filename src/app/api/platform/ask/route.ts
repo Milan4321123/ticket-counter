@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { QUOTA_MESSAGE, takeAiQuota } from '@/lib/aiQuota';
 import { answerWithBestModel, platformAssistantContext } from '@/lib/assistant';
 import { BodyTooLargeError, readJsonLimited } from '@/lib/http';
 import { clientIp, rateLimit } from '@/lib/ratelimit';
@@ -53,6 +54,10 @@ export async function POST(req: Request) {
     }
     if (question.length > MAX_QUESTION) {
       return apiError(400, `Questions can be at most ${MAX_QUESTION} characters — please shorten yours a little.`);
+    }
+
+    if (!takeAiQuota([{ key: `platform-ask:ip:${clientIp(req)}`, perDay: 25 }, { key: 'platform-ask:all', perDay: 1500 }])) {
+      return apiError(429, QUOTA_MESSAGE);
     }
 
     if (!rateLimit('platform-ask:all', 60, 60_000)) {

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { takeAiQuota } from '@/lib/aiQuota';
 import { aiDesignerEnabled, generatePageDesign } from '@/lib/ai';
 import { readJsonLimited, BodyTooLargeError } from '@/lib/http';
 import { rateLimit } from '@/lib/ratelimit';
@@ -39,6 +40,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!rateLimit(`portal-design:${organizer.id}`, GENERATIONS_PER_WINDOW, WINDOW_MS)) {
       return NextResponse.json(
         { error: 'That is a lot of designs in a short time — please wait a few minutes and try again.' } satisfies ApiErrorResponse,
+        { status: 429 }
+      );
+    }
+
+    if (!takeAiQuota([{ key: `design:org:${organizer.id}`, perDay: 20 }, { key: 'design:all', perDay: 500 }])) {
+      return NextResponse.json(
+        { error: 'That is the limit of AI designs for today — pick colours yourself below, or try again tomorrow.' } satisfies ApiErrorResponse,
         { status: 429 }
       );
     }

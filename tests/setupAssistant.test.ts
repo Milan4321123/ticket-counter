@@ -1,7 +1,7 @@
 // The editor's setup assistant (lib/setupAssistant): the fixed rules.
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { normaliseProposal, rulesProposal } from '../src/lib/setupAssistant.ts';
+import { normaliseProposal, proposeSetup, rulesProposal, sampleProposal, wantsSuggestions } from '../src/lib/setupAssistant.ts';
 
 describe('setup assistant — fixed rules', () => {
   it('keeps what is valid and drops what breaks a rule', () => {
@@ -73,5 +73,52 @@ describe('setup assistant — Roman Nepali', () => {
     assert.equal(wantsSuggestions('tapai aafai euta nepali mithai pasal banaidinus, 5 wota saman'), true);
     assert.equal(wantsSuggestions('afai banaidinu hai'), true);
     assert.equal(wantsSuggestions('mero momo pasal cha, chicken momo 9 euro, sanibar lina aaunus'), false);
+  });
+});
+
+describe('make one up — however it is typed', () => {
+  it('recognises loose and misspelled requests', () => {
+    for (const said of [
+      'guve me dumm set',
+      'create one event for me',
+      'create one even tyouself come up wiht own data',
+      'make something for me',
+      'erstell mir einen laden',
+      'aafai banaidinus',
+    ]) {
+      assert.equal(wantsSuggestions(said), true, said);
+    }
+    assert.equal(wantsSuggestions('chicken momo 9 euro, veg momo 8 euro'), false);
+  });
+
+  it('has a complete built-in sample for when the AI cannot answer', () => {
+    const shop = sampleProposal('make one up', 'shop');
+    assert.ok(shop.name && shop.pickupInfo && shop.description);
+    assert.ok((shop.tiers ?? []).length >= 5);
+    assert.equal(shop.address, undefined, 'never an address');
+    const salon = sampleProposal('make me a salon', 'shop');
+    assert.match(salon.name ?? '', /Beauty/);
+    const event = sampleProposal('make up an event in Berlin', 'event');
+    assert.ok(event.eventDate && event.eventDate > new Date().toISOString().slice(0, 10), 'a future date');
+    assert.ok((event.tiers ?? []).length >= 3);
+  });
+});
+
+describe('make one up — with the AI unavailable', () => {
+  it('answers with the built-in sample, and says when the page is the other kind', async () => {
+    const saved = process.env.GEMINI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+    try {
+      const a = await proposeSetup('create one event for me', 'shop');
+      assert.equal(a.source, 'sample');
+      assert.equal(a.suggested, true);
+      assert.ok((a.proposal.tiers ?? []).length > 0);
+      assert.match(a.reply, /This page is a shop/);
+      const b = await proposeSetup('hello', 'shop');
+      assert.equal(b.source, 'rules');
+      assert.match(b.reply, /make one up/);
+    } finally {
+      if (saved !== undefined) process.env.GEMINI_API_KEY = saved;
+    }
   });
 });

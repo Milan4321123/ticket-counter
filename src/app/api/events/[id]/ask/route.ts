@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { QUOTA_MESSAGE, takeAiQuota } from '@/lib/aiQuota';
 import { demoAddress, listingOpenTo } from '@/lib/demo';
 import { answerVisitorQuestion, type AssistantContext } from '@/lib/ai';
 import {
@@ -171,6 +172,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           : 'Sent to the organizer — they will answer it on this page. Thanks for asking!',
         willEmail: Boolean(askerEmail),
       });
+    }
+
+    // Daily caps (lib/aiQuota): per visitor, per event page, and site-wide.
+    if (
+      !takeAiQuota([
+        { key: `ask:ip:${clientIp(req)}`, perDay: 40 },
+        { key: `ask:event:${id}`, perDay: 400 },
+        { key: 'ask:all', perDay: 3000 },
+      ])
+    ) {
+      return apiError(429, QUOTA_MESSAGE);
     }
 
     if (!rateLimit('ask:all', 60, 60_000)) {

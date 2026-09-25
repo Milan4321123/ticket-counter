@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { takeAiQuota } from '@/lib/aiQuota';
 import { BodyTooLargeError, readJsonLimited } from '@/lib/http';
 import { clientIp, rateLimit } from '@/lib/ratelimit';
 import { proposeSetup } from '@/lib/setupAssistant';
@@ -24,8 +25,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (auth.failure) return auth.failure;
   const owned = requireOwnedEvent(auth.organizer, id);
   if (owned.failure) return owned.failure;
+  // A burst (several messages fired at once), an hour, and a whole day.
+  if (!rateLimit(`setup-assistant:burst:${auth.organizer.id}`, 6, 60_000)) {
+    return bad('One moment — that is a lot of messages at once. Wait a few seconds and send again.', 429);
+  }
   if (!rateLimit(`setup-assistant:${auth.organizer.id}`, 20, 60 * 60_000) || !rateLimit(`setup-assistant:ip:${clientIp(req)}`, 40, 60 * 60_000)) {
     return bad('That is a lot of requests — please fill the rest in the form, or try again in a while.', 429);
+  }
+  if (
+    !takeAiQuota([
+      { key: `setup:org:${auth.organizer.id}`, perDay: auth.organizer.isDemo ? 30 : 80 },
+      { key: `setup:ip:${clientIp(req)}`, perDay: 100 },
+      { key: 'setup:all', perDay: 2000 },
+    ])
+  ) {
+    return bad('That is the limit for the AI helper today — you can still fill everything in the form, and it is back tomorrow.', 429);
   }
   let body: { text?: unknown };
   try {

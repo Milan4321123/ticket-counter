@@ -45,8 +45,8 @@ export interface SetupAnswer {
   suggested: boolean;
   /** What the assistant says back, in one or two sentences. */
   reply: string;
-  /** 'ai' or the plain-rules fallback. */
-  source: 'ai' | 'rules';
+  /** 'ai', the plain-rules fallback, or the built-in sample (AI busy). */
+  source: 'ai' | 'rules' | 'sample';
 }
 
 const MAX_TIERS = 20;
@@ -129,6 +129,9 @@ export function normaliseProposal(raw: unknown, kind: 'event' | 'shop'): SetupPr
  */
 export function wantsSuggestions(said: string): boolean {
   return (
+    // Said loosely, and often with typos: "give me dumm set", "create one event
+    // for me", "come up wiht own data", "make something yourself".
+    /\b(dumm\w*|fake|test ?data|placeholder|random|whatever|anything|something)\b|\bcome ?up\b|\b(own|your) (data|content|details|stuff|ideas?)\b|\b(yourself|urself|by yourself|for me)\b|\b(create|make|build|generate|give me)( me)? (one|some|a|an|the|me)\b|\b(erstell|mach) (mir|mal|einfach)\b|\birgendwas\b/i.test(said) ||
     /\b(come up with|your own (idea|one)|make (it|one|a|me) up|make up|invent|suggest|you decide|up to you|surprise me|example|sample|demo|dummy|just (give|make|create)|add (some |a few |\d+ )?(more )?(content|items|things|products|dishes|tickets|stuff)|more (content|items|products|dishes)|fill (it|the rest)|create (me )?(a|an) |denk dir|ausdenken|beispiel|vorschlag|du entscheidest)/i.test(said) ||
     // Nepali: "yourself", "make it for me", "example", "demo", "suggest".
     /आफैं|आफै|बनाइदिनु|बनाइदेऊ|बनाइदिनुस्|उदाहरण|डेमो|सुझाव|तपाईं नै/.test(said) ||
@@ -219,6 +222,79 @@ export function rulesProposal(said: string, kind: 'event' | 'shop'): SetupPropos
 }
 
 /** Turn what the seller said into a proposal (AI first, plain rules as the fallback). */
+/**
+ * A complete, realistic sample for when the seller asked us to make one up and
+ * the AI could not answer (busy, quota, no key) — so "make one up" never ends
+ * in "I can't". Plain templates: a momo kitchen, a salon, or a Dashain night.
+ * Never an address; a city only if the seller named one.
+ */
+export function sampleProposal(said: string, kind: 'event' | 'shop'): SetupProposal {
+  const city = rulesProposal(said, kind).city;
+  if (kind === 'shop' && /salon|beauty|threading|hair|mehendi|nail|make-?up|spa/i.test(said)) {
+    return {
+      name: 'Glow Threading & Beauty',
+      category: 'other',
+      description:
+        'Eyebrow threading, mehendi and bridal make-up by an experienced Nepali beautician. Book a time online and pay when you come.',
+      pickupInfo: 'By appointment — pick a time when you book. Please arrive five minutes early.',
+      ...(city ? { city } : {}),
+      tiers: [
+        { name: 'Eyebrow threading', priceCents: 800, cap: 0, description: 'Clean, precise shape — about 15 minutes.', studentOnly: false },
+        { name: 'Full face threading', priceCents: 2000, cap: 0, description: 'Brows, upper lip and chin.', studentOnly: false },
+        { name: 'Mehendi — both hands', priceCents: 3500, cap: 0, description: 'Traditional or modern design, natural henna.', studentOnly: false },
+        { name: 'Haircut & blow-dry', priceCents: 3000, cap: 0, description: 'Wash, cut and styling.', studentOnly: false },
+        { name: 'Bridal make-up trial', priceCents: 6000, cap: 0, description: 'Try the full look before the big day.', studentOnly: false },
+      ],
+    };
+  }
+  if (kind === 'shop') {
+    return {
+      name: 'Himalayan Momo Kitchen',
+      category: 'khaja-food',
+      description:
+        'Hand-folded momo, sel roti and homemade achar from a small Nepali home kitchen. Order ahead and collect them fresh.',
+      pickupInfo: 'Collect on Saturdays, 12:00–18:00 — the address comes with your order.',
+      ...(city ? { city } : {}),
+      tiers: [
+        { name: 'Chicken momo (10 pcs)', priceCents: 900, cap: 30, description: 'Juicy chicken momo with tomato achar.', studentOnly: false },
+        { name: 'Veg momo (10 pcs)', priceCents: 800, cap: 30, description: 'Cabbage, paneer and spring onion.', studentOnly: false },
+        { name: 'Jhol momo (10 pcs)', priceCents: 1050, cap: 20, description: 'Momo in a warm sesame-tomato soup.', studentOnly: false },
+        { name: 'Sel roti (6 pcs)', priceCents: 600, cap: 25, description: 'Sweet rice-flour rings, fried fresh.', studentOnly: false },
+        { name: 'Aloo achar (500 g)', priceCents: 550, cap: 20, description: 'Spicy potato pickle with timur.', studentOnly: false },
+        { name: 'Family box — 40 momo + achar', priceCents: 4200, cap: 10, description: 'Mixed momo for four to six people.', studentOnly: false },
+      ],
+    };
+  }
+  // An event about a month away, on a Saturday.
+  const d = new Date(Date.now() + 30 * 86_400_000);
+  d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7));
+  const iso = d.toISOString().slice(0, 10);
+  const shown = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  return {
+    name: `Dashain Night ${d.getFullYear()}`,
+    artist: 'Live Nepali band & DJ',
+    description:
+      'A full evening for Dashain: live Nepali folk and modern songs, a dinner of sel roti and curry, and a dance floor until late. Families welcome.',
+    eventDate: iso,
+    dateDisplay: `${shown} · Doors 18:00`,
+    venueName: 'Community Hall',
+    totalCapacity: 200,
+    ...(city ? { city } : {}),
+    tiers: [
+      { name: 'Early bird', priceCents: 1500, cap: 50, description: 'Limited — for the first to book.', studentOnly: false },
+      { name: 'Standard', priceCents: 2000, cap: 120, description: 'Entry and dinner.', studentOnly: false },
+      { name: 'VIP', priceCents: 4000, cap: 30, description: 'Front tables, welcome drink and dinner.', studentOnly: false },
+    ],
+  };
+}
+
+/** Asked for the other kind than this page is ("create an event" on a shop). */
+function kindMismatch(said: string, kind: 'event' | 'shop'): boolean {
+  return kind === 'shop'
+    ? /\b(event|concert|party|festival|show|karyakram|konzert|veranstaltung)\b/i.test(said) && !/\b(shop|store|pasal|laden)\b/i.test(said)
+    : /\b(shop|store|pasal|laden|restaurant)\b/i.test(said) && !/\b(event|concert|party|show)\b/i.test(said);
+}
+
 export async function proposeSetup(said: string, kind: 'event' | 'shop'): Promise<SetupAnswer> {
   const suggested = wantsSuggestions(said);
   const raw = (await geminiJson(prompt(kind, said), {
@@ -234,11 +310,24 @@ export async function proposeSetup(said: string, kind: 'event' | 'shop'): Promis
         proposal,
         suggested,
         reply:
-          str(raw.reply, 300) ??
-          (suggested ? 'Here is a complete suggestion — change anything you like before filling it in.' : 'Here is what I can fill in — untick anything that is not right.'),
+          (kindMismatch(said, kind) ? `(This page is a ${kind} — for the other kind, tap ⇄ Switch → New.) ` : '') +
+          (str(raw.reply, 300) ??
+            (suggested ? 'Here is a complete suggestion — change anything you like before filling it in.' : 'Here is what I can fill in — untick anything that is not right.')),
         source: 'ai',
       };
     }
+  }
+  // Asked us to make one up and the AI could not: the built-in sample.
+  if (suggested) {
+    const other = kind === 'shop' ? 'an event' : 'a shop';
+    return {
+      proposal: sampleProposal(said, kind),
+      suggested: true,
+      reply: kindMismatch(said, kind)
+        ? `This page is a ${kind}, so here is a sample ${kind} — change anything you like. For ${other}, tap ⇄ Switch → New.`
+        : `Here is a sample ${kind} to start from — change anything you like before filling it in.`,
+      source: 'sample',
+    };
   }
   const proposal = rulesProposal(said, kind);
   return {
@@ -246,9 +335,9 @@ export async function proposeSetup(said: string, kind: 'event' | 'shop'): Promis
     suggested: false,
     reply: Object.keys(proposal).length
       ? 'I picked out what I could — check each line, untick anything wrong, and add the rest in the chat or the form.'
-      : suggested
-        ? 'The AI helper is busy right now, so I cannot invent a shop for you this minute — try again shortly, or tell me your items and prices.'
-      : 'I could not pick out details from that. Try something like: “Dashain party on 10 October in Berlin, 200 people, standard 25€, VIP 45€”.',
+      : kind === 'shop'
+        ? 'I did not catch any details. Tell me what you sell with prices — e.g. “chicken momo 9€, veg momo 8€, collect Saturdays” — or tap ✨ below and I make one up.'
+        : 'I did not catch any details. Tell me the day, place and prices — e.g. “Dashain party 10 October in Berlin, standard 25€, VIP 45€” — or tap ✨ below and I make one up.',
     source: 'rules',
   };
 }

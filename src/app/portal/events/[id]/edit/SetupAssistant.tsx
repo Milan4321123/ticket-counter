@@ -59,6 +59,8 @@ interface Message {
   viewLabel?: string;
   /** A "get a real account" link under this message. */
   account?: boolean;
+  /** One-tap replies under this message (sent as if typed). */
+  chips?: string[];
   /** Show the "which listing?" picker under this message. */
   picker?: boolean;
 }
@@ -97,6 +99,7 @@ type Words = {
   published: string;
   switchBtn: string;
   whatChange: string;
+  makeOneUp: string;
   which: string;
   newShop: string;
   newEvent: string;
@@ -157,6 +160,7 @@ const T: Record<Lang, Words> = {
     demoPreview: 'All done ✓ This is a demo, so your page stays private — it can’t go live. Have a look at it here — and to sell for real, send this page as your application: once approved, it moves into your own account.',
     published: 'Published 🎉 — your page is live.',
     switchBtn: '⇄ Switch',
+    makeOneUp: '✨ Make one up for me',
     whatChange: 'Sure — what shall I change or add? E.g. “add 4 more items”, “veg momo 7€”, “write a nicer description”. Say “done” when you are happy.',
     which: 'Which one shall we work on? Pick one, or start a new one.',
     newShop: '＋ New shop',
@@ -219,6 +223,7 @@ const T: Record<Lang, Words> = {
     demoPreview: 'Fertig ✓ Das ist eine Demo, deine Seite bleibt also privat – sie kann nicht online gehen. Hier kannst du sie ansehen – und um wirklich zu verkaufen, schick diese Seite als Bewerbung: Nach der Freigabe zieht sie in dein eigenes Konto um.',
     published: 'Veröffentlicht 🎉 – deine Seite ist online.',
     switchBtn: '⇄ Wechseln',
+    makeOneUp: '✨ Denk dir eins aus',
     whatChange: 'Klar – was soll ich ändern oder ergänzen? Z. B. „füge 4 Artikel hinzu“, „Veggie-Momo 7€“, „schreib eine schönere Beschreibung“. Sag „fertig“, wenn alles passt.',
     which: 'Woran sollen wir arbeiten? Wähle eins aus oder fang neu an.',
     newShop: '＋ Neuer Laden',
@@ -277,6 +282,7 @@ const T: Record<Lang, Words> = {
     demoPreview: 'सबै सकियो ✓ यो डेमो हो, त्यसैले तपाईंको पेज निजी रहन्छ — लाइभ हुँदैन। यहाँ हेर्नुहोस् — साँच्चै बेच्न यही पेज आवेदनको रूपमा पठाउनुहोस्: स्वीकृत भएपछि यो तपाईंको आफ्नै खातामा सर्छ।',
     published: 'प्रकाशित भयो 🎉 — तपाईंको पेज लाइभ छ।',
     switchBtn: '⇄ अर्को',
+    makeOneUp: '✨ आफैं बनाइदिनुस्',
     whatChange: 'हुन्छ — के बदल्ने वा थप्ने? जस्तै “arko 4 item thapnus”, “veg momo 7 euro”, “ramro description lekhnus”। सबै ठीक भए “bhayo” भन्नुहोस्।',
     which: 'कुनमा काम गर्ने? एउटा छान्नुहोस्, वा नयाँ सुरु गर्नुहोस्।',
     newShop: '＋ नयाँ पसल',
@@ -364,6 +370,8 @@ export default function SetupAssistant({
   const [tiers, setTiers] = useState<SavedTier[]>(existingTiers);
 
   const said = messages.filter((m) => m.from === 'me').map((m) => m.text);
+  /** Something was filled in during this chat (so "what to change?" makes sense). */
+  const filledOnce = useRef(false);
   const latest = [...messages].reverse().find((m) => m.proposal)?.proposal ?? null;
   const say = (m: Message) => setMessages((prev) => [...prev, m]);
 
@@ -572,8 +580,8 @@ export default function SetupAssistant({
 
   // ---- Step 1: describe it, get a proposal --------------------------------
 
-  async function send() {
-    const text = draft.trim();
+  async function send(typed?: string) {
+    const text = (typed ?? draft).trim();
     if (!text || busy) return;
     setMessages((m) => [...m, { from: 'me', text }]);
     setDraft('');
@@ -609,11 +617,18 @@ export default function SetupAssistant({
       } else {
         const p = data.proposal;
         if (Object.keys(p).filter((k) => k !== 'tiers').length === 0 && !(p.tiers ?? []).length) {
-          // Nothing to fill in: answer, and ask what to change instead of repeating the last question.
-          if (data.reply) say({ from: 'bot', text: data.reply });
-          confirmed.current = false;
-          setAsking('confirm');
-          say({ from: 'bot', text: t.whatChange });
+          // Nothing to fill in. On a page that already has content, ask what
+          // to change; on an empty one, offer to make one up — never "what
+          // shall I change?" when nothing is there yet.
+          const hasContent = startedAlready || filledOnce.current;
+          if (hasContent) {
+            if (data.reply) say({ from: 'bot', text: data.reply });
+            confirmed.current = false;
+            setAsking('confirm');
+            say({ from: 'bot', text: t.whatChange });
+          } else {
+            say({ from: 'bot', text: data.reply ?? t.error, chips: [t.makeOneUp] });
+          }
           return;
         }
         const tk: Record<string, boolean> = {};
@@ -645,6 +660,7 @@ export default function SetupAssistant({
     setSaving(false);
     if (ok) {
       say({ from: 'bot', text: t.filled(Object.keys(patch).length + chosen.length) });
+      filledOnce.current = true;
       confirmed.current = false;
       router.refresh();
       setBusy(true);
@@ -720,6 +736,23 @@ export default function SetupAssistant({
         {messages.map((m, i) => (
           <div key={i} className={`sa-msg sa-${m.from}`}>
             {m.text ? <p>{m.text}</p> : null}
+            {m.chips && m === last && (
+              <div className="ks-presets" style={{ marginTop: 8 }}>
+                {m.chips.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    className="btn btn-brand btn-sm"
+                    disabled={busy}
+                    onClick={() =>
+                      void send(c === t.makeOneUp ? `${c} — come up with a complete sample ${kind} yourself` : c)
+                    }
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            )}
             {m.picker && (
               <div className="sa-picker">
                 {listings.map((l) => (

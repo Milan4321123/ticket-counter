@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { takeAiQuota } from '@/lib/aiQuota';
 import { asLang } from '@/lib/i18n';
 import { clientIp, rateLimit } from '@/lib/ratelimit';
 import { MAX_BATCH, MAX_TEXT_LEN, translateTexts } from '@/lib/translate';
@@ -20,6 +21,8 @@ export async function POST(req: Request) {
     ? body.texts.filter((t): t is string => typeof t === 'string' && t.length > 0 && t.length <= MAX_TEXT_LEN).slice(0, MAX_BATCH)
     : [];
   if (lang === 'en' || texts.length === 0) return NextResponse.json({ map: {} });
+  // A day's worth of browsing is a few hundred requests; past that, English.
+  if (!takeAiQuota([{ key: `translate:ip:${clientIp(req)}`, perDay: 1500 }])) return NextResponse.json({ map: {} });
   try {
     return NextResponse.json({ map: await translateTexts(lang, texts) });
   } catch (e) {
