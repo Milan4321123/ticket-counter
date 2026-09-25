@@ -1419,6 +1419,11 @@ function migrateCustomers(db: Database.Database): void {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       last_login_at TEXT
     );
+    CREATE TABLE IF NOT EXISTS customer_baskets (
+      customer_id TEXT PRIMARY KEY,
+      lines TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
     CREATE TABLE IF NOT EXISTS customer_login_codes (
       email TEXT PRIMARY KEY COLLATE NOCASE,
       code_hash TEXT NOT NULL,

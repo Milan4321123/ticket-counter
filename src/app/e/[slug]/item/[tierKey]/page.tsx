@@ -48,6 +48,8 @@ import { getAvailability } from '@/lib/inventory';
 import { socialImageUrl } from '@/lib/listing';
 import { listShopItems } from '@/lib/marketItems';
 import SwipeFx from '@/components/SwipeFx';
+import AddToBasket from '@/components/basket/AddToBasket';
+import { basketLineFor } from '@/lib/basket';
 import { formatMoney, subscribeDiscountCents } from '@/lib/money';
 import { subscriptionOffer } from '@/lib/subscriptions';
 import { getOrganizer } from '@/lib/organizers';
@@ -309,6 +311,7 @@ export default async function ItemPage({ params, searchParams }: Params) {
 
   const organizer = getOrganizer(event.organizerId);
   const sellerName = organizer?.name?.trim() || 'the organizer';
+  const basketLine = basketLineFor(event, tier, sellerName, tier.mediaId ? mediaUrl(tier.mediaId, 'card', null) : null);
 
   // The shop's own name with the "(example shop)" mark split off, so the mark
   // can be shown as its own chip rather than read as part of the name. See
@@ -628,9 +631,14 @@ export default async function ItemPage({ params, searchParams }: Params) {
                  like "Gift box · pods, tin & chiya masala" inside it wraps the
                  control over three lines to say what the heading just said —
                  but a screen reader jumping between links needs the name. */
-              <Link href={buyHref} className="btn btn-primary btn-lg" aria-label={`${v.cta} ${tier.name}`}>
-                {v.cta}
-              </Link>
+              <>
+                <Link href={buyHref} className="btn btn-primary btn-lg" aria-label={`${v.cta} ${tier.name}`}>
+                  {v.cta}
+                </Link>
+                {/* Into the basket that spans every seller, for a shopper
+                    filling one order from several stalls (lib/basket). */}
+                {basketLine && <AddToBasket line={basketLine} />}
+              </>
             ) : (
               /* Not a disabled button: there is nothing to press, and a greyed
                  control invites people to keep trying it. The badge above

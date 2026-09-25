@@ -1,0 +1,231 @@
+'use client';
+
+// The basket: everything picked, grouped by seller, then ONE checkout that
+// places one ordinary bank-transfer order per seller through POST /api/orders
+// — the same endpoint, prices and limits as a single checkout. Each seller is
+// paid directly; /basket/done shows every payment on one page.
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useMemo, useState } from 'react';
+import { formatMoney } from '@/lib/money';
+import { removeLines, setQty, useBasket, type BasketLine } from '@/components/basket/basketStore';
+
+interface Group {
+  eventId: string;
+  slug: string;
+  listing: string;
+  seller: string;
+  kind: 'event' | 'shop';
+  currency: string;
+  lines: BasketLine[];
+  subtotal: number;
+}
+
+export default function BasketPage({ customer }: { customer: { name: string; email: string } | null }) {
+  const lines = useBasket();
+  const router = useRouter();
+  const [name, setName] = useState(customer?.name ?? '');
+  const [email, setEmail] = useState(customer?.email ?? '');
+  const [busy, setBusy] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const groups = useMemo(() => {
+    const map = new Map<string, Group>();
+    for (const l of lines) {
+      const g = map.get(l.eventId) ?? {
+        eventId: l.eventId,
+        slug: l.slug,
+        listing: l.listing,
+        seller: l.seller,
+        kind: l.kind,
+        currency: l.currency,
+        lines: [],
+        subtotal: 0,
+      };
+      g.lines.push(l);
+      g.subtotal += l.priceCents * l.qty;
+      map.set(l.eventId, g);
+    }
+    return [...map.values()];
+  }, [lines]);
+
+  const total = groups.reduce((n, g) => n + g.subtotal, 0);
+  const currency = groups[0]?.currency ?? 'EUR';
+
+  async function checkout(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy || groups.length === 0) return;
+    if (!name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setFormError('Please enter your name and a valid email address.');
+      return;
+    }
+    setBusy(true);
+    setFormError(null);
+    setErrors({});
+    const placed: string[] = [];
+    const failed: Record<string, string> = {};
+    // One order per seller, one after another (each reserves its own stock).
+    for (const g of groups) {
+      try {
+        const res = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            eventId: g.eventId,
+            buyerName: name.trim(),
+            buyerEmail: email.trim(),
+            payerName: '',
+            items: g.lines.map((l) => ({ tierId: l.tierKey, quantity: l.qty })),
+            expectedTotalCents: g.subtotal,
+            marketingOptIn: false,
+            ref: '',
+            voucherCode: '',
+            payVia: 'transfer',
+          }),
+        });
+        const data = (await res.json().catch(() => null)) as { orderId?: string; error?: string } | null;
+        if (!res.ok || !data?.orderId) throw new Error(data?.error ?? 'This part could not be ordered.');
+        placed.push(data.orderId);
+        removeLines(g.lines.map((l) => l.key));
+      } catch (err) {
+        failed[g.eventId] = err instanceof Error ? err.message : 'This part could not be ordered.';
+      }
+    }
+    setBusy(false);
+    setErrors(failed);
+    if (placed.length > 0) {
+      const extra = Object.keys(failed).length ? '&partial=1' : '';
+      router.push(`/basket/done?o=${placed.join(',')}${extra}`);
+    }
+  }
+
+  if (lines.length === 0) {
+    return (
+      <div className="container section bk">
+        <h1 className="page-title">Your basket</h1>
+        <div className="bk-empty">
+          <span aria-hidden="true">🧺</span>
+          <p>Your basket is empty.</p>
+          <p className="muted small">Tap “＋ Add to basket” on anything in the bazaar — from as many sellers as you like.</p>
+          <p>
+            <Link href="/market" className="btn btn-brand">
+              Shop the bazaar
+            </Link>{' '}
+            <Link href="/" className="btn">
+              Browse events
+            </Link>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container section bk">
+      <h1 className="page-title">Your basket</h1>
+      <p className="muted bk-sub">
+        From {groups.length} {groups.length === 1 ? 'shop or event' : 'shops and events'}. Each seller is paid directly,
+        so you get one payment per shop or event — all on one page after you order.
+      </p>
+
+      <div className="bk-layout">
+        <div className="bk-groups">
+          {groups.map((g) => (
+            <section key={g.eventId} className={`bk-group${errors[g.eventId] ? ' has-error' : ''}`}>
+              <header className="bk-group-head">
+                <span aria-hidden="true">{g.kind === 'shop' ? '🛍' : '🎟'}</span>
+                <div>
+                  <Link href={`/e/${g.slug}`} className="bk-group-name">
+                    {g.listing}
+                  </Link>
+                  <span className="muted small">Sold by {g.seller}</span>
+                </div>
+                <b>{formatMoney(g.subtotal, g.currency)}</b>
+              </header>
+              {g.lines.map((l) => (
+                <div key={l.key} className="bk-line">
+                  {l.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={l.image} alt="" />
+                  ) : (
+                    <span className="bk-line-blank">{l.name.charAt(0)}</span>
+                  )}
+                  <div className="bk-line-info">
+                    <strong>{l.name}</strong>
+                    <span>{formatMoney(l.priceCents, l.currency)} each</span>
+                  </div>
+                  <div className="qty-stepper">
+                    <button type="button" aria-label={`Remove one ${l.name}`} onClick={() => setQty(l.key, l.qty - 1)} disabled={busy}>
+                      −
+                    </button>
+                    <span className="qty-value">{l.qty}</span>
+                    <button
+                      type="button"
+                      aria-label={`Add one ${l.name}`}
+                      onClick={() => setQty(l.key, l.qty + 1)}
+                      disabled={busy || l.qty >= l.max}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {errors[g.eventId] && (
+                <p className="bk-error" role="alert">
+                  {errors[g.eventId]} <Link href={`/e/${g.slug}/checkout`}>Order this one on its own page →</Link>
+                </p>
+              )}
+            </section>
+          ))}
+          <p className="small">
+            <Link href="/market">← Keep shopping</Link>
+          </p>
+        </div>
+
+        <form className="bk-summary" onSubmit={checkout}>
+          <h2>Checkout</h2>
+          {groups.map((g) => (
+            <div key={g.eventId} className="bk-sum-row">
+              <span>{g.listing}</span>
+              <span>{formatMoney(g.subtotal, g.currency)}</span>
+            </div>
+          ))}
+          <div className="bk-sum-row bk-sum-total">
+            <span>Total</span>
+            <span>{formatMoney(total, currency)}</span>
+          </div>
+          <label htmlFor="bk-name">Your name</label>
+          <input id="bk-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" required maxLength={120} />
+          <label htmlFor="bk-email">Email — your order confirmations go here</label>
+          <input
+            id="bk-email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+            required
+            maxLength={200}
+          />
+          {formError && (
+            <p className="bk-error" role="alert">
+              {formError}
+            </p>
+          )}
+          <button className="btn btn-brand btn-lg btn-block" disabled={busy}>
+            {busy ? 'Placing your orders…' : groups.length === 1 ? 'Place order' : `Place ${groups.length} orders`}
+          </button>
+          <p className="muted small" style={{ margin: 0 }}>
+            Your items are held for you. Next you see each seller’s payment details — bank transfer or PayPal — with a
+            QR code for your banking app. Nothing is charged here.
+          </p>
+          {!customer && (
+            <p className="muted small" style={{ margin: 0 }}>
+              <Link href="/account">Sign in</Link> to keep your basket and orders on every device.
+            </p>
+          )}
+        </form>
+      </div>
+    </div>
+  );
+}

@@ -148,6 +148,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               organizerShort={tr('nav.organizer.short')}
               search={tr('nav.search')}
               account={tr('nav.account')}
+              basket={tr('nav.basket')}
               signedIn={Boolean(await currentCustomer())}
               lang={
                 <div className="lang-switch-header">

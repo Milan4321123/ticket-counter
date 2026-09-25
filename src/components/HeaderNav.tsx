@@ -7,6 +7,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
+import BasketButton from './basket/BasketButton';
 
 interface Props {
   events: string;
@@ -19,6 +20,7 @@ interface Props {
   /** "Your account" — the customer's orders (/account). */
   account: string;
   signedIn?: boolean;
+  basket: string;
 }
 
 function sectionOf(path: string): 0 | 1 | -1 {
@@ -27,7 +29,7 @@ function sectionOf(path: string): 0 | 1 | -1 {
   return -1;
 }
 
-export default function HeaderNav({ events, bazaar, organizer, organizerShort, search, lang, account, signedIn = false }: Props) {
+export default function HeaderNav({ events, bazaar, organizer, organizerShort, search, lang, account, signedIn = false, basket }: Props) {
   const path = usePathname() ?? '/';
   const [active, setActive] = useState(sectionOf(path));
   // Follow real navigation (back button, links elsewhere on the page).
@@ -60,6 +62,7 @@ export default function HeaderNav({ events, bazaar, organizer, organizerShort, s
             <path d="m16 16 4 4" />
           </svg>
         </Link>
+        <BasketButton label={basket} />
         <Link href="/account" className="gn-icon gn-account" aria-label={account} title={account}>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="12" cy="8.5" r="3.5" />

@@ -78,3 +78,16 @@ describe('customer sessions and accounts', () => {
     assert.ok(mine.every((o) => o.eventSlug === ev.slug));
   });
 });
+
+describe('the basket on the account', () => {
+  it('keeps what the customer saved, and only for them', async () => {
+    const { getCustomerBasket, setCustomerBasket } = await import('../src/lib/customers.ts');
+    const a = upsertCustomer('hira@example.de');
+    const b = upsertCustomer('ishan@example.de');
+    assert.deepEqual(getCustomerBasket(a.id), []);
+    setCustomerBasket(a.id, [{ key: 'e1:tea', qty: 2 }]);
+    setCustomerBasket(a.id, [{ key: 'e1:tea', qty: 3 }]);
+    assert.deepEqual(getCustomerBasket(a.id), [{ key: 'e1:tea', qty: 3 }]);
+    assert.deepEqual(getCustomerBasket(b.id), []);
+  });
+});

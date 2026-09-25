@@ -218,3 +218,28 @@ export function subscriptionsForCustomer(email: string): CustomerSubscription[] 
 export function googleSignInConfigured(): boolean {
   return Boolean(process.env.GOOGLE_CLIENT_ID?.trim() && process.env.GOOGLE_CLIENT_SECRET?.trim());
 }
+
+// ---------------------------------------------------------------------------
+// The basket, kept on the account so it follows the customer between devices.
+// Stored as the browser sends it; it is only ever read back by its owner, and
+// every price and limit in it is checked again by POST /api/orders at checkout.
+// ---------------------------------------------------------------------------
+
+export function getCustomerBasket(customerId: string): unknown[] {
+  const row = getDb().prepare(`SELECT lines FROM customer_baskets WHERE customer_id = ?`).get(customerId) as { lines: string } | undefined;
+  try {
+    const parsed = row ? JSON.parse(row.lines) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function setCustomerBasket(customerId: string, lines: unknown[]): void {
+  getDb()
+    .prepare(
+      `INSERT INTO customer_baskets (customer_id, lines, updated_at) VALUES (?, ?, datetime('now'))
+       ON CONFLICT(customer_id) DO UPDATE SET lines = excluded.lines, updated_at = excluded.updated_at`
+    )
+    .run(customerId, JSON.stringify(lines));
+}
