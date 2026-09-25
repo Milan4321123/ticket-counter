@@ -97,65 +97,8 @@ export default async function PortalDashboardPage({
   }));
   const firstName = organizer.name.trim().split(/\s+/)[0] || organizer.name;
 
-  // Account-wide numbers for the tiles. Money is summed in the currency of the
-  // listings (all EUR today); a mixed-currency account shows the first one's.
-  const currency = events[0]?.currency ?? 'EUR';
-  const sum = (pick: (t: ReturnType<typeof totalsFor>) => number) =>
-    cards.reduce((n, c) => n + pick(c.stats), 0);
-  const received = sum((t) => t.revenueCents);
-  const onItsWay = sum((t) => t.awaitingTransferCents);
-  const toConfirm = sum((t) => t.awaitingTransferOrders);
-  const sold = sum((t) => t.ticketsSold);
-  const redeemed = sum((t) => t.checkedIn);
   const questions = cards.reduce((n, c) => n + c.openQuestions, 0);
   const live = cards.filter((c) => c.event.status === 'published').length;
-
-  // What needs doing, most urgent first: money waiting to be matched, people
-  // waiting for an answer, drafts that are not selling yet, account safety.
-  type Todo = { href: string; title: string; line: string; tone: 'amber' | 'green' | 'brand'; icon: React.ReactNode };
-  const todos: Todo[] = [];
-  for (const c of cards) {
-    if (c.stats.awaitingTransferOrders > 0) {
-      todos.push({
-        href: `/portal/events/${c.event.id}/orders`,
-        title: `Confirm ${c.stats.awaitingTransferOrders} payment${c.stats.awaitingTransferOrders === 1 ? '' : 's'}`,
-        line: `${c.event.name} · ${formatMoney(c.stats.awaitingTransferCents, c.event.currency)} on its way`,
-        tone: 'amber',
-        icon: <IconInbox />,
-      });
-    }
-  }
-  for (const c of cards) {
-    if (c.openQuestions > 0) {
-      todos.push({
-        href: `/portal/events/${c.event.id}/edit?tab=questions`,
-        title: `Answer ${c.openQuestions} question${c.openQuestions === 1 ? '' : 's'}`,
-        line: `From visitors to ${c.event.name}`,
-        tone: 'green',
-        icon: <IconMessage />,
-      });
-    }
-  }
-  for (const c of cards) {
-    if (c.event.status === 'draft') {
-      todos.push({
-        href: `/portal/events/${c.event.id}/edit?tab=publish`,
-        title: 'Finish and publish',
-        line: `${c.event.name} is still a private draft`,
-        tone: 'brand',
-        icon: <IconEdit />,
-      });
-    }
-  }
-  if (!hasAuthenticator && !organizer.isDemo) {
-    todos.push({
-      href: '/portal/settings',
-      title: 'Protect your account',
-      line: 'Set up the free authenticator app — needed before you publish',
-      tone: 'brand',
-      icon: <IconShield />,
-    });
-  }
 
   // The demo's three businesses (lib/demo), found the way demoTargetPath finds them.
   const demoPicks = organizer.isDemo
@@ -168,7 +111,7 @@ export default async function PortalDashboardPage({
           tone: 'amber',
         },
         {
-          event: events.find((e) => e.kind !== 'shop'),
+          event: [...events].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).find((e) => e.kind !== 'shop'),
           emoji: '🎶',
           title: 'Event',
           line: 'Tickets, seat map, payments, door scanning',
@@ -183,6 +126,9 @@ export default async function PortalDashboardPage({
         },
       ].flatMap((p) => (p.event ? [{ ...p, id: p.event.id, who: readListingName(p.event.name).name }] : []))
     : [];
+  // A demo's own three businesses are the cards above; the listings grid shows
+  // everything else (what the visitor made themselves).
+  const shownCards = cards.filter((c) => !demoPicks.some((p) => p.id === c.event.id));
   const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
@@ -216,9 +162,10 @@ export default async function PortalDashboardPage({
             tool board, and every page's "All tools" brings you back. */}
         {demoPicks.length > 0 && (
           <section className="hub-demo-picks anim-fade-up" aria-label="Pick a demo">
-            <h2 className="hub-board-title" style={{ margin: 0 }}>
-              Pick one to explore
-            </h2>
+            <div className="hub-demo-ready">
+              <strong>🎉 Your {demoPicks.length} demo businesses are ready</strong>
+              <span>Pick one to explore — every tool works, payments are simulated.</span>
+            </div>
             <div className="demo-picks">
               {demoPicks.map((p) => (
                 <Link key={p.id} href={`/portal/events/${p.id}`} className={`demo-pick demo-pick-${p.tone} hub-demo-pick`}>
@@ -242,71 +189,7 @@ export default async function PortalDashboardPage({
           </div>
         )}
 
-        {cards.length > 0 && (
-          <section className="hub-stats anim-fade-up anim-d1" aria-label="Your numbers">
-            <div className="hub-stat hub-stat-green">
-              <div className="hub-stat-label">
-                <IconCheck /> {tr('hub.received')}
-              </div>
-              <div className="hub-stat-value">{formatMoney(received, currency)}</div>
-              <div className="hub-stat-note">Paid straight into your account</div>
-            </div>
-            <div className="hub-stat hub-stat-amber">
-              <div className="hub-stat-label">
-                <IconInbox /> {tr('hub.onItsWay')}
-              </div>
-              <div className="hub-stat-value">{formatMoney(onItsWay, currency)}</div>
-              <div className="hub-stat-note">
-                {toConfirm > 0 ? `${toConfirm} payment${toConfirm === 1 ? '' : 's'} to confirm` : 'Nothing waiting'}
-              </div>
-            </div>
-            <div className="hub-stat hub-stat-brand">
-              <div className="hub-stat-label">
-                <IconTicket /> {tr('hub.sold')}
-              </div>
-              <div className="hub-stat-value">{sold}</div>
-              <div className="hub-stat-note">Tickets and items, all listings</div>
-            </div>
-            <div className="hub-stat">
-              <div className="hub-stat-label">
-                <IconScan /> {tr('hub.scanned')}
-              </div>
-              <div className="hub-stat-value">{redeemed}</div>
-              <div className="hub-stat-note">Checked in at the door or collected</div>
-            </div>
-          </section>
-        )}
-
-        {cards.length > 0 && (
-          <section className="hub-band anim-fade-up anim-d2">
-            <div className="hub-panel">
-              <h2 className="hub-panel-title">{tr('hub.attention')}</h2>
-              {todos.length === 0 ? (
-                <div className="hub-allclear">
-                  <IconCheck /> {tr('hub.allClear')}
-                </div>
-              ) : (
-                <ul className="hub-todo">
-                  {todos.slice(0, 6).map((t) => (
-                    <li key={t.href + t.title}>
-                      <Link href={t.href} className="hub-todo-item">
-                        <span className={`hub-todo-icon${t.tone === 'green' ? ' hub-todo-icon-green' : t.tone === 'brand' ? ' hub-todo-icon-brand' : ''}`}>
-                          {t.icon}
-                        </span>
-                        <span className="hub-todo-text">
-                          <strong>{t.title}</strong>
-                          <span>{t.line}</span>
-                        </span>
-                        <span className="hub-todo-go" aria-hidden="true">
-                          →
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div className="hub-panel">
+        <section className="hub-panel hub-quick anim-fade-up anim-d1" aria-label="Quick tools">
               <h2 className="hub-panel-title">{tr('hub.tools')}</h2>
               <div className="hub-tools">
                 <Link href="/portal/promos" className="hub-tool">
@@ -330,11 +213,9 @@ export default async function PortalDashboardPage({
                   <span>Card and PayPal on your own account</span>
                 </Link>
               </div>
-            </div>
-          </section>
-        )}
+        </section>
 
-        {cards.length > 0 && (
+        {shownCards.length > 0 && (
           <>
             <div className="hub-section-title">
               <h2>{tr('hub.yourListings')}</h2>
@@ -343,7 +224,7 @@ export default async function PortalDashboardPage({
               </span>
             </div>
             <section className="hub-cards">
-              {cards.map(({ event, stats, openQuestions, thumb }, i) => {
+              {shownCards.map(({ event, stats, openQuestions, thumb }, i) => {
                 const v = vocabFor(event.kind);
                 const pct =
                   event.totalCapacity > 0 ? Math.min(100, Math.round((stats.ticketsSold / event.totalCapacity) * 100)) : 0;
