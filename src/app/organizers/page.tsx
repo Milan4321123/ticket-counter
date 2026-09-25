@@ -32,42 +32,16 @@ export async function generateMetadata() {
 export default function OrganizersPage() {
   return (
     <div className="og">
-      {/* ---- Hero ---- */}
-      <section className="og-hero container">
-        <p className="feed-kicker anim-fade-up">For organizers, restaurants &amp; shops</p>
-        <h1 className="og-title anim-fade-up anim-d1">
-          Sell tickets and goods.
-          <br />
-          <span>Free.</span>
-        </h1>
-        <p className="og-sub anim-fade-up anim-d2">
-          Your page, your orders, your door — and the money goes straight into your own account.
-        </p>
-        <div className="og-cta anim-fade-up anim-d2">
-          <DemoStart className="btn btn-brand btn-lg">
-            ▶ Try the demo
-          </DemoStart>
-          {/* Straight into the AI assistant on a blank page of the right kind. */}
-          <DemoStart to="assistant-event" className="btn btn-lg">
-            ✨ Create an event page
-          </DemoStart>
-          <DemoStart to="assistant" className="btn btn-lg">
-            ✨ Create a shop page
-          </DemoStart>
-        </div>
-        <ul className="og-chips anim-fade-up anim-d3">
-          <li>€0 fees · no commission</li>
-          <li>Paid to your bank</li>
-          <li>Live in minutes</li>
-          <li>AI fills in your page</li>
-        </ul>
-      </section>
-
-      {/* ---- 48 seconds of the real app ---- */}
-      <section id="video">
-        {/* Every video, as a row you swipe: making your page first, then a
-            day in the life of a restaurant, a shop and an event. */}
-        <StoryDeck kicker="Watch · 1–2 min each" title="See it working" order={['setup', 'restaurant', 'shop', 'event']} />
+      {/* The page opens on the videos — making a page first, then a day at a
+          restaurant, a shop and an event, and the customer's side. The buttons
+          (Try the demo, Create an event / shop page) follow just below. */}
+      <h1 className="sr-only">Sell tickets and goods on MartNepali — free for organizers, restaurants and shops</h1>
+      <section id="video" className="og-videos">
+        <StoryDeck
+          kicker="For organizers, restaurants & shops · free"
+          title="See it working"
+          order={['setup', 'restaurant', 'shop', 'event', 'customer']}
+        />
       </section>
 
       {/* ---- The AI setup assistant: one sentence in, a filled form out ---- */}
