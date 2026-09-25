@@ -233,11 +233,20 @@ const T: Record<Lang, Words> = {
   },
 };
 
+/**
+ * The first message, the same in every site language: hello in all three,
+ * and the fact that Nepali typed in English letters works too — most people
+ * type Nepali that way on an English keyboard.
+ */
+const GREETING =
+  'Namaste 🙏 · Hallo · Hello! Write in English, Deutsch or Nepali — Nepali in English letters is fine too, ' +
+  'e.g. “k cha, sanchai xa? mero momo pasal cha, chicken momo 9 euro, sanibar Berlin ma lina aaunus”.';
+
 /** The order the required pieces are asked for. */
 const ORDER = ['name', 'eventDate', 'venueName', 'address', 'pickupInfo', 'description', 'tiers', 'payout', 'payoutDemo', 'photo', 'publish'];
 
-const SKIP_RE = /^\s*(skip|later|next|überspringen|später|weiter|छोड्नुहोस्|छोड|पछि)\s*[.!]?\s*$/i;
-const WRITE_IT_RE = /\b(you write|write it|you do it|schreib du|du schreibst)\b|तपाईं लेख्नुहोस्|तपाईं नै लेख्नुहोस्|आफैं लेख्नुहोस्/i;
+const SKIP_RE = /^\s*(skip|later|next|überspringen|später|weiter|छोड्नुहोस्|छोड|पछि|chodnus|chhodnus|chodnu|pachi|pachhi|pachhi garchu)\s*[.!]?\s*$/i;
+const WRITE_IT_RE = /\b(you write|write it|you do it|schreib du|du schreibst|tapai(le)? lekh(nus|idinus|nuhos)|timi(le)? lekh|aafai lekh|lekhidinus)\b|तपाईं लेख्नुहोस्|तपाईं नै लेख्नुहोस्|आफैं लेख्नुहोस्/i;
 
 export default function SetupAssistant({
   eventId,
@@ -260,7 +269,10 @@ export default function SetupAssistant({
   const isShop = kind === 'shop';
   const unit = isShop ? t.labels.item : t.labels.ticket;
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([{ from: 'bot', text: t.hello(isShop) }]);
+  const [messages, setMessages] = useState<Message[]>([
+    { from: 'bot', text: GREETING },
+    { from: 'bot', text: t.hello(isShop) },
+  ]);
   const [draft, setDraft] = useState('');
   const [base, setBase] = useState('');
   const [busy, setBusy] = useState(false);

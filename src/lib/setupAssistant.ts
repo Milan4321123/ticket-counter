@@ -131,7 +131,9 @@ export function wantsSuggestions(said: string): boolean {
   return (
     /\b(come up with|your own (idea|one)|make (it|one|a|me) up|make up|invent|suggest|you decide|up to you|surprise me|example|sample|demo|dummy|just (give|make|create)|create (me )?(a|an) |denk dir|ausdenken|beispiel|vorschlag|du entscheidest)/i.test(said) ||
     // Nepali: "yourself", "make it for me", "example", "demo", "suggest".
-    /आफैं|आफै|बनाइदिनु|बनाइदेऊ|बनाइदिनुस्|उदाहरण|डेमो|सुझाव|तपाईं नै/.test(said)
+    /आफैं|आफै|बनाइदिनु|बनाइदेऊ|बनाइदिनुस्|उदाहरण|डेमो|सुझाव|तपाईं नै/.test(said) ||
+    // …and the same in Roman Nepali, typed in English letters.
+    /\b(aa?f(a|ai|ei|ey)|banai?di(nu|nus|nuhos|a|eu)|bana(u|unus|idinus)|udaharan|sujha?w|tapai(le)? nai|timi(le)? nai|jasto (bhaye|pani))\b/i.test(said)
   );
 }
 
@@ -152,7 +154,10 @@ ${wantsSuggestions(said) ? `SUGGESTION MODE — the seller asked you to come up 
 - ${kind === 'event' ? '"eventDate": the event day as YYYY-MM-DD (resolve words like "next Saturday" from today); "dateDisplay": that day written out, with doors/start time if said, e.g. "Saturday, 10 October 2026 · Doors 18:00".' : 'No dates. "pickupInfo": where/when buyers collect, only if said.'}
 - ${kind === 'event' ? '"tiers" are ticket types' : '"tiers" are the items for sale'}: [{"name","priceCents","cap","description","studentOnly"}]; "cap" only if a quantity was said.
 - ${kind === 'shop' ? `"category": one key from: ${cats} — only if clearly one of them.` : '"artist": performers, only if named. "venueName": the venue, only if named.'}
-- LANGUAGE: write "description" and "reply" in the SAME language the seller wrote in — English if they wrote English, German if German, Nepali (Devanagari) if Nepali or romanised Nepali. Names of items may stay as the seller wrote them.
+- LANGUAGE: sellers may write English, German, Nepali in Devanagari, or Nepali typed in English letters ("Roman Nepali", e.g. "mero momo pasal cha, chicken momo 9 euro, sanibar Berlin ma lina aaunus", "k cha sanchai xa"). Understand all of them.
+  Write "reply" in the SAME language AND script the seller used: Roman Nepali back in Roman Nepali (English letters, never Devanagari), Devanagari in Devanagari, German in German, English in English.
+  Everything that goes on the PUBLIC page — "description", "pickupInfo", "dateDisplay", item "description"s — is written for buyers: in clear English if the seller wrote Roman Nepali or English (translate it, e.g. "sanibar 4 baje dekhi 7 baje samma" → "Saturdays 4–7 pm"), in German if German, in Devanagari Nepali if Devanagari. Names of items may stay as the seller wrote them.
+  Roman Nepali words to know: cha/xa = is, ho = is, mero = my, pasal = shop, bechchu = I sell, rupaiya/euro = money, sanibar = Saturday, aaitabar = Sunday, lina aaunus = come to collect, aafai/afai = yourself, banaidinus/banaidinu = please make, janaa = people, tikat = ticket.
 - "description": 1–3 friendly sentences built ONLY from the stated facts, no promises that were not made.
 - "totalCapacity": total people/items, only if said. "city" and "address" only if said.
 - "reply": one short sentence to the seller about what you filled and what is still missing (e.g. no date yet).

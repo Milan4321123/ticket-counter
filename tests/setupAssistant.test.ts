@@ -66,3 +66,12 @@ describe('setup assistant — when it may invent', () => {
     assert.equal(wantsSuggestions('Dashain Night on 10 October at Kulturhaus, standard 25€'), false);
   });
 });
+
+describe('setup assistant — Roman Nepali', () => {
+  it('knows a request to invent, typed in English letters', async () => {
+    const { wantsSuggestions } = await import('../src/lib/setupAssistant.ts');
+    assert.equal(wantsSuggestions('tapai aafai euta nepali mithai pasal banaidinus, 5 wota saman'), true);
+    assert.equal(wantsSuggestions('afai banaidinu hai'), true);
+    assert.equal(wantsSuggestions('mero momo pasal cha, chicken momo 9 euro, sanibar lina aaunus'), false);
+  });
+});
