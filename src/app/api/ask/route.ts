@@ -16,6 +16,7 @@ import {
   type AskFilters,
   type FilterRun,
 } from '@/lib/askFilters';
+import { fallbackAnswer, quickAnswer } from '@/lib/askFaq';
 import { answerLinks, askIntents, askSearch, isQuestion, SITE_PAGES, type AskLink } from '@/lib/siteAsk';
 
 /** Asked to be SHOWN — then the bazaar opens with the filters, not just a list in the chat. */
@@ -46,6 +47,14 @@ export async function POST(req: Request) {
 
   const intents = askIntents(q);
   const { links, go } = intents;
+
+  // The basics — what is this, is it free, how do I sell / pay, how does it
+  // work — answered instantly in the visitor's language, without the AI.
+  const quick = go ? null : quickAnswer(q);
+  if (quick) {
+    const parsed = answerLinks(quick);
+    return NextResponse.json({ links: parsed.links, results: [], answer: parsed.clean, note: null, go: false });
+  }
   const question = isQuestion(q);
 
   // A shopper's filters: "items under 10 euro", "cheapest sweets in Munich",
@@ -119,7 +128,8 @@ export async function POST(req: Request) {
       note = QUOTA_MESSAGE;
     } else {
       const pages = SITE_PAGES.map((p) => `${p.path} — ${p.what}`).join('\n');
-      const r = await answerWithBestModel(
+      // At most ~8 seconds: a visitor watching dots for longer has left.
+      const r = await withinMs(8_000, answerWithBestModel(
         `You are the friendly guide of ${platformNameFromEnv()}, answering visitors in a chat on the homepage. ` +
           'Use ONLY the platform context and the page list. Never invent fees, policies or features. ' +
           'Explain clearly and warmly in 2-5 short sentences; when the visitor asks to explain more, go deeper with ' +
@@ -141,9 +151,13 @@ export async function POST(req: Request) {
           `VISITOR:\n${q}`,
         'Respond with STRICT JSON only: {"confident":boolean,"answer":string}. confident=false with an empty answer ' +
           'only when the context truly does not cover a specific question.'
-      ).catch(() => null);
+      ).catch(() => null));
       if (r?.confident && r.answer.trim()) answer = r.answer.trim().slice(0, 1200);
-      else note = 'I am not sure about that one — a person from the team can help.';
+      else {
+        // Slow, busy or unsure: never a dead end — what the site is, plus a person.
+        answer = fallbackAnswer(q);
+        note = 'fallback';
+      }
     }
   }
   let inAnswer: AskLink[] = [];
@@ -155,7 +169,14 @@ export async function POST(req: Request) {
   const allLinks = [...links, ...inAnswer.filter((l) => !links.some((x) => x.href === l.href))];
   // A question with nothing else to offer still gets a way forward.
   const extra = note && !allLinks.some((l) => l.href === '/contact') ? [{ label: 'Talk to a person', href: '/contact', icon: '💬' }] : [];
-  return NextResponse.json({ links: [...allLinks, ...extra], results, answer: answer ?? summary, note, go, filters: searched });
+  return NextResponse.json({
+    links: [...allLinks, ...extra],
+    results,
+    answer: answer ?? summary,
+    note: note === 'fallback' ? null : note,
+    go,
+    filters: searched,
+  });
 }
 
 /** The chat's reply to a filter: what was found, the cards, and the page with all of them. */
@@ -196,4 +217,9 @@ function filterReply(filters: AskFilters, run: FilterRun, prev: AskFilters | nul
     go: open && !events && run.total > 0 && run.atEvents === 0 && Boolean(run.link),
     filters,
   };
+}
+
+/** The promise's value, or null once `ms` have passed. */
+function withinMs<T>(ms: number, p: Promise<T>): Promise<T | null> {
+  return Promise.race([p, new Promise<null>((r) => setTimeout(() => r(null), ms))]);
 }
