@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import LogoutButton from './LogoutButton';
+import DemoPicker from './DemoPicker';
 import { readListingName } from '@/lib/exampleShop';
 import PlatformAssistant from '@/components/PlatformAssistant';
 import {
@@ -98,7 +99,6 @@ export default async function PortalDashboardPage({
   const firstName = organizer.name.trim().split(/\s+/)[0] || organizer.name;
 
   const questions = cards.reduce((n, c) => n + c.openQuestions, 0);
-  const live = cards.filter((c) => c.event.status === 'published').length;
 
   // The demo's three businesses (lib/demo), found the way demoTargetPath finds them.
   const demoPicks = organizer.isDemo
@@ -129,58 +129,25 @@ export default async function PortalDashboardPage({
   // A demo's own three businesses are the cards above; the listings grid shows
   // everything else (what the visitor made themselves).
   const shownCards = cards.filter((c) => !demoPicks.some((p) => p.id === c.event.id));
-  const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
     <>
       <PortalNav active="events" />
       <div className="container hub-home">
-        <header className="hub-hello anim-fade-up">
-          <div>
-            <h1>
-              {tr('hub.namaste')}, {firstName} 🙏
-            </h1>
-            <p>
-              {today} ·{' '}
-              {cards.length === 0
-                ? 'Welcome — this is where your events and shops live.'
-                : `${live} of your ${cards.length} ${cards.length === 1 ? 'listing is' : 'listings are'} live.`}
-            </p>
-          </div>
+        <header className="hub-hello hub-hello-slim anim-fade-up">
+          <h1>
+            {tr('hub.namaste')}, {firstName} 🙏
+          </h1>
           <div className="hub-hello-actions">
             {/* Only appears where the browser can install, or on iPhone with the how-to. */}
             <InstallAppButton label="Install the seller app" />
-            {/* Sign-out lives here now that the hub has no sidebar. */}
-            <LogoutButton />
-            <a href="#new" className="btn btn-brand">
-              {tr('hub.new')}
-            </a>
+            <LogoutButton quiet />
           </div>
         </header>
 
         {/* A demo account opens on its three businesses: pick one, land on its
             tool board, and every page's "All tools" brings you back. */}
-        {demoPicks.length > 0 && (
-          <section className="hub-demo-picks anim-fade-up" aria-label="Pick a demo">
-            <div className="hub-demo-ready">
-              <strong>🎉 Your {demoPicks.length} demo businesses are ready</strong>
-              <span>Pick one to explore — every tool works, payments are simulated.</span>
-            </div>
-            <div className="demo-picks">
-              {demoPicks.map((p) => (
-                <Link key={p.id} href={`/portal/events/${p.id}`} className={`demo-pick demo-pick-${p.tone} hub-demo-pick`}>
-                  <span className="demo-pick-emoji" aria-hidden="true">
-                    {p.emoji}
-                  </span>
-                  <h2>{p.title}</h2>
-                  <p className="demo-pick-who">{p.who}</p>
-                  <span className="hub-demo-pick-line">{p.line}</span>
-                  <span className="btn btn-brand btn-sm demo-pick-go">Open its tools →</span>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
+        {demoPicks.length > 0 && <DemoPicker picks={demoPicks} />}
 
         {deletedName && (
           <div className="notice notice-success anim-fade-up" role="status" style={{ margin: 0 }}>

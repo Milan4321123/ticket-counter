@@ -41,11 +41,6 @@ export default function PortalNav({ active, event, tab }: Props) {
             <Link href="/portal" className="hub-slim-back">
               ← Home
             </Link>
-            {event && (
-              <span className="hub-slim-name" title={event.name}>
-                <span className="hub-listing-kind">{event.kind === 'shop' ? 'Shop' : 'Event'}</span> {event.name}
-              </span>
-            )}
           </div>
         </div>
       )}

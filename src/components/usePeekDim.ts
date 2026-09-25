@@ -162,6 +162,7 @@ export function useInfiniteLoop(track: RefObject<HTMLElement | null>, count: num
       const centred = getComputedStyle(first).scrollSnapAlign.includes('center');
       jump(centred ? first.offsetLeft - (el.clientWidth - first.offsetWidth) / 2 : first.offsetLeft - pad());
     }
+    paintPeekDim(el);
     el.dispatchEvent(new Event('scroll'));
 
     let timer = 0;

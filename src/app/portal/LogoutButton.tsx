@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-export default function LogoutButton() {
+export default function LogoutButton({ quiet = false }: { quiet?: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
@@ -20,7 +20,7 @@ export default function LogoutButton() {
   }
 
   return (
-    <button type="button" className="btn btn-sm" onClick={onLogout} disabled={busy}>
+    <button type="button" className={quiet ? 'hub-signout' : 'btn btn-sm'} onClick={onLogout} disabled={busy}>
       {busy ? 'Signing out…' : 'Sign out'}
     </button>
   );

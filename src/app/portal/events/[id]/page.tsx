@@ -1,11 +1,9 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getEventById } from '@/lib/events';
-import { formatMoney } from '@/lib/money';
 import { getStats } from '@/lib/orders';
 import { organizerPlanActive } from '@/lib/organizers';
 import { readListingName } from '@/lib/exampleShop';
-import { vocabFor } from '@/lib/vocab';
 import PlanExpired from '../../PlanExpired';
 import PortalNav from '../../PortalNav';
 import { requirePortalOrganizer } from '../../guard';
@@ -29,7 +27,6 @@ export default async function ListingToolsPage({ params }: { params: Promise<{ i
   if (!event || event.organizerId !== organizer.id) redirect('/portal');
 
   const isShop = event.kind === 'shop';
-  const v = vocabFor(event.kind);
   const stats = getStats(event.id);
   const tools = listingTools(event).filter((t) => t.key !== 'overview');
   const main = tools.filter((t) => t.primary);
@@ -50,33 +47,11 @@ export default async function ListingToolsPage({ params }: { params: Promise<{ i
       <div className="container section hub-board">
         <header className="hub-board-head anim-fade-up">
           <p className="feed-kicker">{isShop ? 'Your shop' : 'Your event'}</p>
-          <h1 className="page-title" style={{ margin: '2px 0 6px' }}>
+          <h1 className="page-title" style={{ margin: '2px 0 0' }}>
             {name}
+            {!published && <span className="badge badge-amber hub-board-draft">Not published</span>}
           </h1>
-          <p className="muted" style={{ margin: 0 }}>
-            {published ? 'Live on the site.' : 'Not published yet — only you can see it.'} Pick a tool below; “All tools”
-            at the top of every page brings you back here.
-          </p>
         </header>
-
-        <div className="hub-board-stats anim-fade-up anim-d1">
-          <div>
-            <strong>{stats.ticketsSold}</strong>
-            <span>{isShop ? 'items sold' : 'tickets sold'}</span>
-          </div>
-          <div>
-            <strong>{formatMoney(stats.revenueCents, event.currency)}</strong>
-            <span>received</span>
-          </div>
-          <div className={stats.awaitingTransferOrders > 0 ? 'hub-board-stat-warn' : undefined}>
-            <strong>{stats.awaitingTransferOrders}</strong>
-            <span>to confirm</span>
-          </div>
-          <div>
-            <strong>{stats.checkedIn}</strong>
-            <span>{isShop ? 'collected' : 'checked in'}</span>
-          </div>
-        </div>
 
         <h2 className="hub-board-title">Run it</h2>
         <div className="hub-board-grid anim-fade-up anim-d1">
@@ -119,9 +94,6 @@ export default async function ListingToolsPage({ params }: { params: Promise<{ i
             </Link>
           ))}
         </div>
-        <p className="muted small" style={{ marginTop: 18 }}>
-          {v.Redeem} and the live screen work best on a phone or tablet at the {isShop ? 'counter' : 'door'}.
-        </p>
       </div>
     </>
   );
