@@ -38,6 +38,10 @@ export interface MarketQuery {
   shop: string;
   band: string;
   inStock: boolean;
+  /** A price ceiling in cents ("under €10" from the Ask chat); 0 = none. */
+  max: number;
+  /** A price floor in cents ("over €20"); 0 = none. */
+  min: number;
   sort: SortKey;
   page: number;
 }
@@ -69,9 +73,17 @@ export function readQuery(sp: SearchParams): MarketQuery {
     // this page's own toggle and its own hidden field. Being generous here
     // ("on", "true", "yes") would buy nothing and cost four URLs for one page.
     inStock: one(sp.stock) === '1',
+    max: readMax(one(sp.max)),
+    min: readMax(one(sp.min)),
     sort: asSortKey(one(sp.sort)),
     page: readPage(one(sp.page)),
   };
+}
+
+/** ?max= in euros ("10", "7.5") as cents, or 0 for anything else. */
+function readMax(raw: string): number {
+  const n = Number(raw.replace(',', '.'));
+  return Number.isFinite(n) && n > 0 && n <= 10000 ? Math.round(n * 100) : 0;
 }
 
 /** ?page= as a whole number, or 1 for anything that is not one. */
@@ -109,6 +121,8 @@ export function hrefFor(query: MarketQuery, patch: Partial<MarketQuery> = {}): s
   if (next.shop) params.set('shop', next.shop);
   if (next.band) params.set('band', next.band);
   if (next.inStock) params.set('stock', '1');
+  if (next.max) params.set('max', String(next.max / 100));
+  if (next.min) params.set('min', String(next.min / 100));
   // 'featured' is the order this page has when nobody asked for one, so it is
   // not written down. Naming the default in the URL is how a site ends up with
   // two addresses for its own front door.
@@ -128,6 +142,8 @@ export function isSlice(query: MarketQuery): boolean {
       query.shop ||
       query.band ||
       query.inStock ||
+      query.max ||
+      query.min ||
       query.sort !== 'featured' ||
       query.page > 1
   );
@@ -142,6 +158,8 @@ export function filtersOf(query: MarketQuery): MarketFilters {
     shop: query.shop,
     inStock: query.inStock,
     band: query.band,
+    maxCents: query.max,
+    minCents: query.min,
   };
 }
 

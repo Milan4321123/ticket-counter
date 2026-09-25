@@ -22,14 +22,17 @@ interface Msg {
   results?: AskResult[];
   going?: AskLink;
   thinking?: boolean;
+  /** The shopping filters this reply applied — the next question builds on them. */
+  filters?: unknown;
 }
 
-const W: Record<Lang, { pill: string; hello: string; sub: string; ph: string; ideas: string[]; none: string; opening: string; events: string; shops: string; items: string; close: string; fresh: string; langs: string }> = {
+const W: Record<Lang, { pill: string; hello: string; sub: string; ph: string; ideas: string[]; shop: string[]; none: string; opening: string; events: string; shops: string; items: string; close: string; fresh: string; langs: string }> = {
   en: {
     pill: 'Ask anything — events, momo, how it works…',
     hello: 'Namaste! What are you looking for?',
     sub: 'Find events, shops and food, or ask how anything works.',
     ph: 'Ask or search…',
+    shop: ['Items under €10', 'Momo in Berlin under €8', 'Cheapest sweets, only in stock', '10 euro bhanda sasto khaja', 'Events this weekend'],
     ideas: ['What is MartNepali?', 'Show me how it works (video)', 'Dashain events', 'Ma euta event setup garna chahanchhu', 'Berlin ma momo kaha paincha?', 'I want to put my event here', 'How do I pay?', 'Open my basket'],
     langs: 'Write in English, Deutsch, नेपाली — or Roman Nepali, like the two above.',
     none: 'Nothing matched that — try a different word, a city, or ask a question.',
@@ -41,6 +44,7 @@ const W: Record<Lang, { pill: string; hello: string; sub: string; ph: string; id
     hello: 'Namaste! Wonach suchst du?',
     sub: 'Finde Events, Läden und Essen — oder frag, wie etwas funktioniert.',
     ph: 'Fragen oder suchen…',
+    shop: ['Artikel unter 10 €', 'Momo in Berlin unter 8 €', 'Günstigste Süßigkeiten, nur vorrätig', '10 euro bhanda sasto khaja', 'Events dieses Wochenende'],
     ideas: ['Was ist MartNepali?', 'Zeig mir, wie es geht (Video)', 'Dashain Events', 'Ma euta event setup garna chahanchhu', 'Berlin ma momo kaha paincha?', 'Ich möchte mein Event hier anbieten', 'Wie bezahle ich?', 'Öffne meinen Warenkorb'],
     langs: 'Schreib auf Deutsch, Englisch, नेपाली — oder Nepali in lateinischen Buchstaben, wie oben.',
     none: 'Nichts gefunden — versuch ein anderes Wort, eine Stadt oder stell eine Frage.',
@@ -52,6 +56,7 @@ const W: Record<Lang, { pill: string; hello: string; sub: string; ph: string; id
     hello: 'नमस्ते! तपाईं के खोज्दै हुनुहुन्छ?',
     sub: 'कार्यक्रम, पसल र खाना खोज्नुहोस्, वा कुनै कुरा कसरी चल्छ सोध्नुहोस्।',
     ph: 'सोध्नुहोस् वा खोज्नुहोस्…',
+    shop: ['€10 भन्दा सस्तो सामान', 'Momo in Berlin under €8', 'सबैभन्दा सस्तो मिठाई', '10 euro bhanda sasto khaja', 'यो हप्ता कार्यक्रम'],
     ideas: ['MartNepali के हो?', 'यो कसरी चल्छ देखाउनुहोस् (भिडियो)', 'दशैं कार्यक्रम', 'Ma euta event setup garna chahanchhu', 'Berlin ma momo kaha paincha?', 'मेरो कार्यक्रम यहाँ राख्न चाहन्छु', 'कसरी भुक्तानी गर्ने?', 'मेरो टोकरी खोल्नुहोस्'],
     langs: 'नेपाली, English, Deutsch — वा Roman Nepali मा पनि लेख्न सक्नुहुन्छ, माथिका जस्तै।',
     none: 'केही भेटिएन — अर्को शब्द, सहर, वा प्रश्न सोध्नुहोस्।',
@@ -85,8 +90,14 @@ function Orb({ busy = false, size = 26 }: { busy?: boolean; size?: number }) {
   return <span className={`ab-orb${busy ? ' is-busy' : ''}`} style={{ width: size, height: size }} aria-hidden="true" />;
 }
 
-export default function AskBar({ lang = 'en' }: { lang?: Lang }) {
-  const w = W[lang] ?? W.en;
+/**
+ * `where="bazaar"`: a slimmer pill above the goods whose examples are about
+ * shopping — the same chat, so "cheaper" or "only in Berlin" asked here builds
+ * on the filters set from the homepage.
+ */
+export default function AskBar({ lang = 'en', where = 'home' }: { lang?: Lang; where?: 'home' | 'bazaar' }) {
+  const base = W[lang] ?? W.en;
+  const w = where === 'bazaar' ? { ...base, ideas: base.shop } : base;
   const [open, setOpen] = useState(false);
   const [tick, setTick] = useState(0);
 
@@ -99,12 +110,16 @@ export default function AskBar({ lang = 'en' }: { lang?: Lang }) {
 
   return (
     <>
-      <button type="button" className="ab-pill" onClick={() => setOpen(true)} aria-label={w.pill} translate="no">
+      <button type="button" className={`ab-pill${where === 'bazaar' ? ' is-compact' : ''}`} onClick={() => setOpen(true)} aria-label={w.pill} translate="no">
         <span className="ab-ring" aria-hidden="true" />
         <span className="ab-pill-in">
           <Orb />
           <span key={tick} className="ab-hint">
-            {tick === 0 ? w.pill : w.ideas[(tick - 1) % w.ideas.length] + '…'}
+            {where === 'bazaar'
+              ? `${w.ideas[tick % w.ideas.length]}…`
+              : tick === 0
+                ? w.pill
+                : `${w.ideas[(tick - 1) % w.ideas.length]}…`}
           </span>
           <span className="ab-mic" aria-hidden="true">
             <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
@@ -121,7 +136,7 @@ const STORE = 'ask:chat:v1';
 function loadChat(): Msg[] {
   try {
     const saved = JSON.parse(sessionStorage.getItem(STORE) || '[]') as Msg[];
-    return Array.isArray(saved) ? saved.filter((m) => !m.thinking && !m.going).slice(-40) : [];
+    return Array.isArray(saved) ? saved.filter((m) => !m.thinking && (!m.going || m.text)).map((m) => ({ ...m, going: undefined })).slice(-40) : [];
   } catch {
     return [];
   }
@@ -131,7 +146,7 @@ function AskOverlay({ w, onClose }: { w: (typeof W)['en']; onClose: () => void }
   const [msgs, setMsgs] = useState<Msg[]>(loadChat);
   useEffect(() => {
     try {
-      sessionStorage.setItem(STORE, JSON.stringify(msgs.filter((m) => !m.thinking && !m.going).slice(-40)));
+      sessionStorage.setItem(STORE, JSON.stringify(msgs.filter((m) => !m.thinking && (!m.going || m.text)).slice(-40)));
     } catch {
       // Private mode: the chat simply starts fresh next time.
     }
@@ -184,20 +199,24 @@ function AskOverlay({ w, onClose }: { w: (typeof W)['en']; onClose: () => void }
           q,
           // The conversation so far, so follow-ups ("explain more") make sense.
           history: msgs.filter((m) => m.text && !m.thinking).slice(-6).map((m) => ({ from: m.from, text: m.text })),
+          // What the shopper has narrowed to so far ("cheaper", "only in Berlin" change it).
+          filters: [...msgs].reverse().find((m) => m.from === 'bot' && m.filters)?.filters ?? null,
         }),
       });
       const d = (await res.json().catch(() => null)) as {
-        links?: AskLink[]; results?: AskResult[]; answer?: string | null; note?: string | null; go?: boolean; error?: string;
+        links?: AskLink[]; results?: AskResult[]; answer?: string | null; note?: string | null; go?: boolean; error?: string; filters?: unknown;
       } | null;
       const links = d?.links ?? [];
       const results = d?.results ?? [];
       let reply: Msg;
+      const filters = d?.filters ?? undefined;
       if (d?.go && links[0]) {
-        reply = { from: 'bot', going: links[0] };
-        window.setTimeout(() => (window.location.href = links[0].href), 900);
+        // Kept (with its answer) so the chat, reopened on the next page, still knows the filters.
+        reply = { from: 'bot', going: links[0], text: d.answer ?? undefined, links, filters };
+        window.setTimeout(() => (window.location.href = links[0].href), 1100);
       } else {
         const text = d?.error ?? d?.answer ?? d?.note ?? (results.length || links.length ? undefined : w.none);
-        reply = { from: 'bot', text, links, results };
+        reply = { from: 'bot', text, links, results, filters };
       }
       setMsgs((m) => [...m.slice(0, -1), reply]);
     } catch {
@@ -241,7 +260,7 @@ function AskOverlay({ w, onClose }: { w: (typeof W)['en']; onClose: () => void }
                 <button
                   key={i}
                   type="button"
-                  className={`ab-idea${/^(Ma euta|Berlin ma)/.test(i) ? ' is-roman' : ''}`}
+                  className={`ab-idea${/^(Ma euta|Berlin ma|10 euro bhanda)/.test(i) ? ' is-roman' : ''}`}
                   style={{ animationDelay: `${0.15 + k * 0.06}s` }}
                   onClick={() => void ask(i)}
                 >

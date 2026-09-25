@@ -1,10 +1,12 @@
+import { formatMoney } from '@/lib/money';
 import { absoluteUrl, itemListJsonLd, jsonLdScript, shareImages } from '@/lib/seo';
 import Np from '@/components/Np';
+import AskBar from '@/components/AskBar';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import LiveSearchInput from './LiveSearchInput';
-import { serverT } from '@/lib/i18nServer';
+import { currentLang, serverT } from '@/lib/i18nServer';
 import { ensureExampleBazaarOnce } from '@/lib/exampleBazaar';
 import { runSubscriptionSweep } from '@/lib/subscriptions';
 import ItemTile from '@/components/ItemTile';
@@ -324,7 +326,7 @@ export default async function MarketPage({ searchParams }: Props) {
   // the empty state has to know: "nobody sells that here" is a true sentence
   // about a search and a false one about a search with a town, a price band
   // and a seller stacked on top of it.
-  const narrowed = Boolean(query.city || query.shop || query.band || query.inStock);
+  const narrowed = Boolean(query.city || query.shop || query.band || query.inStock || query.max || query.min);
   const filtered = Boolean(terms.length || query.category || narrowed);
 
   // Removable pills for the two filters that are not a chip the visitor can
@@ -334,6 +336,8 @@ export default async function MarketPage({ searchParams }: Props) {
   // without itself — and a pill for each would be the same control twice.
   const pills: { key: string; label: string; href: string }[] = [];
   if (query.q) pills.push({ key: 'q', label: `“${query.q}”`, href: hrefFor(query, { q: '' }) });
+  if (query.max) pills.push({ key: 'max', label: `Up to ${formatMoney(query.max, 'EUR')}`, href: hrefFor(query, { max: 0 }) });
+  if (query.min) pills.push({ key: 'min', label: `From ${formatMoney(query.min, 'EUR')}`, href: hrefFor(query, { min: 0 }) });
   if (query.shop) {
     const row = shopRows.find((s) => s.key === query.shop);
     pills.push({
@@ -398,6 +402,8 @@ export default async function MarketPage({ searchParams }: Props) {
       {query.shop && <input type="hidden" name="shop" value={query.shop} />}
       {query.band && <input type="hidden" name="band" value={query.band} />}
       {query.inStock && <input type="hidden" name="stock" value="1" />}
+      {query.max > 0 && <input type="hidden" name="max" value={String(query.max / 100)} />}
+      {query.min > 0 && <input type="hidden" name="min" value={String(query.min / 100)} />}
       {omit !== 'sort' && query.sort !== 'featured' && (
         <input type="hidden" name="sort" value={query.sort} />
       )}
@@ -428,6 +434,9 @@ export default async function MarketPage({ searchParams }: Props) {
             <h1 className="bz-hero-title anim-fade-up anim-d1">
               {tr('bz.title')}
             </h1>
+            {/* Ask in words — "momo under €8 in Berlin", "cheaper", "only in
+                stock" — and the chat sets the filters below. */}
+            <AskBar lang={await currentLang()} where="bazaar" />
           </div>
           {all.length > 0 && (
             /* A plain GET form: what a visitor types lands in the URL, so a

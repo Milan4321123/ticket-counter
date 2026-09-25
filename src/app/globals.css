@@ -9172,3 +9172,19 @@ html.tx-wait body {
   box-shadow: inset 0 0 0 1px rgba(240, 171, 252, 0.45);
   background: rgba(217, 70, 239, 0.12);
 }
+
+/* The Ask pill on the bazaar: one line under the title, not a hero of its own. */
+.ab-pill.is-compact {
+  max-width: 420px;
+  margin: 10px 0 0;
+}
+.ab-pill.is-compact .ab-pill-in {
+  min-height: 42px;
+  padding: 5px 8px 5px 10px;
+  gap: 10px;
+  font-size: 0.92rem;
+}
+.ab-pill.is-compact .ab-orb {
+  width: 20px !important;
+  height: 20px !important;
+}

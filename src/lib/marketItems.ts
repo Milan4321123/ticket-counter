@@ -446,6 +446,10 @@ export interface MarketFilters {
   shop: string;
   inStock: boolean;
   band: string;
+  /** Price ceiling in cents, inclusive; 0 or missing = none. */
+  maxCents?: number;
+  /** Price floor in cents, inclusive; 0 or missing = none. */
+  minCents?: number;
 }
 
 /**
@@ -476,7 +480,9 @@ export function filterShopItems(items: ShopItem[], f: MarketFilters): ShopItem[]
       // in a shop that is open, with something left. Not merely remaining > 0,
       // which is also true of an item whose seller has paused their orders.
       (!f.inStock || item.buyable) &&
-      (!band || bandOf(item) === band)
+      (!band || bandOf(item) === band) &&
+      (!f.maxCents || item.priceCents <= f.maxCents) &&
+      (!f.minCents || item.priceCents >= f.minCents)
   );
 }
 
