@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { formatMoney } from '@/lib/money';
 import { removeLines, setQty, useBasket, type BasketLine } from '@/components/basket/basketStore';
+import { WishPanel } from '@/components/WishButton';
 
 interface Group {
   eventId: string;
@@ -203,13 +204,20 @@ export default function BasketPage({ customer }: { customer: { name: string; ema
                 </div>
               ))}
               {g.example && (
-                <p className="bk-example">
-                  Example shop — it shows how the bazaar works and cannot be ordered from. It stays in your basket
-                  until you remove it.{' '}
-                  <button type="button" className="bk-remove" onClick={() => removeLines(g.lines.map((l) => l.key))}>
-                    Remove
-                  </button>
-                </p>
+                <>
+                  <WishPanel
+                    eventId={g.eventId}
+                    example
+                    unit={g.kind === 'shop' ? 'item' : 'ticket'}
+                    items={g.lines.map((l) => ({ tierKey: l.tierKey, name: l.name }))}
+                  />
+                  <p className="bk-example">
+                    It stays in your basket until you remove it.{' '}
+                    <button type="button" className="bk-remove" onClick={() => removeLines(g.lines.map((l) => l.key))}>
+                      Remove
+                    </button>
+                  </p>
+                </>
               )}
               {errors[g.eventId] && (
                 <p className="bk-error" role="alert">

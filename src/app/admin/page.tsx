@@ -117,6 +117,10 @@ export default async function AdminDashboardPage() {
           <Link href="/admin/reviews" className="btn btn-sm">
             Reviews
           </Link>
+          {/* What people wanted but could not buy (lib/wishes). */}
+          <Link href="/admin/wishes" className="btn btn-sm">
+            ♥ Wish list
+          </Link>
           <Link href="/admin/contact" className="btn btn-primary btn-sm">
             Applications
             {newContactRequests > 0 ? (

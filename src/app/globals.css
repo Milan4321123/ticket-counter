@@ -9188,3 +9188,110 @@ html.tx-wait body {
   width: 20px !important;
   height: 20px !important;
 }
+
+/* ---------- Wish list (components/WishButton) ---------- */
+.wish-btn {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 143, 165, 0.45);
+  border-radius: 999px;
+  background: rgba(220, 20, 60, 0.08);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+  z-index: 2; /* above a card's full-size title link */
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.wish-btn:hover:not(:disabled) {
+  background: rgba(220, 20, 60, 0.16);
+}
+.wish-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.wish-btn.is-on {
+  background: var(--brand-soft);
+  border-color: var(--brand);
+}
+.wish-btn .wish-heart {
+  color: var(--brand-text);
+  font-size: 1.1em;
+  line-height: 1;
+}
+.wish-btn.is-on .wish-heart {
+  animation: wish-pop 0.35s ease;
+}
+.wish-btn .wish-count {
+  font-weight: 500;
+  font-size: 0.85em;
+  opacity: 0.75;
+}
+.wish-btn.wish-sm {
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  margin-top: 8px;
+  align-self: flex-start;
+}
+@keyframes wish-pop {
+  0% { transform: scale(0.6); }
+  60% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+.wish-panel {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  margin: 10px 0;
+  border: 1px solid rgba(255, 143, 165, 0.35);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(220, 20, 60, 0.1), rgba(139, 92, 246, 0.08));
+}
+.wish-panel-title {
+  margin: 0;
+  font-weight: 700;
+}
+.wish-panel-text {
+  margin: 0;
+  font-size: 0.92rem;
+  opacity: 0.85;
+}
+.wish-panel-done {
+  margin: 0;
+  font-weight: 600;
+  color: var(--brand-text);
+}
+.wish-board {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  margin: 0 0 18px;
+  border: 1px solid rgba(255, 143, 165, 0.35);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(220, 20, 60, 0.1), rgba(139, 92, 246, 0.08));
+}
+.wish-board ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.wish-board li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.wish-board li .badge {
+  margin-left: 8px;
+}
+.wish-board li strong {
+  white-space: nowrap;
+  color: var(--brand-text);
+}

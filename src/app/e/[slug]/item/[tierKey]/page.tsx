@@ -72,6 +72,8 @@ import { tierBadge, ticketState, visibleTiers } from '@/lib/ticketState';
 import { cityLabel, otherShowsByAct, shortDateLabel } from '@/lib/sameAct';
 import OtherCityNotice from '@/components/OtherCityNotice';
 import CityCheck from '@/components/CityCheck';
+import WishButton from '@/components/WishButton';
+import { canWish, wishCount } from '@/lib/wishes';
 import { vocabFor } from '@/lib/vocab';
 
 // Availability comes from the database — always render fresh, exactly like the
@@ -682,7 +684,20 @@ export default async function ItemPage({ params, searchParams }: Params) {
                 seller and a price beside each, and dropping a dated concert
                 ticket into that list would make a claim about what the list
                 is that the list cannot keep. */}
-            {isShop && <SaveButton item={savedItem} />}
+            {/* What cannot be bought — an example shop's goods, a "Coming
+                soon" row — can be wished for instead (lib/wishes): the seller,
+                and we, see how many want it. It also keeps the shopper's own
+                saved copy, so it replaces Save for later here. */}
+            {(listing.isExample || tier.status === 'coming-soon') && canWish(event, tier) ? (
+              <WishButton
+                eventId={event.id}
+                tierKey={tier.tierKey}
+                count={wishCount(event.id, tier.tierKey)}
+                item={isShop ? savedItem : undefined}
+              />
+            ) : (
+              isShop && <SaveButton item={savedItem} />
+            )}
           </p>
 
           {/* The way into the seller's own writing, and the reason it shows two

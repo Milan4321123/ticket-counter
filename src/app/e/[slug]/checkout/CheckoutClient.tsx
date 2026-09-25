@@ -16,6 +16,7 @@ import { vocabFor, type Vocab } from '@/lib/vocab';
 import OtherCityNotice, { type OtherShow } from '@/components/OtherCityNotice';
 import styles from './checkout.module.css';
 import SeatMapView, { type SeatMapData } from '@/components/SeatMapView';
+import { WishPanel } from '@/components/WishButton';
 import { translator, type Lang } from '@/lib/i18n';
 
 declare global {
@@ -63,6 +64,10 @@ export interface CheckoutConfig {
   /** Event or shop — decides every noun on this page. See lib/vocab. */
   kind: EventKind;
   tiers: CheckoutTier[];
+  /** One of the site's own example shops: never takes an order, offers the wish list instead. */
+  example?: boolean;
+  /** The listing can be wished for (published and not a try-it demo). */
+  wishable?: boolean;
 }
 
 export interface CheckoutTierAvailability {
@@ -1981,10 +1986,22 @@ export default function CheckoutClient({
              worse outcome than a buyer who simply knows this one cannot be
              ordered from. The seller's own "ask a question" box is still on
              the listing page for anyone who does want to reach them. */
-          <div className="notice notice-error">
-            This {v.listing} has no payment details, so an order cannot be placed on it.
-            Nothing has been reserved and nothing can be charged.
-          </div>
+          config.wishable ? (
+            /* Not a dead end: what was picked goes on the wish list, so the
+               seller — and for an example shop, we — learn that somebody
+               wanted it (lib/wishes). */
+            <WishPanel
+              eventId={eventId}
+              example={Boolean(config.example)}
+              unit={v.unit}
+              items={config.tiers.filter((t) => (qty[t.id] ?? 0) > 0).map((t) => ({ tierKey: t.id, name: t.name }))}
+            />
+          ) : (
+            <div className="notice notice-error">
+              This {v.listing} has no payment details, so an order cannot be placed on it.
+              Nothing has been reserved and nothing can be charged.
+            </div>
+          )
         ) : (
           <>
             {/* The choice, only when there IS one. Each row says the one

@@ -19,6 +19,7 @@ import { parseSeatMap, takenSeats } from '@/lib/seats';
 import { currentLang } from '@/lib/i18nServer';
 import { BUYER_RETENTION_DAYS } from '@/lib/retention';
 import CheckoutClient from './CheckoutClient';
+import { readListingName } from '@/lib/exampleShop';
 
 // Availability comes from the database — always render fresh.
 export const dynamic = 'force-dynamic';
@@ -194,6 +195,8 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
         currency: event.currency,
         maxTicketsPerOrder: event.maxPerOrder,
         kind: event.kind,
+        example: readListingName(event.name).isExample,
+        wishable: event.status === 'published' && !event.isDemo,
         // Coming-soon types are not offered at checkout at all: a stepper that
         // cannot go above zero is a worse answer than not showing the row.
         // Same order as the grid the buyer just tapped through — what is

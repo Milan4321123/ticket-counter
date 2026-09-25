@@ -53,6 +53,9 @@ import { loadFeedSnapshot } from '@/lib/feedSnapshot';
 import { getAvailability } from '@/lib/inventory';
 import { runWaitlistNotifySweep } from '@/lib/waitlist';
 import WaitlistForm from '@/components/WaitlistForm';
+import WishButton from '@/components/WishButton';
+import { readListingName } from '@/lib/exampleShop';
+import { canWish, wishCountsFor } from '@/lib/wishes';
 import { cityLabel, otherShowsByAct, shortDateLabel } from '@/lib/sameAct';
 import {
   ticketState,
@@ -430,6 +433,10 @@ export default async function EventPage({ params, searchParams }: Params) {
   // Shops only. An event's tickets are not reviewed here: "Standard entry, 3
   // stars" is a verdict on somebody's evening, not on a thing that was sold.
   const itemRatings = isShop ? ratingsForItems([event.id]) : new Map();
+  // "Add to wish list" on what cannot be bought: an example shop's goods and
+  // "Coming soon" rows (lib/wishes) — with how many already want each.
+  const exampleListing = readListingName(event.name).isExample;
+  const wishCounts = !preview ? wishCountsFor(event.id) : new Map<string, number>();
   const shopRating = isShop ? ratingForShop(event.id) : null;
 
   const heroCollectLine =
@@ -996,6 +1003,10 @@ export default async function EventPage({ params, searchParams }: Params) {
                         {v.cta}
                       </Link>
                     ) : null;
+                  const wishBtn =
+                    !preview && (exampleListing || tier.status === 'coming-soon') && canWish(event, tier) ? (
+                      <WishButton eventId={event.id} tierKey={tier.tierKey} count={wishCounts.get(tier.tierKey) ?? 0} size="sm" />
+                    ) : null;
                   const card = (
                     <>
                       {/* The photo, when there is one. Cards without one keep
@@ -1078,6 +1089,7 @@ export default async function EventPage({ params, searchParams }: Params) {
                           {buyBtn}
                         </>
                       )}
+                      {wishBtn}
                     </>
                   );
                   // With an item page the card is a plain box holding two links

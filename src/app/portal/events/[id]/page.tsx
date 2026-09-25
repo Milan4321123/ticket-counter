@@ -4,6 +4,7 @@ import { getEventById } from '@/lib/events';
 import { getStats } from '@/lib/orders';
 import { organizerPlanActive } from '@/lib/organizers';
 import { readListingName } from '@/lib/exampleShop';
+import { listWishTotals } from '@/lib/wishes';
 import PlanExpired from '../../PlanExpired';
 import PortalNav from '../../PortalNav';
 import { requirePortalOrganizer } from '../../guard';
@@ -33,6 +34,9 @@ export default async function ListingToolsPage({ params }: { params: Promise<{ i
   const more = tools.filter((t) => !t.primary);
   const published = event.status === 'published';
   const { name } = readListingName(event.name);
+  // "Add to wish list" taps on this listing's items (lib/wishes) — mostly
+  // "Coming soon" rows: how many would buy each the day it opens.
+  const wishes = listWishTotals(organizer.id).filter((w) => w.eventId === event.id);
 
   const badge: Record<string, string> = {};
   if (stats.awaitingTransferOrders > 0) badge.orders = `${stats.awaitingTransferOrders} to confirm`;
@@ -52,6 +56,31 @@ export default async function ListingToolsPage({ params }: { params: Promise<{ i
             {!published && <span className="badge badge-amber hub-board-draft">Not published</span>}
           </h1>
         </header>
+
+        {wishes.length > 0 && (
+          <section className="wish-board anim-fade-up">
+            <h2 className="hub-board-title" style={{ marginTop: 0 }}>
+              ♥ On buyers&rsquo; wish lists
+            </h2>
+            <ul>
+              {wishes.map((w) => (
+                <li key={w.tierKey}>
+                  <span>
+                    {w.tierName}
+                    {w.tierStatus === 'coming-soon' && <span className="badge badge-green">Coming soon</span>}
+                  </span>
+                  <strong>
+                    {w.wishes} {w.wishes === 1 ? 'wants' : 'want'} it
+                  </strong>
+                </li>
+              ))}
+            </ul>
+            <p className="muted small" style={{ margin: 0 }}>
+              People tapped &ldquo;Add to wish list&rdquo; on these. Put a coming-soon {isShop ? 'item' : 'ticket'} on sale in{' '}
+              <Link href={`/portal/events/${event.id}/edit`}>the editor</Link> when you are ready.
+            </p>
+          </section>
+        )}
 
         <h2 className="hub-board-title">Run it</h2>
         <div className="hub-board-grid anim-fade-up anim-d1">
