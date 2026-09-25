@@ -196,154 +196,145 @@ export default function PromoCodesCard({ initialCodes, listings, currency }: Pro
             is. Buyers pay the organizer directly and the platform never
             touches any of it, so a code can only ever be the organizer's own
             reduction of their own price. */}
-        <div className="notice" style={{ marginTop: 0 }}>
-          <strong>This is your discount, on your own prices.</strong> A code means the buyer
-          transfers <em>less money to you</em> — nothing is paid by us and nothing is deducted from
-          you. The platform is free, never handles your ticket money, and takes no part of this.
-          Only give what you are happy to give away.
-        </div>
+        <p className="muted small" style={{ marginTop: 0 }}>
+          Your own discount on your own prices — the buyer simply pays you less. We never take a part.
+        </p>
 
-        <form onSubmit={submit}>
-          <div className="field">
-            <label htmlFor="promo-code">The code buyers type</label>
+        <form onSubmit={submit} className="ks">
+          <section className="ks-step">
+            <h3 className="ks-q">
+              <span className="ks-num">1</span> The code
+            </h3>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <input
                 id="promo-code"
-                className="input"
+                className="input bf-big"
                 autoComplete="off"
                 value={code}
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
                 placeholder="DASHAIN10"
                 maxLength={24}
+                aria-label="The code buyers type"
                 style={{ flex: '1 1 180px' }}
               />
               <button type="button" className="btn btn-sm" onClick={suggestCode} disabled={busy}>
-                Generate one
+                ✨ Make one up
               </button>
             </div>
-            <p className="muted small">
-              5 to 24 characters — letters, numbers and dashes. Not exactly eight letters and
-              numbers though (dashes do not count): that is the shape of the thank-you vouchers
-              your referrers earn, and one buyer typing one box has to mean one thing. Your codes
-              are yours: another seller can use the same word without it ever touching yours.
+            <p className="muted small" style={{ margin: 0 }}>
+              5–24 letters, numbers or dashes (not exactly 8 letters/numbers — that shape is for thank-you vouchers).
             </p>
-          </div>
+          </section>
 
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-              columnGap: 16,
-            }}
-          >
-            <div className="field">
-              <label htmlFor="promo-kind">Takes off</label>
-              <select
-                id="promo-kind"
-                className="input"
-                value={kind}
-                onChange={(e) => setKind(e.target.value === 'percent' ? 'percent' : 'fixed')}
-              >
-                <option value="fixed">An amount</option>
-                <option value="percent">A percentage</option>
-              </select>
+          <section className="ks-step">
+            <h3 className="ks-q">
+              <span className="ks-num">2</span> How much off?
+            </h3>
+            <div className="te-seg" role="radiogroup" aria-label="Takes off" style={{ justifySelf: 'start' }}>
+              <button type="button" role="radio" aria-checked={kind === 'fixed'} className={kind === 'fixed' ? 'is-on' : ''} onClick={() => setKind('fixed')}>
+                {currency === 'EUR' ? '€' : currency} amount
+              </button>
+              <button type="button" role="radio" aria-checked={kind === 'percent'} className={kind === 'percent' ? 'is-on' : ''} onClick={() => setKind('percent')}>
+                % off
+              </button>
             </div>
-            {kind === 'fixed' ? (
-              <div className="field">
-                <label htmlFor="promo-amount">Amount ({currency})</label>
+            <div className="ks-presets">
+              {(kind === 'fixed' ? ['2', '5', '10'] : ['10', '15', '20', '50']).map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className={`ks-chip${(kind === 'fixed' ? amount : percent) === n ? ' is-on' : ''}`}
+                  onClick={() => (kind === 'fixed' ? setAmount(n) : setPercent(n))}
+                >
+                  {kind === 'fixed' ? `${n} ${currency === 'EUR' ? '€' : currency}` : `${n}%`}
+                </button>
+              ))}
+              {kind === 'fixed' ? (
                 <input
                   id="promo-amount"
-                  className="input"
+                  className="input bf-num"
                   type="text"
                   inputMode="decimal"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  placeholder="e.g. 5.00"
+                  placeholder="other"
+                  aria-label={`Amount (${currency})`}
                 />
-              </div>
-            ) : (
-              <div className="field">
-                <label htmlFor="promo-percent">Percentage off</label>
+              ) : (
                 <input
                   id="promo-percent"
-                  className="input"
+                  className="input bf-num"
                   type="number"
                   min={1}
                   max={100}
                   value={percent}
                   onChange={(e) => setPercent(e.target.value)}
-                  placeholder="e.g. 10"
+                  placeholder="other"
+                  aria-label="Percentage off"
+                />
+              )}
+            </div>
+          </section>
+
+          <section className="ks-step">
+            <h3 className="ks-q">
+              <span className="ks-num">3</span> Where does it work?
+            </h3>
+            <select
+              id="promo-event"
+              className="input"
+              value={eventId}
+              onChange={(e) => setEventId(e.target.value)}
+              aria-label="Works on"
+            >
+              <option value="">All your listings</option>
+              {listings.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </section>
+
+          <details className="bf-inline" open={maxRedemptions || expiresOn ? true : undefined}>
+            <summary>+ Limit how often, or until when (optional)</summary>
+            <div className="bf-row">
+              <div className="field" style={{ margin: 0 }}>
+                <label htmlFor="promo-max">Uses in total</label>
+                <input
+                  id="promo-max"
+                  className="input"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  value={maxRedemptions}
+                  onChange={(e) => setMaxRedemptions(e.target.value)}
+                  placeholder="no limit"
                 />
               </div>
-            )}
+              <div className="field" style={{ margin: 0 }}>
+                <label htmlFor="promo-expires">Last day it works</label>
+                <input
+                  id="promo-expires"
+                  className="input"
+                  type="date"
+                  min={todayIso()}
+                  value={expiresOn}
+                  onChange={(e) => setExpiresOn(e.target.value)}
+                />
+              </div>
+            </div>
+            <p className="muted small" style={{ margin: '8px 0 0' }}>
+              A use is given back if the order is cancelled or never paid. One code per order.
+            </p>
+          </details>
+
+          <div className="ks-save">
+            <button type="submit" className="btn btn-brand" disabled={busy}>
+              {busy ? <span className="spinner" aria-hidden /> : null}
+              {busy ? 'Saving…' : 'Create code'}
+            </button>
           </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-              columnGap: 16,
-            }}
-          >
-            <div className="field">
-              <label htmlFor="promo-event">Works on</label>
-              <select
-                id="promo-event"
-                className="input"
-                value={eventId}
-                onChange={(e) => setEventId(e.target.value)}
-              >
-                <option value="">All your listings</option>
-                {listings.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="promo-max">Limit (optional)</label>
-              <input
-                id="promo-max"
-                className="input"
-                type="number"
-                min={0}
-                value={maxRedemptions}
-                onChange={(e) => setMaxRedemptions(e.target.value)}
-                placeholder="no limit"
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="promo-expires">Last day (optional)</label>
-              <input
-                id="promo-expires"
-                className="input"
-                type="date"
-                min={todayIso()}
-                value={expiresOn}
-                onChange={(e) => setExpiresOn(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* The test-mode exception is SAID, not left to be discovered. A
-              mock order finalizes as paid, so it holds its redemption exactly
-              like a real sale until the test orders are deleted — promising
-              "never used up by a booking nobody paid for" without that caveat
-              was simply untrue for anybody trying the checkout out. */}
-          <p className="muted small" style={{ marginTop: 0 }}>
-            A limit counts redemptions, and it is given back when an order is cancelled or its
-            payment never arrives — a real code is never used up by a booking nobody paid for. One
-            exception: a booking you make yourself in test mode counts as paid, so it holds its
-            redemption until the test orders are deleted before going live. The last day counts: a
-            code that ends on the 20th still works all of the 20th. A buyer can use
-            <strong> one code per order</strong>: a code and a thank-you voucher never stack.
-          </p>
-
-          <button type="submit" className="btn btn-primary" disabled={busy}>
-            {busy ? <span className="spinner" aria-hidden /> : null}
-            {busy ? 'Saving…' : 'Create code'}
-          </button>
         </form>
       </div>
 
