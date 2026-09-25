@@ -18,6 +18,8 @@ import SpeechInput from '@/components/SpeechInput';
 import { formatMoney } from '@/lib/money';
 import { ASSISTANT_AWAY_EVENT, ASSISTANT_RETURN_EVENT, GOTO_TAB_EVENT } from './GoToTab';
 import { saveEvent, type SavedTier } from './save';
+import { fixTypos } from '@/lib/askTypos';
+import { categoryLabel } from '@/lib/categories';
 
 type Lang = 'en' | 'de' | 'ne';
 
@@ -373,6 +375,31 @@ const SWITCH_RE = /\b(another|other|different|new|next|second)\s+(shop|store|eve
 /** Questions during which the seller can keep chatting changes. */
 const FREE_CHAT = new Set(['confirm', 'photo', 'publish']);
 
+/** "no", "nothing to change", "passt", "kei chaina" — no changes: move on. */
+const NO_CHANGE = /^\s*(no|nope|nah|nothing( to change)?|no changes?|all good|looks good|perfect|fine|nein|nichts|passt|alles gut|kei chaina|kehi chaina|chaina|thik cha|thik xa|sab thik)\b/i;
+/** "uploaded", "done uploading", "hochgeladen", "upload gare" — check what is missing again. */
+const UPLOADED = /\b(uploaded|added (the |a )?(photo|picture|poster)|done uploading|hochgeladen|upload gare|upload bhayo|halें|rakhe)\b/i;
+
+/**
+ * Asking to GO somewhere in the editor: "upload photo", "change the colours",
+ * "add an FAQ", "preview". Answered with a button to that section.
+ */
+const SECTION_INTENTS: { re: RegExp; tab: string; label: Record<Lang, string> }[] = [
+  { re: /\b(photos?|pictures?|images?|posters?|upload|videos?|fotos?|bilder?|tasbir|photo)\b|फोटो/i, tab: 'media', label: { en: '📸 Photos & videos →', de: '📸 Fotos & Videos →', ne: '📸 फोटो र भिडियो →' } },
+  { re: /\b(faq|questions? and answers?|fragen)\b/i, tab: 'faq', label: { en: '❓ FAQ →', de: '❓ FAQ →', ne: '❓ प्रश्नोत्तर →' } },
+  { re: /\b(updates?|news|post|neuigkeit\w*|announce\w*)\b/i, tab: 'updates', label: { en: '📣 Updates →', de: '📣 Neuigkeiten →', ne: '📣 अपडेट →' } },
+  { re: /\b(design|colou?rs?|theme|look|style|farben?|stil|rang)\b/i, tab: 'design', label: { en: '🎨 Design →', de: '🎨 Design →', ne: '🎨 डिजाइन →' } },
+  { re: /\b(seats?|seating|seat map|sitzplan|plätze)\b/i, tab: 'seating', label: { en: '💺 Seating →', de: '💺 Sitzplan →', ne: '💺 सिट →' } },
+  { re: /\b(languages?|translat\w*|deutsch|german|nepali|sprachen?|übersetz\w*)\b/i, tab: 'languages', label: { en: '🌐 Languages →', de: '🌐 Sprachen →', ne: '🌐 भाषा →' } },
+  { re: /\b(pick[- ]?up times?|collection times?|opening (hours|times)|slots?|abholzeit\w*|öffnungszeit\w*)\b/i, tab: 'kitchen', label: { en: '🕒 Pick-up times →', de: '🕒 Abholzeiten →', ne: '🕒 लिने समय →' } },
+];
+const GOTO_SAY: Record<Lang, string> = { en: 'Here it is — tap below, then “Return to the chat”.', de: 'Hier entlang — tippe unten, danach „Return to the chat“.', ne: 'यहाँ छ — तल थिच्नुहोस्, अनि “Return to the chat”।' };
+const SWITCHED_SAY: Record<Lang, (k: 'event' | 'shop') => string> = {
+  en: (k) => `That sounds like ${k === 'shop' ? 'a shop or restaurant' : 'an event'} — I have made this page one, so the right fields are there.`,
+  de: (k) => `Das klingt nach ${k === 'shop' ? 'einem Laden oder Restaurant' : 'einem Event'} — ich habe die Seite entsprechend umgestellt.`,
+  ne: (k) => `यो ${k === 'shop' ? 'पसल वा रेस्टुरेन्ट' : 'कार्यक्रम'} जस्तो छ — मैले यो पेजलाई त्यसैमा बदलें।`,
+};
+
 const SKIP_RE = /^\s*(skip|later|next|überspringen|später|weiter|छोड्नुहोस्|छोड|पछि|chodnus|chhodnus|chodnu|pachi|pachhi|pachhi garchu)\s*[.!]?\s*$/i;
 const WRITE_IT_RE = /\b(you write|write it|you do it|schreib du|du schreibst|tapai(le)? lekh(nus|idinus|nuhos)|timi(le)? lekh|aafai lekh|lekhidinus)\b|तपाईं लेख्नुहोस्|तपाईं नै लेख्नुहोस्|आफैं लेख्नुहोस्/i;
 
@@ -426,10 +453,14 @@ export default function SetupAssistant({
   const latest = [...messages].reverse().find((m) => m.proposal)?.proposal ?? null;
   const say = (m: Message) => setMessages((prev) => [...prev, m]);
   const progressRef = useRef<Progress | null>(null);
+  /** Set when the server switched this page's kind — reload after filling in. */
+  const switchedTo = useRef<'event' | 'shop' | null>(null);
   /** Steps the seller said "skip" to in this conversation. */
   const skipped = useRef(new Set<string>());
 
-  async function propose(text: string): Promise<{ proposal?: Proposal; reply?: string; suggested?: boolean; error?: string } | null> {
+  async function propose(
+    text: string
+  ): Promise<{ proposal?: Proposal; reply?: string; suggested?: boolean; error?: string; switchedKind?: 'event' | 'shop' | null } | null> {
     const res = await fetch(`/api/portal/events/${eventId}/setup-assistant`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -638,10 +669,42 @@ export default function SetupAssistant({
   // ---- Step 1: describe it, get a proposal --------------------------------
 
   async function send(typed?: string) {
-    const text = (typed ?? draft).trim();
-    if (!text || busy) return;
-    setMessages((m) => [...m, { from: 'me', text }]);
+    const typedText = (typed ?? draft).trim();
+    if (!typedText || busy) return;
+    setMessages((m) => [...m, { from: 'me', text: typedText }]);
     setDraft('');
+    // Phone typing: "uplaod phtot" is read as "upload photo" (lib/askTypos).
+    const text = fixTypos(typedText);
+    const reask = () => {
+      const q = asking ? (t.q as Record<string, string | undefined>)[asking] : undefined;
+      if (q) say({ from: 'bot', text: q });
+    };
+    // "I uploaded it" — look again at what is still missing.
+    if (UPLOADED.test(text)) {
+      setBusy(true);
+      await askNext();
+      setBusy(false);
+      return;
+    }
+    // "No / nothing / passt" at "anything to change?" — no changes, move on.
+    if (asking === 'confirm' && NO_CHANGE.test(text) && text.split(/\s+/).length <= 5 && !/\d/.test(text)) {
+      confirmed.current = true;
+      setBusy(true);
+      await askNext();
+      setBusy(false);
+      return;
+    }
+    // "Upload photo", "change colours", "add FAQ"… — the button to that section.
+    const intent = !/\d|€/.test(text) && text.split(/\s+/).length <= 7 ? SECTION_INTENTS.find((x) => x.re.test(text)) : undefined;
+    if (intent) {
+      say({ from: 'bot', text: GOTO_SAY[lang] ?? GOTO_SAY.en, goto: { tab: intent.tab, label: intent.label[lang] ?? intent.label.en } });
+      return;
+    }
+    if (/^\s*(preview|see (my|the) page|view (my|the) page|show (me )?(my|the) page|vorschau|seite (ansehen|zeigen)|page (hernu|dekhau)\w*)\b/i.test(text)) {
+      say({ from: 'bot', text: '👀', view: `/e/${slug}`, viewLabel: t.buttons.preview });
+      reask();
+      return;
+    }
     // "another shop", "new event", "arko pasal"… — offer the picker.
     if (SWITCH_RE.test(text)) {
       showPicker();
@@ -703,6 +766,12 @@ export default function SetupAssistant({
         return;
       }
       const data = await propose([...said, text].join('\n'));
+      if (data?.switchedKind) {
+        // The server turned this blank page into the other kind (lib/setupAssistant
+        // kindMismatch) — say so; after "Fill it in" the editor reloads as that kind.
+        switchedTo.current = data.switchedKind;
+        say({ from: 'bot', text: (SWITCHED_SAY[lang] ?? SWITCHED_SAY.en)(data.switchedKind) });
+      }
       if (!data?.proposal) {
         say({ from: 'bot', text: data?.error ?? t.error });
       } else {
@@ -749,6 +818,13 @@ export default function SetupAssistant({
     }
     if (ok && chosen.length) ok = await saveTiers(chosen);
     setSaving(false);
+    if (ok && switchedTo.current) {
+      // The editor was drawn for the old kind: open it again as the new one,
+      // with the assistant carrying on from what is still missing.
+      say({ from: 'bot', text: t.filled(Object.keys(patch).length + chosen.length) });
+      window.setTimeout(() => (window.location.href = `/portal/events/${eventId}/edit?assistant=1`), 900);
+      return;
+    }
     if (ok) {
       say({ from: 'bot', text: t.filled(Object.keys(patch).length + chosen.length) });
       filledOnce.current = true;
@@ -807,7 +883,11 @@ export default function SetupAssistant({
   }, []);
 
   const fmt = (k: string, v: unknown): string =>
-    k === 'totalCapacity' ? `${v} ${isShop ? t.labels.items : t.labels.people}` : String(v);
+    k === 'totalCapacity'
+      ? `${v} ${isShop ? t.labels.items : t.labels.people}`
+      : k === 'category'
+        ? categoryLabel(String(v)) || String(v)
+        : String(v);
 
   if (!open) {
     return (

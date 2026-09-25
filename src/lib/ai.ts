@@ -10,6 +10,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { answerWithBestModel, jsonWithBestModel } from './assistant';
 import { parsePageDesign, type PageDesign } from './events';
 import { geminiEnabled } from './gemini';
+import { askLang } from './askFaq';
 
 /**
  * How much of the organizer's own notes reaches a prompt. They may write up to
@@ -260,6 +261,14 @@ export async function suggestEventFaqs(input: FaqSuggestInput): Promise<FaqSugge
     return { ok: false, error: 'The AI assistant is not switched on for this server.' };
   }
   try {
+    // The language to write in, decided HERE from the notes (or the
+    // description) and named outright: told only "the notes' language", the
+    // model still wrote German FAQs for English notes on a Berlin event —
+    // Oranienstraße and Gemeinschaftssaal outvoted the notes.
+    const source = input.organizerNotes.trim() || input.description;
+    const writeIn = { en: 'ENGLISH', de: 'GERMAN (Deutsch)', ne: 'NEPALI in Devanagari script', rn: 'NEPALI in Latin letters (Roman Nepali), like the notes' }[
+      askLang(source.slice(0, 600))
+    ];
     const facts =
       `EVENT FACTS (the only source of truth):\n` +
       `Name: ${input.eventName}\nArtist: ${input.artist || '-'}\nDate: ${input.dateDisplay || '-'}\n` +
@@ -296,7 +305,8 @@ export async function suggestEventFaqs(input: FaqSuggestInput): Promise<FaqSugge
         // majority of the WORDS rather than of the notes. An organizer who typed
         // their notes in English got a German FAQ back and no way to say
         // otherwise. Named precisely, with proper nouns ruled out as evidence.
-        'LANGUAGE: write every question and answer in the same language as the ORGANIZER NOTES section. ' +
+        `LANGUAGE: write every question and answer in ${writeIn}. ` +
+        'That is the language of the ORGANIZER NOTES section. ' +
         'If there are no notes, use the language of the Description. Ignore the language of names — a venue, ' +
         'a city, an artist or a word like "Schülerausweis" is a proper noun and says nothing about which ' +
         'language to write in. Do not translate those names; write the surrounding sentences in the notes\' ' +
@@ -308,8 +318,7 @@ export async function suggestEventFaqs(input: FaqSuggestInput): Promise<FaqSugge
         '{"faqs":[{"question":string,"answer":string}]}. Give 5 to 8 pairs. No markdown, no extra keys. ' +
         // Said twice on purpose. This is the last thing the model reads before
         // it answers, and it is the instruction that was being lost.
-        'Every question and answer must be in the language of the ORGANIZER NOTES (or the Description if there ' +
-        'are none) — not the language of the venue or city names.',
+        `Every question and answer must be in ${writeIn} — not the language of the venue or city names.`,
       FAQ_SCHEMA,
       parseFaqSuggestions,
       // A whole FAQ is far longer than one visitor answer, and on Gemini the

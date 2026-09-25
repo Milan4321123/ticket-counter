@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { takeAiQuota } from '@/lib/aiQuota';
 import { BodyTooLargeError, readJsonLimited } from '@/lib/http';
 import { clientIp, rateLimit } from '@/lib/ratelimit';
-import { proposeSetup } from '@/lib/setupAssistant';
+import { kindMismatch, proposeSetup, soundsLikeFood } from '@/lib/setupAssistant';
+import { getDb } from '@/lib/db';
 import { getEventFaqs, getEventMedia, getEventTiers, listEventPosts } from '@/lib/events';
 import { parseSlotConfig } from '@/lib/kitchen';
 import { parseSeatMap } from '@/lib/seats';
@@ -51,8 +52,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
   const text = typeof body.text === 'string' ? body.text.trim() : '';
   if (text.length < 5) return bad('Tell me a little about your listing first.');
-  const answer = await proposeSetup(text, owned.event.kind);
-  return NextResponse.json(answer);
+  // "mero momo pasal…" on a blank EVENT draft (or a concert on a blank shop):
+  // the page is simply the other kind — switch it rather than fill an event
+  // with a menu. Only while nothing is on it yet: no items, no description.
+  const e = owned.event;
+  let kind = e.kind;
+  let switchedKind: 'event' | 'shop' | null = null;
+  const blank = e.status === 'draft' && !e.description.trim() && getEventTiers(e.id).length === 0;
+  if (blank && kindMismatch(text, kind)) {
+    kind = kind === 'event' ? 'shop' : 'event';
+    const category = kind === 'shop' && soundsLikeFood(text) ? 'khaja-food' : '';
+    getDb().prepare(`UPDATE events SET kind = ?, category = ? WHERE id = ?`).run(kind, category, e.id);
+    switchedKind = kind;
+  }
+  const answer = await proposeSetup(text, kind);
+  return NextResponse.json({ ...answer, switchedKind });
 }
 
 /**
@@ -67,7 +81,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (owned.failure) return owned.failure;
   const e = owned.event;
   const missing: string[] = [];
-  if (!e.name.trim()) missing.push('name');
+  // "My new event" is the blank draft's placeholder, not a name.
+  if (!e.name.trim() || /^My new (event|shop|restaurant)$/i.test(e.name.trim())) missing.push('name');
   if (e.kind === 'shop') {
     if (!e.pickupInfo.trim()) missing.push('pickupInfo');
   } else {

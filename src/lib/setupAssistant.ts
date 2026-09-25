@@ -290,10 +290,15 @@ export function sampleProposal(said: string, kind: 'event' | 'shop'): SetupPropo
 }
 
 /** Asked for the other kind than this page is ("create an event" on a shop). */
-function kindMismatch(said: string, kind: 'event' | 'shop'): boolean {
+export function kindMismatch(said: string, kind: 'event' | 'shop'): boolean {
   return kind === 'shop'
-    ? /\b(event|concert|party|festival|show|karyakram|konzert|veranstaltung)\b/i.test(said) && !/\b(shop|store|pasal|laden)\b/i.test(said)
-    : /\b(shop|store|pasal|laden|restaurant)\b/i.test(said) && !/\b(event|concert|party|show)\b/i.test(said);
+    ? /\b(event|concert|party|festival|show|karyakram|konzert|veranstaltung)\b/i.test(said) && !/\b(shop|store|pasal|laden|restaurant|kitchen)\b/i.test(said)
+    : /\b(shop|store|pasal|dokan|laden|restaurant|kitchen|momo|khaja|menu)\b/i.test(said) && !/\b(event|concert|party|show|karyakram|festival)\b/i.test(said);
+}
+
+/** Food words: a shop described like this is a restaurant (the food shelf). */
+export function soundsLikeFood(said: string): boolean {
+  return /\b(restaurant|kitchen|momo|khaja|khana|food|menu|thukpa|chowmein|dish|dishes|essen|gericht\w*|sel roti|mithai|sweets)\b/i.test(said);
 }
 
 export async function proposeSetup(said: string, kind: 'event' | 'shop'): Promise<SetupAnswer> {

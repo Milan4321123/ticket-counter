@@ -10,7 +10,8 @@ const VOCAB = (
   'order orders stock available sweets jewellery jewelry clothes clothing groceries spices crafts handicrafts food ' +
   'momo achar thukpa chowmin dhaka topi roti chiya masala tea rice sell selling seller organizer organiser ' +
   'setup create restaurant demo video payment works free where what show find search looking want chat help ' +
-  'sure dashain tihar holi teej berlin munich frankfurt hamburg cologne darmstadt heidelberg'
+  'sure dashain tihar holi teej berlin munich frankfurt hamburg cologne darmstadt heidelberg ' +
+  'upload uploaded photo photos picture pictures preview design colours colors update updates publish language'
 ).split(' ');
 
 /** Damerau (optimal string alignment) distance, stopping early past `max`. */
@@ -51,7 +52,9 @@ function fixWord(word: string): string {
 }
 
 /** Short slips a distance rule cannot safely catch. */
-const SHORT: Record<string, string> = { cna: 'can', teh: 'the', hwo: 'how', adn: 'and', fro: 'for', yuo: 'you', ot: 'to', waht: 'what', wat: 'what', pls: 'please', plz: 'please', u: 'you' };
+const SHORT: Record<string, string> = {
+  phtot: 'photo', phtoto: 'photo', potho: 'photo', phot: 'photo', uplaod: 'upload', uplaoed: 'uploaded', uploded: 'uploaded', uplod: 'upload',
+  cna: 'can', teh: 'the', hwo: 'how', adn: 'and', fro: 'for', yuo: 'you', ot: 'to', waht: 'what', wat: 'what', pls: 'please', plz: 'please', u: 'you' };
 
 /** The message with obvious slips put right ("itesms udner 10 eruro" → "items under 10 euro"). */
 export function fixTypos(q: string): string {
