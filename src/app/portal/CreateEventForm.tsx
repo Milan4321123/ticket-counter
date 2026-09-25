@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { EventKind } from '@/lib/types';
 
@@ -23,6 +23,9 @@ export default function CreateEventForm() {
   const isShop = kind === 'shop';
   const noun = isShop ? 'shop' : 'event';
 
+  /** Which button sent the form: the AI helper opens with the new listing. */
+  const withAi = useRef(true);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
@@ -44,7 +47,7 @@ export default function CreateEventForm() {
         setBusy(false);
         return;
       }
-      router.push(`/portal/events/${data.eventId}/edit`);
+      router.push(`/portal/events/${data.eventId}/edit${withAi.current ? '?assistant=1' : ''}`);
       router.refresh();
     } catch {
       setError('Could not reach the server — please check your connection and try again.');
@@ -54,42 +57,47 @@ export default function CreateEventForm() {
 
   return (
     <form onSubmit={submit}>
-      <fieldset style={{ border: 0, padding: 0, margin: '0 0 14px' }}>
-        <legend className="small" style={{ padding: 0, marginBottom: 8, fontWeight: 600 }}>
-          What are you setting up?
-        </legend>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <KindChoice
-            checked={!isShop}
-            onSelect={() => setKind('event')}
+      <div className="ks-modes" role="radiogroup" aria-label="What are you setting up?" style={{ marginBottom: 12, gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+        {(
+          [
+            ['event', '🎟', 'An event', 'A date and a place — tickets scanned at the door.'],
+            ['shop', '🛍', 'A shop', 'Food, goods or bookings — people order ahead.'],
+          ] as const
+        ).map(([k, icon, title, line]) => (
+          <button
+            key={k}
+            type="button"
+            role="radio"
+            aria-checked={kind === k}
+            className={`ks-mode${kind === k ? ' is-on' : ''}`}
+            onClick={() => setKind(k)}
             disabled={busy}
-            title="An event"
-            blurb="Happens once, at a venue, on a date. Sells tickets, scanned at the door."
-          />
-          <KindChoice
-            checked={isShop}
-            onSelect={() => setKind('shop')}
-            disabled={busy}
-            title="A shop"
-            blurb="Sells items people order ahead and come to collect. No date, no venue — you say where and when to pick up."
-          />
-        </div>
-      </fieldset>
+          >
+            <span className="ks-mode-icon" aria-hidden="true">
+              {icon}
+            </span>
+            <strong>{title}</strong>
+            <span>{line}</span>
+          </button>
+        ))}
+      </div>
 
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        <input
-          className="input"
-          style={{ flex: '1 1 240px' }}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          maxLength={120}
-          placeholder={isShop ? 'Shop name, e.g. Sunita’s Home Kitchen' : 'Event name, e.g. Summer Night Live 2026'}
-          aria-label={isShop ? 'New shop name' : 'New event name'}
-          disabled={busy}
-        />
-        <button type="submit" className="btn btn-brand" disabled={busy}>
-          {busy ? <span className="spinner" aria-hidden /> : null}
-          {busy ? 'Creating…' : isShop ? 'Create shop' : 'Create event'}
+      <input
+        className="input bf-big"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        maxLength={120}
+        placeholder={isShop ? 'Shop name, e.g. Sunita’s Home Kitchen' : 'Event name, e.g. Summer Night Live 2026'}
+        aria-label={isShop ? 'New shop name' : 'New event name'}
+        disabled={busy}
+      />
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
+        <button type="submit" className="btn btn-brand" disabled={busy} onClick={() => (withAi.current = true)}>
+          {busy && withAi.current ? <span className="spinner" aria-hidden /> : null}✨ Create with the AI helper
+        </button>
+        <button type="submit" className="btn" disabled={busy} onClick={() => (withAi.current = false)}>
+          {busy && !withAi.current ? <span className="spinner" aria-hidden /> : null}
+          {isShop ? 'Create shop' : 'Create event'}
         </button>
       </div>
       {error && (
@@ -98,58 +106,8 @@ export default function CreateEventForm() {
         </div>
       )}
       <p className="muted small" style={{ margin: '10px 0 0' }}>
-        New {isShop ? 'shops' : 'events'} start as a private draft — nothing goes public until you hit Publish.
+        It starts as a private draft. The AI helper asks a few questions and fills it in for you.
       </p>
     </form>
-  );
-}
-
-/**
- * One of the two choices. A label wrapping a real radio: the whole card is the
- * hit target, but keyboard and screen-reader users still get an ordinary radio
- * group rather than a div someone has taught to look clickable.
- */
-function KindChoice({
-  checked,
-  onSelect,
-  disabled,
-  title,
-  blurb,
-}: {
-  checked: boolean;
-  onSelect: () => void;
-  disabled: boolean;
-  title: string;
-  blurb: string;
-}) {
-  return (
-    <label
-      style={{
-        flex: '1 1 220px',
-        display: 'flex',
-        gap: 10,
-        alignItems: 'flex-start',
-        padding: '12px 14px',
-        borderRadius: 12,
-        cursor: disabled ? 'default' : 'pointer',
-        border: `1px solid ${checked ? 'var(--brand)' : 'var(--border)'}`,
-        background: checked ? 'var(--brand-soft)' : 'var(--bg-elevated)',
-      }}
-    >
-      <input
-        type="radio"
-        name="listing-kind"
-        checked={checked}
-        onChange={onSelect}
-        disabled={disabled}
-        style={{ marginTop: 3, flex: 'none' }}
-      />
-      <span>
-        <strong>{title}</strong>
-        <span className="muted small" style={{ display: 'block', marginTop: 2 }}>
-          {blurb}
-        </span>
-      </span>
-    </label>
   );
 }
