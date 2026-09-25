@@ -1723,17 +1723,36 @@
   color: var(--text);
 }
 
-/* ---- The demo's three businesses: big cards, swipe on a phone ---- */
+/* ---- The demo's businesses: a carousel like the homepage's, every width ---- */
+.dp {
+  position: relative;
+  /* A grid child: without this it grows to fit every card and never scrolls. */
+  min-width: 0;
+  max-width: 100%;
+}
+
 .dp-track {
   position: relative;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  display: flex;
+  gap: 16px;
+  margin: 0 -16px;
+  padding: 6px max(16px, calc(50% - 190px)) 10px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.dp-track::-webkit-scrollbar {
+  display: none;
 }
 
 .dp-card {
   --tone: 220, 20, 60;
   --d: 0;
+  flex: 0 0 380px;
+  scroll-snap-align: center;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -1813,26 +1832,15 @@
     font-size: 1.5rem;
   }
 
-  /* One business in the middle, a slice of each neighbour on both sides. */
+  /* Phone: one business in the middle, a slice of each neighbour. */
   .dp-track {
-    display: flex;
     gap: 12px;
-    margin: 0 -16px;
     padding: 4px 13vw 8px;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    scroll-behavior: smooth;
-    scrollbar-width: none;
-  }
-
-  .dp-track::-webkit-scrollbar {
-    display: none;
   }
 
   .dp-card {
-    flex: 0 0 74vw;
+    flex-basis: 74vw;
     min-height: 300px;
-    scroll-snap-align: center;
   }
 }
 
@@ -1853,12 +1861,6 @@
   margin-bottom: 20px;
 }
 
-/* The demo picker's extra copies exist only for the endless swipe on a phone. */
-@media (min-width: 721px) {
-  .dp-clone {
-    display: none !important;
-  }
-}
 
 /* Phone: the tool board's and editor's cards get the same round arrow as
    the homepage tiles, in the card's own colour. */
@@ -1908,5 +1910,24 @@
   .ed-card-todo::after {
     background: rgba(251, 191, 36, 0.16);
     color: #fbbf24;
+  }
+}
+
+/* The picker's arrows sit on the cards' edges; hidden on a phone (swipe). */
+.dp .pk-arrow {
+  top: calc(50% - 14px);
+}
+
+.dp-prev {
+  left: max(4px, calc(50% - 250px));
+}
+
+.dp-next {
+  right: max(4px, calc(50% - 250px));
+}
+
+@media (max-width: 720px) {
+  .dp .pk-arrow {
+    display: none;
   }
 }

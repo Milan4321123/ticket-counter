@@ -194,8 +194,12 @@ async function sweepBuyerReminders(): Promise<number> {
       `SELECT o.id AS orderId
        FROM orders o
        JOIN events e ON e.id = o.event_id
+       JOIN organizers org ON org.id = e.organizer_id
        WHERE o.status = 'claimed'
          AND o.payment_mode = 'transfer'
+         -- Demo accounts (lib/demo) have only undeliverable .invalid buyers;
+         -- trying them every sweep only filled the server log.
+         AND COALESCE(org.is_demo, 0) = 0
          AND o.buyer_reminder_sent_at IS NULL
          AND o.buyer_erased_at IS NULL
          AND o.created_at < datetime('now', ?)
