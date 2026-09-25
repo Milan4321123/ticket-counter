@@ -879,6 +879,7 @@ export default async function EventPage({ params, searchParams }: Params) {
           {/* …and the moment they tap to buy, one clear question. */}
           {otherCities.length > 0 && !preview && (
             <CityCheck
+              lang={await currentLang()}
               slug={event.slug}
               city={heroCity}
               dateLabel={heroWhen}

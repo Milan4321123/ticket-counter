@@ -71,6 +71,7 @@ import {
 import { tierBadge, ticketState, visibleTiers } from '@/lib/ticketState';
 import { cityLabel, otherShowsByAct, shortDateLabel } from '@/lib/sameAct';
 import OtherCityNotice from '@/components/OtherCityNotice';
+import CityCheck from '@/components/CityCheck';
 import { vocabFor } from '@/lib/vocab';
 
 // Availability comes from the database — always render fresh, exactly like the
@@ -619,6 +620,17 @@ export default async function ItemPage({ params, searchParams }: Params) {
               page has its own buy button and a shared item link can reach it
               without passing either of them. */}
           <OtherCityNotice city={cityLabel(event.city)} shows={itemOtherCities} />
+          {itemOtherCities.length > 0 && (
+            <CityCheck
+              lang={await currentLang()}
+              slug={event.slug}
+              city={cityLabel(event.city)}
+              dateLabel={shortDateLabel(event)}
+              venue={event.venueName}
+              act={event.artist}
+              others={itemOtherCities}
+            />
+          )}
 
           {/* A flex row rather than the inline flow these two would otherwise
               fall into. The buy control is btn-lg and the save toggle is a

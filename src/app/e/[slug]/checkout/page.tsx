@@ -6,6 +6,7 @@ import { getEventBySlug, getEventMedia, getEventTiers, mediaUrl } from '@/lib/ev
 import { getAvailability } from '@/lib/inventory';
 import { ticketState, tiersInSaleOrder } from '@/lib/ticketState';
 import { cityLabel, otherShowsByAct, shortDateLabel } from '@/lib/sameAct';
+import CityCheck from '@/components/CityCheck';
 import { vocabFor } from '@/lib/vocab';
 import { expireOverdueTransferReservations } from '@/lib/orders';
 import { getOrganizer } from '@/lib/organizers';
@@ -155,7 +156,27 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
   ) as Record<string, BasketLineData>;
   const liveMedia = new Set(getEventMedia(event.id).map((m) => m.id));
 
+  const otherCities = otherShowsByAct(event).map((other) => ({
+    slug: other.slug,
+    city: cityLabel(other.city),
+    dateLabel: shortDateLabel(other),
+  }));
   return (
+    <>
+      {/* Every way into paying passes here: "is this the right city?" first,
+          when the same act also plays elsewhere (components/CityCheck). */}
+      {otherCities.length > 0 && (
+        <CityCheck
+          lang={await currentLang()}
+          mode="gate"
+          slug={event.slug}
+          city={cityLabel(event.city)}
+          dateLabel={shortDateLabel(event)}
+          venue={event.venueName}
+          act={event.artist}
+          others={otherCities}
+        />
+      )}
     <CheckoutClient
       eventId={event.id}
       preselectTier={preselectTier}
@@ -209,11 +230,8 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
       retentionDays={BUYER_RETENTION_DAYS}
       organizerName={organizerName}
       refCode={refCode}
-      otherCities={otherShowsByAct(event).map((other) => ({
-        slug: other.slug,
-        city: cityLabel(other.city),
-        dateLabel: shortDateLabel(other),
-      }))}
+      otherCities={otherCities}
     />
+    </>
   );
 }
