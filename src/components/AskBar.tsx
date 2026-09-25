@@ -14,7 +14,7 @@ import type { Lang } from '@/lib/i18n';
 import SpeechInput from './SpeechInput';
 
 interface AskLink { label: string; href: string; icon: string }
-interface AskResult { kind: 'event' | 'shop' | 'item'; title: string; sub: string; href: string; image: string | null }
+interface AskResult { kind: 'event' | 'shop' | 'item' | 'offer'; title: string; sub: string; href: string; image: string | null }
 interface Msg {
   from: 'me' | 'bot';
   text?: string;
@@ -26,7 +26,7 @@ interface Msg {
   filters?: unknown;
 }
 
-const W: Record<Lang, { pill: string; hello: string; sub: string; ph: string; ideas: string[]; shop: string[]; none: string; opening: string; events: string; shops: string; items: string; close: string; fresh: string; langs: string }> = {
+const W: Record<Lang, { pill: string; hello: string; sub: string; ph: string; ideas: string[]; shop: string[]; none: string; opening: string; events: string; shops: string; items: string; offers: string; close: string; fresh: string; langs: string }> = {
   en: {
     pill: 'Ask anything — events, momo, how it works…',
     hello: 'Namaste! What are you looking for?',
@@ -37,7 +37,7 @@ const W: Record<Lang, { pill: string; hello: string; sub: string; ph: string; id
     langs: 'Write in English, Deutsch, नेपाली — or Roman Nepali, like the two above.',
     none: 'Nothing matched that — try a different word, a city, or ask a question.',
     opening: 'Opening',
-    events: 'Events', shops: 'Shops', items: 'Food & goods', close: 'Close', fresh: 'New chat',
+    events: 'Events', shops: 'Shops', items: 'Bazaar — food & goods', offers: 'Tickets & dishes at events', close: 'Close', fresh: 'New chat',
   },
   de: {
     pill: 'Frag einfach — Events, Momo, wie es geht…',
@@ -49,7 +49,7 @@ const W: Record<Lang, { pill: string; hello: string; sub: string; ph: string; id
     langs: 'Schreib auf Deutsch, Englisch, नेपाली — oder Nepali in lateinischen Buchstaben, wie oben.',
     none: 'Nichts gefunden — versuch ein anderes Wort, eine Stadt oder stell eine Frage.',
     opening: 'Öffne',
-    events: 'Events', shops: 'Läden', items: 'Essen & Waren', close: 'Schließen', fresh: 'Neuer Chat',
+    events: 'Events', shops: 'Läden', items: 'Basar — Essen & Waren', offers: 'Tickets & Gerichte bei Events', close: 'Schließen', fresh: 'Neuer Chat',
   },
   ne: {
     pill: 'जे पनि सोध्नुहोस् — कार्यक्रम, मम, कसरी चल्छ…',
@@ -61,7 +61,7 @@ const W: Record<Lang, { pill: string; hello: string; sub: string; ph: string; id
     langs: 'नेपाली, English, Deutsch — वा Roman Nepali मा पनि लेख्न सक्नुहुन्छ, माथिका जस्तै।',
     none: 'केही भेटिएन — अर्को शब्द, सहर, वा प्रश्न सोध्नुहोस्।',
     opening: 'खोल्दै',
-    events: 'कार्यक्रम', shops: 'पसल', items: 'खाना र सामान', close: 'बन्द गर्नुहोस्', fresh: 'नयाँ कुराकानी',
+    events: 'कार्यक्रम', shops: 'पसल', items: 'बजार — खाना र सामान', offers: 'कार्यक्रमका टिकट र परिकार', close: 'बन्द गर्नुहोस्', fresh: 'नयाँ कुराकानी',
   },
 };
 
@@ -228,8 +228,8 @@ function AskOverlay({ w, onClose }: { w: (typeof W)['en']; onClose: () => void }
   }
 
   const groups = (rs: AskResult[]) =>
-    (['event', 'shop', 'item'] as const)
-      .map((k) => ({ k, label: k === 'event' ? w.events : k === 'shop' ? w.shops : w.items, list: rs.filter((r) => r.kind === k) }))
+    (['event', 'offer', 'shop', 'item'] as const)
+      .map((k) => ({ k, label: { event: w.events, offer: w.offers, shop: w.shops, item: w.items }[k], list: rs.filter((r) => r.kind === k) }))
       .filter((g) => g.list.length);
 
   return createPortal(
@@ -307,7 +307,7 @@ function AskOverlay({ w, onClose }: { w: (typeof W)['en']; onClose: () => void }
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img src={r.image} alt="" loading="lazy" />
                                 ) : (
-                                  <span aria-hidden="true">{r.kind === 'event' ? '🎟' : r.kind === 'shop' ? '🏪' : '🥟'}</span>
+                                  <span aria-hidden="true">{r.kind === 'event' || r.kind === 'offer' ? '🎟' : r.kind === 'shop' ? '🏪' : '🥟'}</span>
                                 )}
                               </span>
                               <strong>{r.title}</strong>

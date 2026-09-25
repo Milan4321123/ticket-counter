@@ -10,6 +10,7 @@
 // this shape and is checked against the same whitelists.
 import { SHOP_CATEGORIES } from './categories';
 import { listPublishedEvents, mediaUrl, type EventRow } from './events';
+import { findEventOffers, listEventOffers, offerCard } from './eventOffers';
 import { geminiJson } from './gemini';
 import { filterShopItems, listShopItems, sortShopItems, type ShopItem, type SortKey } from './marketItems';
 import { hrefFor } from './marketQuery';
@@ -32,6 +33,9 @@ export interface EventFilters {
   from: string; // YYYY-MM-DD, '' = open
   to: string;
   whenLabel: string;
+  /** Ticket price limits, cents; 0 = none. */
+  minCents: number;
+  maxCents: number;
 }
 export interface AskFilters {
   mode: 'items' | 'events';
@@ -40,7 +44,7 @@ export interface AskFilters {
 }
 
 export const EMPTY_ITEMS: ItemFilters = { q: '', category: '', city: '', shop: '', shopName: '', minCents: 0, maxCents: 0, inStock: false, sort: 'featured' };
-export const EMPTY_EVENTS: EventFilters = { q: '', city: '', from: '', to: '', whenLabel: '' };
+export const EMPTY_EVENTS: EventFilters = { q: '', city: '', from: '', to: '', whenLabel: '', minCents: 0, maxCents: 0 };
 
 export function fold(s: string): string {
   return s
@@ -160,6 +164,38 @@ function money(raw: string | undefined): number {
   return Number.isFinite(n) && n > 0 && n <= 10000 ? Math.round(n * 100) : 0;
 }
 
+/** "under €10", "5 bis 10 euro", "cheaper", "any price" — applied to `p`; true when anything changed. */
+function readPrice(t: string, p: { minCents: number; maxCents: number }): boolean {
+  let changed = false;
+  const range = PRICE_RANGE.exec(t);
+  const max = PRICE_MAX.exec(t);
+  const min = PRICE_MIN.exec(t);
+  if (range) {
+    p.minCents = money(range[1] ?? range[3]);
+    p.maxCents = money(range[2] ?? range[4]);
+    changed = true;
+  } else {
+    if (max) {
+      p.maxCents = money(max[1] ?? max[2]);
+      changed = true;
+    }
+    if (min) {
+      p.minCents = money(min[1] ?? min[2]);
+      changed = true;
+    }
+  }
+  if (CHEAPER.test(t) && p.maxCents) {
+    p.maxCents = Math.max(100, Math.round((p.maxCents * 0.7) / 50) * 50);
+    changed = true;
+  }
+  if (/\b(any price|no price limit|egal welcher preis|jun sukai price)\b/i.test(t)) {
+    p.maxCents = 0;
+    p.minCents = 0;
+    changed = true;
+  }
+  return changed;
+}
+
 /** Every town something is sold or held in, folded → as written. */
 function towns(): Map<string, string> {
   const m = new Map<string, string>();
@@ -201,8 +237,9 @@ export function readFilters(
     if (city) ev.city = city;
     else if (!prev?.events.city && prev?.items.city && prev.mode === 'items') ev.city = prev.items.city;
     if (when) Object.assign(ev, { from: when.from, to: when.to, whenLabel: when.label });
+    const priced = readPrice(t, ev);
     // "How do I sell tickets?" names events but is not a search for them.
-    const strong = Boolean(city || when || (reset && prev) || SEEKING.test(t) || (prev && prev.mode === 'events'));
+    const strong = Boolean(city || when || priced || (reset && prev) || SEEKING.test(t) || (prev && prev.mode === 'events'));
     const words = f.split(' ').filter((w) => w.length > 2 && !NOISE.has(w) && fold(city) !== w && !EVENT_WORDS.test(w) && !isMonth(w));
     if (words.length) {
       // A new thing to look for ("dashain concerts") is a new search, unless it
@@ -217,31 +254,9 @@ export function readFilters(
   const it = base.items;
   if (city) it.city = city;
   // Price.
-  const range = PRICE_RANGE.exec(t);
-  const max = PRICE_MAX.exec(t);
-  const min = PRICE_MIN.exec(t);
-  if (range) {
-    it.minCents = money(range[1] ?? range[3]);
-    it.maxCents = money(range[2] ?? range[4]);
-    found = true;
-  } else {
-    if (max) {
-      it.maxCents = money(max[1] ?? max[2]);
-      found = true;
-    }
-    if (min) {
-      it.minCents = money(min[1] ?? min[2]);
-      found = true;
-    }
-  }
+  if (readPrice(t, it)) found = true;
   if (CHEAPER.test(t)) {
-    if (it.maxCents) it.maxCents = Math.max(100, Math.round((it.maxCents * 0.7) / 50) * 50);
     it.sort = 'price-asc';
-    found = true;
-  }
-  if (/\b(any price|no price limit|egal welcher preis|jun sukai price)\b/i.test(t)) {
-    it.maxCents = 0;
-    it.minCents = 0;
     found = true;
   }
   // Shelf.
@@ -311,7 +326,10 @@ export function describeItems(it: ItemFilters): string {
 }
 
 export function describeEvents(ev: EventFilters): string {
-  return [ev.q && `“${ev.q}”`, ev.city && `in ${ev.city}`, ev.whenLabel].filter(Boolean).join(' · ');
+  const eur = (c: number) => `€${(c / 100).toFixed(c % 100 ? 2 : 0)}`;
+  const price =
+    ev.minCents && ev.maxCents ? `tickets ${eur(ev.minCents)}–${eur(ev.maxCents)}` : ev.maxCents ? `tickets up to ${eur(ev.maxCents)}` : ev.minCents ? `tickets from ${eur(ev.minCents)}` : '';
+  return [ev.q && `“${ev.q}”`, ev.city && `in ${ev.city}`, ev.whenLabel, price].filter(Boolean).join(' · ');
 }
 
 /** Whitelist an AI- or client-supplied filter set before anything uses it. */
@@ -337,15 +355,18 @@ export function cleanFilters(raw: unknown): AskFilters | null {
       inStock: i.inStock === true,
       sort: sorts.includes(i.sort as SortKey) ? (i.sort as SortKey) : 'featured',
     },
-    events: { q: s(e.q), city: s(e.city), from: d(e.from), to: d(e.to), whenLabel: s(e.whenLabel, 30) },
+    events: { q: s(e.q), city: s(e.city), from: d(e.from), to: d(e.to), whenLabel: s(e.whenLabel, 30), minCents: n(e.minCents), maxCents: n(e.maxCents) },
   };
 }
 
 // ---------------- Acting on them ----------------
 
 export interface FilterRun {
-  results: { kind: 'event' | 'item'; title: string; sub: string; href: string; image: string | null }[];
+  results: { kind: 'event' | 'item' | 'offer'; title: string; sub: string; href: string; image: string | null }[];
+  /** Bazaar items (items mode) or events (events mode). */
   total: number;
+  /** Also found at events: matching events and their tickets / dishes. */
+  atEvents: number;
   /** The bazaar (or the homepage's event list) with exactly these filters. */
   link: { label: string; href: string; icon: string } | null;
   /** The search words gave nothing, so they were dropped and the rest applied. */
@@ -374,9 +395,19 @@ function itemsFor(it: ItemFilters): ShopItem[] {
 function eventsFor(ev: EventFilters): EventRow[] {
   const terms = fold(ev.q).split(' ').filter(Boolean);
   const town = fold(ev.city);
+  // With a price: only events selling something inside it.
+  const inPrice =
+    ev.minCents || ev.maxCents
+      ? new Set(
+          listEventOffers()
+            .filter((o) => (!ev.maxCents || o.tier.priceCents <= ev.maxCents) && (!ev.minCents || o.tier.priceCents >= ev.minCents))
+            .map((o) => o.event.id)
+        )
+      : null;
   return listPublishedEvents()
     .filter((e) => e.kind !== 'shop' && (!e.eventDate || e.eventDate >= today()))
     .filter((e) => !town || fold(e.city).includes(town))
+    .filter((e) => !inPrice || inPrice.has(e.id))
     .filter((e) => !ev.from || (e.eventDate !== null && e.eventDate >= ev.from && e.eventDate <= (ev.to || ev.from)))
     .filter((e) => {
       const hay = fold([e.name, e.artist, e.city, e.venueName, e.description.slice(0, 400)].join(' '));
@@ -399,8 +430,11 @@ export function runFilters(f: AskFilters): FilterRun {
         list = loose;
       }
     }
+    // The tickets and dishes on those events that match the words ("momo").
+    const offers = findEventOffers({ q: ev.q, city: ev.city, from: ev.from, to: ev.to, minCents: ev.minCents, maxCents: ev.maxCents });
     return {
-      results: list.slice(0, 6).map((e) => {
+      atEvents: offers.length,
+      results: [...list.slice(0, 6).map((e) => {
         const id = e.posterMediaId || e.coverMediaId || e.profileMediaId;
         return {
           kind: 'event' as const,
@@ -409,7 +443,7 @@ export function runFilters(f: AskFilters): FilterRun {
           href: `/e/${e.slug}`,
           image: id ? mediaUrl(id, 'card', null) : null,
         };
-      }),
+      }), ...offers.slice(0, 6).map(offerCard)],
       total: list.length,
       link: list.length > 6 ? { label: 'All upcoming events', href: '/#events', icon: '🎟' } : null,
       relaxed,
@@ -418,8 +452,16 @@ export function runFilters(f: AskFilters): FilterRun {
   }
   let it = f.items;
   let list = itemsFor(it);
+  // The same words on events: a "Momo Night" and the momo plates sold at it.
+  // Not for a shelf other than food or a single shop — those are bazaar questions.
+  const eventSide = Boolean(it.q) && !it.shop && (!it.category || it.category === 'khaja-food');
+  const offers = eventSide
+    ? findEventOffers({ q: it.q, city: it.city, maxCents: it.maxCents, minCents: it.minCents, cheapestFirst: it.sort === 'price-asc' })
+    : [];
+  const namedEvents = eventSide && !it.minCents && !it.maxCents ? eventsFor({ ...EMPTY_EVENTS, q: it.q, city: it.city }) : [];
   let relaxed = '';
-  if (!list.length && it.q && (it.category || it.city || it.shop || it.maxCents || it.minCents || it.inStock)) {
+  // Nothing anywhere by that word: drop it and show what fits the rest.
+  if (!list.length && !offers.length && !namedEvents.length && it.q && (it.category || it.city || it.shop || it.maxCents || it.minCents || it.inStock)) {
     const loose = itemsFor({ ...it, q: '' });
     if (loose.length) {
       relaxed = it.q;
@@ -428,7 +470,7 @@ export function runFilters(f: AskFilters): FilterRun {
     }
   }
   const said = describeItems(it);
-  const nearMiss = list.length ? null : closest(it);
+  const nearMiss = list.length || offers.length || namedEvents.length ? null : closest(it);
   const href = hrefFor({
     q: it.q,
     category: it.category,
@@ -442,15 +484,29 @@ export function runFilters(f: AskFilters): FilterRun {
     page: 1,
   });
   return {
-    results: list.slice(0, 6).map((x) => ({
+    atEvents: offers.length + namedEvents.length,
+    results: [
+      ...namedEvents.slice(0, 3).map((e) => {
+        const id = e.posterMediaId || e.coverMediaId || e.profileMediaId;
+        return {
+          kind: 'event' as const,
+          title: e.name,
+          sub: [e.dateDisplay || e.eventDate || '', e.city].filter(Boolean).join(' · '),
+          href: `/e/${e.slug}`,
+          image: id ? mediaUrl(id, 'card', null) : null,
+        };
+      }),
+      ...list.slice(0, 6).map((x) => ({
       kind: 'item' as const,
       title: x.tier.name,
       sub: `${formatMoney(x.priceCents, x.currency)} · ${x.shopName}`,
       href: x.href,
       image: x.photo ? mediaUrl(x.photo.id, 'card', null) : null,
     })),
+      ...offers.slice(0, 6).map(offerCard),
+    ],
     total: list.length,
-    link: nearMiss ?? { label: `Open the bazaar${said ? ` — ${said}` : ''}`, href, icon: '🛍' },
+    link: nearMiss ?? (list.length ? { label: `Open the bazaar${said ? ` — ${said}` : ''}`, href, icon: '🛍' } : null),
     relaxed,
     said,
   };

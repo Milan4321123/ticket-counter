@@ -13,6 +13,7 @@
 import { listPublishedEvents, mediaUrl, type EventRow } from './events';
 import { listShopItems, searchShopItems } from './marketItems';
 import { formatMoney } from './money';
+import { findEventOffers, offerCard } from './eventOffers';
 
 export interface AskLink {
   label: string;
@@ -20,7 +21,7 @@ export interface AskLink {
   icon: string;
 }
 export interface AskResult {
-  kind: 'event' | 'shop' | 'item';
+  kind: 'event' | 'shop' | 'item' | 'offer';
   title: string;
   sub: string;
   href: string;
@@ -48,6 +49,7 @@ const STOP = new Set(
   (
     'find show me search for looking look i want to the a an in at on near nearby some any events event shows show ' +
     'tickets ticket shop shops items item buy get where is are there please with and of from my your ' +
+    'under below over above less more than up euro euros eur cheap cheapest price ' +
     'finde suche zeig mir ich will die der das ein eine in bei für nach gibt es bitte ' +
     'khoja khojnus dekhau chahiyo cha xa ma ko ra'
   ).split(' ')
@@ -79,7 +81,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 export function askSearch(q: string): AskResult[] {
   const terms = fold(q)
     .split(' ')
-    .filter((t) => t.length > 1 && !STOP.has(t));
+    .filter((t) => t.length > 1 && !STOP.has(t) && !/^\d+$/.test(t));
   if (terms.length === 0) return [];
   const has = (hay: string) => terms.every((t) => hay.includes(t));
 
@@ -113,7 +115,10 @@ export function askSearch(q: string): AskResult[] {
       image: it.photo ? mediaUrl(it.photo.id, 'card', null) : null,
     }));
 
-  return [...events, ...shops, ...items];
+  // Tickets and dishes sold AT events ("Chicken momo plate" at a Momo Night).
+  const offers = findEventOffers({ q: terms.join(' ') }).slice(0, 6).map(offerCard);
+
+  return [...events, ...shops, ...items, ...offers];
 }
 
 function pictureOf(e: EventRow): string | null {

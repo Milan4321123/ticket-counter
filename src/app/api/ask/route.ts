@@ -75,7 +75,7 @@ export async function POST(req: Request) {
   }
   let run: FilterRun | null = filters ? runFilters(filters) : null;
   // Nothing on those filters, no filters worth keeping: plain search instead.
-  if (run && run.total === 0 && !read.strong) {
+  if (run && run.total === 0 && run.atEvents === 0 && !read.strong) {
     run = null;
     filters = null;
   }
@@ -87,7 +87,7 @@ export async function POST(req: Request) {
       const guessed = await aiFilters(q, prev);
       if (guessed) {
         const r = runFilters(guessed);
-        if (r.total > 0) return NextResponse.json(filterReply(guessed, r, prev, opening));
+        if (r.total + r.atEvents > 0) return NextResponse.json(filterReply(guessed, r, prev, opening));
       }
     }
   }
@@ -108,7 +108,8 @@ export async function POST(req: Request) {
     const parts = [
       n('event') && `${n('event')} event${n('event') === 1 ? '' : 's'}`,
       n('shop') && `${n('shop')} shop${n('shop') === 1 ? '' : 's'}`,
-      n('item') && `${n('item')} item${n('item') === 1 ? '' : 's'}`,
+      n('item') && `${n('item')} bazaar item${n('item') === 1 ? '' : 's'}`,
+      n('offer') && `${n('offer')} ticket${n('offer') === 1 ? '' : 's'} or dish${n('offer') === 1 ? '' : 'es'} at events`,
     ].filter(Boolean);
     summary = `Here is what I found for “${q}”: ${parts.join(', ')}. Tap one to open it.`;
   }
@@ -160,12 +161,19 @@ export async function POST(req: Request) {
 /** The chat's reply to a filter: what was found, the cards, and the page with all of them. */
 function filterReply(filters: AskFilters, run: FilterRun, prev: AskFilters | null, open: boolean) {
   const events = filters.mode === 'events';
-  const noun = (n: number) => (events ? `upcoming event${n === 1 ? '' : 's'}` : `item${n === 1 ? '' : 's'}`);
+  const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
+  const main = events ? plural(run.total, 'upcoming event') : plural(run.total, 'item');
   const lines: string[] = [];
   if (run.relaxed) lines.push(`Nothing matched “${run.relaxed}” exactly — here is what fits the rest.`);
-  if (run.total > 0) {
-    lines.push(`**${run.total} ${noun(run.total)}**${run.said ? ` — ${run.said}` : ''}.`);
-    if (!events && open) lines.push('Opening the bazaar with these filters…');
+  if (run.total > 0 || run.atEvents > 0) {
+    const found = [
+      run.total > 0 && `**${main}**${events ? '' : ' in the bazaar'}`,
+      run.atEvents > 0 && `**${run.atEvents}** ${events ? 'matching ticket' + (run.atEvents === 1 ? '' : 's') + ' or dish' + (run.atEvents === 1 ? '' : 'es') : 'at events (tickets, dishes)'}`,
+    ].filter(Boolean);
+    lines.push(`${found.join(' and ')}${run.said ? ` — ${run.said}` : ''}.`);
+    // Opening the bazaar would hide what was found at events, so it only
+    // opens by itself when the bazaar is all there is.
+    if (!events && open && run.total > 0 && run.atEvents === 0) lines.push('Opening the bazaar with these filters…');
     else if (!prev) lines.push(events ? 'Tap one to see tickets. Add a town or a date to narrow it.' : 'Say “cheaper”, “only in stock”, a town or a food to narrow it.');
   } else {
     lines.push(`Nothing right now${run.said ? ` for **${run.said}**` : ''}.`);
@@ -179,13 +187,13 @@ function filterReply(filters: AskFilters, run: FilterRun, prev: AskFilters | nul
   }
   const links: AskLink[] = [];
   if (run.link) links.push(run.link);
-  if (run.total === 0 && !run.link) links.push(events ? { label: 'Upcoming events', href: '/#events', icon: '🎟' } : { label: 'The whole bazaar', href: '/market', icon: '🛍' });
+  if (run.total === 0 && run.atEvents === 0 && !run.link) links.push(events ? { label: 'Upcoming events', href: '/#events', icon: '🎟' } : { label: 'The whole bazaar', href: '/market', icon: '🛍' });
   return {
     links,
     results: run.results,
     answer: lines.join(' '),
     note: null,
-    go: open && !events && run.total > 0 && Boolean(run.link),
+    go: open && !events && run.total > 0 && run.atEvents === 0 && Boolean(run.link),
     filters,
   };
 }
