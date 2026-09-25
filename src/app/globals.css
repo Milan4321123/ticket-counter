@@ -7615,3 +7615,17 @@ html:has(.item-page) {
     display: none;
   }
 }
+
+/* German / Nepali: the page stays faded for a moment while components/
+   AutoTranslate swaps in the translations, so English does not flash first.
+   The animation shows it anyway after 1.2s, whatever the script does. */
+html.tx-wait body {
+  opacity: 0;
+  animation: tx-reveal 0.2s ease 1.2s forwards;
+}
+
+@keyframes tx-reveal {
+  to {
+    opacity: 1;
+  }
+}

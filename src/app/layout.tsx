@@ -23,6 +23,7 @@ import HeaderNav from '@/components/HeaderNav';
 import SignedInToast from '@/components/SignedInToast';
 import { currentCustomer } from '@/lib/customers';
 import LangSwitch from '@/components/LangSwitch';
+import AutoTranslate from '@/components/AutoTranslate';
 import { translator } from '@/lib/i18n';
 import { currentLang } from '@/lib/i18nServer';
 
@@ -117,8 +118,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const tr = translator(lang);
   const contact = getPlatformContact();
   return (
-    <html lang={lang} className={sora.variable}>
+    <html lang={lang} className={`${sora.variable}${lang === 'en' ? '' : ' tx-wait'}`}>
       <body>
+        {/* Everything the dictionary does not cover, in the visitor's language. */}
+        {lang !== 'en' && <AutoTranslate lang={lang} />}
         <ServiceWorkerRegistrar />
         {/* Who publishes this site. Site-wide rather than home-page-only so that
             an event page arriving cold from a search result still identifies its
