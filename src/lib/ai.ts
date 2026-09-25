@@ -349,6 +349,15 @@ const DESIGN_SCHEMA = {
       enum: ['bold', 'elegant', 'party', 'minimal'],
       description: 'Overall page treatment.',
     },
+    layout: {
+      type: 'string',
+      enum: ['classic', 'poster', 'festival', 'editorial', 'neon'],
+      description:
+        'The page frame: poster (the event poster as a big card — great when they uploaded a poster), festival ' +
+        '(colourful, kites, big date, countdown — Dashain, Tihar, melas, family days), editorial (magazine serif — ' +
+        'cultural evenings, talks, classical music, dinners), neon (club night glow — DJ nights, parties, concerts), ' +
+        'classic (plain and safe).',
+    },
     headline: {
       type: 'string',
       description: 'Short, punchy hero headline (max ~8 words). May be the event name or better.',
@@ -367,7 +376,7 @@ const DESIGN_SCHEMA = {
       description: 'Heading for the description section, e.g. "About the night".',
     },
   },
-  required: ['accent', 'vibe', 'headline', 'tagline', 'highlights', 'aboutTitle'],
+  required: ['accent', 'vibe', 'layout', 'headline', 'tagline', 'highlights', 'aboutTitle'],
   additionalProperties: false,
 } as const;
 

@@ -53,6 +53,7 @@ import { loadFeedSnapshot } from '@/lib/feedSnapshot';
 import { getAvailability } from '@/lib/inventory';
 import { runWaitlistNotifySweep } from '@/lib/waitlist';
 import WaitlistForm from '@/components/WaitlistForm';
+import EventCountdown from '@/components/EventCountdown';
 import WishButton from '@/components/WishButton';
 import { readListingName } from '@/lib/exampleShop';
 import { canWish, wishCountsFor } from '@/lib/wishes';
@@ -479,6 +480,19 @@ export default async function EventPage({ params, searchParams }: Params) {
   const extraQs = `${refCode ? `&ref=${refCode}` : ''}${tableLabel ? `&table=${encodeURIComponent(tableLabel)}` : ''}`;
   const checkoutHref = extraQs ? `${checkoutBase}?${extraQs.slice(1)}` : checkoutBase;
   const headline = design.headline || event.name;
+  const layout = design.layout ?? 'classic';
+  // "SAT · 17 · OCT" for the layouts with a big date block.
+  const heroDate =
+    !isShop && event.eventDate && /^\d{4}-\d{2}-\d{2}$/.test(event.eventDate)
+      ? (() => {
+          const d = new Date(`${event.eventDate}T12:00:00Z`);
+          return {
+            weekday: d.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' }),
+            day: String(d.getUTCDate()),
+            month: d.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' }),
+          };
+        })()
+      : null;
 
   // ---------------- Stalls (slice 2) ----------------
   //
@@ -715,7 +729,18 @@ export default async function EventPage({ params, searchParams }: Params) {
         </div>
       )}
 
-      <section className="hero event-hero" style={heroStyle}>
+      <section className={`hero event-hero event-hero--${layout}`} style={heroStyle}>
+        {/* The layout's own decoration (lib/events PageDesign.layout). */}
+        {layout === 'festival' && (
+          <div className="evl-kites" aria-hidden="true">
+            {['🪁', '✨', '🪁', '🎶', '🪔', '🪁', '✨'].map((k, i) => (
+              <span key={i} style={{ ['--i' as string]: i, ['--y' as string]: `${[12, 34, 8, 52, 22, 44, 16][i]}%` } as React.CSSProperties}>
+                {k}
+              </span>
+            ))}
+          </div>
+        )}
+        {layout === 'neon' && <div className="evl-grid" aria-hidden="true" />}
         {(coverVideoUrl || stillUrl) && (
           <div
             className={`event-hero-media${stillUrl ? '' : ' event-hero-media-bare'}`}
@@ -738,6 +763,21 @@ export default async function EventPage({ params, searchParams }: Params) {
         )}
 
         <div className="container event-hero-inner">
+          {/* Poster layout: the poster itself, crisp, as a tilted card. */}
+          {layout === 'poster' && stillUrl && (
+            <div className="evl-poster-card anim-fade-up" aria-hidden="true">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={stillUrl} alt="" />
+            </div>
+          )}
+          {/* The big date, for the layouts that shout it. */}
+          {layout !== 'classic' && layout !== 'poster' && heroDate && (
+            <div className="evl-date anim-fade-up" aria-hidden="true">
+              <span>{heroDate.weekday}</span>
+              <strong>{heroDate.day}</strong>
+              <span>{heroDate.month}</span>
+            </div>
+          )}
           {/* "Live event" is a claim, and on a draft it is a false one. */}
           <p className="hero-kicker anim-fade-up">
             {preview ? 'Not published yet' : isShop ? 'Open for orders' : 'Live event'}
@@ -879,6 +919,9 @@ export default async function EventPage({ params, searchParams }: Params) {
                 </p>
               ) : null}
             </div>
+          )}
+          {(layout === 'festival' || layout === 'neon') && !isShop && event.eventDate && (
+            <EventCountdown date={event.eventDate} time={event.dateDisplay.match(/(\d{1,2}:\d{2})/)?.[1]} />
           )}
           {/* Under the button, not buried in the body: this is the last thing
               between a visitor and a checkout for the wrong country. */}

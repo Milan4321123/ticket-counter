@@ -8,10 +8,12 @@ import { saveEvent } from './save';
 // Mirrors the PageDesign spec in lib/events (kept local: that lib is server-only).
 type Accent = 'violet' | 'sunset' | 'ocean' | 'emerald' | 'gold' | 'crimson';
 type Vibe = 'bold' | 'elegant' | 'party' | 'minimal';
+type Layout = 'classic' | 'poster' | 'festival' | 'editorial' | 'neon';
 
 interface Design {
   accent?: Accent;
   vibe?: Vibe;
+  layout?: Layout;
   headline?: string;
   tagline?: string;
   highlights?: string[];
@@ -33,6 +35,15 @@ const ACCENTS: { key: Accent; color: string; label: string }[] = [
   { key: 'crimson', color: '#ef4444', label: 'Crimson' },
 ];
 
+/** The page frames (lib/events PageDesign.layout), each with a tiny drawn preview. */
+const LAYOUTS: { key: Layout; label: string; hint: string }[] = [
+  { key: 'classic', label: 'Classic', hint: 'Clean, photo behind the title' },
+  { key: 'poster', label: 'Poster', hint: 'Your poster as a big card' },
+  { key: 'festival', label: 'Festival', hint: 'Colour, kites, countdown' },
+  { key: 'editorial', label: 'Editorial', hint: 'Magazine, elegant serif' },
+  { key: 'neon', label: 'Neon night', hint: 'Club glow, grid, countdown' },
+];
+
 const VIBES: { key: Vibe; label: string; hint: string }[] = [
   { key: 'bold', label: 'Bold', hint: 'big and loud' },
   { key: 'elegant', label: 'Elegant', hint: 'refined and calm' },
@@ -44,6 +55,7 @@ export default function DesignPanel({ eventId, aiEnabled, initial }: Props) {
   const router = useRouter();
   const [accent, setAccent] = useState<Accent | ''>(initial.accent ?? '');
   const [vibe, setVibe] = useState<Vibe | ''>(initial.vibe ?? '');
+  const [layout, setLayout] = useState<Layout>(initial.layout ?? 'classic');
   const [headline, setHeadline] = useState(initial.headline ?? '');
   const [tagline, setTagline] = useState(initial.tagline ?? '');
   const [aboutTitle, setAboutTitle] = useState(initial.aboutTitle ?? '');
@@ -66,6 +78,7 @@ export default function DesignPanel({ eventId, aiEnabled, initial }: Props) {
     const design: Design = {};
     if (accent) design.accent = accent;
     if (vibe) design.vibe = vibe;
+    if (layout !== 'classic') design.layout = layout;
     if (headline.trim()) design.headline = headline.trim();
     if (tagline.trim()) design.tagline = tagline.trim();
     if (aboutTitle.trim()) design.aboutTitle = aboutTitle.trim();
@@ -110,6 +123,7 @@ export default function DesignPanel({ eventId, aiEnabled, initial }: Props) {
       const d = data.design;
       if (d.accent) setAccent(d.accent);
       if (d.vibe) setVibe(d.vibe);
+      if (d.layout) setLayout(d.layout);
       if (typeof d.headline === 'string') setHeadline(d.headline);
       if (typeof d.tagline === 'string') setTagline(d.tagline);
       if (typeof d.aboutTitle === 'string') setAboutTitle(d.aboutTitle);
@@ -181,7 +195,32 @@ export default function DesignPanel({ eventId, aiEnabled, initial }: Props) {
           </div>
         )}
 
-        {/* ---- 2. Or pick it yourself ---- */}
+        {/* ---- 2. Or pick it yourself: the frame, then the colour ---- */}
+        <section className="ks-step">
+          <h3 className="ks-q">
+            <span className="ks-num">🖼</span> Layout
+          </h3>
+          <div className="lz-grid" role="radiogroup" aria-label="Layout">
+            {LAYOUTS.map((l) => (
+              <button
+                key={l.key}
+                type="button"
+                role="radio"
+                aria-checked={layout === l.key}
+                className={`lz-card${layout === l.key ? ' is-on' : ''}`}
+                onClick={() => setLayout(l.key)}
+              >
+                <span className={`lz-thumb lz-${l.key}`} aria-hidden="true">
+                  <i />
+                  <b />
+                  <em />
+                </span>
+                <strong>{l.label}</strong>
+                <span>{l.hint}</span>
+              </button>
+            ))}
+          </div>
+        </section>
         <section className="ks-step">
           <h3 className="ks-q">
             <span className="ks-num">🎨</span> {aiEnabled ? 'Or pick it yourself' : 'Pick a look'}

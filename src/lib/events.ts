@@ -236,6 +236,13 @@ export interface PageDesign {
   accent?: 'violet' | 'sunset' | 'ocean' | 'emerald' | 'gold' | 'crimson';
   /** Overall mood; adjusts hero treatment. */
   vibe?: 'bold' | 'elegant' | 'party' | 'minimal';
+  /**
+   * The page's frame — a different hero and look, not just colours:
+   * classic (the default), poster (the poster as a big tilted card),
+   * festival (moving colours, kites, date badge, countdown), editorial
+   * (magazine serif), neon (club night glow, grid, countdown).
+   */
+  layout?: PageLayout;
   headline?: string; // short punchy line for the hero (defaults to event name)
   tagline?: string; // one sentence under the headline
   highlights?: string[]; // up to 5 short bullet highlights
@@ -1250,6 +1257,8 @@ export function videoEmbedUrl(raw: string): { kind: 'youtube' | 'vimeo' | 'file'
 
 const ACCENTS = new Set(['violet', 'sunset', 'ocean', 'emerald', 'gold', 'crimson']);
 const VIBES = new Set(['bold', 'elegant', 'party', 'minimal']);
+export const PAGE_LAYOUTS = ['classic', 'poster', 'festival', 'editorial', 'neon'] as const;
+export type PageLayout = (typeof PAGE_LAYOUTS)[number];
 
 /** Parse + sanitize a stored page design. Unknown/invalid fields are dropped. */
 export function parsePageDesign(raw: string | null | undefined): PageDesign {
@@ -1264,6 +1273,7 @@ export function parsePageDesign(raw: string | null | undefined): PageDesign {
   const clean: PageDesign = {};
   if (typeof d.accent === 'string' && ACCENTS.has(d.accent)) clean.accent = d.accent as PageDesign['accent'];
   if (typeof d.vibe === 'string' && VIBES.has(d.vibe)) clean.vibe = d.vibe as PageDesign['vibe'];
+  if (typeof d.layout === 'string' && (PAGE_LAYOUTS as readonly string[]).includes(d.layout)) clean.layout = d.layout as PageLayout;
   const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : undefined);
   const headline = str(d.headline, 90);
   const tagline = str(d.tagline, 200);
