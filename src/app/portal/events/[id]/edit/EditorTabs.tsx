@@ -26,6 +26,9 @@ export interface EditorTabDef {
   line?: string;
 }
 
+/** What every listing needs before it can go live; everything else is an extra. */
+const SETUP_KEYS = new Set(['basics', 'tickets', 'media', 'publish']);
+
 /** One line and an icon per section, for the card view. */
 const CARD_INFO: Record<string, { icon: string; line: string }> = {
   basics: { icon: '📝', line: 'Name, date, place and description' },
@@ -202,8 +205,17 @@ export default function EditorTabs({
             </a>
           )}
 
-          <div className="ed-cards">
-            {tabs.map((t, i) => {
+          {(
+            [
+              ['Set up', tabs.filter((t) => SETUP_KEYS.has(t.key))],
+              ['Extras — optional', tabs.filter((t) => !SETUP_KEYS.has(t.key))],
+            ] as const
+          ).map(([heading, group]) =>
+            group.length === 0 ? null : (
+              <section key={heading} className="ed-group">
+                <h3 className="ed-group-title">{heading}</h3>
+                <div className="ed-cards">
+                  {group.map((t, i) => {
               const base = CARD_INFO[t.key] ?? { icon: '•', line: '' };
               const info = { icon: t.icon ?? base.icon, line: t.line ?? base.line };
               const isNext = t.key === nextUp;
@@ -234,8 +246,11 @@ export default function EditorTabs({
                   </span>
                 </button>
               );
-            })}
-          </div>
+                  })}
+                </div>
+              </section>
+            )
+          )}
         </div>
       )}
 

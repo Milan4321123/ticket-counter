@@ -3173,3 +3173,17 @@
   -webkit-appearance: none;
   margin: 0;
 }
+
+/* Editor overview: the required steps, then the optional extras. */
+.ed-group + .ed-group {
+  margin-top: 18px;
+}
+
+.ed-group-title {
+  margin: 0 0 10px;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
