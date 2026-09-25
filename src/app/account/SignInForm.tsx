@@ -3,7 +3,7 @@
 // Sign in with a code sent to your email, or with Google. Two steps on one
 // card: address, then the six digits.
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function SignInForm({ google, back = '/account' }: { google: boolean; back?: string }) {
   const router = useRouter();
@@ -12,6 +12,13 @@ export default function SignInForm({ google, back = '/account' }: { google: bool
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Google refuses to sign anyone in inside another app's built-in browser
+  // (WhatsApp, Instagram, Facebook…): its page shows an error instead. There
+  // we say how to get to a real browser, and the email code still works.
+  const [inAppBrowser, setInAppBrowser] = useState(false);
+  useEffect(() => {
+    setInAppBrowser(/FBAN|FBAV|FB_IAB|Instagram|WhatsApp|Line\/|Snapchat|TikTok|; wv\)/i.test(navigator.userAgent));
+  }, []);
 
   async function post(url: string, body: unknown): Promise<string | null> {
     const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -47,7 +54,13 @@ export default function SignInForm({ google, back = '/account' }: { google: bool
 
   return (
     <div className="acc-signin">
-      {google && (
+      {google && inAppBrowser && (
+        <p className="acc-inapp">
+          To use <strong>Google</strong>, open this page in Chrome or Safari (⋮ or share menu → “Open in browser”). Or
+          use a code by email below — it works here.
+        </p>
+      )}
+      {google && !inAppBrowser && (
         <>
           <a className="acc-google" href={`/api/account/google?back=${encodeURIComponent(back)}`}>
             <svg viewBox="0 0 48 48" aria-hidden="true">
