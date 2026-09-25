@@ -1,0 +1,7 @@
+{
+  "name": "pitch-video",
+  "private": true,
+  "type": "module",
+  "description": "Records the demo and renders the pitch video (see README.md).",
+  "dependencies": { "puppeteer-core": "^23.0.0" }
+}

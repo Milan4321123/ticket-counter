@@ -1,0 +1,10 @@
+rec/
+dbg/
+frames2/
+sample/
+node_modules/
+*.wav
+*.mp4
+events.json
+timeline.json
+package-lock.json
