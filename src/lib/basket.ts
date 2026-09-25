@@ -23,6 +23,7 @@ export interface BasketLineData {
   listing: string;
   kind: 'event' | 'shop';
   image: string | null;
+  example?: boolean;
 }
 
 export function basketLineFor(
@@ -31,9 +32,14 @@ export function basketLineFor(
   seller: string,
   image: string | null
 ): BasketLineData | null {
-  if (event.isDemo || event.status !== 'published' || !event.salesOpen) return null;
-  if (tier.status !== 'on-sale' || tier.priceCents <= 0 || tier.seatsPerUnit > 1) return null;
-  if (!paymentOptionsFor(event).transfer) return null;
+  const example = readListingName(event.name).isExample;
+  if (event.isDemo || event.status !== 'published') return null;
+  if (!example && !event.salesOpen) return null;
+  if (tier.priceCents <= 0 || tier.seatsPerUnit > 1) return null;
+  if (!example && tier.status !== 'on-sale') return null;
+  // The site's example shops take no money at all; they may sit in a basket
+  // (clearly marked) so a visitor can see how one works, and are never ordered.
+  if (!example && !paymentOptionsFor(event).transfer) return null;
   if (event.kind === 'shop' && parseSlotConfig(event.pickupSlots).enabled) return null;
   if (event.kind === 'event' && parseSeatMap(event.seatMap)?.enabled) return null;
   if (parseChoices(tier.choices).length > 0) return null;
@@ -50,5 +56,6 @@ export function basketLineFor(
     listing: readListingName(event.name).name,
     kind: event.kind,
     image,
+    ...(example ? { example: true } : {}),
   };
 }

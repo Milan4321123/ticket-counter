@@ -3822,3 +3822,22 @@
     width: 88px;
   }
 }
+
+.bk-example {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(251, 191, 36, 0.1);
+  color: #fcd34d;
+  font-size: 0.82rem;
+}
+
+.bk-remove {
+  border: 0;
+  background: none;
+  color: #fbbf24;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}

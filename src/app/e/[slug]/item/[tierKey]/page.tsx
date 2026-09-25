@@ -635,9 +635,6 @@ export default async function ItemPage({ params, searchParams }: Params) {
                 <Link href={buyHref} className="btn btn-primary btn-lg" aria-label={`${v.cta} ${tier.name}`}>
                   {v.cta}
                 </Link>
-                {/* Into the basket that spans every seller, for a shopper
-                    filling one order from several stalls (lib/basket). */}
-                {basketLine && <AddToBasket line={basketLine} />}
               </>
             ) : (
               /* Not a disabled button: there is nothing to press, and a greyed
@@ -647,6 +644,10 @@ export default async function ItemPage({ params, searchParams }: Params) {
                 {state.kind === 'past' ? state.badge : badge.label}
               </span>
             )}
+            {/* Into the basket that spans every seller, for a shopper filling
+                one order from several stalls (lib/basket). Example shops too,
+                marked — they show how it works and are never ordered. */}
+            {basketLine && <AddToBasket line={basketLine} />}
 
             {/* Beside the button rather than under it: the two things a
                 shopper can do on this page are buy it now and come back to it

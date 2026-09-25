@@ -19,6 +19,8 @@ interface Group {
   currency: string;
   lines: BasketLine[];
   subtotal: number;
+  /** An example shop: shown, never ordered. */
+  example: boolean;
 }
 
 export default function BasketPage({ customer }: { customer: { name: string; email: string } | null }) {
@@ -42,20 +44,24 @@ export default function BasketPage({ customer }: { customer: { name: string; ema
         currency: l.currency,
         lines: [],
         subtotal: 0,
+        example: false,
       };
       g.lines.push(l);
       g.subtotal += l.priceCents * l.qty;
+      if (l.example) g.example = true;
       map.set(l.eventId, g);
     }
     return [...map.values()];
   }, [lines]);
 
-  const total = groups.reduce((n, g) => n + g.subtotal, 0);
-  const currency = groups[0]?.currency ?? 'EUR';
+  // Example shops sit in the basket to show how it works; only real ones are ordered.
+  const orderable = groups.filter((g) => !g.example);
+  const total = orderable.reduce((n, g) => n + g.subtotal, 0);
+  const currency = orderable[0]?.currency ?? groups[0]?.currency ?? 'EUR';
 
   async function checkout(e: React.FormEvent) {
     e.preventDefault();
-    if (busy || groups.length === 0) return;
+    if (busy || orderable.length === 0) return;
     if (!name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       setFormError('Please enter your name and a valid email address.');
       return;
@@ -66,7 +72,7 @@ export default function BasketPage({ customer }: { customer: { name: string; ema
     const placed: string[] = [];
     const failed: Record<string, string> = {};
     // One order per seller, one after another (each reserves its own stock).
-    for (const g of groups) {
+    for (const g of orderable) {
       try {
         const res = await fetch('/api/orders', {
           method: 'POST',
@@ -171,6 +177,15 @@ export default function BasketPage({ customer }: { customer: { name: string; ema
                   </div>
                 </div>
               ))}
+              {g.example && (
+                <p className="bk-example">
+                  Example shop — it shows how the bazaar works and cannot be ordered from. It stays in your basket
+                  until you remove it.{' '}
+                  <button type="button" className="bk-remove" onClick={() => removeLines(g.lines.map((l) => l.key))}>
+                    Remove
+                  </button>
+                </p>
+              )}
               {errors[g.eventId] && (
                 <p className="bk-error" role="alert">
                   {errors[g.eventId]} <Link href={`/e/${g.slug}/checkout`}>Order this one on its own page →</Link>
@@ -185,7 +200,7 @@ export default function BasketPage({ customer }: { customer: { name: string; ema
 
         <form className="bk-summary" onSubmit={checkout}>
           <h2>Checkout</h2>
-          {groups.map((g) => (
+          {orderable.map((g) => (
             <div key={g.eventId} className="bk-sum-row">
               <span>{g.listing}</span>
               <span>{formatMoney(g.subtotal, g.currency)}</span>
@@ -212,8 +227,14 @@ export default function BasketPage({ customer }: { customer: { name: string; ema
               {formError}
             </p>
           )}
-          <button className="btn btn-brand btn-lg btn-block" disabled={busy}>
-            {busy ? 'Placing your orders…' : groups.length === 1 ? 'Place order' : `Place ${groups.length} orders`}
+          <button className="btn btn-brand btn-lg btn-block" disabled={busy || orderable.length === 0}>
+            {busy
+              ? 'Placing your orders…'
+              : orderable.length === 0
+                ? 'Only example items here'
+                : orderable.length === 1
+                  ? 'Place order'
+                  : `Place ${orderable.length} orders`}
           </button>
           <p className="muted small" style={{ margin: 0 }}>
             Your items are held for you. Next you see each seller’s payment details — bank transfer or PayPal — with a

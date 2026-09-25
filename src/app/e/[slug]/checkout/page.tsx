@@ -12,6 +12,7 @@ import { getOrganizer } from '@/lib/organizers';
 import { paymentOptionsFor } from '@/lib/paymentConnections';
 import { subscriptionOffer } from '@/lib/subscriptions';
 import { currentCustomer } from '@/lib/customers';
+import { basketLineFor, type BasketLineData } from '@/lib/basket';
 import { availableSlots, cleanTableLabel, parseChoices, parseSlotConfig } from '@/lib/kitchen';
 import { parseSeatMap, takenSeats } from '@/lib/seats';
 import { currentLang } from '@/lib/i18nServer';
@@ -144,6 +145,14 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
       : null;
 
   const customer = event.isDemo ? null : await currentCustomer();
+  // The picks here are mirrored into the cross-seller basket (lib/basket), so
+  // leaving and coming back — or shopping elsewhere first — keeps them.
+  const sellerName = getOrganizer(event.organizerId)?.name?.trim() || 'the seller';
+  const basketLines = Object.fromEntries(
+    getEventTiers(event.id)
+      .map((t) => [t.tierKey, basketLineFor(event, t, sellerName, t.mediaId ? mediaUrl(t.mediaId, 'card', null) : null)] as const)
+      .filter(([, line]) => line !== null)
+  ) as Record<string, BasketLineData>;
   const liveMedia = new Set(getEventMedia(event.id).map((m) => m.id));
 
   return (
@@ -186,6 +195,7 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
       kitchen={kitchen}
       subscribe={tableFromQr ? null : subscriptionOffer(event)}
       customer={customer ? { name: customer.name, email: customer.email } : null}
+      basketLines={basketLines}
       lang={await currentLang()}
       seating={seating}
       payment={{

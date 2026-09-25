@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { discountCentsFor, formatMoney, subscribeDiscountCents } from '@/lib/money';
+import { getBasket, removeListing, replaceListing, type BasketLine } from '@/components/basket/basketStore';
 import type {
   ApiErrorResponse,
   CaptureOrderResponse,
@@ -169,6 +170,11 @@ interface Props {
   subscribe?: { pct: number } | null;
   /** The signed-in customer, to pre-fill name and email. */
   customer?: { name: string; email: string } | null;
+  /**
+   * tierKey → its basket line, for the items that can live in the
+   * cross-seller basket (lib/basket). Picks of these are mirrored there.
+   */
+  basketLines?: Record<string, Omit<BasketLine, 'qty'>> | null;
 }
 
 export interface CheckoutSlot {
@@ -350,6 +356,7 @@ export default function CheckoutClient({
   lang = 'en',
   subscribe = null,
   customer = null,
+  basketLines = null,
 }: Props) {
   const tr = translator(lang);
   const router = useRouter();
@@ -370,6 +377,36 @@ export default function CheckoutClient({
   // A signed-in customer (lib/customers) starts with their own details filled in.
   const [name, setName] = useState(customer?.name ?? '');
   const [email, setEmail] = useState(customer?.email ?? '');
+
+  // ---- Remembering the picks ----
+  // Picks are kept while the buyer goes elsewhere: basket-able items in the
+  // cross-seller basket (and so on their account when signed in), the rest in
+  // this tab's session. Opening the checkout again brings them back.
+  const memoryKey = `mn_co_${eventId}`;
+  const restoredPicks = useRef(false);
+  useEffect(() => {
+    const remembered: Record<string, number> = {};
+    try {
+      const saved = JSON.parse(window.sessionStorage.getItem(memoryKey) ?? '{}') as Record<string, number>;
+      for (const [k, n] of Object.entries(saved)) if (Number.isInteger(n) && n > 0) remembered[k] = n;
+    } catch {
+      /* nothing saved */
+    }
+    for (const l of getBasket()) if (l.eventId === eventId) remembered[l.tierKey] = l.qty;
+    if (Object.keys(remembered).length > 0) {
+      setQty((prev) => {
+        const next = { ...prev };
+        for (const t of config.tiers) {
+          if (seating?.map.sections.some((sec) => sec.tierKey === t.id)) continue;
+          const want = remembered[t.id];
+          if (want) next[t.id] = Math.max(prev[t.id] ?? 0, Math.min(want, config.maxTicketsPerOrder));
+        }
+        return next;
+      });
+    }
+    restoredPicks.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // ---- Restaurant pack: slot, choices, note (shops only) ----
   const slotsRequired = Boolean(kitchen && kitchen.slots.length > 0 && !kitchen.table);
   const firstOpenDay = kitchen?.slots.find((d) => d.slots.some((sl) => sl.open))?.date ?? kitchen?.slots[0]?.date ?? '';
@@ -775,6 +812,7 @@ export default function CheckoutClient({
         ...kitchenFields(),
       };
       const created = await postJson<CreateOrderResponse>('/api/orders', req);
+      forgetPicks();
       await postJson<CaptureOrderResponse>(`/api/orders/${created.orderId}/capture`, {});
       router.replace(`/order/${created.orderId}`);
       // Keep the button disabled while the redirect happens.
@@ -813,6 +851,7 @@ export default function CheckoutClient({
         ...kitchenFields(),
       };
       const created = await postJson<CreateOrderResponse>('/api/orders', req);
+      forgetPicks();
       // The order page shows the bank details, amount, and reference.
       router.replace(`/order/${created.orderId}`);
       // Keep the button disabled while the redirect happens.
@@ -856,6 +895,7 @@ export default function CheckoutClient({
         ...kitchenFields(),
       };
       const created = await postJson<CreateOrderResponse>('/api/orders', req);
+      forgetPicks();
       if (!created.redirectUrl) throw new ApiError(GENERIC_ERROR, undefined, 500);
       window.location.assign(created.redirectUrl);
       // Keep the button disabled while the browser leaves.
@@ -958,6 +998,7 @@ export default function CheckoutClient({
               ...s.kitchenFields(),
             };
             const created = await postJson<CreateOrderResponse>('/api/orders', req);
+      forgetPicks();
             localOrderIdRef.current = created.orderId;
             if (!created.paypalOrderId) {
               throw new ApiError(GENERIC_ERROR, undefined, 500);
@@ -1036,6 +1077,37 @@ export default function CheckoutClient({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [method, paypalClientId, sdkState, isFreeOrder]);
+
+  // Every change to the picks is remembered (after the first restore).
+  useEffect(() => {
+    if (!restoredPicks.current) return;
+    const picked = Object.fromEntries(Object.entries(qty).filter(([, n]) => n > 0));
+    try {
+      if (Object.keys(picked).length) window.sessionStorage.setItem(memoryKey, JSON.stringify(picked));
+      else window.sessionStorage.removeItem(memoryKey);
+    } catch {
+      /* private mode */
+    }
+    if (basketLines) {
+      replaceListing(
+        eventId,
+        Object.entries(picked)
+          .filter(([k]) => basketLines[k])
+          .map(([k, n]) => ({ ...basketLines[k], qty: n }))
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qty]);
+
+  /** Once the order exists, its picks leave the basket and the memory. */
+  const forgetPicks = () => {
+    removeListing(eventId);
+    try {
+      window.sessionStorage.removeItem(memoryKey);
+    } catch {
+      /* private mode */
+    }
+  };
 
   // ---------------- Render ----------------
 
@@ -1128,6 +1200,11 @@ export default function CheckoutClient({
           <p className={styles.basketBack}>
             <a href={`/e/${config.slug}`}>← Back to the shop</a>
             <a href={`/market?shop=${encodeURIComponent(config.slug)}`}>Browse in the bazaar</a>
+          </p>
+        )}
+        {basketLines && Object.keys(basketLines).length > 0 && totalQty > 0 && (
+          <p className={styles.basketSaved}>
+            ✓ Saved in your <a href="/basket">basket</a> — keep shopping at other sellers and pay for everything together.
           </p>
         )}
         {isShop && basket.length === 0 && (

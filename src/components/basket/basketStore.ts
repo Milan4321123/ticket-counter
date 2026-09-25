@@ -22,6 +22,8 @@ export interface BasketLine {
   listing: string;
   kind: 'event' | 'shop';
   image: string | null;
+  /** One of the site's example shops: shown, never ordered. */
+  example?: boolean;
 }
 
 const KEY = 'mn_basket_v1';
@@ -79,6 +81,19 @@ export function setQty(key: string, qty: number) {
     .map((l) => (l.key === key ? { ...l, qty: Math.max(0, Math.min(l.max || 99, qty)) } : l))
     .filter((l) => l.qty > 0);
   write(lines);
+}
+
+/** Make this listing's lines exactly these (the checkout mirrors its picks here). */
+export function replaceListing(eventId: string, next: BasketLine[]) {
+  const others = read().filter((l) => l.eventId !== eventId);
+  const before = JSON.stringify(read().filter((l) => l.eventId === eventId));
+  if (before === JSON.stringify(next)) return;
+  write([...others, ...next]);
+}
+
+export function removeListing(eventId: string) {
+  const lines = read();
+  if (lines.some((l) => l.eventId === eventId)) write(lines.filter((l) => l.eventId !== eventId));
 }
 
 export function removeLines(keys: string[]) {
