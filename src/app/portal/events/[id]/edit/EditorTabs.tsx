@@ -63,10 +63,40 @@ export default function EditorTabs({
   // '' = the card overview.
   const [active, setActive] = useState('');
 
-  // Open the section named in ?tab= so a refresh (or a saved link) lands in place.
+  /** Open a section from a link inside the editor, with the same history rule as select(). */
+  const openFromEvent = (key: string) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', key);
+    if (window.history.state && window.history.state.edSection) window.history.replaceState({ ...window.history.state, edSection: key }, '', url);
+    else window.history.pushState({ ...window.history.state, edSection: key }, '', url);
+    setActive(key);
+  };
+
+  // Open the section named in ?tab= so a refresh (or a saved link) lands in
+  // place — with the section list put underneath it in the history, so the
+  // phone's back button returns to the list rather than leaving the editor.
   useEffect(() => {
-    const wanted = new URLSearchParams(window.location.search).get('tab');
-    if (wanted && tabs.some((t) => t.key === wanted)) setActive(wanted);
+    const url = new URL(window.location.href);
+    const wanted = url.searchParams.get('tab');
+    if (wanted && tabs.some((t) => t.key === wanted)) {
+      if (!(window.history.state && window.history.state.edSection)) {
+        url.searchParams.delete('tab');
+        window.history.replaceState({ ...window.history.state, edOverview: true }, '', url);
+        url.searchParams.set('tab', wanted);
+        window.history.pushState({ ...window.history.state, edSection: wanted }, '', url);
+      }
+      setActive(wanted);
+    }
+  }, [tabs]);
+
+  // Back / forward: follow the address (a section, or the list).
+  useEffect(() => {
+    const onPop = () => {
+      const wanted = new URLSearchParams(window.location.search).get('tab');
+      setActive(wanted && tabs.some((t) => t.key === wanted) ? wanted : '');
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
   }, [tabs]);
 
   // A button anywhere in the editor can send the organizer to a named section.
@@ -74,7 +104,7 @@ export default function EditorTabs({
     const onGoto = (e: Event) => {
       const key = (e as CustomEvent<string>).detail;
       if (typeof key === 'string' && tabs.some((t) => t.key === key)) {
-        setActive(key);
+        openFromEvent(key);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     };
@@ -86,19 +116,31 @@ export default function EditorTabs({
     const bound = tabs
       .filter((t): t is EditorTabDef & { revealOn: string } => Boolean(t.revealOn))
       .map((t) => {
-        const onReveal = () => setActive(t.key);
+        const onReveal = () => openFromEvent(t.key);
         window.addEventListener(t.revealOn, onReveal);
         return () => window.removeEventListener(t.revealOn, onReveal);
       });
     return () => bound.forEach((off) => off());
   }, [tabs]);
 
+  /**
+   * Open a section (or '' for the list). Opening one from the list adds a
+   * history step, so back comes back to the list; moving between sections
+   * replaces it, so one back still lands on the list, not the last section.
+   */
   function select(key: string) {
-    setActive(key);
     const url = new URL(window.location.href);
     if (key) url.searchParams.set('tab', key);
     else url.searchParams.delete('tab');
-    window.history.replaceState({}, '', url);
+    const inSection = Boolean(window.history.state && window.history.state.edSection);
+    if (!key && inSection) {
+      // "All sections": the same as pressing back.
+      window.history.back();
+      return;
+    }
+    if (key && !active) window.history.pushState({ ...window.history.state, edSection: key }, '', url);
+    else window.history.replaceState({ ...window.history.state, edSection: key || undefined, edOverview: key ? undefined : true }, '', url);
+    setActive(key);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
