@@ -5,6 +5,7 @@ import PlatformAssistant from '@/components/PlatformAssistant';
 import InView from '@/components/InView';
 import DemoStart from '@/components/DemoStart';
 import PitchVideo from '@/components/PitchVideo';
+import StoryShelf from '@/components/StoryShelf';
 import './organizers.css';
 
 // The brand name comes from an env var — read it fresh on every request.
@@ -62,6 +63,7 @@ export default function OrganizersPage() {
       {/* ---- 48 seconds of the real app ---- */}
       <section className="container og-video" id="video">
         <PitchVideo caption="The real app, start to finish — set up, get orders, get paid." />
+        <StoryShelf />
       </section>
 
       {/* ---- The AI setup assistant: one sentence in, a filled form out ---- */}

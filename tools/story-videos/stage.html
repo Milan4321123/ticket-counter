@@ -1,0 +1,286 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&display=block');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 960px; height: 540px; overflow: hidden; background: #07080c; }
+  body { font-family: 'Sora', -apple-system, 'Helvetica Neue', sans-serif; color: #fff; }
+  #stage { position: relative; width: 960px; height: 540px; overflow: hidden; background: #07080c; }
+  .bg { position: absolute; inset: -20%; will-change: transform;
+    background:
+      radial-gradient(40% 45% at 15% 20%, rgba(220, 20, 60, 0.42), transparent 70%),
+      radial-gradient(45% 45% at 90% 90%, rgba(124, 58, 237, 0.45), transparent 70%),
+      radial-gradient(30% 30% at 60% 25%, rgba(236, 72, 153, 0.14), transparent 70%); }
+  .grain { position: absolute; inset: 0; opacity: .05; background-image: radial-gradient(rgba(255,255,255,.8) 1px, transparent 1px); background-size: 3px 3px; }
+
+  /* The phone, left of centre. Screen 214 px wide shows the 390 px recording. */
+  #rig { position: absolute; left: 0; top: 0; width: 960px; height: 540px; perspective: 1300px; z-index: 2; }
+  #phone { position: absolute; left: 138px; top: 22px; width: 232px; height: 496px; border-radius: 38px;
+    background: linear-gradient(145deg, #2a2d36, #0d0f14 40%, #1c1f27); padding: 7px; transform-style: preserve-3d; will-change: transform;
+    box-shadow: 0 0 0 1.2px rgba(255,255,255,.16), 0 36px 80px rgba(0,0,0,.75), 0 0 70px rgba(124,58,237,.28); }
+  #screen { position: relative; width: 218px; height: 482px; border-radius: 32px; overflow: hidden; background: #0a0b10; }
+  #status { position: absolute; left: 0; right: 0; top: 0; height: 26px; z-index: 4; background: #0a0b10;
+    display: flex; align-items: center; justify-content: space-between; padding: 5px 20px 0; font-size: 9px; font-weight: 700; }
+  #status .bat { width: 16px; height: 8px; border-radius: 2px; border: 1.2px solid rgba(255,255,255,.8); position: relative; }
+  #status .bat::after { content: ''; position: absolute; inset: 1px 4px 1px 1px; border-radius: 1px; background: #fff; }
+  #notch { position: absolute; left: 50%; top: 9px; width: 66px; height: 18px; margin-left: -33px; border-radius: 14px; background: #000; z-index: 5; }
+  #view { position: absolute; left: 0; top: 26px; width: 218px; height: 456px; overflow: hidden; }
+  #rec { position: absolute; left: 0; top: 0; width: 218px; height: auto; will-change: transform; transform-origin: 0 0; }
+  #flash { position: absolute; inset: 0; background: radial-gradient(circle at var(--fx) var(--fy), rgba(255,255,255,.95), rgba(255,255,255,.4) 40%, rgba(10,11,16,0) 75%); opacity: 0; z-index: 3; pointer-events: none; }
+  #glare { position: absolute; inset: 0; border-radius: 32px; pointer-events: none; z-index: 6;
+    background: linear-gradient(115deg, rgba(255,255,255,.10), rgba(255,255,255,0) 35%); }
+
+  /* The counter tablet (kitchen board, live screen): 1180×820 shown at 520 px. */
+  #tablet { position: absolute; left: 34px; top: 76px; width: 540px; height: 382px; border-radius: 26px;
+    background: linear-gradient(145deg, #2a2d36, #0d0f14 40%, #1c1f27); padding: 10px; will-change: transform, opacity; opacity: 0;
+    box-shadow: 0 0 0 1.2px rgba(255,255,255,.16), 0 36px 80px rgba(0,0,0,.75), 0 0 70px rgba(124,58,237,.28); }
+  #tscreen { position: relative; width: 520px; height: 362px; border-radius: 16px; overflow: hidden; background: #0a0b10; }
+  #trec { position: absolute; left: 0; top: 0; width: 520px; height: auto; will-change: transform; transform-origin: 0 0; }
+  #tflash { position: absolute; inset: 0; background: radial-gradient(circle at var(--fx) var(--fy), rgba(255,255,255,.9), rgba(10,11,16,0) 70%); opacity: 0; pointer-events: none; }
+
+  /* The explanation beside the phone. */
+  #panel { position: absolute; left: 430px; top: 0; bottom: 0; right: 44px; display: flex; flex-direction: column; justify-content: center; z-index: 3; }
+  #kicker { font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: #fda4af; min-height: 14px; }
+  #title { margin-top: 10px; font-size: 31px; line-height: 1.12; font-weight: 800; letter-spacing: -.02em; }
+  #title .w, #body .w { display: inline-block; will-change: transform, opacity; }
+  #body { margin-top: 14px; font-size: 15px; line-height: 1.55; color: rgba(255,255,255,.82); font-weight: 500; max-width: 440px; }
+  #steps { margin-top: 26px; display: flex; flex-direction: column; gap: 5px; }
+  .st { display: flex; align-items: center; gap: 10px; font-size: 11.5px; font-weight: 600; color: rgba(255,255,255,.38); transition: none; }
+  .st i { width: 18px; height: 18px; border-radius: 50%; flex: none; display: grid; place-items: center; font-style: normal; font-size: 9px; font-weight: 800;
+    box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.25); }
+  .st.done { color: rgba(255,255,255,.6); }
+  .st.done i { background: #22c55e; box-shadow: none; color: #fff; }
+  .st.now { color: #fff; }
+  .st.now i { background: linear-gradient(135deg, #e11d48, #a855f7); box-shadow: 0 0 14px rgba(236,72,153,.6); color: #fff; }
+
+  #brand { position: absolute; right: 44px; bottom: 20px; font-size: 12px; font-weight: 700; color: rgba(255,255,255,.7); z-index: 3; }
+  #brand b { color: #fff; } #brand b span { color: #f43f5e; }
+
+  #intro, #outro { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 60px; z-index: 4; }
+  .logo { font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
+  .logo span { color: #f43f5e; }
+  .ik { margin-top: 18px; font-size: 12px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: #fda4af; }
+  .big { margin-top: 10px; font-size: 44px; line-height: 1.06; font-weight: 800; letter-spacing: -.03em; }
+  .big em { font-style: normal; background: linear-gradient(90deg,#fb7185,#f0abfc,#c4b5fd); -webkit-background-clip: text; color: transparent; }
+  .sub { margin-top: 14px; font-size: 16px; color: rgba(255,255,255,.78); line-height: 1.4; }
+  .chips { margin-top: 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .chip { padding: 8px 16px; border-radius: 999px; background: rgba(255,255,255,.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,.16); font-weight: 700; font-size: 13px; }
+  .row { margin-top: 22px; display: flex; gap: 18px; align-items: center; justify-content: center; }
+  .cta { padding: 13px 24px; border-radius: 999px; font-size: 17px; font-weight: 800;
+    background: linear-gradient(135deg,#e11d48,#be123c); box-shadow: 0 12px 36px rgba(225,29,72,.5); }
+  .url { font-size: 15px; color: #c4b5fd; font-weight: 700; }
+  .vid { margin-top: 22px; padding: 12px 18px; border-radius: 16px; background: rgba(255,255,255,.06);
+    box-shadow: inset 0 0 0 1px rgba(196,181,253,.35); font-size: 14px; line-height: 1.45; color: rgba(255,255,255,.88); }
+  .vid b { color: #fff; } .vid .mail { color: #f0abfc; font-weight: 800; margin-left: 6px; }
+  .el { will-change: transform, opacity; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="bg" id="bg"></div>
+  <div class="grain"></div>
+  <div id="rig">
+    <div id="phone">
+      <div id="screen">
+        <div id="status"><span>9:41</span><span class="bat"></span></div>
+        <div id="notch"></div>
+        <div id="view"><img id="rec" alt="" /><div id="flash"></div></div>
+        <div id="glare"></div>
+      </div>
+    </div>
+    <div id="tablet"><div id="tscreen"><img id="trec" alt="" /><div id="tflash"></div></div></div>
+  </div>
+  <div id="panel">
+    <div id="kicker"></div>
+    <div id="title"></div>
+    <div id="body"></div>
+    <div id="steps"></div>
+  </div>
+  <div id="brand"><b>Mart<span>Nepali</span></b> · martnepali.com</div>
+  <div id="intro">
+    <div class="logo el" data-d="0">Mart<span>Nepali</span></div>
+    <div class="ik el" data-d="0.15" id="i-k"></div>
+    <div class="big el" data-d="0.25" id="i-t"></div>
+    <div class="sub el" data-d="0.45" id="i-s"></div>
+  </div>
+  <div id="outro">
+    <div class="logo el" data-d="0">Mart<span>Nepali</span></div>
+    <div class="big el" data-d="0.12" id="o-t"></div>
+    <div class="chips">
+      <div class="chip el" data-d="0.35">€0 fees · no commission</div>
+      <div class="chip el" data-d="0.45">Paid straight to your own account</div>
+      <div class="chip el" data-d="0.55">English · Deutsch · नेपाली</div>
+    </div>
+    <div class="row">
+      <div class="cta el" data-d="0.75">▶ Try it free</div>
+      <div class="url el" data-d="0.85">martnepali.com/demo</div>
+    </div>
+    <div class="vid el" data-d="1.3">🎬 <b>Want a video like this for your page?</b><span class="mail">support@eventsticketbuy.com</span></div>
+  </div>
+</div>
+<script>
+let TL = null, FR = null;
+const $ = (id) => document.getElementById(id);
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const smooth = (x) => { x = clamp(x); return x * x * (3 - 2 * x); };
+const eio = (x) => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const eout = (x) => 1 - Math.pow(1 - clamp(x), 3);
+const SW = 218, SH = 456;
+const S = SW / 390; // recording CSS px → screen px
+
+window.setup = (tl, frames) => {
+  TL = tl; FR = frames;
+  $('i-k').textContent = tl.meta.intro.kicker;
+  $('i-t').innerHTML = tl.meta.intro.title;
+  $('i-s').textContent = tl.meta.intro.sub;
+  $('o-t').innerHTML = tl.meta.outro.title;
+  $('steps').innerHTML = tl.chapters.map((c, i) => `<div class="st" data-i="${i}"><i>${i + 1}</i><span>${c.chapter}</span></div>`).join('');
+};
+
+function outToRec(o) {
+  const m = TL.map;
+  if (o <= m[0][1]) return 0;
+  let lo = 0, hi = m.length - 1;
+  while (lo < hi - 1) { const mid = (lo + hi) >> 1; if (m[mid][1] <= o) lo = mid; else hi = mid; }
+  const [r0, o0] = m[lo], [r1, o1] = m[hi];
+  return r0 + (r1 - r0) * clamp((o - o0) / Math.max(1e-6, o1 - o0));
+}
+function frameAt(r) {
+  let lo = 0, hi = FR.length - 1;
+  if (r <= FR[0].t) return FR[0];
+  while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (FR[mid].t <= r) lo = mid; else hi = mid - 1; }
+  return FR[lo];
+}
+/** 0 = phone, 1 = tablet, easing across each switch. */
+function tabletness(t) {
+  let m = 0;
+  for (const d of TL.devices || []) {
+    const p = eio((t - (d.t - 0.25)) / 0.7);
+    if (t >= d.t - 0.25) m = d.kind === 'tablet' ? p : 1 - p;
+  }
+  return clamp(m);
+}
+
+function camera(t, cx = 195, cy = 422) {
+  let best = { w: 0, z: 1, x: cx, y: cy }, through = null;
+  for (const c of TL.cams) {
+    if (t < c.a - 0.5 || t > c.b + 0.5) continue;
+    if (c.kind === 'through') {
+      if (t >= c.a && t <= c.b) through = { p: (t - c.a) / (c.b - c.a), c };
+      continue;
+    }
+    const ramp = c.kind === 'type' ? 0.45 : 0.4;
+    const w = smooth((t - c.a) / ramp) * smooth((c.b - t) / ramp);
+    if (w * (c.z - 1) > best.w * (best.z - 1)) best = { w, z: c.z, x: c.x, y: c.y };
+  }
+  let z = 1 + best.w * (best.z - 1);
+  let fx = cx + (best.x - cx) * best.w, fy = cy + (best.y - cy) * best.w;
+  let flash = 0;
+  if (through) {
+    const p = through.p;
+    z = z + (through.c.z - z) * Math.pow(p, 2.2);
+    fx = through.c.x; fy = through.c.y;
+    flash = Math.pow(p, 1.6) * 0.85;
+  }
+  for (const n of TL.navs) {
+    const d = t - (n + 0.47);
+    if (d >= 0 && d < 0.45) { z = Math.min(z, 0.93 + 0.07 * eout(d / 0.45)); flash = Math.max(flash, 0.7 * (1 - eout(d / 0.3))); }
+  }
+  return { z, fx, fy, flash };
+}
+
+let lastSrc = '', lastCh = -1;
+window.render = async (t) => {
+  const { INTRO, TOTAL, OUTRO } = TL;
+  const outroStart = TOTAL - OUTRO;
+  $('bg').style.transform = `translate(${Math.sin(t * 0.13) * 18}px, ${Math.cos(t * 0.11) * 22}px) rotate(${Math.sin(t * 0.05) * 4}deg)`;
+
+  // Intro / outro, line by line.
+  const introOut = clamp((t - (INTRO - 0.5)) / 0.45);
+  $('intro').style.opacity = 1 - introOut;
+  document.querySelectorAll('#intro .el').forEach((el) => {
+    const d = +el.dataset.d, p = eout((t - d) / 0.6);
+    el.style.opacity = p; el.style.transform = `translateY(${(1 - p) * 22 - introOut * 26}px)`;
+  });
+  const oo = t - outroStart;
+  $('outro').style.opacity = clamp(oo / 0.4);
+  document.querySelectorAll('#outro .el').forEach((el) => {
+    const d = +el.dataset.d, p = eout((oo - d) / 0.6);
+    el.style.opacity = p; el.style.transform = `translateY(${(1 - p) * 20}px)`;
+  });
+
+  // The phone: rises in, tilts gently, a small swing on every new screen.
+  const rise = eout((t - (INTRO - 0.55)) / 0.8);
+  const leave = eio((t - (outroStart - 0.2)) / 0.6);
+  let ry = 9 + Math.sin(t * 0.45) * 4, rx = 3 + Math.sin(t * 0.33) * 2, rz = Math.sin(t * 0.27) * 1, tx = 0;
+  for (const c of TL.cuts) {
+    const d = t - c;
+    if (d > -0.3 && d < 0.8) {
+      const e = d < 0.2 ? eio((d + 0.3) / 0.5) : 1 - eout((d - 0.2) / 0.6);
+      ry += 16 * e; tx -= 16 * e;
+    }
+  }
+  const ty = (1 - rise) * 560 + leave * -30;
+  const sc = (0.92 + 0.08 * rise) * (1 - 0.2 * leave);
+  // Phone ↔ counter tablet: one turns away as the other turns in.
+  const m = tabletness(t);
+  $('phone').style.opacity = rise * (1 - leave) * (1 - m);
+  $('phone').style.transform = `translate(${tx - 120 * m}px, ${ty}px) scale(${sc * (1 - 0.15 * m)}) rotateX(${rx}deg) rotateY(${ry + 50 * m}deg) rotateZ(${rz}deg)`;
+  $('tablet').style.opacity = m * (1 - leave);
+  $('tablet').style.transform = `translate(${-80 * (1 - m)}px, ${Math.sin(t * 0.4) * 3}px) rotateY(${-40 * (1 - m) + 6 + Math.sin(t * 0.35) * 2}deg) rotateX(${2 + Math.sin(t * 0.3) * 1.5}deg) scale(${0.85 + 0.15 * m})`;
+  // The explanation makes room for the wider device.
+  $('panel').style.left = 430 + 172 * m + 'px';
+  $('title').style.fontSize = 31 - 6 * m + 'px';
+  $('body').style.fontSize = 15 - 1.5 * m + 'px';
+  $('brand').style.opacity = clamp((t - INTRO) / 0.6) * (1 - leave);
+
+  // The recording, with the camera.
+  const r = outToRec(Math.max(INTRO, Math.min(t, outroStart)));
+  const f = frameAt(r);
+  const onTablet = f.dev === 'tablet';
+  const img = onTablet ? $('trec') : $('rec');
+  const src = 'rec/' + f.name;
+  if (src !== lastSrc) { img.src = src; lastSrc = src; await img.decode().catch(() => {}); }
+  const sw = onTablet ? 520 : SW, sh = onTablet ? 362 : SH, k = onTablet ? 520 / 1180 : S;
+  const cam = onTablet ? camera(t, 590, 410) : camera(t);
+  const zoom = onTablet ? 1 + (cam.z - 1) * 0.6 : cam.z;
+  const px = cam.fx * k, py = cam.fy * k;
+  const pull = (zoom - 1) * 0.35;
+  const dx = (sw / 2 - px) * pull, dy = (sh / 2 - py) * pull;
+  img.style.transform = `translate(${dx}px, ${dy}px) translate(${px}px, ${py}px) scale(${zoom}) translate(${-px}px, ${-py}px)`;
+  const fl = onTablet ? $('tflash') : $('flash');
+  fl.style.opacity = cam.flash;
+  fl.style.setProperty('--fx', px + 'px'); fl.style.setProperty('--fy', py + 'px');
+
+  // The chapter beside the phone: kicker, title word by word, then the text.
+  let ch = -1;
+  TL.chapters.forEach((c, i) => { if (t >= c.start - 0.15) ch = i; });
+  if (t < INTRO - 0.2 || t > outroStart - 0.1) ch = -1;
+  if (ch !== lastCh) {
+    const c = TL.chapters[ch];
+    $('kicker').textContent = c ? c.kicker : '';
+    $('title').innerHTML = c ? c.title.split(' ').map((w) => `<span class="w">${w}</span>`).join(' ') : '';
+    $('body').innerHTML = c ? c.body.split(' ').map((w) => `<span class="w">${w}</span>`).join(' ') : '';
+    document.querySelectorAll('.st').forEach((el, i) => { el.className = 'st' + (i < ch ? ' done' : i === ch ? ' now' : ''); el.querySelector('i').textContent = i < ch ? '✓' : String(i + 1); });
+    lastCh = ch;
+  }
+  const c = TL.chapters[ch];
+  if (c) {
+    const since = t - (c.start - 0.15);
+    $('kicker').style.opacity = eout(since / 0.4);
+    document.querySelectorAll('#title .w').forEach((w, i) => {
+      const p = eout((since - 0.05 * i) / 0.45);
+      w.style.opacity = p; w.style.transform = `translateY(${(1 - p) * 14}px)`;
+    });
+    document.querySelectorAll('#body .w').forEach((w, i) => {
+      const p = eout((since - 0.35 - 0.018 * i) / 0.4);
+      w.style.opacity = p; w.style.transform = `translateY(${(1 - p) * 8}px)`;
+    });
+  }
+  $('panel').style.opacity = clamp((t - (INTRO - 0.1)) / 0.5) * (1 - leave);
+};
+</script>
+</body>
+</html>

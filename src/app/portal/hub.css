@@ -3275,3 +3275,15 @@
   color: #c4b5fd;
   font-weight: 700;
 }
+
+/* A tool's "▶ 12s" story chapter sits on its card, outside the card's link. */
+.hub-board-cell {
+  position: relative;
+  display: grid;
+}
+.hub-board-see {
+  position: absolute;
+  right: 40px;
+  bottom: 12px;
+  z-index: 2;
+}

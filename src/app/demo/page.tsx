@@ -1,4 +1,5 @@
 import PitchVideo from '@/components/PitchVideo';
+import StoryShelf from '@/components/StoryShelf';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
@@ -149,6 +150,9 @@ export default async function DemoPage({
       )}
 
       <PitchVideo caption="Watch first: the whole thing in about a minute." />
+      <div className="container">
+        <StoryShelf title="Or watch a whole evening" />
+      </div>
 
       <div className="demo-picks">
         {PICKS.map((p) => (

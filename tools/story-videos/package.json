@@ -1,0 +1,7 @@
+{
+  "name": "story-videos",
+  "private": true,
+  "type": "module",
+  "description": "Records one business story per video (restaurant, shop, event) through the real demo and renders it with explanations beside the phone. See README.md.",
+  "dependencies": { "puppeteer-core": "^23.0.0" }
+}

@@ -9591,3 +9591,218 @@ html.tx-wait body {
 .oc-stage-new { background: rgba(59, 130, 246, 0.16); color: #93c5fd; }
 .oc-stage-cooking { background: rgba(249, 115, 22, 0.16); color: #fdba74; }
 .oc-stage-ready { background: rgba(34, 197, 94, 0.16); color: #86efac; }
+
+/* ---------- Story videos (components/StoryPlayer) ---------- */
+.sp-chip,
+.sp-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(196, 181, 253, 0.4);
+  background: rgba(139, 92, 246, 0.14);
+  color: #ddd6fe;
+  font: inherit;
+  font-weight: 700;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.sp-chip {
+  padding: 8px 14px;
+  font-size: 0.9rem;
+}
+.sp-mini {
+  padding: 3px 9px;
+  font-size: 0.72rem;
+}
+.sp-chip:hover,
+.sp-mini:hover {
+  background: rgba(139, 92, 246, 0.26);
+}
+.sp-card {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sp-card img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  opacity: 0.75;
+  transition: opacity 0.2s ease, transform 0.4s ease;
+}
+.sp-card:hover img {
+  opacity: 0.9;
+  transform: scale(1.02);
+}
+.sp-card-play {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  width: 58px;
+  height: 58px;
+  margin: -29px 0 0 -29px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 1.3rem;
+  background: linear-gradient(135deg, #e11d48, #a855f7);
+  box-shadow: 0 10px 30px rgba(225, 29, 72, 0.5);
+}
+.sp-card-text {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  gap: 2px;
+  padding: 26px 14px 12px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+}
+.sp-card-for {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fda4af;
+}
+.sp-card-len {
+  font-size: 0.78rem;
+  opacity: 0.75;
+}
+.sp-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(3, 3, 8, 0.86);
+  backdrop-filter: blur(6px);
+}
+.sp-box {
+  position: relative;
+  width: min(1180px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 14px;
+  align-items: start;
+}
+.sp-stage {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #000;
+}
+.sp-stage video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+}
+.sp-end {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  background: rgba(0, 0, 0, 0.55);
+}
+.sp-x {
+  position: absolute;
+  right: -6px;
+  top: -44px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.sp-chapters {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  max-height: 70vh;
+  overflow: auto;
+}
+.sp-chapters button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.65);
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+}
+.sp-chapters button:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.sp-chapters button.is-now {
+  background: rgba(139, 92, 246, 0.18);
+  color: #fff;
+  font-weight: 700;
+}
+.sp-n {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.1);
+}
+.sp-chapters button.is-now .sp-n {
+  background: linear-gradient(135deg, #e11d48, #a855f7);
+}
+@media (max-width: 760px) {
+  .sp-box {
+    grid-template-columns: 1fr;
+  }
+  .sp-chapters {
+    max-height: 32vh;
+  }
+}
+.ss {
+  margin: 28px auto 0;
+  max-width: 1080px;
+  text-align: center;
+}
+.ss-title {
+  margin: 0;
+  font-size: 1.4rem;
+}
+.ss-sub {
+  margin: 6px auto 16px;
+  max-width: 560px;
+  font-size: 0.92rem;
+  opacity: 0.75;
+}
+.ss-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 420px));
+  justify-content: center;
+  gap: 14px;
+}

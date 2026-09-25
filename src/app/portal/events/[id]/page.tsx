@@ -5,6 +5,9 @@ import { getStats } from '@/lib/orders';
 import { organizerPlanActive } from '@/lib/organizers';
 import { readListingName } from '@/lib/exampleShop';
 import { listWishTotals } from '@/lib/wishes';
+import { parseSlotConfig } from '@/lib/kitchen';
+import { clipForTool, storyForListing } from '@/lib/stories';
+import StoryPlayer from '@/components/StoryPlayer';
 import PlanExpired from '../../PlanExpired';
 import PortalNav from '../../PortalNav';
 import { requirePortalOrganizer } from '../../guard';
@@ -12,7 +15,10 @@ import { ToolIconView } from '../../HubIcons';
 import { listingTools } from '../../listingTools';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Tools — Organizer portal', robots: { index: false, follow: false } };
+export const metadata = {
+  title: 'Tools — Organizer portal',
+  robots: { index: false, follow: false },
+};
 
 /**
  * One listing's tool board: its four numbers, then every tool it has as a big
@@ -37,6 +43,8 @@ export default async function ListingToolsPage({ params }: { params: Promise<{ i
   // "Add to wish list" taps on this listing's items (lib/wishes) — mostly
   // "Coming soon" rows: how many would buy each the day it opens.
   const wishes = listWishTotals(organizer.id).filter((w) => w.eventId === event.id);
+  // The story video for this kind of business: each tool plays its chapter.
+  const story = storyForListing(event.kind, isShop ? parseSlotConfig(event.pickupSlots).purpose : null);
 
   const badge: Record<string, string> = {};
   if (stats.awaitingTransferOrders > 0) badge.orders = `${stats.awaitingTransferOrders} to confirm`;
@@ -45,7 +53,13 @@ export default async function ListingToolsPage({ params }: { params: Promise<{ i
   return (
     <>
       <PortalNav
-        event={{ id: event.id, name: event.name, slug: event.slug, published, kind: event.kind }}
+        event={{
+          id: event.id,
+          name: event.name,
+          slug: event.slug,
+          published,
+          kind: event.kind,
+        }}
         tab="overview"
       />
       <div className="container section hub-board">
@@ -55,6 +69,11 @@ export default async function ListingToolsPage({ params }: { params: Promise<{ i
             {name}
             {!published && <span className="badge badge-amber hub-board-draft">Not published</span>}
           </h1>
+          {story && (
+            <p style={{ margin: '10px 0 0' }}>
+              <StoryPlayer storyId={story.id} label={`Watch how it works · ${Math.round(story.length / 60)} min`} />
+            </p>
+          )}
         </header>
 
         {wishes.length > 0 && (
@@ -76,29 +95,46 @@ export default async function ListingToolsPage({ params }: { params: Promise<{ i
               ))}
             </ul>
             <p className="muted small" style={{ margin: 0 }}>
-              People tapped &ldquo;Add to wish list&rdquo; on these. Put a coming-soon {isShop ? 'item' : 'ticket'} on sale in{' '}
-              <Link href={`/portal/events/${event.id}/edit`}>the editor</Link> when you are ready.
+              People tapped &ldquo;Add to wish list&rdquo; on these. Put a coming-soon {isShop ? 'item' : 'ticket'} on
+              sale in <Link href={`/portal/events/${event.id}/edit`}>the editor</Link> when you are ready.
             </p>
           </section>
         )}
 
         <h2 className="hub-board-title">Run it</h2>
         <div className="hub-board-grid anim-fade-up anim-d1">
-          {main.map((t) => (
-            <Link key={t.key} href={t.href} className={`hub-board-tool hub-board-${t.key}`}>
-              <span className="hub-board-icon">
-                <ToolIconView icon={t.icon} />
-              </span>
-              <span className="hub-board-text">
-                <strong>{t.label}</strong>
-                <span>{t.line}</span>
-              </span>
-              {badge[t.key] ? <span className="hub-board-badge">{badge[t.key]}</span> : null}
-              <span className="hub-board-go" aria-hidden="true">
-                →
-              </span>
-            </Link>
-          ))}
+          {main.map((t) => {
+            const clip = story ? clipForTool(story, t.key) : null;
+            return (
+              <div key={t.key} className="hub-board-cell">
+                <Link href={t.href} className={`hub-board-tool hub-board-${t.key}`}>
+                  <span className="hub-board-icon">
+                    <ToolIconView icon={t.icon} />
+                  </span>
+                  <span className="hub-board-text">
+                    <strong>{t.label}</strong>
+                    <span>{t.line}</span>
+                  </span>
+                  {badge[t.key] ? <span className="hub-board-badge">{badge[t.key]}</span> : null}
+                  <span className="hub-board-go" aria-hidden="true">
+                    →
+                  </span>
+                </Link>
+                {/* This tool's chapter of the story video, beside its button. */}
+                {clip && story && (
+                  <span className="hub-board-see">
+                    <StoryPlayer
+                      storyId={story.id}
+                      start={clip.start}
+                      end={clip.end}
+                      label={clip.label}
+                      variant="mini"
+                    />
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <h2 className="hub-board-title">Set up &amp; share</h2>
