@@ -69,7 +69,7 @@ import {
 import { platformName } from '@/lib/platform';
 import { currentOrganizer, getOrganizer } from '@/lib/organizers';
 import { listingOpenTo } from '@/lib/demo';
-import { cleanTableLabel } from '@/lib/kitchen';
+import { cleanTableLabel, parseSlotConfig } from '@/lib/kitchen';
 import {
   getReferralRewardSettings,
   organizerCurrency,
@@ -440,11 +440,20 @@ export default async function EventPage({ params, searchParams }: Params) {
   const wishCounts = !preview ? wishCountsFor(event.id) : new Map<string, number>();
   const shopRating = isShop ? ratingForShop(event.id) : null;
 
-  const heroCollectLine =
+  // One chip-sized line: the first line of the collection details, cut at a
+  // word near 64 characters — a paragraph in a pill is an oval, not a chip.
+  const firstCollectLine =
     event.pickupInfo
       .split('\n')
       .map((l) => l.trim())
       .find(Boolean) ?? '';
+  const heroCollectLine =
+    firstCollectLine.length > 70 ? `${firstCollectLine.slice(0, 64).replace(/\s+\S*$/, '')}…` : firstCollectLine;
+  // A restaurant or food stall (its kitchen takes pickup times, or it sells
+  // food or sweets): its goods read as a MENU — rows with a thumbnail, the way
+  // every food app lists dishes — not as a shop's product grid.
+  const foodPlace =
+    isShop && (event.category === 'khaja-food' || event.category === 'sweets-bakery' || parseSlotConfig(event.pickupSlots).enabled);
   // A shop's collection details replace the date AND the venue in this card,
   // and are required to publish — so a published shop always has one. An event
   // still shows it only when it has something to put in it.
@@ -615,7 +624,7 @@ export default async function EventPage({ params, searchParams }: Params) {
         </span>
         <div>
           <div className="event-fact-label">Collection</div>
-          <div className="event-fact-value" style={{ whiteSpace: 'pre-line' }}>
+          <div className={`event-fact-value${event.pickupInfo.trim().length > 90 ? ' event-fact-long' : ''}`} style={{ whiteSpace: 'pre-line' }}>
             {event.pickupInfo.trim()}
           </div>
         </div>
@@ -1172,8 +1181,11 @@ export default async function EventPage({ params, searchParams }: Params) {
                 // across. Only when there are more than a screenful do they
                 // turn into pages — 4 tickets or 9 items each — that swipe
                 // (endless, arrows on a laptop, dots).
-                const perPage = isShop ? 9 : 4;
-                const gridClass = isShop ? 'tier-grid goods-grid' : 'tier-grid tier-grid-2';
+                // A menu is one list, never pages: dishes are compared by
+                // scrolling, and a row is short. A shop pages at twelve (six
+                // rows of two on a phone, four of three on a laptop).
+                const perPage = foodPlace ? Number.POSITIVE_INFINITY : isShop ? 12 : 4;
+                const gridClass = isShop ? `tier-grid goods-grid${foodPlace ? ' menu-list' : ''}` : 'tier-grid tier-grid-2';
                 if (tierCards.length <= perPage) {
                   return <div className={gridClass}>{tierCards}</div>;
                 }
@@ -1468,7 +1480,9 @@ export default async function EventPage({ params, searchParams }: Params) {
         <div className="container">
           <p className="section-kicker">{isShop ? 'From order to collection' : 'From reserve to entry'}</p>
           <h2 className="page-title">How it works</h2>
-          <ol className="step-list" style={{ maxWidth: 680 }}>
+          {/* Four cards in a row (swiped on a phone) rather than four
+              paragraphs down the page: the order of things is the point. */}
+          <ol className="step-list step-strip">
             {howItWorks(payOffer, event.kind).map((item, i) => (
               <li className="step-item" key={item.title}>
                 <span className="step-num">{i + 1}</span>
@@ -1491,20 +1505,16 @@ export default async function EventPage({ params, searchParams }: Params) {
             <div className="card" style={{ maxWidth: 680, marginTop: 18 }}>
               <div className="card-title">Bring a friend, and {organizerDisplayName} says thank you</div>
               <p className="muted small" style={{ marginTop: 0, marginBottom: 0 }}>
-                Book here and you get your own link to share. When{' '}
+                Book, then share your own link. When{' '}
                 {referralOffer.settings.threshold === 1
-                  ? 'a friend books'
-                  : `${referralOffer.settings.threshold} friends book`}{' '}
-                through it and{' '}
-                {referralOffer.settings.threshold === 1 ? 'that booking is' : 'those bookings are'}{' '}
-                confirmed as paid, {organizerDisplayName} gives you{' '}
+                  ? 'a friend books and pays'
+                  : `${referralOffer.settings.threshold} friends book and pay`}{' '}
+                through it, you get{' '}
                 <strong>
                   {formatMoney(referralOffer.settings.rewardCents, referralOffer.currency)} off
                 </strong>{' '}
-                your next booking with them. It is their own discount on their own prices — you
-                simply pay them less next time, and none of it passes through {platformName()}. Only
-                bookings {organizerDisplayName} has confirmed as paid count, and the link is yours
-                once you have booked.
+                your next booking — {organizerDisplayName}&rsquo;s own discount; none of it passes
+                through {platformName()}.
               </p>
             </div>
           )}

@@ -108,6 +108,8 @@ export default function AskOrganizerForm({
     );
   }
 
+  const started = question.trim() !== '' || name.trim() !== '' || email.trim() !== '';
+
   return (
     <div className="card glow-card" id="ask">
       <div className="card-title">Ask {organizerName} a question</div>
@@ -123,7 +125,7 @@ export default function AskOrganizerForm({
         <textarea
           id="ask-question"
           className="input"
-          rows={3}
+          rows={started ? 3 : 2}
           maxLength={MAX_QUESTION}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
@@ -131,39 +133,45 @@ export default function AskOrganizerForm({
           style={{ resize: 'vertical', fontFamily: 'inherit' }}
         />
 
-        <div className="ask-form-row">
-          <div>
-            <label className="field-label" htmlFor="ask-name">
-              Your name <span className="muted">(optional)</span>
-            </label>
-            <input
-              id="ask-name"
-              className="input"
-              value={name}
-              maxLength={80}
-              onChange={(e) => setName(e.target.value)}
-              autoComplete="name"
-            />
-          </div>
-          <div>
-            <label className="field-label" htmlFor="ask-email">
-              Email for the answer <span className="muted">(optional)</span>
-            </label>
-            <input
-              id="ask-email"
-              className="input"
-              type="email"
-              value={email}
-              maxLength={160}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-              placeholder="you@example.com"
-            />
-          </div>
-        </div>
-        <p className="muted small" style={{ margin: '6px 0 0' }}>
-          Leave the email blank to ask anonymously — the answer still appears on this page.
-        </p>
+        {/* Name and email come once there is a question: a page that opens
+            with five empty fields reads as paperwork, not as "ask away". */}
+        {started && (
+          <>
+            <div className="ask-form-row">
+              <div>
+                <label className="field-label" htmlFor="ask-name">
+                  Your name <span className="muted">(optional)</span>
+                </label>
+                <input
+                  id="ask-name"
+                  className="input"
+                  value={name}
+                  maxLength={80}
+                  onChange={(e) => setName(e.target.value)}
+                  autoComplete="name"
+                />
+              </div>
+              <div>
+                <label className="field-label" htmlFor="ask-email">
+                  Email for the answer <span className="muted">(optional)</span>
+                </label>
+                <input
+                  id="ask-email"
+                  className="input"
+                  type="email"
+                  value={email}
+                  maxLength={160}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                />
+              </div>
+            </div>
+            <p className="muted small" style={{ margin: '6px 0 0' }}>
+              Leave the email blank to ask anonymously — the answer still appears on this page.
+            </p>
+          </>
+        )}
 
         {emailGiven && !emailOk && (
           <p className="small" style={{ color: 'var(--red, #f87171)', margin: '8px 0 0' }}>

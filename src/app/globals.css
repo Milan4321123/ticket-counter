@@ -10655,3 +10655,321 @@ html.tx-wait body {
   background: #fff;
   box-shadow: 0 0 8px #ec4899, 0 0 14px #a855f7;
 }
+
+/* ======================================================================
+   Goods, redesigned for how people shop on a phone.
+
+   A shop is a PRODUCT GRID: two tiles across on a phone (one tile a row made
+   a nine-item shop ten screens long), each tile the picture, the name, the
+   price and one Order button — the description is on the item page the tile
+   opens, and the wish list is a heart on the picture, as on every shop app.
+
+   A restaurant or food stall (.menu-list) is a MENU: rows, the dish on the
+   left and its photo as a thumbnail on the right, the way food apps list
+   dishes — scanned top to bottom, compared by name and price.
+   ====================================================================== */
+
+/* The wish list as a heart on the picture — everywhere on the goods grid. */
+.goods-grid .wish-btn {
+  position: absolute;
+  z-index: 3;
+  top: 10px;
+  right: 10px;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(8, 8, 14, 0.62);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-size: 0; /* the words stay for screen readers; the heart is the button */
+}
+
+.goods-grid .wish-btn .wish-heart {
+  font-size: 1.12rem;
+}
+
+.goods-grid .wish-btn .wish-count {
+  display: none;
+}
+
+.goods-grid .wish-btn.is-on {
+  background: rgba(220, 20, 60, 0.85);
+}
+
+.goods-grid .wish-btn.is-on .wish-heart {
+  color: #fff;
+}
+
+@media (max-width: 519px) {
+  .goods-grid:not(.menu-list) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .goods-grid:not(.menu-list):has(.tier-card:only-child) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .goods-grid:not(.menu-list) .tier-card {
+    --tier-card-pad: 10px;
+    gap: 4px;
+    border-radius: 18px;
+  }
+
+  .goods-grid:not(.menu-list) .tier-card-media {
+    border-radius: 18px 18px 0 0;
+  }
+
+  .goods-grid:not(.menu-list) .tier-name {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    font-size: 0.9rem;
+    line-height: 1.3;
+  }
+
+  .goods-grid:not(.menu-list) .tier-price {
+    font-size: 1.15rem;
+  }
+
+  /* On the item page the tile opens — a tile is for choosing. */
+  .goods-grid:not(.menu-list) .tier-desc,
+  .goods-grid:not(.menu-list) .tier-card-go {
+    display: none;
+  }
+
+  .goods-grid:not(.menu-list) .tier-card-foot {
+    padding-top: 2px;
+  }
+
+  .goods-grid:not(.menu-list) .tier-card-buy {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .goods-grid .tier-card-chips {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+  }
+
+  .goods-grid .tier-card-chips .badge {
+    padding: 3px 8px;
+    font-size: 0.66rem;
+  }
+
+  .goods-grid .wish-btn {
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* ---- The menu ---- */
+.goods-grid.menu-list {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+@media (min-width: 760px) {
+  .goods-grid.menu-list,
+  .goods-grid.menu-list:has(.tier-card:nth-child(2):last-child) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 36px;
+  }
+
+  .goods-grid.menu-list:has(.tier-card:only-child) {
+    grid-template-columns: minmax(0, 560px);
+  }
+}
+
+.menu-list .tier-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px;
+  column-gap: 14px;
+  row-gap: 3px;
+  align-content: start;
+  padding: 16px 0;
+  border: 0;
+  border-bottom: 1px solid var(--border-soft);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.menu-list .tier-card::before {
+  display: none;
+}
+
+.menu-list .tier-card:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.menu-list .tier-card > * {
+  grid-column: 1;
+}
+
+.menu-list .tier-card > .tier-card-media {
+  grid-column: 2;
+  grid-row: 1 / span 6;
+  align-self: start;
+  width: 104px;
+  margin: 0;
+  border-radius: 16px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+}
+
+.menu-list .tier-card-media .tier-card-photo {
+  border-radius: 16px;
+}
+
+.menu-list .tier-card-media::after {
+  inset: 55% 0 0;
+}
+
+.menu-list .tier-card-chips {
+  left: 6px;
+  right: 6px;
+  bottom: 6px;
+}
+
+.menu-list .tier-card-chips .badge {
+  padding: 2px 6px;
+  font-size: 0.6rem;
+}
+
+.menu-list .tier-name {
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.menu-list .tier-price {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--accent-text);
+}
+
+.menu-list .tier-desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.menu-list .tier-card-foot {
+  justify-content: flex-start;
+  margin-top: 6px;
+  padding-top: 0;
+}
+
+.menu-list .tier-card-go {
+  display: none;
+}
+
+.menu-list .tier-card-buy {
+  padding: 6px 16px;
+  border-radius: 999px;
+}
+
+/* The heart on the thumbnail's corner. */
+.menu-list .wish-btn {
+  grid-column: 2;
+  grid-row: 1;
+  top: 22px;
+  right: 6px;
+  width: 30px;
+  height: 30px;
+}
+
+.menu-list .wish-btn .wish-heart {
+  font-size: 0.95rem;
+}
+
+/* The chip in the hero is one line — the rest of the collection details are
+   in their card further down. */
+.hero-chip {
+  max-width: 100%;
+}
+
+.hero-chip {
+  min-width: 0;
+}
+
+/* Collection details that run to a paragraph read as text, not as one long
+   bold label. */
+.event-fact-value.event-fact-long {
+  color: var(--text-dim);
+  font-size: 0.94rem;
+  font-weight: 450;
+  line-height: 1.6;
+}
+
+/* "How it works" as a strip of step cards: four across on a laptop, swiped
+   one and a bit at a time on a phone. */
+.step-list.step-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.step-strip .step-item {
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 20px;
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgba(139, 92, 246, 0.16), transparent 60%),
+    var(--bg-card);
+}
+
+.step-strip .step-item::before {
+  display: none;
+}
+
+.step-strip .step-item:last-child {
+  padding-bottom: 18px;
+}
+
+.step-strip .tier-desc {
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 860px) {
+  .step-list.step-strip {
+    display: flex;
+    gap: 10px;
+    margin-right: -16px;
+    margin-left: -16px;
+    padding: 2px 16px 6px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding: 0 16px;
+    scrollbar-width: none;
+  }
+
+  .step-list.step-strip::-webkit-scrollbar {
+    display: none;
+  }
+
+  .step-strip .step-item {
+    flex: 0 0 min(78%, 300px);
+    scroll-snap-align: start;
+  }
+}
