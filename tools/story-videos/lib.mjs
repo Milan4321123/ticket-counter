@@ -41,6 +41,56 @@ export function seller(what, orderId, status = '') {
   console.log(out.trim());
 }
 
+/**
+ * Real listings' pictures (not the demo's, not the site's example shops)
+ * must never appear in a video — they can be a real person's photos. Each is
+ * swapped for a drawn poster with the listing's name; their videos are not
+ * served at all.
+ */
+function realMedia() {
+  const db = new Database(DB_PATH, { readonly: true });
+  const rows = db
+    .prepare(
+      `SELECT m.id, m.mime, e.name, e.slug, e.city
+         FROM event_media m JOIN events e ON e.id = m.event_id
+         LEFT JOIN organizers o ON o.id = e.organizer_id
+        WHERE COALESCE(o.is_demo, 0) = 0 AND e.name NOT LIKE '%(example shop)%' AND e.id NOT LIKE 'seed-%'`
+    )
+    .all();
+  db.close();
+  return rows;
+}
+
+const MASK_DIR = fileURLToPath(new URL('./assets/masks/', import.meta.url));
+async function maskPoster(name, city, i) {
+  fs.mkdirSync(MASK_DIR, { recursive: true });
+  const file = MASK_DIR + name.replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 40) + '.jpg';
+  if (fs.existsSync(file)) return file;
+  const sharp = require('sharp');
+  const pal = [
+    ['#7a1030', '#12030a', '#fbbf24'],
+    ['#1e3a8a', '#060b1f', '#60a5fa'],
+    ['#4c1d95', '#0c0618', '#f0abfc'],
+    ['#065f46', '#03140f', '#6ee7b7'],
+  ][i % 4];
+  const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const words = name.replace(/\s*[—-].*$/, '').split(' ');
+  const l1 = words.slice(0, Math.ceil(words.length / 2)).join(' ');
+  const l2 = words.slice(Math.ceil(words.length / 2)).join(' ');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350">
+    <defs><radialGradient id="g" cx=".5" cy=".35" r=".85"><stop offset="0" stop-color="${pal[0]}"/><stop offset="1" stop-color="${pal[1]}"/></radialGradient></defs>
+    <rect width="100%" height="100%" fill="url(#g)"/>
+    ${Array.from({ length: 6 }, (_, k) => `<circle cx="540" cy="470" r="${120 + k * 50}" fill="none" stroke="${pal[2]}" stroke-opacity="${0.3 - k * 0.04}" stroke-width="3" stroke-dasharray="${6 + k * 3} ${10 + k * 4}"/>`).join('')}
+    <circle cx="540" cy="470" r="110" fill="${pal[2]}" opacity=".85"/>
+    <text x="540" y="505" text-anchor="middle" font-family="Helvetica Neue, Arial" font-weight="800" font-size="100" fill="${pal[1]}">♪</text>
+    <text x="540" y="930" text-anchor="middle" font-family="Helvetica Neue, Arial" font-weight="800" font-size="104" fill="#fff">${esc(l1.toUpperCase())}</text>
+    <text x="540" y="1045" text-anchor="middle" font-family="Helvetica Neue, Arial" font-weight="800" font-size="104" fill="${pal[2]}">${esc(l2.toUpperCase())}</text>
+    <text x="540" y="1150" text-anchor="middle" font-family="Helvetica Neue, Arial" font-weight="600" font-size="40" fill="#fff" opacity=".8" letter-spacing="6">${esc((city || 'LIVE').toUpperCase())}</text>
+  </svg>`;
+  await sharp(Buffer.from(svg)).jpeg({ quality: 86 }).toFile(file);
+  return file;
+}
+
 /** Read-only look into the database (a ticket code, an order id). */
 export function dbGet(sql, ...args) {
   const db = new Database(DB_PATH, { readonly: true });
@@ -65,6 +115,24 @@ export async function openRecorder(outDir) {
     args: ['--no-first-run', '--hide-scrollbars', '--lang=en', '--disable-features=Translate', '--autoplay-policy=no-user-gesture-required'],
   });
   const page = await browser.newPage();
+
+  // No real listing's photo or video ever reaches a frame (see realMedia).
+  const masked = new Map();
+  let n = 0;
+  for (const m of realMedia()) masked.set(m.id, m.mime.startsWith('video/') ? null : await maskPoster(m.name, m.city, n++));
+  await page.setRequestInterception(true);
+  page.on('request', (req) => {
+    // Faces by design: an organizer's WhatsApp photo, the team's post photos.
+    if (/\/api\/(event-photo|platform-photo)\b/.test(req.url())) return void req.respond({ status: 404, body: '' });
+    const id = req.url().match(/\/api\/media\/([0-9a-f-]{36})/)?.[1];
+    if (id && masked.has(id)) {
+      const file = masked.get(id);
+      if (!file) return void req.respond({ status: 404, body: '' });
+      return void req.respond({ status: 200, contentType: 'image/jpeg', body: fs.readFileSync(file) });
+    }
+    void req.continue();
+  });
+  console.log('masked', masked.size, 'real media');
   await page.setViewport({ width: W, height: H, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   await page.setCookie({ name: 'lang', value: 'en', url: BASE });
   page.on('dialog', (d) => void d.accept());

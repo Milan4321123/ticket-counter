@@ -65,6 +65,17 @@ export const STORIES: Story[] = [
     length: 77,
     chapters: [{"id": "home", "tool": "overview", "chapter": "Tickets on sale", "start": 3.2, "end": 8.01}, {"id": "order", "tool": "buyer", "chapter": "A guest picks seats", "start": 8.01, "end": 24.34}, {"id": "paid", "tool": "buyer", "chapter": "QR tickets", "start": 24.34, "end": 35.18}, {"id": "orders", "tool": "orders", "chapter": "New booking", "start": 35.18, "end": 39.25}, {"id": "transfer", "tool": "orders", "chapter": "Confirm a transfer", "start": 39.25, "end": 46.84}, {"id": "insights", "tool": "insights", "chapter": "Sales day by day", "start": 46.84, "end": 53.66}, {"id": "door", "tool": "checkin", "chapter": "Scan at the door", "start": 53.66, "end": 64}, {"id": "live", "tool": "live", "chapter": "Live screen", "start": 64, "end": 69.58}],
   },
+  {
+    id: 'customer',
+    audience: 'buyer',
+    title: 'Find it, ask for it, order it',
+    forWho: 'For customers',
+    icon: '🧡',
+    src: '/media/stories/customer-v2.mp4',
+    poster: '/media/stories/customer-v2-poster.jpg',
+    length: 108,
+    chapters: [{"id": "home", "tool": "home", "chapter": "Discover", "start": 3.2, "end": 10.66}, {"id": "ask", "tool": "ask", "chapter": "Ask anything", "start": 10.66, "end": 35.18}, {"id": "bazaar", "tool": "bazaar", "chapter": "The bazaar", "start": 35.18, "end": 46.97}, {"id": "order", "tool": "order", "chapter": "Order ahead", "start": 46.97, "end": 64.57}, {"id": "ready", "tool": "order", "chapter": "Watch it get ready", "start": 64.57, "end": 73.04}, {"id": "tickets", "tool": "tickets", "chapter": "Tickets for a night out", "start": 73.04, "end": 95.39}, {"id": "wish", "tool": "wish", "chapter": "Wish list", "start": 95.39, "end": 100.95}],
+  },
 ];
 
 export function storyById(id: string): Story | null {

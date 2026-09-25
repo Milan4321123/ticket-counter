@@ -7,13 +7,13 @@ import { dbGet, seller } from '../lib.mjs';
 
 const SHOP = 'sunita-s-home-kitchen';
 const ITEM = 'veg-momo-10-pcs';
-const EVENT = 'jazz-night-berlin';
 const WISH = '/e/newa-mithai-ghar/item/sel-roti-6';
 
 export const meta = {
   id: 'customer',
-  demo: false,
-  warm: ['/api/wishes?eventId=x&tierKey=y', '/', '/market?q=momo&city=Berlin&max=10', `/e/${SHOP}`, `/e/${SHOP}/item/${ITEM}`, `/e/${SHOP}/checkout`, `/e/${EVENT}`, `/e/${EVENT}/checkout`, WISH],
+  // A demo account in the background: its Dashain Night (seat map, drawn
+  // pictures) is the concert — the local events are test data.
+  warm: ['/api/wishes?eventId=x&tierKey=y', '/', '/market?q=momo&city=Berlin&max=10', `/e/${SHOP}`, `/e/${SHOP}/item/${ITEM}`, `/e/${SHOP}/checkout`, WISH],
   intro: { kicker: 'For you', title: 'Nepali events and food, near you', sub: 'Find it, ask for it, order it — in one app.' },
   outro: {
     title: 'Nepali events.<br />Nepali food.<br /><em>One app.</em>',
@@ -70,7 +70,7 @@ export const scenes = [
     chapter: 'Tickets for a night out',
     kicker: 'Going out',
     title: 'Tickets in a minute',
-    body: 'Choose your tickets, pay the organizer directly, and your QR tickets arrive — with a button to add the night to your calendar.',
+    body: 'Pick your seats on the map, pay the organizer directly, and your QR tickets arrive — one per seat, with a button for your calendar.',
     tool: 'tickets',
   },
   {
@@ -90,7 +90,7 @@ async function askChat(h, text) {
   await h.sleep(2200);
 }
 
-export async function run(h) {
+export async function run(h, L) {
   // ---- 1. Discover ----
   h.scene('home');
   await h.goto('/', { settle: 1600 });
@@ -156,27 +156,35 @@ export async function run(h) {
     await h.sleep(2400);
   }
 
-  // ---- 6. Tickets for a concert ----
+  // ---- 6. Tickets for a concert (seats on the map) ----
   h.scene('tickets');
-  await h.goto(`/e/${EVENT}`, { settle: 1000 });
+  await h.goto(`/e/${L.event.slug}`, { settle: 1000 });
   await h.dbg('event');
   await h.swipe(380);
   await h.sleep(500);
-  await h.tap('a', 'Get tickets', { nav: true, after: 1200 }).catch(async () => h.goto(`/e/${EVENT}/checkout`));
+  await h.goto(`/e/${L.event.slug}/checkout`, { settle: 1200 });
+  const pair = await h.page.evaluateHandle(() => {
+    const rows = [...document.querySelectorAll('.seatmap-row')];
+    for (const row of rows.slice(Math.floor(rows.length / 3)).concat(rows)) {
+      const seats = [...row.querySelectorAll('button.seat')];
+      for (let i = Math.floor(seats.length / 3); i < seats.length - 1; i++) {
+        if (seats[i].classList.contains('seat-free') && seats[i + 1].classList.contains('seat-free')) return [seats[i], seats[i + 1]];
+      }
+    }
+    return [];
+  });
+  for (const [, handle] of await pair.getProperties()) {
+    const el = handle.asElement();
+    if (el) await h.tap(null, null, { el, after: 600 });
+  }
   await h.dbg('ev-checkout');
-  // Two standard tickets.
-  await h.tap('main button[aria-label^="Add one"], main button', '+', { after: 400 }).catch(() => {});
-  await h.tap('main button[aria-label^="Add one"], main button', '+', { after: 400 }).catch(() => {});
   await h.typeInto('#buyer-name', 'Sita Gurung');
   await h.typeInto('#buyer-email', 'sita@example.com');
   await h.tap('label.checkbox-row', 'agree', { after: 400 }).catch(() => {});
-  await h.tap('main button.btn-primary.btn-block', undefined, { nav: true, ff: true, after: 1400 });
-  const ticketOrder = h.page.url().match(/\/order\/([^/?#]+)/)?.[1];
-  seller('paid', ticketOrder);
-  await h.goto(`/order/${ticketOrder}`, { settle: 1600 });
+  await h.tap('main button.btn-primary.btn-block', undefined, { nav: true, ff: true, after: 1600 });
   await h.dbg('tickets');
-  await h.sleep(1000);
-  // Their QR tickets, one per person.
+  await h.sleep(800);
+  // Their QR tickets, one per seat.
   const cards = await h.page.$$('.ticket-card');
   for (const c of cards.slice(0, 2)) {
     await h.page.evaluate((e) => e.scrollIntoView({ block: 'center', behavior: 'smooth' }), c);
