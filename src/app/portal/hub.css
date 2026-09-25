@@ -1412,21 +1412,29 @@
   border-color: rgba(251, 191, 36, 0.3);
 }
 
-/* The one to fill next breathes, so the eye goes there first. */
+/* The one to fill next breathes, so the eye goes there first. On its own
+   layer, so the card keeps its raised button shadow underneath. */
 .ed-card.is-next {
   border-color: rgba(251, 191, 36, 0.7);
-  animation:
-    ed-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both,
-    ed-pulse 2.2s ease-in-out 0.8s infinite;
+}
+
+.ed-card.is-next::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.8);
+  pointer-events: none;
+  animation: ed-pulse 2.2s ease-in-out 0.8s infinite;
 }
 
 @keyframes ed-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.35);
+    box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.8), 0 0 0 0 rgba(251, 191, 36, 0.4);
   }
   50% {
-    box-shadow: 0 0 0 7px rgba(251, 191, 36, 0);
+    box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.8), 0 0 0 8px rgba(251, 191, 36, 0);
   }
 }
 
@@ -1585,7 +1593,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .ed-card,
-  .ed-card.is-next,
+  .ed-card.is-next::before,
   .ed-progress-bar > span,
   .ed-progress-bar > span::after {
     animation: none;

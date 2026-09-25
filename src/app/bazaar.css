@@ -4007,3 +4007,153 @@
   gap: 8px 12px;
   margin: 0;
 }
+
+/* ======================================================================
+   Tappable cards look like buttons. Every card that IS a button or a link
+   gets the same physical treatment: a raised shadow and a lit top edge, it
+   lifts on hover and sinks when pressed, and cards without their own arrow
+   get a small round one in the corner — so nobody mistakes a door for text.
+   ====================================================================== */
+.qt-tile,
+.hub-board-tool,
+.ed-card,
+.dp-card,
+.hub-tool,
+.demo-pick,
+.item-visit-shop,
+.login-demo,
+.acc-order,
+.sr-card,
+.hub-card {
+  --press-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 8px 20px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--press-shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.09) !important;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0) 55%);
+  cursor: pointer;
+  transition:
+    transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.18s ease,
+    border-color 0.18s ease !important;
+}
+
+.qt-tile:hover,
+.hub-board-tool:hover,
+.ed-card:hover,
+.dp-card:hover,
+.hub-tool:hover,
+.demo-pick:hover,
+.item-visit-shop:hover,
+.login-demo:hover,
+.acc-order:hover,
+.sr-card:hover,
+.hub-card:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 2px 4px rgba(0, 0, 0, 0.35),
+    0 16px 34px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16) !important;
+}
+
+.qt-tile:active,
+.hub-board-tool:active,
+.ed-card:active,
+.dp-card:active,
+.hub-tool:active,
+.demo-pick:active,
+.item-visit-shop:active,
+.login-demo:active,
+.acc-order:active,
+.sr-card:active,
+.hub-card:active {
+  transform: translateY(1px) scale(0.98);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.35),
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1) !important;
+}
+
+/* The round arrow, for cards that had no "go" mark of their own. */
+.qt-tile,
+.hub-tool,
+.ed-card {
+  position: relative;
+}
+
+.qt-tile::after,
+.hub-tool::after {
+  content: '→';
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  transition:
+    transform 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.qt-tile:hover::after,
+.hub-tool:hover::after {
+  transform: translateX(3px);
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* The tile's colour on its arrow, so each door reads as its own. */
+.qt-tile::after {
+  background: rgba(var(--qt), 0.18);
+  color: rgb(var(--qt));
+  box-shadow: inset 0 0 0 1px rgba(var(--qt), 0.35);
+}
+
+/* Room for the arrow under the text. */
+.qt-tile {
+  padding-bottom: 42px !important;
+}
+
+.hub-tool {
+  padding-bottom: 42px !important;
+}
+
+@media (min-width: 721px) {
+  .qt-tile {
+    padding-bottom: 14px !important;
+    padding-right: 48px !important;
+  }
+
+  .qt-tile::after {
+    top: 50%;
+    bottom: auto;
+    transform: translateY(-50%);
+  }
+
+  .qt-tile:hover::after {
+    transform: translate(3px, -50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qt-tile,
+  .hub-board-tool,
+  .ed-card,
+  .dp-card,
+  .hub-tool,
+  .demo-pick,
+  .item-visit-shop,
+  .login-demo,
+  .acc-order,
+  .sr-card,
+  .hub-card {
+    transition: none !important;
+  }
+}
