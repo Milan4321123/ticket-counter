@@ -48,8 +48,12 @@ export default function OrganizersPage() {
           <DemoStart className="btn btn-brand btn-lg">
             ▶ Try the demo
           </DemoStart>
+          {/* Straight into the AI assistant on a blank page of the right kind. */}
+          <DemoStart to="assistant-event" className="btn btn-lg">
+            ✨ Create an event page
+          </DemoStart>
           <DemoStart to="assistant" className="btn btn-lg">
-            ✨ Try the AI assistant
+            ✨ Create a shop page
           </DemoStart>
         </div>
         <ul className="og-chips anim-fade-up anim-d3">
@@ -81,8 +85,11 @@ export default function OrganizersPage() {
             live.
           </p>
           <div className="og-cta og-cta-left">
-            <DemoStart to="assistant" className="btn btn-brand btn-lg">
-              ✨ Try the AI assistant
+            <DemoStart to="assistant-event" className="btn btn-brand btn-lg">
+              ✨ Create an event page
+            </DemoStart>
+            <DemoStart to="assistant" className="btn btn-lg">
+              ✨ Create a shop page
             </DemoStart>
           </div>
         </div>

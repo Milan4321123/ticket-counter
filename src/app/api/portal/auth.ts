@@ -97,7 +97,13 @@ export function demoPhotoGate(organizer: OrganizerRow, ip: string): NextResponse
   if (!organizer.isDemo) return null;
   const used = (
     getDb()
-      .prepare(`SELECT COUNT(*) AS n FROM event_media m JOIN events e ON e.id = m.event_id WHERE e.organizer_id = ?`)
+      // The visitor's own uploads only — not the pictures the demo came with
+      // (written while it was being built, in its first few minutes).
+      .prepare(
+        `SELECT COUNT(*) AS n FROM event_media m JOIN events e ON e.id = m.event_id
+           JOIN organizers o ON o.id = e.organizer_id
+          WHERE e.organizer_id = ? AND m.created_at > datetime(o.created_at, '+3 minutes')`
+      )
       .get(organizer.id) as { n: number }
   ).n;
   if (used >= DEMO_PHOTO_LIMIT || !rateLimit(`demo:photos:${ip}`, 40, 60 * 60_000)) {
