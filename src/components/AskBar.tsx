@@ -205,12 +205,35 @@ function AskOverlay({ w, onClose }: { w: (typeof W)['en']; onClose: () => void }
       });
       const d = (await res.json().catch(() => null)) as {
         links?: AskLink[]; results?: AskResult[]; answer?: string | null; note?: string | null; go?: boolean; error?: string; filters?: unknown;
+        action?: { type: 'setup'; kind: 'event' | 'shop' };
       } | null;
       const links = d?.links ?? [];
       const results = d?.results ?? [];
       let reply: Msg;
       const filters = d?.filters ?? undefined;
-      if (d?.go && links[0]) {
+      if (d?.action?.type === 'setup') {
+        // "Set up a shop with momo for €30…": hand this exact request to the
+        // setup assistant in the page editor (a free demo), which starts from it.
+        const kind = d.action.kind;
+        try {
+          sessionStorage.setItem('setup:ask', q);
+        } catch {
+          // No storage: the assistant opens and asks instead.
+        }
+        reply = { from: 'bot', text: d.answer ?? undefined, going: { icon: '✨', label: 'Setup assistant', href: '/demo' } };
+        window.setTimeout(() => {
+          const form = document.createElement('form');
+          form.method = 'POST';
+          form.action = '/api/demo/start';
+          const to = document.createElement('input');
+          to.type = 'hidden';
+          to.name = 'to';
+          to.value = kind === 'event' ? 'assistant-event' : 'assistant';
+          form.appendChild(to);
+          document.body.appendChild(form);
+          form.submit();
+        }, 1400);
+      } else if (d?.go && links[0]) {
         // Kept (with its answer) so the chat, reopened on the next page, still knows the filters.
         reply = { from: 'bot', going: links[0], text: d.answer ?? undefined, links, filters };
         window.setTimeout(() => (window.location.href = links[0].href), 1100);
@@ -280,9 +303,12 @@ function AskOverlay({ w, onClose }: { w: (typeof W)['en']; onClose: () => void }
               {m.thinking ? (
                 <span className="ab-dots" aria-label="…"><i /><i /><i /></span>
               ) : m.going ? (
-                <p className="ab-going">
-                  {w.opening} <strong>{m.going.icon} {m.going.label}</strong>…
-                </p>
+                <>
+                  {m.text && <p>{rich(m.text, onClose)}</p>}
+                  <p className="ab-going">
+                    {w.opening} <strong>{m.going.icon} {m.going.label}</strong>…
+                  </p>
+                </>
               ) : (
                 <>
                   {m.text && <p>{rich(m.text, onClose)}</p>}

@@ -95,10 +95,42 @@ const PAY: Answers = {
     'Payment pugepachi QR code email ma aaucha ra sadhai [tapaiko account](/account) ma huncha.',
 };
 
+const HELP: Answers = {
+  en:
+    'No problem — here is what you can do here:\n' +
+    '🎟 **Go out** — [upcoming Nepali events](/#events): concerts, Dashain and Tihar nights, tickets straight to your phone.\n' +
+    '🥟 **Eat & shop** — [the bazaar](/market): momo, sweets, groceries and crafts to collect with a QR code. Try “items under 10 euro”.\n' +
+    '🚀 **Sell** — put your own event, shop or restaurant here, free: [try the demo](/demo).\n' +
+    'Just tell me which one — or ask anything.',
+  de:
+    'Kein Problem — das kannst du hier machen:\n' +
+    '🎟 **Ausgehen** — [kommende nepalesische Events](/#events): Konzerte, Dashain- und Tihar-Abende, Tickets direkt aufs Handy.\n' +
+    '🥟 **Essen & einkaufen** — [der Basar](/market): Momo, Süßes, Lebensmittel und Handwerk, abholen mit QR-Code. Probier „Artikel unter 10 Euro“.\n' +
+    '🚀 **Verkaufen** — dein eigenes Event, deinen Laden oder dein Restaurant hier, kostenlos: [Demo ausprobieren](/demo).\n' +
+    'Sag einfach, was davon — oder frag irgendwas.',
+  ne:
+    'कुनै समस्या छैन — यहाँ यी गर्न सकिन्छ:\n' +
+    '🎟 **घुम्न** — [आउँदा नेपाली कार्यक्रम](/#events): कन्सर्ट, दशैं-तिहार साँझ, टिकट सिधै फोनमा।\n' +
+    '🥟 **खान र किन्न** — [बजार](/market): मम, मिठाई, किराना र हस्तकला, QR कोडले लिनुहोस्।\n' +
+    '🚀 **बेच्न** — आफ्नो कार्यक्रम, पसल वा रेस्टुरेन्ट यहाँ निःशुल्क: [डेमो चलाउनुहोस्](/demo)।\n' +
+    'कुन चाहिन्छ भन्नुहोस् — वा जे पनि सोध्नुहोस्।',
+  rn:
+    'Kei samasya chaina — yaha yo garna sakincha:\n' +
+    '🎟 **Ghumna** — [aauna lageka Nepali event](/#events): concert, Dashain-Tihar saanjh, ticket sidhai phone ma.\n' +
+    '🥟 **Khana ra kinna** — [bazaar](/market): momo, mithai, kirana ra hastakala, QR code le linus. “10 euro bhanda sasto khaja” lekhnus.\n' +
+    '🚀 **Bechna** — aafno event, pasal wa restaurant yaha free ma: [demo chalaunus](/demo).\n' +
+    'Kun chahincha bhannus — wa je pani sodhnus.',
+};
+
 const TOPICS: { re: RegExp; answer: Answers }[] = [
   {
+    // "I am not sure what to do", "help", "keine Ahnung", "k garne thaha chaina".
+    re: /^\s*(help|hi|hello|hey|hallo|namaste|namaskar|start|menu|\?+)\s*[!.?]*\s*$|\b(nots?\s?s?rue|not sure|dont know|don'?t know|no idea|what (can|should|do) i do|where (do|should) i start|what now|confused|lost|keine ahnung|was kann ich (hier )?(machen|tun)|k garne|ke garne|thaha chaina|thaha xaina|bujhina)\b|के गर्ने|थाहा छैन/i,
+    answer: HELP,
+  },
+  {
     // "How do I sell / put my event / open a shop", "event setup garna chahanchhu".
-    re: /\b(how (do|can|could) (i|we) (sell|list|put|add|open|create|start|advertise)|i (want|would like) to (sell|put|list|add|open|create|advertise)|sell (my|our|tickets|food)|put my (event|shop)|become (a )?(seller|organi[sz]er)|wie (kann|verkaufe|biete) ich|ich (möchte|will) (mein|meine|verkaufen|anbieten)|(event|pasal|karyakram|restaurant) (setup|set up|khol\w*|rakh\w*|banau\w*)|setup garn\w*|kasari (bechne|rakhne|kholne)|bechna chahan\w*)\b|बेच्न|राख्न चाहन्छु|सेटअप/i,
+    re: /\b((can|could|may) (i|we) (set ?up|create|make|put|list|add|sell|open|host|organi[sz]e|start|advertise|post|run)|(set ?up|create|make|host|organi[sz]e|list|post|add) (an? |my |our )?(own )?(event|shop|restaurant|concert|program|party|store|business)|how (do|can|could) (i|we) (sell|list|put|add|open|create|start|advertise|set ?up)|i (want|would like) to (sell|put|list|add|open|create|advertise)|sell (my|our|tickets|food)|put my (event|shop)|become (a )?(seller|organi[sz]er)|wie (kann|verkaufe|biete) ich|ich (möchte|will) (mein|meine|verkaufen|anbieten)|(event|pasal|karyakram|restaurant) (setup|set up|khol\w*|rakh\w*|banau\w*)|setup garn\w*|kasari (bechne|rakhne|kholne)|bechna chahan\w*)\b|बेच्न|राख्न चाहन्छु|सेटअप/i,
     answer: SELL,
   },
   {
@@ -133,14 +165,57 @@ export function aboutAnswer(q: string): string {
 }
 
 const SORRY: Record<AskLang, string> = {
-  en: 'I could not answer that one just now — a person from the team can (button below). In short:',
-  de: 'Das konnte ich gerade nicht beantworten — ein Mensch aus dem Team hilft gern (Button unten). Kurz gesagt:',
-  ne: 'अहिले यसको उत्तर दिन सकिनँ — टिमका मानिसले मद्दत गर्नुहुन्छ (तलको बटन)। छोटकरीमा:',
-  rn: 'Ahile yesko uttar dina sakina — team ko manche le help garcha (tala ko button). Chhotkari ma:',
+  en: 'I did not quite catch that — tap “Talk to a person” below for anything special.',
+  de: 'Das habe ich nicht ganz verstanden — für Besonderes tippe unten auf „Talk to a person“.',
+  ne: 'मैले ठ्याक्कै बुझिनँ — विशेष कुराका लागि तलको “Talk to a person” थिच्नुहोस्।',
+  rn: 'Maile thyakkai bujhina — bishesh kura ko lagi tala “Talk to a person” thichnus.',
 };
 
-/** When the AI is busy or unsure: say so briefly, then what the site is — never a dead end. */
+/** When the AI is busy or unsure: a friendly menu of what the site does — never a dead end. */
 export function fallbackAnswer(q: string): string {
   const lang = askLang(q);
-  return `${SORRY[lang]} ${ABOUT[lang]}`;
+  return `${HELP[lang]}\n\n${SORRY[lang]}`;
+}
+
+/**
+ * What the homepage chat's AI is told about the site — short on purpose: a
+ * 14,000-character manual made every answer slow enough to time out.
+ */
+export const ASK_CONTEXT = [
+  'MartNepali: Nepali events and a bazaar of Nepali shops in Germany (Berlin, Frankfurt, Munich, Hamburg, Darmstadt and more).',
+  'Buyers: find events and buy tickets; order food (momo, sweets), groceries, clothes, jewellery and crafts from shops and collect them with a QR code; a basket can hold items from several shops.',
+  'Payment: buyers pay each organizer or shop DIRECTLY (bank transfer with a personal reference and a QR for the banking app, PayPal, or card where the seller offers it). The money never passes through MartNepali.',
+  'After paying, QR tickets / collection codes arrive by email and are in the buyer account (/account). Sold-out events have a waitlist. Things not on sale yet can go on a wish list.',
+  'Sellers (organizers, shops, restaurants, salons): completely free, no commission. An AI helper builds the page from a few words in a chat (tickets, menus, photos, payment). Features: ticket types, student tickets, table bookings, seat maps, pickup time slots, kitchen screen, door scanner, discount codes, referral rewards, subscribe & save, reviews, insights, pages in English, German and Nepali.',
+  'To start selling: try the demo without signing up (/demo), then apply for a free account (/contact?intent=account) — a person approves it. Seller sign-in: /portal/login.',
+  'The team can design a custom page or a promo video on request (/contact).',
+].join('\n');
+
+/**
+ * "Set up a shop with momo for 30 euro and topi for 20" — not a question about
+ * selling but the request itself. The chat hands it to the setup assistant
+ * (in a free demo), which builds the page from exactly these words.
+ */
+export function setupRequest(q: string): { kind: 'event' | 'shop' } | null {
+  const t = q.toLowerCase();
+  const build =
+    /\b(set ?up|setup|create|make|build|open|start|banau\w*|khol\w*|erstell\w*|anleg\w*|eröffne\w*)\b.{0,20}\b(an? |my |our |mero |ein |einen |eine |meine?n? )?(own )?(shop|store|pasal|restaurant|kitchen|stall|event|concert|party|festival|program|programme|karyakram|laden|geschäft|veranstaltung|konzert)\b/i.test(t) ||
+    /\b(shop|pasal|event|karyakram|restaurant)\s+(setup|set up|banau\w*|khol\w*)\b/i.test(t);
+  // Only with something to build from — a price, an item, a name, a date.
+  const details = /\d|€|\beuro|\bwith\b|\bmit\b|\bsanga\b|\bitems?\b|\bcalled\b|\bnamed\b|\bmenu\b|\btickets?\b/i.test(t);
+  if (!build || !details) return null;
+  const event = /\b(event|concert|party|festival|program|programme|karyakram|veranstaltung|konzert|night|tickets?)\b/i.test(t);
+  const shop = /\b(shop|store|pasal|restaurant|kitchen|stall|laden|geschäft|items?|menu|momo|food|khaja)\b/i.test(t);
+  return { kind: event && !shop ? 'event' : 'shop' };
+}
+
+const SETUP_SAY: Record<AskLang, (kind: 'event' | 'shop') => string> = {
+  en: (k) => `Let’s build it! I am opening the setup assistant in a free demo with your request — it fills in your ${k} page, and you check it. Nothing goes live without you.`,
+  de: (k) => `Los geht’s! Ich öffne den Einrichtungs-Assistenten in einer kostenlosen Demo mit deiner Anfrage — er füllt deine ${k === 'event' ? 'Event' : 'Laden'}-Seite aus, du prüfst sie. Nichts geht ohne dich online.`,
+  ne: (k) => `बनाऔं! तपाईंको अनुरोधसहित निःशुल्क डेमोमा सेटअप सहायक खोल्दैछु — उसले ${k === 'event' ? 'कार्यक्रम' : 'पसल'} पेज भर्छ, तपाईं जाँच्नुहोस्। तपाईंबिना केही लाइभ हुँदैन।`,
+  rn: (k) => `Banaaun! Tapaiko request sanga free demo ma setup assistant kholdai chu — usle ${k === 'event' ? 'event' : 'pasal'} page bhardincha, tapai check garnus. Tapai bina kei live hudaina.`,
+};
+
+export function setupSay(q: string, kind: 'event' | 'shop'): string {
+  return SETUP_SAY[askLang(q)](kind);
 }

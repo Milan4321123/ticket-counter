@@ -8954,6 +8954,8 @@ html.tx-wait body {
   border-radius: 18px 18px 18px 4px;
   background: rgba(255, 255, 255, 0.07);
   line-height: 1.5;
+  /* Menu-style answers keep their line breaks. */
+  white-space: pre-line;
 }
 
 .ab-going strong {

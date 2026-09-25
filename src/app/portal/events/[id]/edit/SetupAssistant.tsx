@@ -698,7 +698,20 @@ export default function SetupAssistant({
 
   // ?assistant=1 (the "Try the AI assistant" door): open straight away.
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('assistant') === '1') void openChat();
+    if (new URLSearchParams(window.location.search).get('assistant') === '1') {
+      // Sent from the homepage Ask chat ("set up a shop with momo for €30…"):
+      // that request is the first message, so the seller never types it twice.
+      let handed = '';
+      try {
+        handed = sessionStorage.getItem('setup:ask') ?? '';
+        sessionStorage.removeItem('setup:ask');
+      } catch {
+        // No storage: the assistant simply opens and asks.
+      }
+      void openChat().then(() => {
+        if (handed.trim()) void send(handed.trim().slice(0, 500));
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

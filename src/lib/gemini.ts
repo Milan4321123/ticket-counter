@@ -26,8 +26,10 @@ const MODEL_LADDER = Array.from(
   new Set(
     [
       (process.env.GEMINI_MODEL || '').trim(),
-      'gemini-flash-lite-latest',
+      // Measured Sep 2026: 3.5-flash-lite answers in ~0.7s with minimal
+      // thinking; the "-latest" alias took 5-12s for the same one-liner.
       'gemini-3.5-flash-lite',
+      'gemini-flash-lite-latest',
       'gemini-3.5-flash',
       'gemini-flash-latest',
     ].filter(Boolean)
@@ -122,6 +124,13 @@ export async function geminiJson(prompt: string, options: GeminiOptions = {}): P
   return null;
 }
 
+/**
+ * Models that refused `thinkingLevel` (400). Everything else is asked to think
+ * minimally: left to itself a lite model spent 11-13 seconds reasoning before
+ * a one-line JSON reply, which is every answer timing out in a chat.
+ */
+const noThinkingLevel = new Set<string>();
+
 type Outcome =
   | { kind: 'ok'; value: unknown }
   | { kind: 'next'; status?: number; timedOut?: boolean }
@@ -142,12 +151,22 @@ async function geminiJsonOnce(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: 'application/json', maxOutputTokens },
+        generationConfig: {
+          responseMimeType: 'application/json',
+          maxOutputTokens,
+          ...(noThinkingLevel.has(model) ? {} : { thinkingConfig: { thinkingLevel: 'minimal' } }),
+        },
       }),
       signal: controller.signal,
     });
 
     if (!res.ok) {
+      // This model does not take thinkingLevel: remember, and ask again without it.
+      if (res.status === 400 && !noThinkingLevel.has(model)) {
+        noThinkingLevel.add(model);
+        clearTimeout(timer);
+        return geminiJsonOnce(model, key, prompt, options);
+      }
       if (res.status === 401 || res.status === 403) {
         warnThrottled(
           `Gemini rejected the API key (${res.status}). Check GEMINI_API_KEY — the assistant is falling back ` +
