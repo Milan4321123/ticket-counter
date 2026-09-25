@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { serverT } from '@/lib/i18nServer';
+import { currentLang, serverT } from '@/lib/i18nServer';
+import AskBar from '@/components/AskBar';
 import { ensureExampleBazaarOnce } from '@/lib/exampleBazaar';
 import { runSubscriptionSweep } from '@/lib/subscriptions';
 import ShopRail from '@/components/ShopRail';
@@ -220,6 +221,10 @@ export default async function HomePage() {
           explanations (how paying works, the FAQ) live on /organizers and on
           each checkout, where someone is actually about to use them. */}
       <h1 className="sr-only">{tr('home.title')}</h1>
+      {/* Ask anything — opens a full-screen chat over the page. */}
+      <div className="container ab-wrap">
+        <AskBar lang={await currentLang()} />
+      </div>
       {upcomingCount > 0 && (
         <div className="container pk-head">
           <p className="feed-kicker">{tr('pk.kicker')}</p>
