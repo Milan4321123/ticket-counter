@@ -37,9 +37,20 @@ for (let i = 0; i < ev.length; i++) {
     if (end) slow.push([ev[i].t, end.t]);
   }
 }
+// Scrolls inside the scenes a story names in meta.slowScroll (the finished
+// page) play slower, so the page can actually be read.
+const slowIds = new Set(story.meta.slowScroll ?? []);
+const scenesAt = ev.filter((e) => e.type === 'scene');
+const sceneOf = (t) => [...scenesAt].reverse().find((x) => x.t <= t)?.id;
+for (let i = 0; i < ev.length; i++) {
+  if (ev[i].type === 'swipe-start' && slowIds.has(sceneOf(ev[i].t))) {
+    const end = ev.slice(i).find((x) => x.type === 'swipe-end');
+    if (end) slow.push([ev[i].t, end.t, 0.62]);
+  }
+}
 function speedAt(r) {
   for (const [a, b, d] of squeeze) if (r >= a && r < b) return Math.max(BASE_SPEED, (b - a) / d);
-  for (const [a, b] of slow) if (r >= a && r < b) return 0.55;
+  for (const [a, b, v] of slow) if (r >= a && r < b) return v ?? 0.55;
   return BASE_SPEED;
 }
 const map = [];

@@ -468,6 +468,30 @@ export async function openRecorder(outDir) {
       mark('device', { kind, w: dims.width, h: dims.height });
       await sleep(300);
     },
+    /**
+     * The whole page, top to bottom, in one smooth scroll at a reading pace —
+     * stopping where the site's footer comes up.
+     */
+    async scrollThrough(pxPerSec = 620) {
+      mark('swipe-start');
+      await page.evaluate(() => window.__fhide?.());
+      await page.evaluate(async (speed) => {
+        let y = scrollY;
+        let last = performance.now();
+        for (;;) {
+          await new Promise((r) => requestAnimationFrame(r));
+          const now = performance.now();
+          const f = document.querySelector('footer');
+          const end = f ? f.getBoundingClientRect().top + scrollY - innerHeight * 0.55 : document.documentElement.scrollHeight - innerHeight;
+          y = Math.min(end, y + ((now - last) / 1000) * speed);
+          last = now;
+          window.scrollTo(0, y);
+          if (y >= end - 1) break;
+        }
+      }, pxPerSec);
+      mark('swipe-end');
+      await sleep(900);
+    },
     /** Open the camera scanner and keep its view on screen until it reads the code. */
     async scanWithCamera() {
       await h.tap('button', 'Scan with camera', { after: 100 });

@@ -79,13 +79,13 @@ export const STORIES: Story[] = [
   {
     id: 'setup',
     audience: 'seller',
-    title: 'Make your event page, step by step',
+    title: 'Make your event, shop or restaurant page — step by step',
     forWho: 'Create your page',
     icon: '✨',
-    src: '/media/stories/setup-v2.mp4',
-    poster: '/media/stories/setup-v2-poster.jpg',
-    length: 113,
-    chapters: [{"id": "start", "tool": "start", "chapter": "Create an event page", "start": 3.2, "end": 9.07}, {"id": "describe", "tool": "edit", "chapter": "Say it in one sentence", "start": 9.07, "end": 21.36}, {"id": "fill", "tool": "edit", "chapter": "It fills in the form", "start": 21.36, "end": 33.34}, {"id": "photo", "tool": "edit", "chapter": "Add your poster", "start": 33.34, "end": 41.46}, {"id": "extras", "tool": "edit", "chapter": "What’s done, what’s optional", "start": 41.46, "end": 44.18}, {"id": "tickets", "tool": "edit", "chapter": "Ticket details", "start": 44.18, "end": 60.07}, {"id": "updates", "tool": "edit", "chapter": "Post an update", "start": 60.07, "end": 69.36}, {"id": "faq", "tool": "edit", "chapter": "Answer questions first", "start": 69.36, "end": 82.75}, {"id": "design", "tool": "edit", "chapter": "Colours & style", "start": 82.75, "end": 93.57}, {"id": "preview", "tool": "edit", "chapter": "See your page", "start": 93.57, "end": 105.01}],
+    src: '/media/stories/setup-v3.mp4',
+    poster: '/media/stories/setup-v3-poster.jpg',
+    length: 130,
+    chapters: [{"id": "start", "tool": "start", "chapter": "Create an event page", "start": 3.2, "end": 9.1}, {"id": "describe", "tool": "edit", "chapter": "Say it in one sentence", "start": 9.1, "end": 21.38}, {"id": "fill", "tool": "edit", "chapter": "It fills in the form", "start": 21.38, "end": 33.33}, {"id": "photo", "tool": "edit", "chapter": "Add your poster", "start": 33.33, "end": 41.4}, {"id": "extras", "tool": "edit", "chapter": "What’s done, what’s optional", "start": 41.4, "end": 44.15}, {"id": "tickets", "tool": "edit", "chapter": "Ticket details", "start": 44.15, "end": 61.86}, {"id": "updates", "tool": "edit", "chapter": "Post an update", "start": 61.86, "end": 71.46}, {"id": "faq", "tool": "edit", "chapter": "The AI writes your FAQ", "start": 71.46, "end": 93.49}, {"id": "design", "tool": "edit", "chapter": "Colours & style", "start": 93.49, "end": 104.63}, {"id": "preview", "tool": "edit", "chapter": "Your whole page", "start": 104.63, "end": 122.15}],
   },
 ];
 
