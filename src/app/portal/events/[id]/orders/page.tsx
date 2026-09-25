@@ -35,6 +35,12 @@ function StatusBadge({ status }: { status: OrderStatus }) {
   return <span className={`badge ${cls}`}>{status}</span>;
 }
 
+/** "6 min", "2 h 5 min" since a UTC SQLite time. */
+function minutesSince(at: string): string {
+  const m = Math.max(0, Math.round((Date.now() - Date.parse(`${at.replace(' ', 'T')}Z`)) / 60_000));
+  return m < 60 ? `${m} min` : m < 1440 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${Math.floor(m / 1440)} d`;
+}
+
 function ReferenceTag({ reference }: { reference: string }) {
   return (
     <span className="mono small" style={{ whiteSpace: 'nowrap' }} translate="no">
@@ -353,10 +359,21 @@ export default async function PortalOrdersPage({
                     </div>
                   </header>
 
-                  {(k?.when || k?.table || (k && !k.when && !k.table && !k.note && !k.picks?.length)) && (
-                    <p className="oc-slot">
-                      {k.table ? `🍽 Table ${k.table}` : k.when ? `🕔 ${k.when}` : `💺 ${k.line}`}
-                    </p>
+                  {(k?.when || k?.table || (k?.line && !k.when && !k.table && !k.note && !k.picks?.length) || k?.stage) && (
+                    <div className="oc-chips">
+                      {(k.when || k.table || (k.line && !k.note && !k.picks?.length)) && (
+                        <p className="oc-slot">
+                          {k.table ? `🍽 Table ${k.table}` : k.when ? `🕔 ${k.when}` : `💺 ${k.line}`}
+                        </p>
+                      )}
+                      {/* Where it is in the kitchen, and for how long (lib/kitchen). */}
+                      {event.kind === 'shop' && k.stage && (
+                        <p className={`oc-stage oc-stage-${k.stage}`}>
+                          {{ new: '🆕 New', cooking: '🔥 Cooking', ready: '✅ Ready', done: '🤝 Handed over' }[k.stage]}
+                          {k.stageAt && k.stage !== 'done' ? ` · ${minutesSince(k.stageAt)}` : ''}
+                        </p>
+                      )}
+                    </div>
                   )}
 
                   <ul className="oc-items">

@@ -408,3 +408,38 @@
     cursor: pointer;
   }
 }
+
+/* The card's stopwatch: time in this column; amber, then red, when it waits too long. */
+.kb-timer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 2px 0 6px;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+.kb-timer-at {
+  opacity: 0.7;
+}
+.kb-timer-warn {
+  color: #fbbf24;
+  opacity: 1;
+  font-weight: 700;
+}
+.kb-timer-late {
+  color: #f87171;
+  opacity: 1;
+  font-weight: 800;
+  animation: kb-late-pulse 1.6s ease-in-out infinite;
+}
+@keyframes kb-late-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kb-timer-late {
+    animation: none;
+  }
+}

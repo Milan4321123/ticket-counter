@@ -10,6 +10,7 @@ import {
   cropTag,
   getEventById,
   getEventTiers,
+  mapsUrl,
   mediaUrl,
   parseCropRect,
   paypalMeUrl,
@@ -21,6 +22,7 @@ import { girocodePayload } from '@/lib/girocode';
 import { formatMoney } from '@/lib/money';
 import { getBaseUrl } from '@/lib/config';
 import { getOrder, getOrderItems, getTicketsForOrder, paymentReference, referralCode } from '@/lib/orders';
+import OrderTracker, { type TrackerStep } from '@/components/OrderTracker';
 import { orderPayout } from '@/lib/payout';
 import { withAnonymizedBuyer } from '@/lib/retention';
 import { getReferralRewardSettings, referralRewardsReachable } from '@/lib/referrals';
@@ -135,6 +137,51 @@ export default async function OrderPage({
       </Link>
     </div>
   ) : null;
+  // A shop order to collect (not an appointment): the live tracker — where it
+  // is, since when, and where to pick it up (components/OrderTracker).
+  const tracked =
+    event?.kind === 'shop' &&
+    parseSlotConfig(event.pickupSlots).purpose !== 'appointment' &&
+    (order.status === 'paid' || order.status === 'claimed');
+  let trackerBlock: React.ReactNode = null;
+  if (tracked && event) {
+    const codes = getTicketsForOrder(order.id);
+    const scanned = codes.length > 0 && codes.every((t) => t.checkedInAt);
+    const collectedAt = scanned
+      ? codes.map((t) => t.checkedInAt as string).sort().at(-1) ?? null
+      : kitchenInfo.handedAt;
+    const paid = order.status === 'paid';
+    const st = kitchenInfo.kitchenStatus;
+    const atTable = Boolean(kitchenInfo.tableLabel);
+    const steps: TrackerStep[] = [
+      { label: 'Ordered', at: order.createdAt, done: true },
+      { label: paid ? 'Paid' : 'Waiting for your payment', at: order.paidAt, done: paid },
+      { label: 'Being prepared', at: kitchenInfo.cookingAt, done: paid && (st !== 'new' || scanned) },
+      {
+        label: atTable ? 'Ready — on its way to your table' : 'Ready to collect',
+        at: kitchenInfo.readyAt,
+        done: paid && (st === 'ready' || st === 'done' || scanned),
+      },
+      { label: atTable ? 'Served' : 'Collected', at: collectedAt, done: paid && (st === 'done' || scanned) },
+    ];
+    const reached = steps.reduce((i, x, k) => (x.done ? k : i), 0);
+    const headline = [
+      'Order received — waiting for payment',
+      'Paid — the kitchen has your order',
+      'Being prepared',
+      atTable ? 'Ready — coming to your table' : 'Ready! Show your code at the counter',
+      atTable ? 'Served — enjoy!' : 'Collected — enjoy!',
+    ][reached];
+    trackerBlock = (
+      <OrderTracker
+        steps={steps}
+        headline={headline}
+        place={atTable ? '' : [event.venueName, event.address, event.city].filter(Boolean).join(', ')}
+        mapsHref={atTable ? null : mapsUrl(event)}
+      />
+    );
+  }
+
   const kitchenBlock =
     kitchenInfo.tableLabel || kitchenInfo.pickupSlot || kitchenInfo.note ? (
       <div className="notice anim-fade-up" style={{ marginTop: 0 }}>
@@ -146,7 +193,7 @@ export default async function OrderPage({
             {slotLabel(kitchenInfo.pickupSlot)}
           </strong>
         ) : null}
-        {kitchenInfo.kitchenStatus === 'ready' && order.status === 'paid' ? (
+        {tracked ? null : kitchenInfo.kitchenStatus === 'ready' && order.status === 'paid' ? (
           <span className="badge badge-green" style={{ marginLeft: 8 }}>
             Ready now
           </span>
@@ -326,7 +373,7 @@ export default async function OrderPage({
           </div>
         ) : null}
         {subscriptionBlock}
-        {subscriptionBlock}
+        {trackerBlock}
       {kitchenBlock}
         {seatsBlock}
         {itemsLine ? (
@@ -914,6 +961,7 @@ export default async function OrderPage({
             ? 'Payment confirmed — you’re all set. Show the code below when you collect.'
             : 'Payment confirmed — you’re all set. See you at the show!'}
       </div>
+      {trackerBlock}
       {kitchenBlock}
       {seatsBlock}
       {event?.kind === 'shop' && itemsLine ? <p className="muted small anim-fade-up">{itemsLine}</p> : null}

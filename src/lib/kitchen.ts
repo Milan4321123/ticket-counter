@@ -322,21 +322,39 @@ export function setOrderKitchenDetails(orderId: string, d: KitchenDetails): void
     .run(d.pickupSlot, d.tableLabel, d.note, Object.keys(d.choices).length ? JSON.stringify(d.choices) : null, orderId);
 }
 
-export function getOrderKitchenDetails(orderId: string): KitchenDetails & { kitchenStatus: KitchenStatus } {
+export function getOrderKitchenDetails(orderId: string): KitchenDetails & {
+  kitchenStatus: KitchenStatus;
+  cookingAt: string | null;
+  readyAt: string | null;
+  handedAt: string | null;
+} {
   const row = getDb()
     .prepare(
       `SELECT pickup_slot AS pickupSlot, table_label AS tableLabel, order_note AS note, item_choices AS choices,
-              kitchen_status AS kitchenStatus
+              kitchen_status AS kitchenStatus, kitchen_cooking_at AS cookingAt, kitchen_ready_at AS readyAt,
+              CASE WHEN kitchen_status = 'done' THEN kitchen_updated_at END AS handedAt
        FROM orders WHERE id = ?`
     )
     .get(orderId) as
-    | { pickupSlot: string | null; tableLabel: string; note: string; choices: string | null; kitchenStatus: string }
+    | {
+        pickupSlot: string | null;
+        tableLabel: string;
+        note: string;
+        choices: string | null;
+        kitchenStatus: string;
+        cookingAt: string | null;
+        readyAt: string | null;
+        handedAt: string | null;
+      }
     | undefined;
   return {
     pickupSlot: row?.pickupSlot ?? null,
     tableLabel: row?.tableLabel ?? '',
     note: row?.note ?? '',
     choices: parsePicks(row?.choices),
+    cookingAt: row?.cookingAt ?? null,
+    readyAt: row?.readyAt ?? null,
+    handedAt: row?.handedAt ?? null,
     kitchenStatus: asKitchenStatus(row?.kitchenStatus),
   };
 }
@@ -368,6 +386,11 @@ export interface KitchenTicket {
   note: string;
   paidAt: string | null;
   updatedAt: string | null;
+  /** When it went into Cooking / Ready (UTC 'YYYY-MM-DD HH:MM:SS'), or null. */
+  cookingAt: string | null;
+  readyAt: string | null;
+  /** When the buyer ordered. */
+  createdAt: string;
   items: { name: string; quantity: number; picks: string }[];
   /** Every code of the order has been scanned at the counter. */
   collected: boolean;
@@ -385,6 +408,7 @@ export function listKitchenTickets(event: EventRow, tiers: EventTierRow[]): Kitc
       `SELECT o.id, o.buyer_name AS buyerName, o.kitchen_status AS status, o.pickup_slot AS pickupSlot,
               o.table_label AS tableLabel, o.order_note AS note, o.item_choices AS choices,
               o.paid_at AS paidAt, o.kitchen_updated_at AS updatedAt,
+              o.kitchen_cooking_at AS cookingAt, o.kitchen_ready_at AS readyAt, o.created_at AS createdAt,
               (SELECT COUNT(*) FROM tickets t WHERE t.order_id = o.id) AS codes,
               (SELECT COUNT(*) FROM tickets t WHERE t.order_id = o.id AND t.checked_in_at IS NOT NULL) AS scanned
        FROM orders o
@@ -402,6 +426,9 @@ export function listKitchenTickets(event: EventRow, tiers: EventTierRow[]): Kitc
     choices: string | null;
     paidAt: string | null;
     updatedAt: string | null;
+    cookingAt: string | null;
+    readyAt: string | null;
+    createdAt: string;
     codes: number;
     scanned: number;
   }[];
@@ -431,6 +458,9 @@ export function listKitchenTickets(event: EventRow, tiers: EventTierRow[]): Kitc
       note: r.note,
       paidAt: r.paidAt,
       updatedAt: r.updatedAt,
+      cookingAt: r.cookingAt,
+      readyAt: r.readyAt,
+      createdAt: r.createdAt,
       collected,
       items: (itemsStmt.all(r.id) as { tierId: string; quantity: number }[]).map((it) => ({
         name: nameOf.get(it.tierId) ?? it.tierId,
@@ -447,10 +477,14 @@ export function setKitchenStatus(eventId: string, orderId: string, status: Kitch
   return (
     getDb()
       .prepare(
-        `UPDATE orders SET kitchen_status = ?, kitchen_updated_at = datetime('now')
-         WHERE id = ? AND event_id = ? AND status = 'paid'`
+        `UPDATE orders SET kitchen_status = @status, kitchen_updated_at = datetime('now'),
+           -- The clock of the stage it enters starts now; stages after it are
+           -- cleared, so moving a card back and forth never shows a stale time.
+           kitchen_cooking_at = CASE @status WHEN 'cooking' THEN datetime('now') WHEN 'new' THEN NULL ELSE kitchen_cooking_at END,
+           kitchen_ready_at = CASE @status WHEN 'ready' THEN datetime('now') WHEN 'new' THEN NULL WHEN 'cooking' THEN NULL ELSE kitchen_ready_at END
+         WHERE id = @orderId AND event_id = @eventId AND status = 'paid'`
       )
-      .run(status, orderId, eventId).changes > 0
+      .run({ status, orderId, eventId }).changes > 0
   );
 }
 
@@ -465,6 +499,9 @@ export interface KitchenLine {
   picks?: string[];
   /** What the buyer wrote. */
   note?: string;
+  /** Kitchen stage and when it started (UTC), for "Cooking · 6 min". */
+  stage?: KitchenStatus;
+  stageAt?: string | null;
 }
 
 export function kitchenDetailsBulk(orderIds: string[], purpose: SlotConfig['purpose'] = 'collection'): Map<string, KitchenLine> {
@@ -475,10 +512,24 @@ export function kitchenDetailsBulk(orderIds: string[], purpose: SlotConfig['purp
     const batch = orderIds.slice(i, i + 400);
     const rows = db
       .prepare(
-        `SELECT id, pickup_slot AS slot, table_label AS tableLabel, order_note AS note, item_choices AS choices
+        `SELECT id, pickup_slot AS slot, table_label AS tableLabel, order_note AS note, item_choices AS choices,
+                kitchen_status AS stage, status AS orderStatus, paid_at AS paidAt,
+                kitchen_cooking_at AS cookingAt, kitchen_ready_at AS readyAt, kitchen_updated_at AS updatedAt
          FROM orders WHERE id IN (${batch.map(() => '?').join(',')})`
       )
-      .all(...batch) as { id: string; slot: string | null; tableLabel: string; note: string; choices: string | null }[];
+      .all(...batch) as {
+      id: string;
+      slot: string | null;
+      tableLabel: string;
+      note: string;
+      choices: string | null;
+      stage: string;
+      orderStatus: string;
+      paidAt: string | null;
+      cookingAt: string | null;
+      readyAt: string | null;
+      updatedAt: string | null;
+    }[];
     for (const r of rows) {
       const parts: string[] = [];
       if (r.tableLabel) parts.push(`Table ${r.tableLabel}`);
@@ -487,8 +538,12 @@ export function kitchenDetailsBulk(orderIds: string[], purpose: SlotConfig['purp
       const chosen = Object.values(picks).map((p) => Object.values(p).join(' · ')).filter(Boolean);
       if (chosen.length) parts.push(chosen.join(' | '));
       if (r.note) parts.push(`“${r.note}”`);
-      if (parts.length)
+      const stage = asKitchenStatus(r.stage);
+      const paidOrder = r.orderStatus === 'paid';
+      if (parts.length || paidOrder)
         out.set(r.id, {
+          stage: paidOrder ? stage : undefined,
+          stageAt: !paidOrder ? null : stage === 'new' ? r.paidAt : stage === 'cooking' ? (r.cookingAt ?? r.updatedAt) : stage === 'ready' ? (r.readyAt ?? r.updatedAt) : r.updatedAt,
           line: parts.join(' — '),
           when: !r.tableLabel && r.slot ? `${purpose === 'appointment' ? 'Appointment' : 'Collect'} ${slotLabel(r.slot)}` : '',
           table: r.tableLabel,

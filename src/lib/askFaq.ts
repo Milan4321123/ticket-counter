@@ -68,16 +68,16 @@ const HOW: Answers = {
 const SELL: Answers = {
   en:
     'Wonderful — it is free, with no commission, and the money goes straight to your own account. An AI helper fills in your page from a few words: tickets, menus, photos, payment. ' +
-    '[Try it now in the demo](/demo) (no sign-up), see [how it works](/organizers), then [apply for your free account](/contact?intent=account) — a person approves it quickly.',
+    '[Build it now with the AI helper](/demo#build) (free demo, no sign-up), see [how it works](/organizers), then [apply for your free account](/contact?intent=account) — a person approves it quickly.',
   de:
     'Super — kostenlos, ohne Provision, und das Geld geht direkt auf dein eigenes Konto. Ein KI-Helfer füllt deine Seite aus ein paar Worten: Tickets, Menüs, Fotos, Zahlung. ' +
-    '[Jetzt in der Demo ausprobieren](/demo) (ohne Anmeldung), [so funktioniert es](/organizers), dann [kostenloses Konto beantragen](/contact?intent=account) — ein Mensch schaltet es schnell frei.',
+    '[Jetzt mit dem KI-Helfer bauen](/demo#build) (kostenlose Demo, ohne Anmeldung), [so funktioniert es](/organizers), dann [kostenloses Konto beantragen](/contact?intent=account) — ein Mensch schaltet es schnell frei.',
   ne:
     'राम्रो — यो निःशुल्क छ, कमिसन छैन, र पैसा सिधै तपाईंको आफ्नै खातामा आउँछ। AI सहायकले केही शब्दबाट पेज भरिदिन्छ: टिकट, मेनु, फोटो, भुक्तानी। ' +
-    '[अहिले डेमोमा चलाउनुहोस्](/demo) (साइन-अप चाहिँदैन), [कसरी चल्छ](/organizers) हेर्नुहोस्, अनि [निःशुल्क खाता माग्नुहोस्](/contact?intent=account)।',
+    '[अहिले AI सहायकसँग बनाउनुहोस्](/demo#build) (निःशुल्क डेमो, साइन-अप चाहिँदैन), [कसरी चल्छ](/organizers) हेर्नुहोस्, अनि [निःशुल्क खाता माग्नुहोस्](/contact?intent=account)।',
   rn:
     'Ekdam ramro — yo free ho, commission chaina, ani paisa sidhai tapaiko aafno account ma aaucha. AI helper le kehi shabda bata page bhardincha: ticket, menu, photo, payment. ' +
-    '[Ahile demo ma chalaunus](/demo) (sign-up chahidaina), [kasari chalcha](/organizers) hernus, ani [free account magnus](/contact?intent=account) — manche le chitto approve garcha.',
+    '[Ahile AI helper sanga banaunus](/demo#build) (free demo, sign-up chahidaina), [kasari chalcha](/organizers) hernus, ani [free account magnus](/contact?intent=account) — manche le chitto approve garcha.',
 };
 
 const PAY: Answers = {
@@ -199,12 +199,12 @@ export const ASK_CONTEXT = [
 export function setupRequest(q: string): { kind: 'event' | 'shop' } | null {
   const t = q.toLowerCase();
   const build =
-    /\b(set ?up|setup|create|make|build|open|start|banau\w*|khol\w*|erstell\w*|anleg\w*|eröffne\w*)\b.{0,20}\b(an? |my |our |mero |ein |einen |eine |meine?n? )?(own )?(shop|store|pasal|restaurant|kitchen|stall|event|concert|party|festival|program|programme|karyakram|laden|geschäft|veranstaltung|konzert)\b/i.test(t) ||
+    /\b(set ?up|setup|create|make|build|open|start|banau\w*|khol\w*|erstell\w*|anleg\w*|eröffne\w*)\b.{0,20}\b(an? |my |our |mero |ein |einen |eine |meine?n? )?(own )?(shop|store|pasal|restaurant|kitchen|stall|event|concert|party|festival|program|programme|karyakram|laden|geschäft|veranstaltung|konzert|page|site|website|listing|seite)(s|en)?\b/i.test(t) ||
     /\b(shop|pasal|event|karyakram|restaurant)\s+(setup|set up|banau\w*|khol\w*)\b/i.test(t);
   // Only with something to build from — a price, an item, a name, a date.
   const details = /\d|€|\beuro|\bwith\b|\bmit\b|\bsanga\b|\bitems?\b|\bcalled\b|\bnamed\b|\bmenu\b|\btickets?\b/i.test(t);
   if (!build || !details) return null;
-  const event = /\b(event|concert|party|festival|program|programme|karyakram|veranstaltung|konzert|night|tickets?)\b/i.test(t);
+  const event = /\b(events?|concerts?|party|festival|program|programme|karyakram|veranstaltung|konzert|night|tickets?)\b/i.test(t);
   const shop = /\b(shop|store|pasal|restaurant|kitchen|stall|laden|geschäft|items?|menu|momo|food|khaja)\b/i.test(t);
   return { kind: event && !shop ? 'event' : 'shop' };
 }

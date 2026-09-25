@@ -1375,6 +1375,10 @@ function migrateKitchen(db: Database.Database): void {
   if (!orderCols.includes('item_choices')) db.exec(`ALTER TABLE orders ADD COLUMN item_choices TEXT`);
   if (!orderCols.includes('kitchen_status')) db.exec(`ALTER TABLE orders ADD COLUMN kitchen_status TEXT NOT NULL DEFAULT ''`);
   if (!orderCols.includes('kitchen_updated_at')) db.exec(`ALTER TABLE orders ADD COLUMN kitchen_updated_at TEXT`);
+  // When the order reached each stage, so the board and the buyer can see how
+  // long it has been cooking / waiting at the counter.
+  if (!orderCols.includes('kitchen_cooking_at')) db.exec(`ALTER TABLE orders ADD COLUMN kitchen_cooking_at TEXT`);
+  if (!orderCols.includes('kitchen_ready_at')) db.exec(`ALTER TABLE orders ADD COLUMN kitchen_ready_at TEXT`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_orders_event_slot ON orders(event_id, pickup_slot)`);
 }
 

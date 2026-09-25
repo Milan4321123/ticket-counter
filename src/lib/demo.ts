@@ -741,6 +741,19 @@ function seedKitchen(shopId: string): void {
       `-${15 + i * 9} minutes`,
       id
     );
+    // The stage clocks (lib/kitchen), so the board's stopwatches and the
+    // buyer's tracker show believable times: cooking started when it last
+    // moved (or ~10 minutes before it was ready).
+    db.prepare(
+      `UPDATE orders SET
+         created_at = datetime(paid_at, '-3 minutes'),
+         kitchen_cooking_at = CASE kitchen_status WHEN 'cooking' THEN kitchen_updated_at
+                                  WHEN 'ready' THEN datetime(kitchen_updated_at, '-9 minutes')
+                                  WHEN 'done' THEN datetime(kitchen_updated_at, '-15 minutes') END,
+         kitchen_ready_at = CASE kitchen_status WHEN 'ready' THEN kitchen_updated_at
+                                WHEN 'done' THEN datetime(kitchen_updated_at, '-4 minutes') END
+       WHERE id = ?`
+    ).run(id);
   });
 }
 

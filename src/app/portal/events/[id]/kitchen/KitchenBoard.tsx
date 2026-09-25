@@ -18,9 +18,34 @@ interface Ticket {
   tableLabel: string;
   note: string;
   paidAt: string | null;
+  updatedAt: string | null;
+  cookingAt: string | null;
+  readyAt: string | null;
+  createdAt: string;
   items: { name: string; quantity: number; picks: string }[];
   collected: boolean;
 }
+
+/** SQLite's UTC 'YYYY-MM-DD HH:MM:SS' as ms. */
+const utcMs = (s: string | null | undefined) => (s ? Date.parse(`${s.replace(' ', 'T')}Z`) : NaN);
+
+/**
+ * How long a card has sat in its column, and whether that is too long:
+ * a new order nobody started, food cooking unusually long, or a finished
+ * order waiting at the counter. Minutes: [amber from, red from].
+ */
+const LIMITS: Record<'new' | 'cooking' | 'ready', [number, number]> = { new: [5, 10], cooking: [15, 25], ready: [10, 20] };
+
+function stageClock(t: Ticket, now: number): { mins: number; level: '' | 'warn' | 'late' } {
+  if (t.status === 'done') return { mins: 0, level: '' };
+  const start = t.status === 'new' ? utcMs(t.paidAt ?? t.createdAt) : t.status === 'cooking' ? utcMs(t.cookingAt ?? t.updatedAt) : utcMs(t.readyAt ?? t.updatedAt);
+  const mins = Number.isFinite(start) ? Math.max(0, Math.floor((now - start) / 60_000)) : 0;
+  const [warn, late] = LIMITS[t.status];
+  return { mins, level: mins >= late ? 'late' : mins >= warn ? 'warn' : '' };
+}
+
+const berlinTime = (s: string) =>
+  Number.isFinite(utcMs(s)) ? new Date(utcMs(s)).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' }) : '';
 
 const POLL_MS = 6000;
 
@@ -80,6 +105,7 @@ export default function KitchenBoard({
   const [busy, setBusy] = useState<string | null>(null);
   const [fresh, setFresh] = useState<Set<string>>(new Set());
   const [clock, setClock] = useState('');
+  const [now, setNow] = useState(() => Date.now());
   const known = useRef<Set<string> | null>(null);
   const soundRef = useRef(sound);
   soundRef.current = sound;
@@ -146,8 +172,10 @@ export default function KitchenBoard({
   }, [load]);
 
   useEffect(() => {
-    const tick = () =>
+    const tick = () => {
+      setNow(Date.now());
       setClock(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' }));
+    };
     tick();
     const t = setInterval(tick, 15_000);
     return () => clearInterval(t);
@@ -265,6 +293,22 @@ export default function KitchenBoard({
                       <span className="kb-ref">#{t.reference}</span>
                     </div>
                     <div className="kb-name" translate="no">{t.buyerName}</div>
+                    {(() => {
+                      // How long in this column — the board's own stopwatch.
+                      const c = stageClock(t, now);
+                      const word =
+                        mode === 'appointment'
+                          ? { new: 'booked', cooking: 'in progress', ready: 'finished', done: '' }[t.status]
+                          : { new: 'waiting', cooking: 'cooking', ready: 'ready, waiting', done: '' }[t.status];
+                      return (
+                        <p className={`kb-timer${c.level ? ` kb-timer-${c.level}` : ''}`}>
+                          <span>
+                            ⏱ {word} {c.mins < 1 ? 'just now' : `${c.mins} min`}
+                          </span>
+                          <span className="kb-timer-at">ordered {berlinTime(t.createdAt)}</span>
+                        </p>
+                      );
+                    })()}
                     <ul className="kb-items">
                       {t.items.map((it) => (
                         <li key={it.name}>

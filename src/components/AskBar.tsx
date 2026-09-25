@@ -65,6 +65,45 @@ const W: Record<Lang, { pill: string; hello: string; sub: string; ph: string; id
   },
 };
 
+/**
+ * Into the setup assistant: a free demo, a blank shop or event draft in the
+ * editor, the assistant open — with `ask` (when given) as its first message.
+ * A POST, as the demo's own button does (a new account never comes from a link).
+ */
+function startSetup(kind: 'event' | 'shop', ask?: string) {
+  try {
+    if (ask) sessionStorage.setItem('setup:ask', ask);
+  } catch {
+    // No storage: the assistant opens and asks instead.
+  }
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/api/demo/start';
+  const to = document.createElement('input');
+  to.type = 'hidden';
+  to.name = 'to';
+  to.value = kind === 'event' ? 'assistant-event' : 'assistant';
+  form.appendChild(to);
+  document.body.appendChild(form);
+  form.submit();
+}
+
+/** Shop or event, from what the visitor said last in this chat. */
+function guessKind(): 'event' | 'shop' {
+  try {
+    const chat = JSON.parse(sessionStorage.getItem('ask:chat:v1') || '[]') as { from: string; text?: string }[];
+    const said = chat.filter((m) => m.from === 'me').slice(-3).map((m) => m.text ?? '').join(' ');
+    const event = /\b(events?|concerts?|tickets?|party|festival|karyakram|veranstaltung|konzert|night)\b/i.test(said);
+    const shop = /\b(shop|store|pasal|restaurant|kitchen|momo|food|menu|items?|laden)\b/i.test(said);
+    return event && !shop ? 'event' : 'shop';
+  } catch {
+    return 'shop';
+  }
+}
+
+/** "/demo#build" in an answer is the build button, not a page. */
+const isBuild = (href: string) => href === '/demo#build';
+
 /** Answer text with its "[label](/path)" links made real (site paths only). */
 function rich(text: string, onClose: () => void) {
   const out: ReactNode[] = [];
@@ -75,7 +114,19 @@ function rich(text: string, onClose: () => void) {
     if (m.index > last) out.push(text.slice(last, m.index));
     if (m[1]) {
       out.push(
-        <Link key={m.index} href={m[2]} className="ab-inline" onClick={onClose}>
+        <Link
+          key={m.index}
+          href={m[2]}
+          className="ab-inline"
+          onClick={(e) => {
+            if (isBuild(m![2])) {
+              e.preventDefault();
+              startSetup(guessKind());
+              return;
+            }
+            onClose();
+          }}
+        >
           {m[1]}
         </Link>
       );
@@ -215,24 +266,8 @@ function AskOverlay({ w, onClose }: { w: (typeof W)['en']; onClose: () => void }
         // "Set up a shop with momo for €30…": hand this exact request to the
         // setup assistant in the page editor (a free demo), which starts from it.
         const kind = d.action.kind;
-        try {
-          sessionStorage.setItem('setup:ask', q);
-        } catch {
-          // No storage: the assistant opens and asks instead.
-        }
         reply = { from: 'bot', text: d.answer ?? undefined, going: { icon: '✨', label: 'Setup assistant', href: '/demo' } };
-        window.setTimeout(() => {
-          const form = document.createElement('form');
-          form.method = 'POST';
-          form.action = '/api/demo/start';
-          const to = document.createElement('input');
-          to.type = 'hidden';
-          to.name = 'to';
-          to.value = kind === 'event' ? 'assistant-event' : 'assistant';
-          form.appendChild(to);
-          document.body.appendChild(form);
-          form.submit();
-        }, 1400);
+        window.setTimeout(() => startSetup(kind, q), 1400);
       } else if (d?.go && links[0]) {
         // Kept (with its answer) so the chat, reopened on the next page, still knows the filters.
         reply = { from: 'bot', going: links[0], text: d.answer ?? undefined, links, filters };
@@ -315,7 +350,19 @@ function AskOverlay({ w, onClose }: { w: (typeof W)['en']; onClose: () => void }
                   {m.links && m.links.length > 0 && (
                     <div className="ab-links">
                       {m.links.map((l) => (
-                        <Link key={l.href} href={l.href} className="ab-link" onClick={onClose}>
+                        <Link
+                          key={l.href}
+                          href={l.href}
+                          className={`ab-link${isBuild(l.href) ? ' is-build' : ''}`}
+                          onClick={(e) => {
+                            if (isBuild(l.href)) {
+                              e.preventDefault();
+                              startSetup(guessKind());
+                              return;
+                            }
+                            onClose();
+                          }}
+                        >
                           <span aria-hidden="true">{l.icon}</span> {l.label} →
                         </Link>
                       ))}
