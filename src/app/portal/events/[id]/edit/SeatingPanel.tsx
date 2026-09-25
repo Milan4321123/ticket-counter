@@ -52,6 +52,44 @@ export default function SeatingPanel({ eventId, initial, tiers, taken }: Props) 
     setSection(sec, { blocked: [...b] });
   }
 
+  /** One-tap starting layouts — only while nothing has been sold on the map. */
+  const anySold = Object.keys(taken).length > 0;
+  const t0 = seatable[0]?.tierKey ?? '';
+  const tVip = (seatable.find((t) => /vip|front|premium/i.test(t.name)) ?? seatable[1] ?? seatable[0])?.tierKey ?? '';
+  const LAYOUTS: { label: string; sections: SeatMapSection[] }[] = [
+    { label: 'Small room · 5 × 10', sections: [{ ...blankSection(0, t0, 'A'), name: 'Seats', rows: 5, seatsPerRow: 10, aislesAfter: [5] }] },
+    { label: 'Hall · 10 × 20', sections: [{ ...blankSection(0, t0, 'A'), name: 'Hall', rows: 10, seatsPerRow: 20, aislesAfter: [5, 15] }] },
+    {
+      label: 'VIP front + main',
+      sections: [
+        { ...blankSection(0, tVip, 'A'), name: 'VIP', rows: 2, seatsPerRow: 12, aislesAfter: [6] },
+        { ...blankSection(1, t0, 'C'), name: 'Main', rows: 8, seatsPerRow: 16, aislesAfter: [8] },
+      ],
+    },
+  ];
+
+  /** − n + for a number that people nudge rather than type. */
+  const stepper = (id: string, value: number, min: number, max: number, onChange: (n: number) => void) => (
+    <div className="sp-step">
+      <button type="button" aria-label="Fewer" onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min}>
+        −
+      </button>
+      <input
+        id={id}
+        className="input"
+        type="number"
+        inputMode="numeric"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(Math.max(min, Math.min(max, Math.floor(Number(e.target.value) || min))))}
+      />
+      <button type="button" aria-label="More" onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max}>
+        +
+      </button>
+    </div>
+  );
+
   const totalSeats = map.sections.reduce((n, s) => n + s.rows * s.seatsPerRow - s.blocked.length, 0);
 
   async function save() {
@@ -95,8 +133,7 @@ export default function SeatingPanel({ eventId, initial, tiers, taken }: Props) 
       <div>
         <div className="card-title">Reserved seating</div>
         <p className="muted small" style={{ margin: 0 }}>
-          Lay out your hall and buyers pick exact seats at checkout — every seat can only be sold once. Each section is
-          sold as one ticket type; saving sets that type&rsquo;s capacity to its number of seats.
+          Buyers pick their exact seat at checkout. Each section sells as one ticket type.
         </p>
       </div>
 
@@ -111,6 +148,19 @@ export default function SeatingPanel({ eventId, initial, tiers, taken }: Props) 
           </span>
         </span>
       </label>
+
+      {map.enabled && (
+      <>
+      {!anySold && (
+        <div className="ks-presets">
+          <span className="muted small">Start from:</span>
+          {LAYOUTS.map((l) => (
+            <button key={l.label} type="button" className="ks-chip" onClick={() => setMap((m) => ({ ...m, sections: l.sections }))}>
+              {l.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="field" style={{ margin: 0, maxWidth: 260 }}>
         <label htmlFor="seat-stage">Stage label</label>
@@ -143,12 +193,16 @@ export default function SeatingPanel({ eventId, initial, tiers, taken }: Props) 
               </div>
               <div className="field" style={{ margin: 0 }}>
                 <label htmlFor={`sr-${s.id}`}>Rows</label>
-                <input id={`sr-${s.id}`} className="input" type="number" min={1} max={30} value={s.rows} onChange={(e) => setSection(i, { rows: Math.max(1, Math.min(30, Math.floor(Number(e.target.value) || 1))) })} />
+                {stepper(`sr-${s.id}`, s.rows, 1, 30, (n) => setSection(i, { rows: n }))}
               </div>
               <div className="field" style={{ margin: 0 }}>
                 <label htmlFor={`sp-${s.id}`}>Seats per row</label>
-                <input id={`sp-${s.id}`} className="input" type="number" min={1} max={40} value={s.seatsPerRow} onChange={(e) => setSection(i, { seatsPerRow: Math.max(1, Math.min(40, Math.floor(Number(e.target.value) || 1))) })} />
+                {stepper(`sp-${s.id}`, s.seatsPerRow, 1, 40, (n) => setSection(i, { seatsPerRow: n }))}
               </div>
+            </div>
+            <details className="bf-inline" style={{ marginTop: 10 }}>
+              <summary>+ First row letter and aisles</summary>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10 }}>
               <div className="field" style={{ margin: 0 }}>
                 <label htmlFor={`sf-${s.id}`}>First row</label>
                 <select id={`sf-${s.id}`} className="input" value={s.firstRow} onChange={(e) => setSection(i, { firstRow: e.target.value })}>
@@ -176,7 +230,8 @@ export default function SeatingPanel({ eventId, initial, tiers, taken }: Props) 
                   }
                 />
               </div>
-            </div>
+              </div>
+            </details>
             {map.sections.length > 1 && (
               <button
                 type="button"
@@ -212,7 +267,10 @@ export default function SeatingPanel({ eventId, initial, tiers, taken }: Props) 
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+      </>
+      )}
+
+      <div className="ks-save">
         <button type="button" className="btn btn-brand" onClick={() => void save()} disabled={busy}>
           {busy ? 'Saving…' : 'Save seating'}
         </button>
