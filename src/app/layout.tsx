@@ -6,6 +6,7 @@ import Analytics from '@/components/Analytics';
 import ConsentBanner from '@/components/ConsentBanner';
 import ContactBubble from '@/components/ContactBubble';
 import Logo from '@/components/Logo';
+import LogoMotion from '@/components/LogoMotion';
 import { getBaseUrl } from '@/lib/config';
 import { OG_HEIGHT, OG_WIDTH } from '@/lib/ogCard';
 import { SITE_META_DESCRIPTION, SITE_NAME, jsonLdScript, siteJsonLd } from '@/lib/seo';
@@ -123,6 +124,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* Everything the dictionary does not cover, in the visitor's language. */}
         {lang !== 'en' && <AutoTranslate lang={lang} />}
         <ServiceWorkerRegistrar />
+        {/* Stills the waving logo for visitors who asked for less motion. */}
+        <LogoMotion />
         {/* Who publishes this site. Site-wide rather than home-page-only so that
             an event page arriving cold from a search result still identifies its
             publisher — that is the link Google needs to attribute a rich result

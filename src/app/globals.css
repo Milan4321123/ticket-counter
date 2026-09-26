@@ -1593,10 +1593,59 @@ summary {
 
 .logo-word-np {
   color: #fff;
+  /* Depth: the letters stand a few pixels off the page. */
+  text-shadow:
+    0 1px 0 #c9c9d6,
+    0 2px 0 #8f8fa3,
+    0 3px 5px rgba(0, 0, 0, 0.55);
 }
 
+/* The accent word in lit crimson with a shine that passes over it now and
+   then, standing off the page the same way (drop-shadow, because text-shadow
+   shows through gradient-filled letters). */
 .logo-word-co {
   color: var(--brand);
+  background: linear-gradient(100deg, #ff5c78 0%, #dc143c 30%, #ffb3c1 48%, #dc143c 62%, #a80d2d 100%);
+  background-size: 260% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 1px 0 #9c0e2c) drop-shadow(0 1px 0 #6e0a20) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+  animation: logo-shine 5.2s ease-in-out infinite;
+}
+
+@keyframes logo-shine {
+  0%,
+  58% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0% 0;
+  }
+}
+
+/* The flag stands off the page too, and leans in a little under the pointer. */
+.logo-mark {
+  flex: none;
+  overflow: visible;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.45)) drop-shadow(0 0 8px rgba(220, 20, 60, 0.25));
+  transition: transform 0.35s var(--ease-out);
+}
+
+a:hover > .logo-lockup .logo-mark,
+.logo-lockup:hover .logo-mark {
+  transform: rotate(-5deg) scale(1.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo-word-co {
+    animation: none;
+  }
+
+  .logo-mark {
+    transition: none;
+  }
 }
 
 /* ---------- Platform CTA button ---------- */
