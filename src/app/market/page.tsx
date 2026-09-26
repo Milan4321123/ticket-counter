@@ -28,6 +28,7 @@ import {
   queryTerms,
   searchSuggestions,
   sortShopItems,
+  TICKETS_SHELF,
 } from '@/lib/marketItems';
 import type { Facet } from '@/lib/marketItems';
 import {
@@ -83,6 +84,18 @@ interface Props {
     that scrolls is fine; a row that scrolls past forty sellers is a list
     nobody reaches the end of, and the search box finds the rest by name. */
 const MAX_TOWN_CHIPS = 10;
+
+/** Each department's picture on its tile. */
+const DEPT_ICON: Record<string, string> = {
+  tickets: '🎟️',
+  'khaja-food': '🍛',
+  'sweets-bakery': '🍬',
+  'groceries-spices': '🌶️',
+  'clothing-fabrics': '👗',
+  jewellery: '💍',
+  handicrafts: '🪔',
+  other: '✨',
+};
 const MAX_SELLER_CHIPS = 40;
 
 /**
@@ -253,7 +266,9 @@ export default async function MarketPage({ searchParams }: Props) {
   // read beside listShopItems' five — fixed is the rule that matters, never a
   // reader inside a loop.
   const snapshot = loadFeedSnapshot(shops);
-  const all = listShopItems();
+  // Everything on the platform that can be bought: goods, food, and every
+  // upcoming event's tickets (the "Event tickets" shelf).
+  const all = listShopItems({ tickets: true });
   const results = filterShopItems(all, f);
 
   // Every facet counts against the items matching every OTHER active filter,
@@ -470,7 +485,7 @@ export default async function MarketPage({ searchParams }: Props) {
 
       <section className="section bz-wall">
         <div className="container">
-          {shops.length === 0 ? (
+          {shops.length === 0 && all.length === 0 ? (
             // Zero shops ever: the state the page launches in. It still has to
             // be worth arriving at — say what is coming, and invite the person
             // who could stock the first shelf.
@@ -521,11 +536,32 @@ export default async function MarketPage({ searchParams }: Props) {
               {/* Departments: "All" and the seven shelves, each a toggle. The
                   Nepali name leads, small, because it is the word a Nepali
                   shopper recognises first; the English label is the translation. */}
-              <nav className="bz-chips" aria-label="Departments">
+              <nav className="bz-chips bz-chips-dept" aria-label="Departments">
                 <Chip href={hrefFor(query, { category: '' })} on={!query.category}>
+                  <span className="bz-chip-icon" aria-hidden="true">
+                    🛍️
+                  </span>
                   <span>{tr('bz.all')}</span>
                   <span className="bz-chip-count">{forShelf.length}</span>
                 </Chip>
+                {/* Tickets first: every upcoming event, bought right here. */}
+                {(shelfTotals.get(TICKETS_SHELF.key) ?? 0) > 0 && (
+                  <Chip
+                    href={hrefFor(query, { category: query.category === TICKETS_SHELF.key ? '' : TICKETS_SHELF.key })}
+                    on={query.category === TICKETS_SHELF.key}
+                    muted={(shelfCounts.get(TICKETS_SHELF.key) ?? 0) === 0 && query.category !== TICKETS_SHELF.key}
+                    label={TICKETS_SHELF.label}
+                  >
+                    <span className="bz-chip-icon" aria-hidden="true">
+                      {DEPT_ICON.tickets}
+                    </span>
+                    <span className="bz-chip-np" lang="ne">
+                      {TICKETS_SHELF.np}
+                    </span>
+                    <span>{TICKETS_SHELF.label}</span>
+                    <span className="bz-chip-count">{shelfCounts.get(TICKETS_SHELF.key) ?? 0}</span>
+                  </Chip>
+                )}
                 {SHOP_CATEGORIES.map((shelf) => {
                   const count = shelfCounts.get(shelf.key) ?? 0;
                   const on = query.category === shelf.key;
@@ -541,6 +577,9 @@ export default async function MarketPage({ searchParams }: Props) {
                       muted={count === 0 && !on}
                       label={`${shelf.label}${count === 0 ? ' — nothing here yet' : ''}`}
                     >
+                      <span className="bz-chip-icon" aria-hidden="true">
+                        {DEPT_ICON[shelf.key] ?? '✨'}
+                      </span>
                       <span className="bz-chip-np" lang="ne">
                         {shelf.np}
                       </span>
@@ -849,7 +888,7 @@ export default async function MarketPage({ searchParams }: Props) {
                         <strong>
                           Everything on sale — {total} {noun}
                         </strong>{' '}
-                        from {shopCount === 1 ? 'one shop' : `${shopCount} shops`}.{' '}
+                        from {shopCount === 1 ? 'one seller' : `${shopCount} sellers`}.{' '}
                       </>
                     )}
                     {totalPages > 1 ? (

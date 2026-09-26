@@ -17,7 +17,8 @@
 import { relatedWords } from './bazaarWords';
 import { SHOP_CATEGORIES, categoryLabel } from './categories';
 import { readListingName } from './exampleShop';
-import { listPublishedEvents, tierPhoto } from './events';
+import { getDb } from './db';
+import { listPublishedEvents, tierHasItemPage, tierPhoto } from './events';
 import type { EventMediaRow, EventRow, EventTierRow } from './events';
 import { loadFeedSnapshot } from './feedSnapshot';
 import { ratingsForItems } from './reviews';
@@ -110,6 +111,12 @@ export interface ShopItem {
   /** The item's own page, which already renders all of this properly. */
   href: string;
   /**
+   * An event's ticket type rather than a shop's goods (the "Event tickets"
+   * shelf): `shopName` is then the EVENT, `seller` its organizer — the one
+   * the buyer pays, named on the tile — and `when` its date as written.
+   */
+  ticket?: { when: string; seller: string };
+  /**
    * Everything the search box looks in, lower-cased once at read time.
    *
    * Folded here rather than per keystroke-worth-of-request so a search over a
@@ -146,8 +153,37 @@ export interface ShopItem {
  * season), and visible tiers only (a hidden row is off the seller's own page,
  * so it must not be reachable from a bazaar-wide one).
  */
-export function listShopItems(): ShopItem[] {
-  const shops = listPublishedEvents().filter((e) => e.kind === 'shop');
+/** The shelf every event's tickets sit on in the bazaar — not a shop category. */
+export const TICKETS_SHELF = { key: 'tickets', label: 'Event tickets', np: 'टिकट' } as const;
+
+/** Today in Berlin, YYYY-MM-DD — an event dated before it is over. */
+function todayBerlin(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date());
+}
+
+/** Organizer names for the given ids, in one statement. */
+function organizerNames(ids: string[]): Map<string, string> {
+  const out = new Map<string, string>();
+  const unique = [...new Set(ids)];
+  if (!unique.length) return out;
+  const rows = getDb()
+    .prepare(`SELECT id, name FROM organizers WHERE id IN (${unique.map(() => '?').join(',')})`)
+    .all(...unique) as { id: string; name: string }[];
+  for (const r of rows) out.set(r.id, r.name);
+  return out;
+}
+
+/**
+ * `tickets: true` (the bazaar itself): every UPCOMING event's ticket types
+ * too, on the "Event tickets" shelf — the bazaar is where everything on the
+ * platform can be bought. Everywhere else asks for goods only.
+ */
+export function listShopItems(opts: { tickets?: boolean } = {}): ShopItem[] {
+  const today = todayBerlin();
+  const shops = listPublishedEvents().filter(
+    (e) => e.kind === 'shop' || (opts.tickets === true && e.kind === 'event' && !(e.eventDate && e.eventDate < today))
+  );
+  const sellers = organizerNames(shops.filter((e) => e.kind === 'event').map((e) => e.organizerId));
   const snapshot = loadFeedSnapshot(shops);
   // Keyed `${eventId}:${tierKey}`, and holding an entry ONLY for items somebody
   // has actually reviewed — a miss below is the honest answer for the other
@@ -173,18 +209,23 @@ export function listShopItems(): ShopItem[] {
 
     const state = ticketState(shop, tiers, availability);
     const { name: shopName, isExample } = readListingName(shop.name);
-    const categoryKey = shop.category;
-    const categoryName = categoryLabel(categoryKey);
+    const isEvent = shop.kind === 'event';
+    const categoryKey = isEvent ? TICKETS_SHELF.key : shop.category;
+    const categoryName = isEvent ? TICKETS_SHELF.label : categoryLabel(categoryKey);
+    const ticket = isEvent ? { when: shop.dateDisplay || shop.eventDate || '', seller: sellers.get(shop.organizerId) ?? '' } : undefined;
     // Once per shop rather than once per item: every row of one shop was
     // listed the moment the shop was, and Date.parse is not free.
     const listedAt = listedAtMs(shop.createdAt);
 
     for (const tier of visibleTiers(tiers)) {
       const remaining = Math.max(0, availability.tiers[tier.tierKey]?.remaining ?? 0);
+      const ownPhoto = tierPhoto(tier, photos);
       items.push({
         shop,
         tier,
-        photo: tierPhoto(tier, photos),
+        // A ticket without a picture of its own shows the event's poster.
+        photo: ownPhoto ?? (isEvent ? (photos[0] ?? null) : null),
+        ticket,
         shopName,
         isExample,
         categoryKey,
@@ -206,12 +247,16 @@ export function listShopItems(): ShopItem[] {
         showRemaining: availability.showRemaining,
         listedAt,
         rating: ratings.get(`${shop.id}:${tier.tierKey}`) ?? null,
-        href: `/e/${shop.slug}/item/${encodeURIComponent(tier.tierKey)}`,
+        href:
+          isEvent && !tierHasItemPage('event', tier, ownPhoto)
+            ? `/e/${shop.slug}#tickets`
+            : `/e/${shop.slug}/item/${encodeURIComponent(tier.tierKey)}`,
         haystack: searchText(
           [
             tier.name,
             tier.description,
             tier.details,
+            isEvent ? `ticket tickets event ${shop.artist} ${shop.venueName} ${ticket?.seller ?? ''}` : '',
             // The STRIPPED shop name: with the mark left in, a search for
             // "shop" would return every example listing on the site and
             // nothing else, which is the opposite of helpful.

@@ -68,7 +68,7 @@ const D = {
 
   // bazaar
   'bz.kicker': { en: 'The bazaar', de: 'Der Basar', ne: 'बजार' },
-  'bz.title': { en: 'Nepali shops across Germany — order direct, collect with a QR code', de: 'Nepalesische Läden in ganz Deutschland — direkt bestellen, mit QR-Code abholen', ne: 'जर्मनीभरका नेपाली पसल — सिधै अर्डर, QR कोडले लिनुहोस्' },
+  'bz.title': { en: 'Everything in one bazaar — event tickets, restaurant food and Nepali goods', de: 'Alles in einem Basar — Eventtickets, Essen aus Restaurants und nepalesische Waren', ne: 'सबै एउटै बजारमा — कार्यक्रमका टिकट, रेस्टुरेन्टको खाना र नेपाली सामान' },
   'bz.search': { en: 'Search', de: 'Suchen', ne: 'खोज्नुहोस्' },
   'bz.placeholder': { en: 'momo, timur, dhaka topi, Berlin…', de: 'Momo, Timur, Dhaka Topi, Berlin…', ne: 'मम, टिमुर, ढाका टोपी, बर्लिन…' },
   'bz.all': { en: 'All', de: 'Alle', ne: 'सबै' },

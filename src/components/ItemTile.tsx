@@ -75,9 +75,9 @@ export default function ItemTile({ item, compact = false }: ItemTileProps) {
     tier.name,
     priceLabel,
     item.rating ? ratingLabel(item.rating) : '',
-    `${item.isExample ? 'an example shop by' : 'sold by'} ${item.shopName}${
-      item.city ? `, ${item.city}` : ''
-    }`,
+    item.ticket
+      ? `${item.shopName}${item.ticket.when ? `, ${item.ticket.when}` : ''}${item.ticket.seller ? `, by ${item.ticket.seller}` : ''}`
+      : `${item.isExample ? 'an example shop by' : 'sold by'} ${item.shopName}${item.city ? `, ${item.city}` : ''}`,
     stock ?? item.badge.label,
   ]
     .filter(Boolean)
@@ -85,7 +85,7 @@ export default function ItemTile({ item, compact = false }: ItemTileProps) {
 
   const subscribePct = item.shop.kind === 'shop' && !item.shop.isDemo ? item.shop.subscribePct || 0 : 0;
   return (
-    <Link href={item.href} className="bz-tile" aria-label={spoken}>
+    <Link href={item.href} className={`bz-tile${item.ticket ? ' bz-tile-ticket' : ''}`} aria-label={spoken}>
       <div className="bz-tile-media">
         {item.photo ? (
           /* The 'card' variant — the same 800x1000 render the shop's own grid
@@ -150,9 +150,22 @@ export default function ItemTile({ item, compact = false }: ItemTileProps) {
         )}
         <div className="bz-tile-name">
           {/* Devanagari inside a seller's own name for a thing, marked as
-              Nepali so a screen reader does not read it as English. */}
-          <MixedScript>{tier.name}</MixedScript>
+              Nepali so a screen reader does not read it as English. A ticket
+              is named by its event first — "Standard" alone says nothing. */}
+          {item.ticket ? (
+            <>
+              <MixedScript>{item.shopName}</MixedScript>
+              <span className="bz-tile-tier"> · {tier.name}</span>
+            </>
+          ) : (
+            <MixedScript>{tier.name}</MixedScript>
+          )}
         </div>
+        {item.ticket?.when && (
+          <div className="bz-tile-when">
+            <span aria-hidden="true">📅</span> {item.ticket.when}
+          </div>
+        )}
 
         {/* Nothing at all until somebody who bought this has said something —
             see Stars. An unrated item leaves a gap rather than five grey
@@ -164,11 +177,25 @@ export default function ItemTile({ item, compact = false }: ItemTileProps) {
         {/* Whose it is — the disclosed seller, named wherever a price is shown.
             Not decoration: a buyer page that does not name the seller is what
             turns the whole order value into this platform's turnover. */}
-        <div className="bz-tile-seller">
-          {item.isExample ? 'An example shop by ' : 'Sold by '}
-          <strong>{item.shopName}</strong>
-          {item.city ? ` · ${item.city}` : ''}
-        </div>
+        {item.ticket ? (
+          // The organizer sells the ticket, and is named as its seller.
+          <div className="bz-tile-seller">
+            {item.ticket.seller ? (
+              <>
+                Sold by <strong>{item.ticket.seller}</strong>
+              </>
+            ) : (
+              <strong>{item.shopName}</strong>
+            )}
+            {item.city ? ` · ${item.city}` : ''}
+          </div>
+        ) : (
+          <div className="bz-tile-seller">
+            {item.isExample ? 'An example shop by ' : 'Sold by '}
+            <strong>{item.shopName}</strong>
+            {item.city ? ` · ${item.city}` : ''}
+          </div>
+        )}
         {item.isExample && !compact && (
           <div className="bz-tile-seller">
             Published by us to show sellers what their own shop could look like — there is nothing

@@ -60,7 +60,7 @@ export function readQuery(sp: SearchParams): MarketQuery {
     // whitelist it. An unknown key shows everything rather than an empty shelf:
     // a retired category in an old bookmark should degrade to the full bazaar,
     // never to a page that looks like the bazaar has closed.
-    category: isShopCategory(rawCategory) ? rawCategory : '',
+    category: isShopCategory(rawCategory) || rawCategory === 'tickets' ? rawCategory : '',
     // Towns and sellers are not whitelisted against a list, and cannot be: a
     // town is whatever its seller typed and a seller's slug changes when they
     // open a shop. Both are compared, never rendered raw as a claim — a value
