@@ -376,9 +376,13 @@ export interface FilterRun {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+/**
+ * The bazaar's own list — goods, food AND every upcoming event's tickets —
+ * so the chat counts and shows exactly what its "Open the bazaar" link opens.
+ */
 function itemsFor(it: ItemFilters): ShopItem[] {
   return sortShopItems(
-    filterShopItems(listShopItems(), {
+    filterShopItems(listShopItems({ tickets: true }), {
       q: it.q,
       category: it.category,
       city: it.city,
@@ -455,8 +459,13 @@ export function runFilters(f: AskFilters): FilterRun {
   // The same words on events: a "Momo Night" and the momo plates sold at it.
   // Not for a shelf other than food or a single shop — those are bazaar questions.
   const eventSide = Boolean(it.q) && !it.shop && (!it.category || it.category === 'khaja-food');
+  // Tickets are bazaar items now; the event side adds what the bazaar list
+  // does not already hold (dishes sold at events), never the same ticket twice.
+  const inList = new Set(list.map((x) => `${x.shop.id}:${x.tier.tierKey}`));
   const offers = eventSide
-    ? findEventOffers({ q: it.q, city: it.city, maxCents: it.maxCents, minCents: it.minCents, cheapestFirst: it.sort === 'price-asc' })
+    ? findEventOffers({ q: it.q, city: it.city, maxCents: it.maxCents, minCents: it.minCents, cheapestFirst: it.sort === 'price-asc' }).filter(
+        (o) => !inList.has(`${o.event.id}:${o.tier.tierKey}`)
+      )
     : [];
   const namedEvents = eventSide && !it.minCents && !it.maxCents ? eventsFor({ ...EMPTY_EVENTS, q: it.q, city: it.city }) : [];
   let relaxed = '';
@@ -498,8 +507,11 @@ export function runFilters(f: AskFilters): FilterRun {
       }),
       ...list.slice(0, 6).map((x) => ({
       kind: 'item' as const,
-      title: x.tier.name,
-      sub: `${formatMoney(x.priceCents, x.currency)} · ${x.shopName}`,
+      // A ticket is named by its event: "Standard" alone says nothing.
+      title: x.ticket ? `🎟 ${x.shopName} · ${x.tier.name}` : x.tier.name,
+      sub: x.ticket
+        ? [x.priceCents === 0 ? 'Free' : formatMoney(x.priceCents, x.currency), x.ticket.when].filter(Boolean).join(' · ')
+        : `${x.priceCents === 0 ? 'Free' : formatMoney(x.priceCents, x.currency)} · ${x.shopName}`,
       href: x.href,
       image: x.photo ? mediaUrl(x.photo.id, 'card', null) : null,
     })),
