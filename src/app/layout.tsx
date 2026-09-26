@@ -49,7 +49,7 @@ export const metadata: Metadata = {
   // Installable app: the manifest comes from app/manifest.ts; iPhones read the
   // touch icon and these two tags instead.
   appleWebApp: { capable: true, title: PLATFORM_NAME, statusBarStyle: 'black-translucent' },
-  icons: { apple: '/icons/apple-touch-icon.png' },
+  icons: { apple: '/icons/apple-touch-icon-v2.png' },
   title: {
     default: `${PLATFORM_NAME} — Nepali events, tickets & bazaar`,
     // Every page supplies its own short title and gets the brand appended, so a

@@ -12,7 +12,7 @@
  *   5. Any other page is network-first; offline it falls back to its cached
  *      copy, or to /offline.
  */
-const VERSION = 'mn-v2';
+const VERSION = 'mn-v3'; // v3: the 3D flag icons
 const STATIC = `${VERSION}-static`;
 const PAGES = `${VERSION}-pages`;
 const OFFLINE_URL = '/offline';
@@ -21,7 +21,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(STATIC)
-      .then((c) => c.addAll([OFFLINE_URL, '/icons/icon-192.png', '/icons/icon-512.png']))
+      .then((c) => c.addAll([OFFLINE_URL, '/icons/icon-192-v2.png', '/icons/icon-512-v2.png']))
       .then(() => self.skipWaiting())
   );
 });
