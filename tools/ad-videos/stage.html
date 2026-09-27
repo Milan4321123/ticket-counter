@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dashain Heidelberg ad — stage</title>
+<!--
+  The ad, drawn as one page: render(t) puts every element where it belongs at
+  second t, and nothing moves on its own, so render.mjs can shoot it frame by
+  frame. 1080×1920 (9:16). The edit (scene times, taps) is in timeline.js.
+  Open it in a browser with ?t=12.5 to look at one moment, or ?play to watch.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Inter:wght@400;500;600;700&family=Mukta:wght@600;800&display=block" rel="stylesheet">
+<script src="timeline.js"></script>
+<style>
+  :root {
+    --crimson: #dc143c; --crimson-d: #7a0a22; --blue: #0a3a9e; --navy: #07091a;
+    --gold: #fbbf24; --gold-d: #e8951a; --sky: #7cc0ff; --ink: #0b0b14;
+    --disp: 'Bricolage Grotesque', 'Inter', system-ui, sans-serif;
+    --body: 'Inter', system-ui, sans-serif;
+    --deva: 'Mukta', 'Kohinoor Devanagari', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--navy); }
+  body { font-family: var(--body); color: #fff; -webkit-font-smoothing: antialiased; }
+  #frame { position: absolute; inset: 0; overflow: hidden; background: var(--navy); }
+  .abs { position: absolute; }
+  .scene { position: absolute; inset: 0; opacity: 0; will-change: opacity, transform; }
+  .center { left: 0; right: 0; text-align: center; }
+  img { display: block; }
+
+  /* Background: slow glows and rising sparks, under everything. */
+  .glow { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .55; }
+  .spark { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: #ffd66e; box-shadow: 0 0 12px 3px rgba(255, 190, 70, .55); }
+
+  /* Text that rises word by word out of its own line. */
+  .rv { display: block; }
+  .rv .w { display: inline-block; overflow: hidden; vertical-align: top; padding: 0 .02em .08em; margin: 0 -.02em -.08em; }
+  .rv .w > span { display: inline-block; will-change: transform; }
+
+  .kicker { font: 700 30px/1 var(--body); letter-spacing: .22em; text-transform: uppercase; }
+  .pill { display: inline-flex; align-items: center; gap: 14px; padding: 14px 26px; border-radius: 999px; font: 700 28px/1 var(--body); letter-spacing: .16em; text-transform: uppercase; }
+  .h-xl { font: 800 132px/.95 var(--disp); letter-spacing: -.03em; }
+  .h-l { font: 800 96px/1 var(--disp); letter-spacing: -.025em; }
+  .h-m { font: 800 70px/1.05 var(--disp); letter-spacing: -.02em; }
+  .sub { font: 500 38px/1.35 var(--body); color: rgba(255,255,255,.82); }
+
+  /* Kites (changa) — Dashain's sky. */
+  .kite { position: absolute; width: 120px; height: 150px; }
+
+  /* The phone. */
+  .phone { position: absolute; width: 580px; height: 1209px; left: 250px; border-radius: 82px; padding: 20px;
+    background: linear-gradient(145deg, #3a3a46, #101016 40%, #26262e); box-shadow: 0 60px 120px rgba(0,0,0,.6), 0 0 0 2px rgba(255,255,255,.14) inset, 0 0 0 8px #050507 inset; }
+  .phone .screen { position: absolute; left: 20px; top: 20px; width: 540px; height: 1169px; border-radius: 62px; overflow: hidden; background: #0a0a12; }
+  .phone .vp { position: absolute; left: 0; top: 0; width: 390px; height: 844px; transform-origin: 0 0; transform: scale(1.384615); overflow: hidden; }
+  .phone .vp img { position: absolute; left: 0; top: 0; width: 390px; }
+  .phone .island { position: absolute; left: 50%; top: 34px; width: 150px; height: 42px; margin-left: -75px; border-radius: 30px; background: #000; z-index: 5; }
+  .finger { position: absolute; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; background: rgba(255,255,255,.55); border: 3px solid rgba(255,255,255,.9); box-shadow: 0 6px 20px rgba(0,0,0,.35); z-index: 6; opacity: 0; }
+  .ripple { position: absolute; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; border: 4px solid #fff; z-index: 6; opacity: 0; }
+
+  /* Photo that slowly pushes in. */
+  .photo { position: absolute; overflow: hidden; }
+  .photo img { position: absolute; width: 100%; height: 100%; object-fit: cover; }
+
+  .wipe { position: absolute; top: -200px; height: 2320px; width: 1500px; left: -1700px; transform: skewX(-14deg); z-index: 50;
+    background: linear-gradient(90deg, var(--blue) 0 14%, var(--crimson) 14% 100%); }
+
+  /* Scene-specific */
+  .stat { position: absolute; width: 470px; height: 190px; border-radius: 34px; padding: 28px 30px; background: rgba(12, 14, 28, .72); border: 1.5px solid rgba(255,255,255,.14); backdrop-filter: blur(14px); }
+  .stat b { display: block; font: 800 78px/1 var(--disp); letter-spacing: -.02em; }
+  .stat span { display: block; margin-top: 12px; font: 600 28px/1.2 var(--body); color: rgba(255,255,255,.75); }
+  .chip { position: absolute; width: 314px; height: 104px; border-radius: 26px; display: flex; align-items: center; gap: 16px; padding: 0 22px;
+    background: rgba(255,255,255,.08); border: 1.5px solid rgba(124,192,255,.28); font: 700 27px/1.15 var(--body); }
+  .chip i { font-style: normal; font-size: 44px; flex: none; }
+  .coin { position: absolute; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff3c4, #f6c343 35%, #c98a12 75%, #8a5a08);
+    box-shadow: inset 0 0 0 8px rgba(255,255,255,.18), inset 0 -10px 20px rgba(0,0,0,.25), 0 20px 40px rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center;
+    font: 800 120px/1 var(--disp); color: #7a4a05; text-shadow: 0 2px 0 rgba(255,255,255,.35); }
+  .polaroid { position: absolute; background: #fbf7ef; padding: 16px 16px 64px; border-radius: 10px; box-shadow: 0 30px 60px rgba(0,0,0,.5); }
+  .polaroid .photo { position: relative; }
+  .polaroid p { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font: 700 28px/1 var(--body); color: #2a2a33; }
+  .row { position: absolute; left: 90px; right: 90px; height: 76px; display: flex; align-items: center; gap: 24px; font: 600 40px/1.1 var(--body); }
+  .row i { flex: none; width: 76px; height: 76px; border-radius: 22px; display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 40px; background: rgba(255,255,255,.1); border: 1.5px solid rgba(255,255,255,.16); }
+  .ticket { position: absolute; width: 660px; left: 210px; border-radius: 40px; overflow: hidden; background: #14141f; box-shadow: 0 50px 120px rgba(0,0,0,.7), 0 0 0 2px rgba(255,255,255,.12) inset; z-index: 8; }
+  .badge { position: absolute; border-radius: 50%; background: #fff; overflow: hidden; box-shadow: 0 16px 40px rgba(0,0,0,.45); }
+  .badge img { width: 100%; height: 100%; object-fit: contain; }
+</style>
+</head>
+<body>
+<div id="frame">
+  <!-- Background -->
+  <div id="bg" class="abs" style="inset:0">
+    <div class="glow" id="g1" style="width:900px;height:900px;background:#dc143c"></div>
+    <div class="glow" id="g2" style="width:1000px;height:1000px;background:#1d4ed8"></div>
+    <div class="glow" id="g3" style="width:700px;height:700px;background:#f59e0b;opacity:.25"></div>
+    <div id="sparks" class="abs" style="inset:0"></div>
+  </div>
+  <div id="kites" class="abs" style="inset:0;z-index:20"></div>
+
+  <!-- 1 · Hook -->
+  <section class="scene" id="hook">
+    <div class="abs center" id="hk-deva" style="top:0;font:800 330px/1 var(--deva);color:var(--gold);text-shadow:0 0 60px rgba(251,191,36,.45)">दशैं</div>
+    <div class="abs center h-xl" id="hk-date" style="top:430px;font-size:150px">10 OCTOBER</div>
+    <div class="abs center" id="hk-city" style="top:600px;font:700 50px/1 var(--body);letter-spacing:.34em;color:var(--gold)">HEIDELBERG</div>
+    <div class="abs" id="hk-poster" style="left:290px;top:690px;width:500px;height:708px;border-radius:28px;overflow:hidden;box-shadow:0 50px 120px rgba(0,0,0,.65),0 0 0 2px rgba(255,255,255,.18)">
+      <img src="out/dashain/media/poster-main.jpg" style="width:100%;height:100%;object-fit:cover">
+    </div>
+    <div class="abs center" style="top:1450px">
+      <div class="rv h-m" id="hk-artist" data-at="2.5" style="font-size:66px">Sugam Pokhrel &amp; Bajagaja</div>
+      <div id="hk-live" style="margin-top:26px;display:inline-flex" class="pill"><span style="width:14px;height:14px;border-radius:50%;background:#ff3b5c;box-shadow:0 0 14px #ff3b5c"></span>Live in concert</div>
+    </div>
+  </section>
+
+  <!-- 2 · The organizer -->
+  <section class="scene" id="org">
+    <div class="abs center kicker" id="org-k" style="top:300px;color:var(--sky)">Presented by</div>
+    <div class="abs" id="org-ring" style="left:340px;top:390px;width:400px;height:400px;border-radius:50%;background:conic-gradient(from 0deg,#dc143c,#7cc0ff,#1d4ed8,#dc143c);filter:blur(1px)"></div>
+    <div class="badge" id="org-logo" style="left:356px;top:406px;width:368px;height:368px;padding:22px"><img src="out/dashain/media/logo-npjoe.jpg"></div>
+    <div class="abs center" style="top:850px;padding:0 70px">
+      <div class="rv h-m" data-at="0.9" style="font-size:64px">Nepalese Progressive Youth Organisation e.V.</div>
+      <div class="rv" data-at="1.3" style="margin-top:20px;font:800 46px/1.2 var(--deva);color:var(--sky)">नेपाली प्रगतिशील युवा संगठन</div>
+      <div class="rv" data-at="1.55" style="margin-top:14px;font:600 30px/1.2 var(--body);color:rgba(255,255,255,.6);letter-spacing:.12em">DARMSTADT · SINCE 2023</div>
+    </div>
+    <div class="abs center" style="top:1230px">
+      <div class="rv h-l" data-at="2.0">Connecting youth.</div>
+      <div class="rv h-l" data-at="2.35" style="margin-top:10px"><span style="color:var(--crimson);text-shadow:0 0 40px rgba(220,20,60,.5)">Strengthening</span> Nepal.</div>
+    </div>
+  </section>
+
+  <!-- 3 · Their site -->
+  <section class="scene" id="site">
+    <div class="abs center" style="top:210px">
+      <div id="site-url" class="pill" style="background:rgba(124,192,255,.12);border:1.5px solid rgba(124,192,255,.4);color:#fff;letter-spacing:.02em;text-transform:none;font-size:36px;padding:16px 30px 16px 18px">
+        <img src="out/dashain/npjoe-logo.svg" style="width:52px;height:52px">progressive-youth.de
+      </div>
+    </div>
+    <div class="phone" id="site-phone" style="top:360px">
+      <div class="screen"><div class="vp">
+        <img id="site-page" src="out/dashain/shots/npjoe.png">
+        <img src="out/dashain/shots/npjoe-header.png">
+      </div></div>
+      <div class="island"></div>
+    </div>
+    <div class="abs center" id="site-cap" style="top:1640px;font:700 44px/1.2 var(--disp)">Three programmes. <span style="color:var(--sky)">One goal.</span></div>
+  </section>
+
+  <!-- 4 · First aid -->
+  <section class="scene" id="aid">
+    <div class="photo" id="aid-photo" style="inset:0"><img src="out/dashain/media/erste-hilfe-nrna-cup__pitchside-treatment.jpg"></div>
+    <div class="abs" style="inset:0;background:linear-gradient(180deg,rgba(7,9,26,.92) 0%,rgba(7,9,26,.55) 30%,rgba(7,9,26,.15) 48%,rgba(7,9,26,.75) 66%,rgba(7,9,26,.95) 100%)"></div>
+    <div class="abs" style="left:70px;right:70px;top:230px">
+      <div class="pill" id="aid-pill" style="background:var(--crimson);color:#fff"><svg width="30" height="30" viewBox="0 0 30 30"><path d="M11 2h8v9h9v8h-9v9h-8v-9H2v-8h9z" fill="#fff"/></svg>Flagship programme</div>
+      <div class="rv h-l" data-at="0.35" style="margin-top:34px">National First&nbsp;Aid Campaign</div>
+      <div class="rv sub" data-at="0.75" style="margin-top:24px">Life-saving skills for grades 9–12 in Nepal — and teachers become trainers, so every school carries on.</div>
+    </div>
+    <div class="stat" id="st0" style="left:60px;top:1140px"><b data-to="1450" data-suffix="+">0</b><span>Students trained</span></div>
+    <div class="stat" id="st1" style="left:550px;top:1140px"><b data-to="68">0</b><span>Teachers certified as trainers</span></div>
+    <div class="stat" id="st2" style="left:60px;top:1350px"><b data-to="12">0</b><span>Partner schools</span></div>
+    <div class="stat" id="st3" style="left:550px;top:1350px;border-color:rgba(251,191,36,.5)"><b data-to="100" style="color:var(--gold)">0</b><span>Schools by 2030 — the goal</span></div>
+  </section>
+
+  <!-- 5 · One Day for Nation -->
+  <section class="scene" id="day">
+    <div class="abs" style="inset:0;background:radial-gradient(1200px 900px at 50% 30%,#163a8f 0%,#0a1330 55%,#060817 100%)"></div>
+    <div class="abs center" style="top:250px">
+      <div class="pill" style="background:rgba(124,192,255,.14);color:var(--sky);border:1.5px solid rgba(124,192,255,.4)">Programme</div>
+      <div class="rv h-l" data-at="0.25" style="margin-top:30px">One Day for Nation</div>
+      <div class="rv sub" data-at="0.6" style="margin-top:18px">One day. Your skills. Real impact.</div>
+    </div>
+    <div id="chips"></div>
+    <div class="abs center" style="top:1250px">
+      <div class="rv h-m" data-at="2.5" style="color:var(--gold)">12 fields.</div>
+      <div class="rv h-m" data-at="2.7">No profession excluded.</div>
+    </div>
+  </section>
+
+  <!-- 6 · One Euro for Nation -->
+  <section class="scene" id="euro">
+    <div class="abs" style="inset:0;background:radial-gradient(900px 800px at 50% 45%,rgba(245,158,11,.35) 0%,rgba(7,9,26,0) 70%)"></div>
+    <div class="abs center" style="top:250px">
+      <div class="pill" style="background:rgba(251,191,36,.14);color:var(--gold);border:1.5px solid rgba(251,191,36,.45)">Programme</div>
+      <div class="rv h-l" data-at="0.2" style="margin-top:30px">One Euro for Nation</div>
+    </div>
+    <div class="coin" id="coin-big" style="width:320px;height:320px;left:380px;top:560px">€1</div>
+    <div id="stacks"></div>
+    <div class="abs center" style="top:1450px">
+      <div class="rv h-m" data-at="1.9">Small donation. <span style="color:var(--gold)">Big impact.</span></div>
+      <div class="rv sub" data-at="2.25" style="margin-top:18px">From one euro — together it funds the campaigns.</div>
+    </div>
+  </section>
+
+  <!-- 7 · Community -->
+  <section class="scene" id="together">
+    <div class="abs center" style="top:220px;padding:0 60px">
+      <div class="rv h-l" data-at="0.1">…and they bring</div>
+      <div class="rv h-l" data-at="0.3"><span style="color:var(--gold)">our community</span> together.</div>
+    </div>
+    <div class="polaroid" id="pl0" style="left:70px;top:560px"><div class="photo" style="width:500px;height:375px"><img src="out/dashain/media/naya-barsha-2026__live-concert.jpg"></div><p>Naya Barsha 2026</p></div>
+    <div class="polaroid" id="pl1" style="left:520px;top:700px"><div class="photo" style="width:480px;height:320px"><img src="out/dashain/media/dashain-2024__sel-roti-moment.jpg"></div><p>Dashain 2024</p></div>
+    <div class="polaroid" id="pl2" style="left:90px;top:1020px"><div class="photo" style="width:480px;height:320px"><img src="out/dashain/media/dashain-2024__community-meal.jpg"></div><p>Dashain 2024</p></div>
+    <div class="polaroid" id="pl3" style="left:560px;top:1110px"><div class="photo" style="width:440px;height:330px"><img src="out/dashain/media/naya-barsha-2026__guests-at-table.jpg"></div><p>Naya Barsha 2026</p></div>
+    <div class="abs center" id="tg-cap" style="top:1600px;font:700 44px/1.2 var(--disp)"><span style="color:var(--gold)">150+ guests</span> at Naya Barsha 2026</div>
+  </section>
+
+  <!-- 8 · The link -->
+  <section class="scene" id="link">
+    <div class="abs" id="lk-cross" style="left:460px;top:420px;width:160px;height:160px">
+      <svg viewBox="0 0 30 30" width="160" height="160"><path d="M11 2h8v9h9v8h-9v9h-8v-9H2v-8h9z" fill="#dc143c"/></svg>
+    </div>
+    <div class="abs center" style="top:700px">
+      <div class="rv h-m" data-at="0.2">This Dashain,</div>
+      <div class="rv" data-at="0.5" style="font:800 150px/1.05 var(--disp);letter-spacing:-.03em;color:var(--gold);margin:14px 0">your ticket</div>
+      <div class="rv h-m" data-at="0.9">supports first-aid</div>
+      <div class="rv h-m" data-at="1.1">training in Nepal.</div>
+    </div>
+  </section>
+
+  <!-- 9 · The event -->
+  <section class="scene" id="event">
+    <div class="abs center kicker" style="top:180px;color:var(--gold)">Dashain &amp; Tihar Festival 2026</div>
+    <div class="abs" id="ev-poster" style="left:250px;top:250px;width:580px;height:821px;border-radius:30px;overflow:hidden;box-shadow:0 50px 120px rgba(0,0,0,.65),0 0 0 2px rgba(255,255,255,.18)">
+      <img src="out/dashain/media/poster-main.jpg" style="width:100%;height:100%;object-fit:cover">
+    </div>
+    <div class="row" id="rw0" style="top:1120px"><i>🎤</i><span>Sugam Pokhrel &amp; Bajagaja — live</span></div>
+    <div class="row" id="rw1" style="top:1210px"><i>📅</i><span>Saturday, 10 October 2026</span></div>
+    <div class="row" id="rw2" style="top:1300px"><i>📍</i><span>Rohrbacher Kulturhaus, Heidelberg</span></div>
+    <div class="row" id="rw3" style="top:1390px"><i>🍛</i><span>Live music · Dinner · Dance</span></div>
+    <div class="row" id="rw4" style="top:1480px"><i>🎟️</i><span>From <b style="color:var(--gold)">€50</b> · €5 student voucher</span></div>
+  </section>
+
+  <!-- 10 · Buy on MartNepali -->
+  <section class="scene" id="buy">
+    <div class="abs center" id="buy-brand" style="top:190px;font:700 34px/1 var(--body);color:rgba(255,255,255,.7);display:flex;justify-content:center;align-items:center;gap:14px">
+      Tickets on <span id="mn-mark" style="display:inline-block;width:40px;height:46px"></span><b style="font:800 40px/1 var(--disp);color:#fff">Mart<span style="color:var(--crimson)">Nepali</span></b>
+    </div>
+    <div class="abs center" style="top:262px;height:80px">
+      <div id="step" style="display:inline-flex;align-items:center;gap:18px;font:800 50px/1 var(--disp)">
+        <span id="step-n" style="width:62px;height:62px;border-radius:50%;background:var(--crimson);display:inline-flex;align-items:center;justify-content:center;font:800 34px/1 var(--body)">1</span>
+        <span id="step-t">Open martnepali.com</span>
+      </div>
+    </div>
+    <div class="phone" id="buy-phone" style="top:370px">
+      <div class="screen"><div class="vp" id="buy-vp">
+        <img data-shot="home" src="out/dashain/shots/home.png">
+        <img data-shot="event" src="out/dashain/shots/event.png">
+        <img data-shot="city" src="out/dashain/shots/city-check.png">
+        <img data-shot="ck0" src="out/dashain/shots/checkout-0.png">
+        <img data-shot="ck1" src="out/dashain/shots/checkout-1.png">
+        <img data-shot="ck2" src="out/dashain/shots/checkout-2.png">
+        <img data-shot="ck3" src="out/dashain/shots/checkout-3.png">
+        <img id="buy-hdr" src="out/dashain/shots/event-header.png">
+        <div class="finger" id="finger"></div>
+        <div class="ripple" id="ripple"></div>
+      </div></div>
+      <div class="island"></div>
+    </div>
+    <div class="ticket" id="ticket" style="top:420px">
+      <div style="height:250px;position:relative;overflow:hidden">
+        <img src="out/dashain/media/poster-banner.jpg" style="width:100%;height:100%;object-fit:cover;object-position:50% 30%">
+        <div class="abs" style="inset:0;background:linear-gradient(180deg,rgba(20,20,31,0) 40%,#14141f 100%)"></div>
+      </div>
+      <div style="padding:6px 44px 0">
+        <div style="font:700 24px/1 var(--body);letter-spacing:.2em;color:var(--gold)">YOUR TICKET · 2×</div>
+        <div style="margin-top:14px;font:800 54px/1.05 var(--disp)">DashainEvent2026</div>
+        <div style="margin-top:12px;font:600 28px/1.35 var(--body);color:rgba(255,255,255,.72)">Sat 10 Oct 2026 · Rohrbacher Kulturhaus, Heidelberg<br>Standard – Phase 2 · Sita Gurung</div>
+      </div>
+      <div style="position:relative;margin:30px 0 0;height:0;border-top:3px dashed rgba(255,255,255,.18)">
+        <span class="abs" style="left:-22px;top:-22px;width:44px;height:44px;border-radius:50%;background:#07091a"></span>
+        <span class="abs" style="right:-22px;top:-22px;width:44px;height:44px;border-radius:50%;background:#07091a"></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:34px;padding:34px 44px 40px">
+        <div id="tk-qr" style="width:230px;height:230px;border-radius:22px;background:#fff;padding:14px;flex:none"></div>
+        <div>
+          <div style="display:inline-flex;align-items:center;gap:12px;padding:10px 18px;border-radius:999px;background:rgba(34,197,94,.16);color:#4ade80;font:700 26px/1 var(--body)">✓ Paid · valid</div>
+          <div style="margin-top:18px;font:600 28px/1.35 var(--body);color:rgba(255,255,255,.75)">Show this QR at the door — it arrives in your email.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11 · Don't miss out -->
+  <section class="scene" id="cta">
+    <div class="abs" style="inset:0;background:radial-gradient(1100px 1000px at 50% 30%,#a50f2d 0%,#4a0716 45%,#0b0510 100%)"></div>
+    <div class="abs center" style="top:190px">
+      <div id="cta0" style="font:800 210px/.9 var(--disp);letter-spacing:-.04em">DON'T</div>
+      <div id="cta1" style="font:800 210px/.9 var(--disp);letter-spacing:-.04em">MISS</div>
+      <div id="cta2" style="font:800 250px/.9 var(--disp);letter-spacing:-.04em;color:var(--gold);text-shadow:0 0 60px rgba(251,191,36,.45)">OUT!</div>
+    </div>
+    <div class="abs center" id="cta-date" style="top:870px">
+      <div style="font:800 64px/1.1 var(--disp)">Sat 10 October · Heidelberg</div>
+      <div style="margin-top:14px;font:600 36px/1.3 var(--body);color:rgba(255,255,255,.8)">Sugam Pokhrel &amp; Bajagaja · Dinner · Dance</div>
+    </div>
+    <div class="abs" id="cta-card" style="left:90px;right:90px;top:1060px;height:330px;border-radius:40px;background:rgba(10,8,18,.6);border:1.5px solid rgba(255,255,255,.16);display:flex;align-items:center;gap:40px;padding:0 40px">
+      <div id="cta-qr" style="width:250px;height:250px;border-radius:24px;background:#fff;padding:14px;flex:none"></div>
+      <div>
+        <div style="font:600 30px/1.2 var(--body);color:rgba(255,255,255,.7)">Scan or visit</div>
+        <div id="cta-url" style="margin-top:14px;display:inline-block;padding:18px 28px;border-radius:22px;background:linear-gradient(135deg,#ff3b5c,#b8102f);font:800 46px/1 var(--disp);box-shadow:0 14px 40px rgba(220,20,60,.5)">martnepali.com</div>
+        <div style="margin-top:20px;display:inline-flex;align-items:center;gap:10px;font:700 26px/1.2 var(--body);color:#fda4af">⚡ Early-bird already sold out</div>
+      </div>
+    </div>
+    <div class="abs center" id="cta-logos" style="top:1440px">
+      <div style="display:flex;justify-content:center;align-items:center;gap:34px">
+        <div class="badge" style="position:relative;width:130px;height:130px;padding:10px"><img src="out/dashain/media/logo-npjoe.jpg"></div>
+        <span style="font:800 44px/1 var(--body);color:rgba(255,255,255,.5)">×</span>
+        <div class="badge" style="position:relative;width:130px;height:130px;padding:6px"><img src="out/dashain/media/logo-neg.jpg"></div>
+      </div>
+      <div style="margin-top:22px;font:600 28px/1.35 var(--body);color:rgba(255,255,255,.75)">Presented by NPJOE e.V. &amp; Nepali Events Germany</div>
+    </div>
+  </section>
+
+  <div class="wipe" id="wipe"></div>
+</div>
+
+<script>
+const TL = window.TL;
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const eOut = (k) => 1 - Math.pow(1 - k, 3);
+const eOut5 = (k) => 1 - Math.pow(1 - k, 5);
+const eIO = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+const eBack = (k) => { const c = 1.9; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); };
+let seed = 11;
+const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+const S = Object.fromEntries(TL.scenes.map((s) => [s.id, s]));
+const css = (el, o) => { for (const k in o) el.style[k] = o[k]; };
+
+// ---------- setup ----------
+function splitWords() {
+  for (const el of $$('.rv')) {
+    const walk = (node) => {
+      for (const child of [...node.childNodes]) {
+        if (child.nodeType === 3) {
+          const parts = child.textContent.split(/(\s+)/);
+          const frag = document.createDocumentFragment();
+          for (const p of parts) {
+            if (!p) continue;
+            if (/^\s+$/.test(p)) { frag.appendChild(document.createTextNode(' ')); continue; }
+            const w = document.createElement('span'); w.className = 'w';
+            const inner = document.createElement('span'); inner.textContent = p;
+            w.appendChild(inner); frag.appendChild(w);
+          }
+          node.replaceChild(frag, child);
+        } else if (child.nodeType === 1 && !child.classList.contains('w')) {
+          // A styled span inside the line: wrap it whole as one word.
+          const w = document.createElement('span'); w.className = 'w';
+          const inner = document.createElement('span');
+          node.replaceChild(w, child); inner.appendChild(child); w.appendChild(inner);
+        }
+      }
+    };
+    walk(el);
+    el._words = $$('.w > span', el);
+    el._at = parseFloat(el.dataset.at || '0');
+  }
+}
+
+const SPARKS = [];
+function makeSparks() {
+  const box = $('#sparks');
+  for (let i = 0; i < 46; i++) {
+    const d = document.createElement('div'); d.className = 'spark'; box.appendChild(d);
+    SPARKS.push({ el: d, x: rnd() * 1080, y0: rnd() * 1920, v: 30 + rnd() * 70, ph: rnd() * 6.28, s: 0.4 + rnd() * 0.9, sway: 10 + rnd() * 30 });
+  }
+}
+
+const KITE_COLORS = [['#dc143c', '#fbbf24'], ['#1d4ed8', '#7cc0ff'], ['#f59e0b', '#dc143c'], ['#16a34a', '#fbbf24']];
+const KITES = [];
+function makeKites() {
+  const box = $('#kites');
+  const spots = [[130, 260, 0.9], [860, 180, 1.05], [930, 1540, 0.75], [110, 1600, 0.7]];
+  spots.forEach(([x, y, s], i) => {
+    const [a, b] = KITE_COLORS[i];
+    const d = document.createElement('div'); d.className = 'kite';
+    d.innerHTML = `<svg viewBox="0 0 120 150" width="120" height="150"><path d="M60 4 L112 58 L60 112 L8 58 Z" fill="${a}"/><path d="M60 4 L112 58 L60 58 Z" fill="${b}" opacity=".9"/><path d="M60 4 V112 M8 58 H112" stroke="rgba(0,0,0,.25)" stroke-width="2"/><path d="M60 112 q-14 12 0 22 t0 22" stroke="${b}" stroke-width="3" fill="none"/></svg>`;
+    box.appendChild(d);
+    KITES.push({ el: d, x, y, s, ph: i * 1.7 });
+  });
+}
+
+const FIELDS = [['🩺', 'Health & medicine'], ['📚', 'Education'], ['💻', 'Technology & IT'], ['🏗️', 'Engineering'], ['⚖️', 'Law & social work'], ['🎨', 'Arts & culture'],
+  ['⚽', 'Sports'], ['🌱', 'Environment'], ['📈', 'Business & finance'], ['🎙️', 'Media'], ['🍲', 'Nutrition'], ['🧠', 'Mental health']];
+function makeChips() {
+  const box = $('#chips');
+  FIELDS.forEach(([ic, name], i) => {
+    const c = document.createElement('div'); c.className = 'chip';
+    const col = i % 3, row = Math.floor(i / 3);
+    c.style.left = 60 + col * 330 + 'px'; c.style.top = 620 + row * 124 + 'px';
+    c.innerHTML = `<i>${ic}</i><span>${name}</span>`;
+    box.appendChild(c);
+  });
+}
+
+const STACKS = [];
+function makeStacks() {
+  const box = $('#stacks');
+  // Five little towers of coins, filled one coin at a time.
+  const xs = [160, 330, 500, 670, 840], heights = [3, 5, 7, 5, 4];
+  let n = 0;
+  xs.forEach((x, s) => {
+    for (let k = 0; k < heights[s]; k++) {
+      const c = document.createElement('div'); c.className = 'coin';
+      css(c, { width: '110px', height: '38px', borderRadius: '50%', fontSize: '0', left: x - 55 + 'px', top: 1330 - k * 22 + 'px' });
+      box.appendChild(c);
+      STACKS.push({ el: c, k: n++, top: 1330 - k * 22 });
+    }
+  });
+}
+
+window.setup = async function (qr) {
+  splitWords(); makeSparks(); makeKites(); makeChips(); makeStacks();
+  if (qr) { $('#tk-qr').innerHTML = qr; $('#cta-qr').innerHTML = qr; for (const s of $$('#tk-qr svg, #cta-qr svg')) { s.setAttribute('width', '100%'); s.setAttribute('height', '100%'); } }
+  try { const r = await fetch('out/dashain/martnepali-logo.svg'); $('#mn-mark').innerHTML = await r.text(); const s = $('#mn-mark svg'); s.setAttribute('width', '40'); s.setAttribute('height', '46'); } catch {}
+  await document.fonts.ready;
+  await Promise.all($$('img').map((i) => i.decode().catch(() => {})));
+};
+
+// ---------- helpers used by scenes ----------
+function reveal(scope, lt) {
+  for (const el of $$('.rv', scope)) {
+    el._words.forEach((w, i) => {
+      const k = eOut5(prog(lt, el._at + i * 0.06, el._at + i * 0.06 + 0.55));
+      w.style.transform = `translateY(${(1 - k) * 110}%)`;
+    });
+  }
+}
+function popIn(el, lt, at, from = 0.6, dur = 0.45) {
+  const k = prog(lt, at, at + dur);
+  el.style.opacity = clamp(k * 3);
+  el.style.transform = `scale(${lerp(from, 1, eBack(k))})`;
+}
+function kenBurns(el, lt, dur, from = 1.14, to = 1.0, dx = 0, dy = 0) {
+  const k = eIO(prog(lt, 0, dur));
+  el.style.transform = `translate(${dx * k}px, ${dy * k}px) scale(${lerp(from, to, k)})`;
+}
+function fmt(n) { return Math.round(n).toLocaleString('en-US'); }
+
+// ---------- scenes (lt = seconds into the scene, d = its length) ----------
+const SCENES = {
+  hook(lt, el) {
+    const deva = $('#hk-deva', el);
+    // Brush-sweep reveal, then it rises to the top.
+    const sweep = eOut(prog(lt, 0.05, 0.9));
+    const up = eIO(prog(lt, 1.15, 1.7));
+    deva.style.clipPath = `inset(0 ${(1 - sweep) * 100}% 0 0)`;
+    deva.style.transform = `translateY(${lerp(780, 170, up)}px) scale(${lerp(1.05, 0.62, up)})`;
+    deva.style.transformOrigin = '50% 0';
+    const slam = prog(lt, 1.45, 1.75);
+    const date = $('#hk-date', el);
+    date.style.opacity = clamp(slam * 4);
+    date.style.transform = `scale(${lerp(2.4, 1, eOut5(slam))})`;
+    const city = $('#hk-city', el);
+    const ck = eOut(prog(lt, 1.75, 2.2));
+    city.style.opacity = ck; city.style.letterSpacing = lerp(0.7, 0.34, ck) + 'em';
+    const pk = prog(lt, 1.9, 2.6);
+    const poster = $('#hk-poster', el);
+    poster.style.opacity = clamp(pk * 2.5);
+    poster.style.transform = `perspective(1400px) translateY(${(1 - eOut5(pk)) * 500}px) rotateX(${(1 - eOut(pk)) * 40}deg) rotateZ(${Math.sin(lt * 1.3) * 1.2}deg) scale(${1 + 0.03 * Math.sin(lt * 1.7)})`;
+    const lv = $('#hk-live', el); popIn(lv, lt, 2.9);
+    reveal(el, lt);
+  },
+  org(lt, el) {
+    popIn($('#org-logo', el), lt, 0.35, 0.3, 0.6);
+    const ring = $('#org-ring', el);
+    ring.style.opacity = clamp(prog(lt, 0.35, 0.8));
+    ring.style.transform = `rotate(${lt * 60}deg) scale(${lerp(0.4, 1, eBack(prog(lt, 0.35, 0.95)))})`;
+    const k = $('#org-k', el); k.style.opacity = prog(lt, 0.15, 0.5); k.style.letterSpacing = lerp(0.5, 0.22, eOut(prog(lt, 0.15, 0.8))) + 'em';
+    reveal(el, lt);
+  },
+  site(lt, el, d) {
+    const ph = $('#site-phone', el);
+    const k = eOut5(prog(lt, 0, 0.8));
+    ph.style.transform = `perspective(2000px) translateY(${(1 - k) * 900}px) rotateX(${(1 - k) * 25}deg)`;
+    const s = eIO(prog(lt, 1.0, 3.4));
+    $('#site-page', el).style.transform = `translateY(${-s * 690}px)`;
+    popIn($('#site-url', el), lt, 0.2);
+    const cap = $('#site-cap', el); cap.style.opacity = prog(lt, 2.2, 2.6); cap.style.transform = `translateY(${(1 - eOut(prog(lt, 2.2, 2.7))) * 30}px)`;
+  },
+  aid(lt, el, d) {
+    kenBurns($('#aid-photo img', el), lt, d, 1.18, 1.02, 0, -40);
+    popIn($('#aid-pill', el), lt, 0.1);
+    ['#st0', '#st1', '#st2', '#st3'].forEach((id, i) => {
+      const st = $(id, el);
+      const k = prog(lt, 1.4 + i * 0.25, 1.9 + i * 0.25);
+      st.style.opacity = clamp(k * 2.5);
+      st.style.transform = `translateY(${(1 - eOut5(k)) * 80}px)`;
+      const b = $('b', st);
+      const to = +b.dataset.to;
+      b.textContent = fmt(to * eOut(prog(lt, 1.5 + i * 0.25, 2.9 + i * 0.25))) + (b.dataset.suffix && lt > 2.9 + i * 0.25 ? b.dataset.suffix : '');
+    });
+    reveal(el, lt);
+  },
+  day(lt, el) {
+    $$('.chip', el).forEach((c, i) => popIn(c, lt, 1.1 + i * 0.12, 0.4, 0.4));
+    // A light sweep across the chips once they are all in.
+    reveal(el, lt);
+  },
+  euro(lt, el) {
+    const coin = $('#coin-big', el);
+    const fall = prog(lt, 0.3, 0.75);
+    const bounce = lt > 0.75 ? Math.abs(Math.sin((lt - 0.75) * 9)) * Math.exp(-(lt - 0.75) * 5) * 90 : 0;
+    const y = lt < 0.75 ? lerp(-700, 0, fall * fall) : -bounce;
+    coin.style.transform = `translateY(${y}px) rotateY(${lt < 0.75 ? fall * 540 : 0}deg) scale(${1 - 0.25 * eIO(prog(lt, 1.4, 2.0))})`;
+    coin.style.opacity = clamp(fall * 3);
+    // The big coin moves up a little to make room for the towers.
+    coin.style.top = lerp(560, 520, eIO(prog(lt, 1.4, 2.0))) + 'px';
+    for (const c of STACKS) {
+      const at = 1.6 + c.k * 0.045;
+      const k = prog(lt, at, at + 0.28);
+      c.el.style.opacity = k > 0 ? 1 : 0;
+      c.el.style.transform = `translateY(${(1 - k * k) * -600}px)`;
+    }
+    reveal(el, lt);
+  },
+  together(lt, el) {
+    const rots = [-6, 5, 4, -5];
+    ['#pl0', '#pl1', '#pl2', '#pl3'].forEach((id, i) => {
+      const p = $(id, el);
+      const k = prog(lt, 0.5 + i * 0.35, 1.1 + i * 0.35);
+      p.style.opacity = clamp(k * 3);
+      p.style.transform = `translate(${(1 - eOut5(k)) * (i % 2 ? 700 : -700)}px, ${(1 - eOut5(k)) * 120}px) rotate(${rots[i] + (1 - eOut(k)) * (i % 2 ? 18 : -18) + Math.sin(lt * 1.2 + i) * 0.8}deg)`;
+      kenBurns($('img', p), lt, 4.2, 1.12, 1.0);
+    });
+    const cap = $('#tg-cap', el); cap.style.opacity = prog(lt, 2.2, 2.6); cap.style.transform = `translateY(${(1 - eOut(prog(lt, 2.2, 2.7))) * 30}px)`;
+    reveal(el, lt);
+  },
+  link(lt, el) {
+    const c = $('#lk-cross', el);
+    const k = prog(lt, 0.0, 0.5);
+    const beat = lt > 0.5 ? 1 + 0.08 * Math.max(0, Math.sin((lt - 0.5) * Math.PI * 2 * (TL.BPM / 60) / 2)) : 1;
+    c.style.opacity = clamp(k * 2);
+    c.style.transform = `scale(${lerp(0.2, 1, eBack(k)) * beat}) rotate(${(1 - eOut(k)) * -90}deg)`;
+    c.style.filter = `drop-shadow(0 0 ${30 + 20 * (beat - 1) * 10}px rgba(220,20,60,.7))`;
+    reveal(el, lt);
+  },
+  event(lt, el) {
+    const p = $('#ev-poster', el);
+    const k = prog(lt, 0.0, 0.9);
+    p.style.opacity = clamp(k * 3);
+    p.style.transform = `perspective(1600px) rotateY(${(1 - eOut5(k)) * -50}deg) translateX(${(1 - eOut5(k)) * -200}px) scale(${1.0 + 0.02 * Math.sin(lt * 1.3)})`;
+    ['#rw0', '#rw1', '#rw2', '#rw3', '#rw4'].forEach((id, i) => {
+      const r = $(id, el);
+      const kk = prog(lt, 1.5 + i * 0.28, 2.0 + i * 0.28);
+      r.style.opacity = clamp(kk * 2);
+      r.style.transform = `translateX(${(1 - eOut5(kk)) * 140}px)`;
+    });
+  },
+  buy(lt, el) {
+    const ph = $('#buy-phone', el);
+    const enter = eOut5(prog(lt, 0, 0.8));
+    const out = eIO(prog(lt, 11.1, 11.8));
+    ph.style.transform = `perspective(2000px) translateY(${(1 - enter) * 900 + out * 140}px) rotateX(${(1 - enter) * 25}deg) scale(${1 - out * 0.1})`;
+    ph.style.filter = `brightness(${1 - out * 0.55})`;
+
+    // Which screen, and how far down it is scrolled (page px).
+    let shot = 'home', scroll = 0, hdr = false;
+    if (lt >= 1.75) { shot = 'event'; hdr = true; scroll = 120 * eIO(prog(lt, 2.0, 3.0)); }
+    if (lt >= 3.75) { shot = 'city'; hdr = false; scroll = 0; }
+    if (lt >= 5.15) { shot = 'ck0'; hdr = true; scroll = 180; }
+    if (lt >= 6.0) shot = 'ck1';
+    if (lt >= 6.7) shot = 'ck2';
+    if (lt >= 7.15) {
+      shot = 'ck3';
+      scroll = lerp(180, 800, eIO(prog(lt, 7.3, 8.4)));
+      scroll = lerp(scroll, 2437, eIO(prog(lt, 9.2, 10.5)));
+    }
+    for (const img of $$('#buy-vp img[data-shot]')) {
+      const on = img.dataset.shot === shot;
+      img.style.display = on ? 'block' : 'none';
+      if (on) img.style.transform = `translateY(${-scroll}px)`;
+    }
+    // The city check slides up over the event page like the real sheet.
+    if (shot === 'city') {
+      const ev = $('#buy-vp img[data-shot="event"]');
+      ev.style.display = 'block'; ev.style.transform = 'translateY(-120px)'; ev.style.filter = `brightness(${1 - 0.7 * eOut(prog(lt, 3.75, 4.05))})`;
+      const c = $('#buy-vp img[data-shot="city"]');
+      c.style.opacity = eOut(prog(lt, 3.75, 4.05));
+      c.style.transform = `translateY(${(1 - eOut5(prog(lt, 3.75, 4.2))) * 120}px)`;
+    } else {
+      $('#buy-vp img[data-shot="event"]').style.filter = '';
+      $('#buy-vp img[data-shot="city"]').style.opacity = 1;
+    }
+    $('#buy-hdr').style.display = hdr ? 'block' : 'none';
+
+    // Taps (screen coordinates in the 390×844 viewport).
+    const taps = [
+      [TL.buyTaps[0], 97, 330],
+      [TL.buyTaps[1], 91, 588 - 120],
+      [TL.buyTaps[2], 195, 596],
+      [TL.buyTaps[3], 322, 487 - 180],
+      [TL.buyTaps[4], 322, 575 - 180],
+      [TL.buyTaps[5], 195, 3031 - 2437],
+    ];
+    const f = $('#finger'), r = $('#ripple');
+    let shown = false;
+    for (const [at, x, y] of taps) {
+      if (lt > at - 0.45 && lt < at + 0.35) {
+        const a = prog(lt, at - 0.45, at - 0.2), press = lt >= at - 0.05 && lt < at + 0.12;
+        css(f, { left: x + 'px', top: y + 'px', opacity: String(a * (lt > at + 0.2 ? 1 - prog(lt, at + 0.2, at + 0.35) : 1)), transform: `scale(${press ? 0.8 : lerp(1.4, 1, eOut(a))})` });
+        const rk = prog(lt, at, at + 0.4);
+        css(r, { left: x + 'px', top: y + 'px', opacity: String(lt >= at ? 1 - rk : 0), transform: `scale(${1 + rk * 1.8})` });
+        shown = true;
+      }
+    }
+    if (!shown) { f.style.opacity = 0; r.style.opacity = 0; }
+
+    // Step labels.
+    const steps = [[0, 'Open martnepali.com'], [1.75, 'Tap the event → Get tickets'], [5.15, 'Pick your tickets'], [7.2, 'Add your name & email'], [9.2, 'Reserve — pay by PayPal or bank'], [11.3, 'Your QR ticket, by email']];
+    let si = 0; steps.forEach(([at], i) => { if (lt >= at) si = i; });
+    const since = lt - steps[si][0];
+    const sk = eOut5(prog(since, 0, 0.35));
+    $('#step-n').textContent = si + 1;
+    $('#step-t').textContent = steps[si][1];
+    $('#step').style.transform = `translateY(${(1 - sk) * 40}px)`;
+    $('#step').style.opacity = sk;
+    $('#step-n').style.background = si === 5 ? '#16a34a' : 'var(--crimson)';
+    popIn($('#buy-brand', el), lt, 0.1);
+
+    // The ticket rises out of the phone.
+    const tk = $('#ticket');
+    const tkk = prog(lt, 11.35, 12.05);
+    tk.style.opacity = clamp(tkk * 3);
+    tk.style.transform = `perspective(1600px) translateY(${(1 - eOut5(tkk)) * 520}px) rotateX(${(1 - eOut(tkk)) * -35}deg) scale(${lerp(0.7, 1, eOut5(tkk))}) rotateZ(${Math.sin(lt * 1.4) * 0.8}deg)`;
+  },
+  cta(lt, el) {
+    // Each word lands exactly on its beat (TL.ctaSlams), with a shudder.
+    const t = lt + S.cta.start;
+    TL.ctaSlams.forEach((at, i) => {
+      const e = $(['#cta0', '#cta1', '#cta2'][i], el);
+      const k = prog(t, at - 0.2, at);
+      e.style.opacity = clamp(k * 4);
+      const shake = t > at && t < at + 0.25 ? Math.sin(t * 90) * 8 * (1 - prog(t, at, at + 0.25)) : 0;
+      e.style.transform = `translateX(${shake}px) scale(${lerp(2.6, 1, eOut5(k))})`;
+    });
+    // After the drop everything pulses with the kick.
+    const drop = TL.ctaSlams[2];
+    const ph = ((t - TL.G0) / TL.BEAT) % 1;
+    const pulse = t > drop ? Math.exp(-ph * 7) : 0;
+    $('#cta2', el).style.transform += ` scale(${1 + 0.05 * pulse})`;
+    const r0 = drop - S.cta.start;
+    const dk = prog(lt, r0 + 0.1, r0 + 0.6);
+    const dt = $('#cta-date', el); dt.style.opacity = dk; dt.style.transform = `translateY(${(1 - eOut5(dk)) * 40}px)`;
+    const card = $('#cta-card', el); popIn(card, lt, r0 + 0.5, 0.85, 0.5);
+    const url = $('#cta-url', el);
+    url.style.transform = `scale(${lt > r0 + 1 ? 1 + 0.05 * pulse : 1})`;
+    const lg = $('#cta-logos', el); lg.style.opacity = prog(lt, r0 + 1.1, r0 + 1.5); lg.style.transform = `translateY(${(1 - eOut5(prog(lt, r0 + 1.1, r0 + 1.6))) * 40}px)`;
+  },
+};
+
+// ---------- background, kites, wipes ----------
+function background(t) {
+  const g1 = $('#g1'), g2 = $('#g2'), g3 = $('#g3');
+  css(g1, { left: 380 + Math.sin(t * 0.21) * 260 - 450 + 'px', top: 300 + Math.cos(t * 0.17) * 200 - 450 + 'px' });
+  css(g2, { left: 700 + Math.cos(t * 0.19) * 280 - 500 + 'px', top: 1400 + Math.sin(t * 0.23) * 220 - 500 + 'px' });
+  css(g3, { left: 540 + Math.sin(t * 0.31) * 300 - 350 + 'px', top: 900 + Math.cos(t * 0.27) * 300 - 350 + 'px' });
+  for (const s of SPARKS) {
+    const y = ((s.y0 - t * s.v) % 2000 + 2000) % 2000 - 40;
+    css(s.el, { transform: `translate(${s.x + Math.sin(t * 0.8 + s.ph) * s.sway}px, ${y}px) scale(${s.s})`, opacity: String(0.35 + 0.65 * Math.abs(Math.sin(t * 1.3 + s.ph))) });
+  }
+  // Kites fly in the hook and the finale.
+  const kv = Math.max(1 - prog(t, S.hook.end - 0.6, S.hook.end), prog(t, S.cta.start + 0.2, S.cta.start + 1.2));
+  for (const k of KITES) {
+    const x = k.x + Math.sin(t * 0.7 + k.ph) * 30, y = k.y + Math.cos(t * 0.9 + k.ph) * 22;
+    css(k.el, { opacity: String(kv * 0.95), transform: `translate(${x - 60}px, ${y - 75}px) rotate(${Math.sin(t * 1.1 + k.ph) * 12}deg) scale(${k.s})` });
+  }
+}
+const WIPES = ['org', 'aid', 'event', 'cta'].map((id) => S[id].start + 0.12);
+function wipe(t) {
+  const w = $('#wipe');
+  let x = -1700;
+  for (const at of WIPES) {
+    const k = prog(t, at - 0.35, at + 0.35);
+    if (k > 0 && k < 1) x = lerp(-1700, 1300, eIO(k));
+  }
+  w.style.transform = `translateX(${x}px) skewX(-14deg)`;
+  w.style.display = x > -1700 && x < 1300 ? 'block' : 'none';
+}
+
+window.render = function (t) {
+  background(t);
+  for (const sc of TL.scenes) {
+    const el = document.getElementById(sc.id);
+    const on = t >= sc.start && t <= sc.end;
+    el.style.display = on ? 'block' : 'none';
+    if (!on) continue;
+    const lt = t - sc.start, d = sc.end - sc.start;
+    const wiped = WIPES.some((w) => Math.abs(w - sc.start - 0.12) < 1e-6);
+    const fin = sc.start === 0 ? 1 : wiped ? (t >= sc.start + 0.12 ? 1 : 0) : prog(lt, 0, 0.3);
+    const fout = sc.end >= TL.TOTAL ? 1 : 1 - prog(t, sc.end - 0.25, sc.end);
+    el.style.opacity = Math.min(fin, fout);
+    el.style.zIndex = 10;
+    SCENES[sc.id](lt, el, d);
+  }
+  wipe(t);
+};
+
+// Standalone viewing: ?t=12 shows one moment, ?play plays it in real time.
+if (!new URLSearchParams(location.search).has('render')) {
+  addEventListener('load', async () => {
+    await window.setup(null);
+    const q = new URLSearchParams(location.search);
+    if (q.has('play')) {
+      const t0 = performance.now();
+      const loop = () => { const t = ((performance.now() - t0) / 1000) % TL.TOTAL; window.render(t); requestAnimationFrame(loop); };
+      loop();
+    } else window.render(parseFloat(q.get('t') || '0'));
+  });
+}
+</script>
+</body>
+</html>

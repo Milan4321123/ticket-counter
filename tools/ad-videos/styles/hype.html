@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hype short — stage</title>
+<!-- 1 · HYPE: black & white kinetic type cut on every beat of a 140 bpm trap
+     track, a duotone poster, the direct link, a hard-shadow phone, the
+     early-bird "sold out" stamp and DON'T · MISS · OUT. Edit: specs.js (hype). -->
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@500;700;800&display=block" rel="stylesheet">
+<script src="specs.js"></script>
+<script src="../stagekit.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; background: #000; }
+  body { font-family: Inter, sans-serif; color: #fff; -webkit-font-smoothing: antialiased; }
+  #frame { position: absolute; inset: 0; overflow: hidden; background: #000; }
+  .layer { position: absolute; inset: 0; }
+  .anton { font-family: Anton, Impact, sans-serif; text-transform: uppercase; letter-spacing: .01em; }
+  #word { position: absolute; left: 0; right: 0; top: 50%; text-align: center; line-height: .9; white-space: nowrap; }
+  #word .fit { display: inline-block; }
+  #poster { position: absolute; inset: -60px; background: url(../out/dashain/media/poster-main.jpg) center/cover; filter: grayscale(1) contrast(1.5) brightness(.9); }
+  #poster-tint { position: absolute; inset: 0; background: #dc143c; mix-blend-mode: multiply; }
+  .band { display: inline-block; background: #000; padding: 10px 34px 0; }
+  #grain { position: absolute; inset: -200px; opacity: .13; mix-blend-mode: screen; pointer-events: none; z-index: 90;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='300' height='300' filter='url(%23n)'/></svg>"); }
+  #link { position: absolute; left: 50%; top: 1500px; transform: translateX(-50%); background: #fff; color: #000; border-radius: 999px; padding: 26px 44px; font: 800 54px/1 Inter, sans-serif; white-space: nowrap; box-shadow: 14px 14px 0 #dc143c; }
+  .kphone { box-shadow: 22px 22px 0 #dc143c; outline: 6px solid #fff; }
+  #cap { position: absolute; left: 60px; top: 150px; font-size: 150px; line-height: .95; }
+  #cap span { background: #fff; color: #000; padding: 6px 26px 0; display: inline-block; }
+  .kticket { box-shadow: 22px 22px 0 #dc143c !important; outline: 6px solid #fff; }
+  #stamp { position: absolute; left: 50%; top: 900px; width: 760px; margin-left: -380px; text-align: center; border: 14px solid #ff1f4b; color: #ff1f4b; border-radius: 26px; padding: 20px 0 6px; font-size: 190px; line-height: 1; transform: rotate(-12deg); mix-blend-mode: screen; }
+  .slam { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 400px; }
+  .flash { position: absolute; inset: 0; background: #fff; opacity: 0; z-index: 95; }
+</style>
+</head>
+<body>
+<div id="frame">
+  <div class="layer" id="shake">
+    <div class="layer" id="posterwrap" style="display:none"><div id="poster"></div><div id="poster-tint"></div><div class="layer" style="background:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,.1) 40%,rgba(0,0,0,.7))"></div></div>
+    <div id="word" class="anton"></div>
+
+    <div class="layer" id="linkpart" style="display:none">
+      <div class="anton" style="position:absolute;left:0;right:0;top:420px;text-align:center;font-size:250px;line-height:.9" id="tix">TICKETS<br><span style="color:#dc143c">↓</span></div>
+      <div id="link">🔗 martnepali.com/e/dashain…</div>
+    </div>
+
+    <div class="layer" id="phonepart" style="display:none">
+      <div id="cap" class="anton"><span></span></div>
+      <div id="phonehost" class="layer"></div>
+      <div id="youin" class="anton" style="position:absolute;left:0;right:0;top:170px;text-align:center;font-size:210px;line-height:.9">YOU'RE <span style="color:#dc143c">IN.</span></div>
+      <div id="tickethost" class="layer"></div>
+    </div>
+
+    <div class="layer" id="urg" style="display:none">
+      <div class="anton" style="position:absolute;left:0;right:0;top:330px;text-align:center;font-size:200px;line-height:.9">EARLY<br>BIRD</div>
+      <div class="anton" id="old" style="position:absolute;left:0;right:0;top:760px;text-align:center;font-size:170px;color:#777;text-decoration:line-through;text-decoration-thickness:14px">€39.99</div>
+      <div id="stamp" class="anton">SOLD OUT</div>
+      <div id="ph2" class="anton" style="position:absolute;left:0;right:0;top:1250px;text-align:center;font-size:120px;line-height:1">PHASE 2 · <span style="color:#dc143c">€50</span><br><span style="font-size:90px">SELLING NOW</span></div>
+    </div>
+
+    <div class="slam anton" id="s0" style="display:none;background:#000;color:#fff">DON'T</div>
+    <div class="slam anton" id="s1" style="display:none;background:#fff;color:#000">MISS</div>
+    <div class="slam anton" id="s2" style="display:none;background:#dc143c;color:#fff;font-size:480px">OUT.</div>
+
+    <div class="layer" id="end" style="display:none;background:#000">
+      <div class="anton" id="e-date" style="position:absolute;left:0;right:0;top:170px;text-align:center;font-size:330px;line-height:.9;color:transparent;-webkit-text-stroke:6px #fff">10.10</div>
+      <div class="anton" style="position:absolute;left:0;right:0;top:500px;text-align:center;font-size:96px;line-height:1">HEIDELBERG</div>
+      <div style="position:absolute;left:0;right:0;top:620px;text-align:center;font:700 36px/1.3 Inter,sans-serif;color:rgba(255,255,255,.75);letter-spacing:.14em">ROHRBACHER KULTURHAUS</div>
+      <div class="anton" style="position:absolute;left:0;right:0;top:720px;text-align:center;font-size:110px;line-height:1"><span style="background:#dc143c;padding:8px 30px 0">SUGAM POKHREL</span><br><span style="font-size:80px">&amp; BAJAGAJA · LIVE</span></div>
+      <div id="e-card" style="position:absolute;left:110px;right:110px;top:1050px;height:330px;background:#fff;color:#000;display:flex;align-items:center;gap:36px;padding:0 36px;box-shadow:18px 18px 0 #dc143c">
+        <div class="qr" style="width:260px;height:260px;flex:none"></div>
+        <div><div style="font:800 30px/1.2 Inter,sans-serif;color:#555">TICKETS</div><div class="anton" style="font-size:86px;line-height:1;margin-top:6px">MARTNEPALI<br>.COM</div></div>
+      </div>
+      <div style="position:absolute;left:0;right:0;top:1440px;display:flex;justify-content:center;align-items:center;gap:26px">
+        <div style="width:110px;height:110px;border-radius:50%;background:#fff;padding:8px"><img src="../out/dashain/media/logo-npjoe.jpg" style="width:100%;height:100%;object-fit:contain;filter:grayscale(1)"></div>
+        <span class="anton" style="font-size:60px">×</span>
+        <div style="width:110px;height:110px;border-radius:50%;background:#fff;padding:5px"><img src="../out/dashain/media/logo-neg.jpg" style="width:100%;height:100%;object-fit:contain;filter:grayscale(1)"></div>
+      </div>
+      <div style="position:absolute;left:0;right:0;top:1575px;text-align:center;font:700 26px/1.3 Inter,sans-serif;color:rgba(255,255,255,.7)">Presented by NPJOE e.V. &amp; Nepali Events Germany</div>
+    </div>
+  </div>
+  <div id="grain"></div>
+  <div class="flash" id="flash"></div>
+</div>
+<script>
+const { $, $$, clamp, lerp, prog, eOut, eOut5, eIO, eBack, css } = K;
+const S = SPECS.S.hype;
+let phone;
+
+async function setup(qr) {
+  phone = new K.Phone($('#phonehost'), { width: 600, look: 'bare' });
+  css(phone.el, { left: '232px', top: '440px' });
+  const tk = K.ticket({ theme: 'dark', qr: qr || '' });
+  css(tk, { left: '220px', top: '520px' });
+  $('#tickethost').appendChild(tk);
+  await K.ready(qr);
+}
+
+// Which beat-word is up, and how long it has been up.
+function current(list, t) { let c = null; for (const w of list) if (t >= w[0]) c = w; return c; }
+const hit = (t, at, dur = 0.14) => (t >= at && t < at + dur ? 1 - (t - at) / dur : 0);
+
+function render(t) {
+  const beatPh = ((t - S.G0) / S.B);
+  // Camera shake on every beat until the phone arrives, and on the slams.
+  let sh = 0;
+  if (t >= S.G0 && t < S.linkTap + 0.2) sh = Math.exp(-(beatPh % 1) * 6) * 16;
+  for (const s of S.slams) sh = Math.max(sh, hit(t, s, 0.25) * 26);
+  $('#shake').style.transform = `translate(${Math.sin(t * 97) * sh}px, ${Math.cos(t * 83) * sh}px)`;
+  $('#grain').style.transform = `translate(${(Math.floor(t * 24) * 37) % 200 - 100}px, ${(Math.floor(t * 24) * 53) % 200 - 100}px)`;
+
+  // Beat words (+ the poster from LIVE on).
+  const w = current(S.words, t);
+  const inWords = t < S.linkAt;
+  const word = $('#word');
+  word.style.display = inWords ? 'block' : 'none';
+  $('#posterwrap').style.display = inWords && t >= S.words[4][0] ? 'block' : 'none';
+  if (inWords) {
+    if (!w) { word.textContent = ''; }
+    else {
+      const [at, txt] = w, k = prog(t, at, at + 0.12);
+      word.innerHTML = `<span class="fit${txt === 'LIVE.' || t >= S.words[4][0] ? ' band' : ''}"${txt === 'LIVE.' ? ' style="background:#dc143c"' : ''}>${txt}</span>`;
+      // As big as the word can be and still fit the width.
+      word.style.fontSize = '100px';
+      const big = Math.min(txt === '10.10' ? 420 : 300, Math.floor(100 * 980 / $('.fit', word).offsetWidth));
+      const rgb = hit(t, at, 0.2) * 22;
+      word.style.fontSize = big + 'px';
+      css(word, { marginTop: -$('.fit', word).offsetHeight / 2 + 'px', transform: `scale(${lerp(1.35, 1, eOut5(k))}) skewX(${hit(t, at, 0.1) * -8}deg)`, textShadow: `${rgb}px 0 #ff1f4b, ${-rgb}px 0 #22d3ee` });
+    }
+    const pk = prog(t, S.words[4][0], S.linkAt);
+    $('#poster').style.transform = `scale(${1.08 + pk * 0.18})`;
+  }
+
+  // TICKETS ↓ and the link.
+  const lp = $('#linkpart');
+  lp.style.display = t >= S.linkAt && t < S.phone + 0.15 ? 'block' : 'none';
+  if (t >= S.linkAt) {
+    const k = prog(t, S.linkAt, S.linkAt + 0.14);
+    $('#tix').style.transform = `scale(${lerp(1.4, 1, eOut5(k))})`;
+    const lk = K.popIn($('#link'), t, S.linkAt + 0.1, 0.6, 0.25);
+    $('#link').style.transform = `translateX(-50%) scale(${lerp(0.6, 1, eBack(lk)) * (t > S.linkTap - 0.05 && t < S.linkTap + 0.1 ? 0.92 : 1)})`;
+  }
+
+  // The phone.
+  const pp = $('#phonepart');
+  const pon = t >= S.phone && t < S.urgency[0];
+  pp.style.display = pon ? 'block' : 'none';
+  if (pon) {
+    const k = prog(t, S.phone, S.phone + 0.18);
+    const out = eIO(prog(t, S.ticketAt - 0.1, S.ticketAt + 0.3));
+    phone.el.style.transform = `translateY(${(1 - eOut5(k)) * 900 + out * 200}px) rotate(${-4 + (1 - eOut5(k)) * -10}deg) scale(${1 - out * 0.12})`;
+    phone.el.style.filter = `brightness(${1 - out * 0.7})`;
+    phone.render(t, S);
+    const c = current(S.captions, t);
+    const cap = $('#cap');
+    cap.style.display = c && t < S.ticketAt ? 'block' : 'none';
+    if (c) { $('span', cap).textContent = c[1]; const ck = prog(t, c[0], c[0] + 0.12); cap.style.transform = `scale(${lerp(1.3, 1, eOut5(ck))})`; cap.style.transformOrigin = '0 0'; }
+    const tk = $('.kticket');
+    const tkk = prog(t, S.ticketAt, S.ticketAt + 0.22);
+    tk.style.opacity = tkk > 0 ? 1 : 0;
+    tk.style.transform = `translateY(${(1 - eOut5(tkk)) * 900}px) rotate(${3 - (1 - eOut5(tkk)) * 12}deg)`;
+    const yi = $('#youin'), yk = prog(t, S.ticketAt + 0.45, S.ticketAt + 0.57);
+    yi.style.opacity = yk > 0 ? 1 : 0;
+    yi.style.transform = `scale(${lerp(1.5, 1, eOut5(yk))})`;
+    yi.style.textShadow = `${hit(t, S.ticketAt + 0.45, 0.2) * 18}px 0 #ff1f4b, ${-hit(t, S.ticketAt + 0.45, 0.2) * 18}px 0 #22d3ee`;
+  }
+
+  // Early bird: sold out. Phase 2: selling now.
+  const u = $('#urg');
+  u.style.display = t >= S.urgency[0] && t < S.slams[0] ? 'block' : 'none';
+  if (t >= S.urgency[0]) {
+    const st = $('#stamp'), sk = prog(t, S.urgency[0] + S.B, S.urgency[0] + S.B + 0.12);
+    st.style.opacity = sk > 0 ? 1 : 0;
+    st.style.transform = `rotate(-12deg) scale(${lerp(2.2, 1, eOut5(sk))})`;
+    $('#old').style.opacity = t >= S.urgency[0] + 0.1 ? 1 : 0;
+    const p2 = $('#ph2'), pk = prog(t, S.urgency[1], S.urgency[1] + 0.12);
+    p2.style.opacity = pk > 0 ? (Math.floor((t - S.urgency[1]) / (S.B / 2)) % 2 === 1 && t > S.urgency[1] + S.B * 1.5 ? 0.35 : 1) : 0;
+    p2.style.transform = `scale(${lerp(1.4, 1, eOut5(pk))})`;
+  }
+
+  // DON'T · MISS · OUT.
+  S.slams.forEach((at, i) => {
+    const el = $('#s' + i), next = S.slams[i + 1] ?? S.endCard;
+    const on = t >= at && t < next;
+    el.style.display = on ? 'flex' : 'none';
+    if (on) el.style.transform = `scale(${lerp(1.5, 1, eOut5(prog(t, at, at + 0.12)))})`;
+  });
+
+  // The end card.
+  const e = $('#end');
+  e.style.display = t >= S.endCard ? 'block' : 'none';
+  if (t >= S.endCard) {
+    const k = prog(t, S.endCard, S.endCard + 0.15);
+    $('#e-date').style.transform = `scale(${lerp(1.3, 1, eOut5(k)) * (1 + 0.04 * Math.exp(-(beatPh % 1) * 6))})`;
+    K.popIn($('#e-card'), t, S.endCard + 0.3, 0.8, 0.3);
+  }
+
+  $('#flash').style.opacity = Math.max(hit(t, S.G0, 0.1), hit(t, S.linkTap, 0.08), hit(t, S.ticketAt, 0.08), hit(t, S.endCard, 0.1), hit(t, S.finalHit, 0.12)) * 0.45;
+}
+window.setup = setup; window.render = render;
+K.standalone(setup, render, S.TOTAL);
+</script>
+</body>
+</html>

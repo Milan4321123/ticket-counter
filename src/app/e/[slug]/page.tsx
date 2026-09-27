@@ -16,6 +16,9 @@ import FeedVideo from '@/components/FeedVideo';
 import MediaSwiper from '@/components/MediaSwiper';
 import type { MediaSwiperItem } from '@/components/MediaSwiper';
 import HeroCoverVideo from './HeroCoverVideo';
+import HeroDepth from './HeroDepth';
+import EventDepth from './EventDepth';
+import HoloStage from './HoloStage';
 import SectionNav from './SectionNav';
 import type { EventSectionLink } from './SectionNav';
 import StickyCtaBar from './StickyCtaBar';
@@ -738,7 +741,10 @@ export default async function EventPage({ params, searchParams }: Params) {
         </div>
       )}
 
-      <section className={`hero event-hero event-hero--${layout}`} style={heroStyle}>
+      <section
+        className={`hero event-hero event-hero--${layout}${!isShop && !coverVideoUrl ? ' event-hero--stage' : ''}`}
+        style={heroStyle}
+      >
         {/* The layout's own decoration (lib/events PageDesign.layout). */}
         {layout === 'festival' && (
           <div className="evl-kites" aria-hidden="true">
@@ -750,6 +756,26 @@ export default async function EventPage({ params, searchParams }: Params) {
           </div>
         )}
         {layout === 'neon' && <div className="evl-grid" aria-hidden="true" />}
+        {/* The floating 3D scene after the cover, so it paints over the photo
+            and under the text. Events only — see HeroDepth. */}
+        {!isShop && <HeroDepth layout={layout} day={heroDate?.day} />}
+        {/* …and the WebGL stage: the cover printed on a holographic 3D ticket.
+            Not over a video cover — a clip is the hero there. */}
+        {!isShop && !coverVideoUrl && (
+          <HoloStage
+            layout={layout}
+            cover={stillUrl}
+            title={event.name}
+            kicker={event.artist || (preview ? 'Preview' : 'Live event')}
+            place={[event.venueName, heroCity].filter(Boolean).join(' · ')}
+            day={heroDate?.day ?? ''}
+            month={heroDate?.month ?? ''}
+            weekday={heroDate?.weekday ?? ''}
+            price={minPrice === null ? '' : minPrice === 0 ? 'FREE' : `FROM ${formatMoney(minPrice, event.currency)}`}
+            accent={theme['--accent']}
+            pink={theme['--pink']}
+          />
+        )}
         {(coverVideoUrl || stillUrl) && (
           <div
             className={`event-hero-media${stillUrl ? '' : ' event-hero-media-bare'}`}
@@ -1085,6 +1111,13 @@ export default async function EventPage({ params, searchParams }: Params) {
                         </div>
                       ) : (
                         photo
+                      )}
+                      {/* The light that moves over a ticket (depth.css). */}
+                      {!isShop && (
+                        <>
+                          <span className="tk-foil" aria-hidden="true" />
+                          <span className="tk-shine" aria-hidden="true" />
+                        </>
                       )}
                       {(!isShop || !photo) && (
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{chips}</div>
@@ -1635,6 +1668,9 @@ export default async function EventPage({ params, searchParams }: Params) {
           </aside>
         </div>
       </section>
+
+      {/* Scroll-driven motion: 3D on an event, calm on a shop. */}
+      <EventDepth mode={isShop ? 'flat' : '3d'} />
 
       {/* Sticky mobile checkout bar — appears below 640px via CSS, and only
           once the hero's own button has scrolled away. */}

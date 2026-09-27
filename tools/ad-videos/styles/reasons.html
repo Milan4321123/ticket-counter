@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>3 reasons short — stage</title>
+<!-- 4 · 3 REASONS: a bright Swiss-style infographic — 01 the artists, 02 the
+     night, 03 the cause (NPJOE's first-aid numbers) — then "Tickets in 4
+     steps" with a ticking checklist beside the phone, to 124 bpm house.
+     Edit: specs.js (reasons). -->
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@500;600;700;800&display=block" rel="stylesheet">
+<script src="specs.js"></script>
+<script src="../stagekit.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; background: #f5f5f0; }
+  body { font-family: Inter, sans-serif; color: #0b0b14; -webkit-font-smoothing: antialiased; }
+  #frame { position: absolute; inset: 0; overflow: hidden; background: #f5f5f0; }
+  .layer { position: absolute; inset: 0; }
+  .sg { font-family: 'Space Grotesk', Inter, sans-serif; letter-spacing: -.03em; }
+  #grid { position: absolute; inset: 0; background-image: linear-gradient(90deg, rgba(11,11,20,.05) 1px, transparent 1px); background-size: 90px 100%; }
+  .num { position: absolute; left: 60px; top: 300px; font: 700 300px/.8 'Space Grotesk', sans-serif; color: transparent; -webkit-text-stroke: 4px #0b0b14; letter-spacing: -.06em; }
+  .ttl { position: absolute; left: 60px; right: 60px; top: 580px; font: 700 100px/1 'Space Grotesk', sans-serif; letter-spacing: -.035em; }
+  .rv { display: block; }
+  .rv .w { display: inline-block; overflow: hidden; vertical-align: top; padding: 0 .02em .1em; margin: 0 -.02em -.1em; }
+  .rv .w > span { display: inline-block; }
+  .tag { display: inline-block; padding: 12px 20px; border: 3px solid #0b0b14; border-radius: 999px; font: 700 28px/1 Inter, sans-serif; letter-spacing: .12em; }
+  .tile { position: absolute; width: 210px; height: 210px; border-radius: 34px; background: #ffd23f; display: flex; align-items: center; justify-content: center; font-size: 110px; box-shadow: 0 16px 0 #0b0b14; }
+  .stat { position: absolute; left: 60px; width: 470px; padding: 26px 30px; border-radius: 28px; background: #fff; border: 3px solid #0b0b14; }
+  .stat b { display: block; font: 700 96px/1 'Space Grotesk', sans-serif; letter-spacing: -.04em; }
+  .stat span { display: block; margin-top: 8px; font: 600 30px/1.2 Inter, sans-serif; color: #444; }
+  .step { position: absolute; left: 50px; width: 470px; display: flex; gap: 20px; align-items: flex-start; font: 700 40px/1.2 Inter, sans-serif; color: #9a9aa3; }
+  .step i { flex: none; width: 70px; height: 70px; border-radius: 50%; border: 4px solid #c9c9cf; display: flex; align-items: center; justify-content: center; font: 800 34px/1 Inter, sans-serif; font-style: normal; color: #9a9aa3; background: #fff; }
+  .step small { display: block; margin-top: 6px; font: 600 27px/1.3 Inter, sans-serif; color: #9a9aa3; }
+  .bar { position: absolute; left: 0; width: 1080px; z-index: 50; }
+  .chip { display: inline-block; padding: 16px 26px; border-radius: 999px; border: 3px solid #fff; font: 800 34px/1 Inter, sans-serif; margin: 0 6px; }
+</style>
+</head>
+<body>
+<div id="frame">
+  <div id="grid"></div>
+
+  <section class="layer" id="intro">
+    <div style="position:absolute;left:60px;top:260px"><span class="tag" id="i-tag">DASHAIN 2026</span></div>
+    <div class="sg" id="i-3" style="position:absolute;left:52px;top:380px;font-size:196px;font-weight:700;line-height:.85;white-space:nowrap">3 reasons</div>
+    <div class="sg" id="i-to" style="position:absolute;left:60px;top:620px;font-size:86px;font-weight:700;line-height:1">to be in Heidelberg</div>
+    <div id="i-date" style="position:absolute;left:60px;top:740px;background:#dc143c;color:#fff;padding:18px 30px;font:700 86px/1 'Space Grotesk',sans-serif;letter-spacing:-.03em">on 10 October.</div>
+    <div id="i-rule" style="position:absolute;left:60px;top:900px;height:8px;width:960px;background:#0b0b14;transform-origin:0 0"></div>
+    <div class="sg" id="i-arrow" style="position:absolute;left:60px;top:950px;font-size:200px;font-weight:700">↓</div>
+  </section>
+
+  <section class="layer r" id="r0" style="display:none">
+    <div class="num">01</div>
+    <div class="ttl"><div class="rv" data-at="0.1">Sugam Pokhrel</div><div class="rv" data-at="0.2">&amp; Bajagaja —</div><div class="rv" data-at="0.3" style="color:#dc143c">live.</div></div>
+    <div id="r0-panel" style="position:absolute;left:470px;top:960px;width:610px;height:760px;background:#1d3fbf"></div>
+    <div id="r0-poster" style="position:absolute;left:560px;top:1010px;width:440px;height:623px;box-shadow:24px 24px 0 #0b0b14"><img src="../out/dashain/media/poster-main.jpg" style="width:100%;height:100%;object-fit:cover"></div>
+    <div id="r0-tag" style="position:absolute;left:60px;top:1080px;font:700 40px/1.35 Inter,sans-serif;width:380px">Nepal's favourite band, one night in Heidelberg.</div>
+  </section>
+
+  <section class="layer r" id="r1" style="display:none">
+    <div class="num">02</div>
+    <div class="ttl"><div class="rv" data-at="0.1">Dinner, dance</div><div class="rv" data-at="0.2">&amp; <span style="color:#dc143c">Dashain.</span></div></div>
+    <div class="tile" id="t0" style="top:1000px;left:90px">🍛</div>
+    <div class="tile" id="t1" style="top:1000px;left:330px;background:#dc143c">💃</div>
+    <div class="tile" id="t2" style="top:1000px;left:570px;background:#1d3fbf">🪁</div>
+    <div class="tile" id="t3" style="top:1000px;left:810px">🎶</div>
+    <div id="r1-sub" style="position:absolute;left:60px;right:60px;top:1310px;font:700 44px/1.35 Inter,sans-serif">A full Dashain &amp; Tihar evening — food, music and the whole community.</div>
+  </section>
+
+  <section class="layer r" id="r2" style="display:none">
+    <div class="num">03</div>
+    <div class="ttl" style="font-size:88px"><div class="rv" data-at="0.1">Your ticket supports</div><div class="rv" data-at="0.2"><span style="color:#dc143c">first-aid training</span></div><div class="rv" data-at="0.3">in Nepal.</div></div>
+    <div class="stat" id="s0" style="top:1000px"><b data-to="1450" data-suffix="+">0</b><span>students trained in first aid</span></div>
+    <div class="stat" id="s1" style="top:1220px"><b data-to="68">0</b><span>teachers certified as trainers</span></div>
+    <div id="r2-cross" style="position:absolute;left:600px;top:1030px;width:400px;height:400px"><svg viewBox="0 0 30 30" width="400" height="400"><path d="M11 2h8v9h9v8h-9v9h-8v-9H2v-8h9z" fill="#dc143c"/></svg></div>
+    <div style="position:absolute;left:600px;top:1460px;width:420px;font:600 30px/1.3 Inter,sans-serif;color:#444">National First Aid Campaign by NPJOE e.V.</div>
+  </section>
+
+  <section class="layer" id="steps" style="display:none">
+    <div class="sg" id="st-h" style="position:absolute;left:50px;top:240px;font-size:120px;font-weight:700;line-height:.95">Tickets in<br><span style="background:#ffd23f;padding:0 16px">4 steps.</span></div>
+    <div class="step" id="st0" style="top:560px"><i>1</i><div>Open the event</div></div>
+    <div class="step" id="st1" style="top:740px"><i>2</i><div>Pick your tickets</div></div>
+    <div class="step" id="st2" style="top:920px"><i>3</i><div>Reserve<small>no card, no account</small></div></div>
+    <div class="step" id="st3" style="top:1120px"><i>4</i><div>Pay by PayPal or bank<small>QR ticket by email</small></div></div>
+    <div id="phonehost" class="layer"></div>
+    <div id="tickethost" class="layer"></div>
+  </section>
+
+  <section class="layer" id="cta" style="display:none">
+    <div class="layer" style="background:#1d3fbf"></div>
+    <div class="sg" style="position:absolute;left:60px;top:240px;font-size:170px;font-weight:700;line-height:.9;color:#fff" id="c-h">Don't<br>miss it.</div>
+    <div id="c-date" style="position:absolute;left:60px;top:590px;font:700 58px/1.2 'Space Grotesk',sans-serif;color:#ffd23f">Sat 10 Oct · Heidelberg</div>
+    <div id="c-sub" style="position:absolute;left:60px;top:670px;font:600 36px/1.3 Inter,sans-serif;color:#fff">Sugam Pokhrel &amp; Bajagaja · Dinner · Dance</div>
+    <div id="c-chips" style="position:absolute;left:54px;top:780px;color:#fff"><span class="chip">No card</span><span class="chip">No fees</span><span class="chip">No account</span></div>
+    <div id="c-card" style="position:absolute;left:60px;right:60px;top:920px;height:330px;background:#fff;display:flex;align-items:center;gap:36px;padding:0 36px;box-shadow:18px 18px 0 #0b0b14">
+      <div class="qr" style="width:260px;height:260px;flex:none"></div>
+      <div><div style="font:600 32px/1.2 Inter,sans-serif;color:#555">Tickets at</div><div class="sg" style="font-size:78px;font-weight:700;line-height:1;margin-top:10px">martnepali<br>.com</div></div>
+    </div>
+    <div id="c-logos" style="position:absolute;left:60px;top:1320px;display:flex;align-items:center;gap:22px;color:#fff;font:600 28px/1.3 Inter,sans-serif">
+      <div style="width:110px;height:110px;border-radius:50%;background:#fff;padding:8px"><img src="../out/dashain/media/logo-npjoe.jpg" style="width:100%;height:100%;object-fit:contain"></div>
+      <div style="width:110px;height:110px;border-radius:50%;background:#fff;padding:5px"><img src="../out/dashain/media/logo-neg.jpg" style="width:100%;height:100%;object-fit:contain"></div>
+      <span>Presented by NPJOE e.V.<br>&amp; Nepali Events Germany</span>
+    </div>
+  </section>
+
+  <div class="bar" id="wipe" style="height:1920px;top:0;display:none"></div>
+</div>
+<script>
+const { $, $$, clamp, lerp, prog, eOut, eOut5, eIO, eBack, css } = K;
+const S = SPECS.S.reasons;
+let phone;
+const T = [0, ...S.reasons, S.steps, S.cta];            // section starts
+const COLORS = ['#dc143c', '#1d3fbf', '#ffd23f', '#0b0b14', '#1d3fbf'];
+
+async function setup(qr) {
+  K.splitWords(document);
+  phone = new K.Phone($('#phonehost'), { width: 420, look: 'bezel' });
+  css(phone.el, { left: '560px', top: '520px' });
+  const tk = K.ticket({ theme: 'light', qr: qr || '' });
+  css(tk, { left: '100px', top: '1230px', transformOrigin: '50% 50%' });
+  $('#tickethost').appendChild(tk);
+  await K.ready(qr);
+}
+const fmt = (n) => Math.round(n).toLocaleString('en-US');
+
+function render(t) {
+  const bph = ((t - S.G0) / S.B);
+  const bounce = Math.exp(-(((bph % 1) + 1) % 1) * 5);
+  // Section wipes: a coloured slab slides across at each cut.
+  const w = $('#wipe');
+  let on = false;
+  T.slice(1).forEach((at, i) => {
+    const k = prog(t, at - 0.22, at + 0.22);
+    if (k > 0 && k < 1) { on = true; w.style.background = COLORS[i]; w.style.transform = `translateX(${lerp(1080, -1080, eIO(k))}px)`; }
+  });
+  w.style.display = on ? 'block' : 'none';
+
+  // Intro.
+  const I = $('#intro');
+  I.style.display = t < T[1] ? 'block' : 'none';
+  if (t < T[1]) {
+    K.popIn($('#i-tag'), t, 0.05, 0.6, 0.3);
+    const a = eOut5(prog(t, 0.1, 0.45));
+    $('#i-3').style.transform = `translateX(${(1 - a) * -900}px)`;
+    $('#i-to').style.clipPath = `inset(0 ${(1 - eOut5(prog(t, 0.3, 0.6))) * 100}% 0 0)`;
+    $('#i-date').style.clipPath = `inset(0 ${(1 - eOut5(prog(t, 0.45, 0.75))) * 100}% 0 0)`;
+    $('#i-rule').style.transform = `scaleX(${eOut5(prog(t, 0.55, 0.95))})`;
+    $('#i-arrow').style.transform = `translateY(${Math.sin(t * 12) * 12}px)`;
+    $('#i-arrow').style.opacity = prog(t, 0.7, 0.8);
+  }
+
+  // The three reasons.
+  [0, 1, 2].forEach((i) => {
+    const R = $('#r' + i), a = T[i + 1], b = T[i + 2];
+    const vis = t >= a && t < b;
+    R.style.display = vis ? 'block' : 'none';
+    if (!vis) return;
+    const lt = t - a;
+    const nk = eOut5(prog(lt, 0, 0.35));
+    $('.num', R).style.transform = `translateX(${(1 - nk) * -400}px)`;
+    K.reveal(R, lt, 0.4, 0.05);
+    if (i === 0) {
+      $('#r0-panel').style.transform = `translateX(${(1 - eOut5(prog(lt, 0.2, 0.55))) * 700}px)`;
+      const pk = eOut5(prog(lt, 0.35, 0.75));
+      $('#r0-poster').style.transform = `translateX(${(1 - pk) * 700}px) rotate(${(1 - pk) * 12 + 2}deg)`;
+      $('#r0-tag').style.opacity = prog(lt, 0.6, 0.9);
+    }
+    if (i === 1) {
+      ['#t0', '#t1', '#t2', '#t3'].forEach((id, j) => {
+        const k = prog(lt, 0.3 + j * S.B / 2, 0.6 + j * S.B / 2);
+        $(id).style.opacity = k > 0 ? 1 : 0;
+        $(id).style.transform = `translateY(${(1 - eBack(k)) * 200 - (k >= 1 ? bounce * 26 : 0)}px) rotate(${(j % 2 ? 4 : -4) * (k >= 1 ? bounce : 1)}deg)`;
+      });
+      $('#r1-sub').style.opacity = prog(lt, 0.7, 1.0);
+    }
+    if (i === 2) {
+      ['#s0', '#s1'].forEach((id, j) => {
+        const st = $(id), k = prog(lt, 0.3 + j * 0.2, 0.6 + j * 0.2);
+        st.style.opacity = k > 0 ? 1 : 0; st.style.transform = `translateX(${(1 - eOut5(k)) * -500}px)`;
+        const bb = $('b', st), to = +bb.dataset.to;
+        bb.textContent = fmt(to * eOut(prog(lt, 0.35 + j * 0.2, 1.3 + j * 0.2))) + (bb.dataset.suffix && lt > 1.3 ? bb.dataset.suffix : '');
+      });
+      const ck = prog(lt, 0.2, 0.6);
+      $('#r2-cross').style.transform = `scale(${lerp(0, 1, eBack(ck)) * (1 + 0.04 * bounce)}) rotate(${(1 - eOut(ck)) * -90}deg)`;
+    }
+  });
+
+  // Tickets in 4 steps.
+  const ST = $('#steps');
+  ST.style.display = t >= S.steps && t < S.cta ? 'block' : 'none';
+  if (ST.style.display === 'block') {
+    const lt = t - S.steps;
+    $('#st-h').style.transform = `translateX(${(1 - eOut5(prog(lt, 0, 0.35))) * -900}px)`;
+    const pk = eOut5(prog(t, S.phone, S.phone + 0.5));
+    phone.el.style.transform = `translateY(${(1 - pk) * 1200}px)`;
+    phone.render(t, S);
+    const starts = [S.phone, S.marks.pick, S.marks.scroll, S.marks.reserve];
+    starts.forEach((s0, i) => {
+      const el = $('#st' + i), done = t >= S.ticks[i], act = t >= s0;
+      const k = prog(lt, 0.15 + i * 0.08, 0.45 + i * 0.08);
+      el.style.opacity = clamp(k * 2); el.style.transform = `translateX(${(1 - eOut5(k)) * -300}px) scale(${act && !done ? 1.04 : 1})`;
+      el.style.transformOrigin = '0 50%';
+      el.style.color = act ? '#0b0b14' : '#9a9aa3';
+      $('small', el) && ($('small', el).style.color = act ? '#444' : '#9a9aa3');
+      const i2 = $('i', el);
+      i2.textContent = done ? '✓' : i + 1;
+      css(i2, { background: done ? '#16a34a' : act ? '#0b0b14' : '#fff', borderColor: done ? '#16a34a' : act ? '#0b0b14' : '#c9c9cf', color: done || act ? '#fff' : '#9a9aa3', transform: `scale(${done ? lerp(1.4, 1, eOut5(prog(t, S.ticks[i], S.ticks[i] + 0.25))) : 1})` });
+    });
+    const tk = $('.kticket'), tkk = prog(t, S.ticketAt, S.ticketAt + 0.5);
+    tk.style.opacity = clamp(tkk * 3);
+    tk.style.transform = `translateY(${(1 - eOut5(tkk)) * 600}px) rotate(${-5 + (1 - eOut5(tkk)) * -10}deg) scale(0.78)`;
+  }
+
+  // Don't miss it.
+  const C = $('#cta');
+  C.style.display = t >= S.cta ? 'block' : 'none';
+  if (t >= S.cta) {
+    const lt = t - S.cta;
+    $('#c-h').style.transform = `translateX(${(1 - eOut5(prog(lt, 0.05, 0.4))) * -900}px) scale(${1 + 0.03 * bounce})`;
+    $('#c-h').style.transformOrigin = '0 50%';
+    [['#c-date', 0.3], ['#c-sub', 0.4], ['#c-chips', 0.55], ['#c-logos', 1.1]].forEach(([id, at]) => {
+      const k = prog(lt, at, at + 0.35);
+      $(id).style.opacity = k; $(id).style.transform = `translateX(${(1 - eOut5(k)) * -200}px)`;
+    });
+    K.popIn($('#c-card'), lt, 0.75, 0.8, 0.4);
+  }
+}
+window.setup = setup; window.render = render;
+K.standalone(setup, render, S.TOTAL);
+</script>
+</body>
+</html>

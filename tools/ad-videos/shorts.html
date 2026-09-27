@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dashain shorts — stage</title>
+<!--
+  The five 15-second shorts (?v=1…5), drawn like stage.html: render(t) sets
+  every element for second t. The edit is in shorts.js. ?v=3&t=4 shows one
+  moment, ?v=3&play plays it.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Inter:wght@400;500;600;700;800&family=Mukta:wght@600;800&display=block" rel="stylesheet">
+<script src="shorts.js"></script>
+<style>
+  :root {
+    --crimson: #dc143c; --blue: #0a3a9e; --navy: #07091a; --gold: #fbbf24; --sky: #7cc0ff; --green: #22c55e;
+    --disp: 'Bricolage Grotesque', 'Inter', system-ui, sans-serif;
+    --body: 'Inter', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--navy); }
+  body { font-family: var(--body); color: #fff; -webkit-font-smoothing: antialiased; }
+  #frame { position: absolute; inset: 0; overflow: hidden; background: var(--navy); }
+  .abs { position: absolute; }
+  .center { left: 0; right: 0; text-align: center; }
+  img { display: block; }
+  .layer { position: absolute; inset: 0; }
+  .hook { display: none; }
+
+  .glow { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .55; }
+  .spark { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: #ffd66e; box-shadow: 0 0 12px 3px rgba(255, 190, 70, .55); }
+  .kite { position: absolute; width: 120px; height: 150px; }
+
+  .rv { display: block; }
+  .rv .w { display: inline-block; overflow: hidden; vertical-align: top; padding: 0 .02em .08em; margin: 0 -.02em -.08em; }
+  .rv .w > span { display: inline-block; }
+  .kicker { font: 700 30px/1 var(--body); letter-spacing: .22em; text-transform: uppercase; }
+  .h-xl { font: 800 124px/.95 var(--disp); letter-spacing: -.03em; }
+  .h-l { font: 800 92px/1 var(--disp); letter-spacing: -.025em; }
+  .h-m { font: 800 64px/1.08 var(--disp); letter-spacing: -.02em; }
+  .sub { font: 500 38px/1.35 var(--body); color: rgba(255,255,255,.85); }
+  .pill { display: inline-flex; align-items: center; gap: 14px; padding: 16px 28px; border-radius: 999px; font: 700 34px/1 var(--body); }
+  .poster { position: absolute; border-radius: 28px; overflow: hidden; box-shadow: 0 50px 120px rgba(0,0,0,.65), 0 0 0 2px rgba(255,255,255,.18); }
+  .poster img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* Phone */
+  .phone { position: absolute; width: 580px; height: 1209px; left: 250px; top: 380px; border-radius: 82px; padding: 20px;
+    background: linear-gradient(145deg, #3a3a46, #101016 40%, #26262e); box-shadow: 0 60px 120px rgba(0,0,0,.6), 0 0 0 2px rgba(255,255,255,.14) inset, 0 0 0 8px #050507 inset; }
+  .phone .screen { position: absolute; left: 20px; top: 20px; width: 540px; height: 1169px; border-radius: 62px; overflow: hidden; background: #0a0a12; }
+  .vp { position: absolute; left: 0; top: 0; width: 390px; height: 844px; transform-origin: 0 0; transform: scale(1.384615); overflow: hidden; }
+  .vp > img { position: absolute; left: 0; top: 0; width: 390px; display: none; }
+  .phone .island { position: absolute; left: 50%; top: 34px; width: 150px; height: 42px; margin-left: -75px; border-radius: 30px; background: #000; z-index: 5; }
+  .finger { position: absolute; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; background: rgba(255,255,255,.55); border: 3px solid rgba(255,255,255,.9); box-shadow: 0 6px 20px rgba(0,0,0,.35); z-index: 60; opacity: 0; pointer-events: none; }
+  .ripple { position: absolute; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; border: 4px solid #fff; z-index: 60; opacity: 0; }
+  .stage-finger { width: 110px; height: 110px; margin: -55px 0 0 -55px; }
+  .stage-ripple { width: 110px; height: 110px; margin: -55px 0 0 -55px; }
+
+  /* Phone: a blank browser with the address bar at the bottom (short 2). */
+  #browser { position: absolute; inset: 0; display: none; background: radial-gradient(500px 500px at 50% 35%, #1b1b2a, #0c0c14); }
+  #browser .tiles { position: absolute; left: 40px; right: 40px; top: 190px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; }
+  #browser .tiles span { aspect-ratio: 1; border-radius: 16px; background: rgba(255,255,255,.07); }
+  #browser .label { position: absolute; left: 40px; top: 150px; font: 700 17px/1 var(--body); color: rgba(255,255,255,.5); }
+  #addr { position: absolute; left: 14px; right: 14px; top: 764px; height: 54px; border-radius: 18px; background: #2a2a34; box-shadow: 0 8px 24px rgba(0,0,0,.4); display: flex; align-items: center; padding: 0 18px; gap: 10px; font: 500 19px/1 var(--body); overflow: hidden; }
+  #addr .ph { color: rgba(255,255,255,.45); }
+  #addr .caret { width: 2px; height: 24px; background: #4f8cff; }
+  #addr .bar { position: absolute; left: 0; bottom: 0; height: 3px; background: #4f8cff; }
+
+  /* Phone: the camera finding the poster's QR (short 3). */
+  #camera { position: absolute; inset: 0; display: none; background: #1a1410; overflow: hidden; }
+  #cam-scene { position: absolute; left: 0; top: 0; width: 390px; height: 844px; }
+  .vf { position: absolute; width: 44px; height: 44px; border: 5px solid #fff; }
+  #qr-lock { position: absolute; border: 4px solid #fbbf24; border-radius: 16px; box-shadow: 0 0 0 2000px rgba(0,0,0,.25); }
+  #cam-banner { position: absolute; left: 14px; right: 14px; top: 64px; height: 108px; border-radius: 26px; background: rgba(40,40,48,.92); backdrop-filter: blur(10px); display: flex; align-items: center; gap: 14px; padding: 0 18px; font: 600 18px/1.3 var(--body); box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+  #cam-banner b { display: block; font: 700 19px/1.2 var(--body); }
+  #cam-banner i { font-style: normal; width: 50px; height: 50px; border-radius: 14px; background: #fff; display: flex; align-items: center; justify-content: center; flex: none; overflow: hidden; }
+
+  /* Things sticking to the poster */
+  .sticker { position: absolute; background: #fff; border-radius: 14px; padding: 10px; box-shadow: 0 8px 20px rgba(0,0,0,.35); }
+  .sticker .t { font: 800 15px/1 var(--body); color: #dc143c; text-align: center; letter-spacing: .12em; margin-bottom: 6px; }
+  .tape { position: absolute; width: 150px; height: 44px; background: rgba(255, 240, 200, .75); box-shadow: 0 2px 6px rgba(0,0,0,.2); }
+
+  .bubble { position: absolute; max-width: 800px; padding: 30px 40px; border-radius: 44px; font: 600 54px/1.2 var(--body); box-shadow: 0 16px 40px rgba(0,0,0,.35); }
+  .bubble.l { left: 70px; background: #2b2d3a; border-bottom-left-radius: 10px; }
+  .bubble.r { right: 70px; background: linear-gradient(135deg, #e11d48, #b8102f); border-bottom-right-radius: 10px; }
+  .check { display: flex; align-items: center; gap: 30px; font: 800 86px/1 var(--disp); letter-spacing: -.02em; }
+  .check i { width: 96px; height: 96px; border-radius: 50%; background: var(--green); display: flex; align-items: center; justify-content: center; font: 800 60px/1 var(--body); font-style: normal; box-shadow: 0 0 40px rgba(34,197,94,.5); }
+  .note { position: absolute; width: 860px; padding: 28px 34px; border-radius: 30px; display: flex; align-items: center; gap: 20px; background: rgba(16,16,28,.88); border: 1.5px solid rgba(255,255,255,.18); backdrop-filter: blur(14px); box-shadow: 0 24px 60px rgba(0,0,0,.55); font: 700 38px/1.2 var(--body); z-index: 30; }
+  .note i { font-style: normal; font-size: 54px; flex: none; }
+
+  .ticket { position: absolute; width: 640px; left: 220px; top: 440px; border-radius: 40px; overflow: hidden; background: #14141f; box-shadow: 0 50px 120px rgba(0,0,0,.7), 0 0 0 2px rgba(255,255,255,.12) inset; z-index: 40; transform-origin: 50% 90%; }
+  .badge { position: relative; border-radius: 50%; background: #fff; overflow: hidden; box-shadow: 0 16px 40px rgba(0,0,0,.45); }
+  .badge img { width: 100%; height: 100%; object-fit: contain; }
+</style>
+</head>
+<body>
+<div id="frame">
+  <div class="layer" id="bg">
+    <div class="glow" id="g1" style="width:900px;height:900px;background:#dc143c"></div>
+    <div class="glow" id="g2" style="width:1000px;height:1000px;background:#1d4ed8"></div>
+    <div class="glow" id="g3" style="width:700px;height:700px;background:#f59e0b;opacity:.25"></div>
+    <div id="sparks" class="layer"></div>
+  </div>
+
+  <!-- Hooks (one per short) -->
+  <section class="layer hook" id="hook1">
+    <div class="abs center kicker" id="h1-k" style="top:200px;color:var(--gold);font-size:36px">Live in Heidelberg</div>
+    <div class="poster" id="h1-poster" style="left:250px;top:270px;width:580px;height:821px"><img src="out/dashain/media/poster-main.jpg"></div>
+    <div class="abs center" style="top:1130px">
+      <div class="rv h-m" data-at="0.8">Sugam Pokhrel &amp; Bajagaja</div>
+      <div class="rv sub" data-at="1.3" style="margin-top:16px">Sat 10 Oct · Rohrbacher Kulturhaus</div>
+      <div class="rv sub" data-at="1.6" style="color:var(--gold)">Live music · Dinner · Dance</div>
+    </div>
+    <div class="abs center" id="h1-cta" style="top:1440px">
+      <div class="rv h-m" data-at="2.3" style="font-size:58px">Get your tickets here 👇</div>
+      <div id="h1-link" class="pill" style="margin-top:26px;background:#fff;color:#111;font-size:36px">🔗 martnepali.com/e/dashain…</div>
+    </div>
+  </section>
+
+  <section class="layer hook" id="hook2">
+    <div class="bubble l" id="b0" style="top:360px">Dashain plans? 🪁</div>
+    <div class="bubble r" id="b1" style="top:530px">Sugam Pokhrel live in Heidelberg 🎤</div>
+    <div class="bubble l" id="b2" style="top:790px">Wait… tickets?? 😳</div>
+    <div class="bubble r" id="b3" style="top:960px">Just type <b>martnepali.com</b> 😉</div>
+    <div class="poster" id="b4" style="right:70px;top:1180px;width:300px;height:425px;border-radius:30px 30px 10px 30px"><img src="out/dashain/media/poster-main.jpg"></div>
+  </section>
+
+  <section class="layer hook" id="hook3">
+    <div class="layer" style="background:repeating-linear-gradient(0deg,#3a2a22 0 58px,#2c1f19 58px 62px),#3a2a22;opacity:.55"></div>
+    <div class="layer" style="background:radial-gradient(900px 900px at 50% 40%,rgba(0,0,0,0),rgba(7,9,26,.9))"></div>
+    <div class="abs center" style="top:170px"><div class="rv h-l" data-at="0.3">Saw this poster?</div></div>
+    <div id="h3-wall" class="abs" style="left:240px;top:330px;width:600px;height:850px">
+      <div class="poster" style="inset:0;border-radius:6px"><img src="out/dashain/media/poster-main.jpg"></div>
+      <div class="sticker qr-sticker" style="left:375px;top:525px;width:170px"><div class="t">TICKETS</div><div class="qr" style="width:150px;height:150px"></div></div>
+      <div class="tape" style="left:-40px;top:-10px;transform:rotate(-30deg)"></div>
+      <div class="tape" style="right:-40px;top:-10px;transform:rotate(30deg)"></div>
+    </div>
+    <div class="abs center" id="h3-sub" style="top:1230px"><div class="rv h-m" data-at="1.2">Scan it. <span style="color:var(--gold)">You're in.</span></div></div>
+  </section>
+
+  <section class="layer hook" id="hook4">
+    <div class="abs center" style="top:300px">
+      <div class="rv h-l" data-at="0.2">Dashain is better</div>
+      <div class="rv h-l" data-at="0.45" style="color:var(--gold)">together.</div>
+    </div>
+    <div class="abs center" id="h4-fam" style="top:610px;font-size:150px;line-height:1;letter-spacing:-.05em">👨🏽👩🏽👧🏽👦🏽</div>
+    <div class="abs center" style="top:880px">
+      <div class="rv h-m" data-at="1.5">Bring everyone —</div>
+      <div class="rv h-m" data-at="1.7">up to <span style="color:var(--gold)">8 tickets</span> per order.</div>
+    </div>
+    <div class="abs center" style="top:1120px"><div id="h4-stu" class="pill" style="background:rgba(124,192,255,.16);border:1.5px solid rgba(124,192,255,.45)">🎓 Students: €5 voucher at the door</div></div>
+    <div class="abs center" style="top:1250px"><div class="rv sub" data-at="2.5">Sugam Pokhrel &amp; Bajagaja · 10 Oct · Heidelberg</div></div>
+  </section>
+
+  <section class="layer hook" id="hook5">
+    <div class="abs center" style="top:300px"><div class="rv h-l" data-at="0.2">Your Dashain tickets:</div></div>
+    <div class="abs" style="left:170px;top:470px">
+      <div class="check" id="c0"><i>✓</i>No card needed</div>
+      <div class="check" id="c1" style="margin-top:44px"><i>✓</i>No fees</div>
+      <div class="check" id="c2" style="margin-top:44px"><i>✓</i>No account</div>
+    </div>
+    <div class="abs center" style="top:950px;padding:0 90px">
+      <div class="rv sub" data-at="2.0" style="font-size:42px">Pay by PayPal or bank transfer — straight to the organizer.</div>
+    </div>
+    <div class="abs center" style="top:1170px"><div id="h5-ev" class="pill" style="background:rgba(251,191,36,.14);border:1.5px solid rgba(251,191,36,.5);color:#fff">🎤 Sugam Pokhrel &amp; Bajagaja · 10 Oct · Heidelberg</div></div>
+  </section>
+
+  <!-- The phone part -->
+  <section class="layer" id="phonepart" style="display:none">
+    <div class="abs center" id="step-row" style="top:250px;height:90px">
+      <div id="step" style="display:inline-flex;align-items:center;gap:18px;font:800 54px/1 var(--disp)">
+        <span id="step-n" style="width:66px;height:66px;border-radius:50%;background:var(--crimson);display:inline-flex;align-items:center;justify-content:center;font:800 36px/1 var(--body)">1</span>
+        <span id="step-t"></span>
+      </div>
+    </div>
+    <div class="abs center" id="brand" style="top:180px;font:700 30px/1 var(--body);color:rgba(255,255,255,.7);display:flex;justify-content:center;align-items:center;gap:12px">
+      Tickets on <span id="mn-mark" style="display:inline-block;width:34px;height:40px"></span><b style="font:800 36px/1 var(--disp);color:#fff">Mart<span style="color:var(--crimson)">Nepali</span></b>
+    </div>
+    <div class="phone" id="phone">
+      <div class="screen"><div class="vp" id="vp">
+        <img data-shot="home" src="out/dashain/shots/home.png">
+        <img data-shot="event" src="out/dashain/shots/event.png">
+        <img data-shot="city" src="out/dashain/shots/city-check.png">
+        <img data-shot="ck0" src="out/dashain/shots/checkout-0.png">
+        <img data-shot="ck1" src="out/dashain/shots/checkout-1.png">
+        <img data-shot="ck2" src="out/dashain/shots/checkout-2.png">
+        <img data-shot="ck3" src="out/dashain/shots/checkout-3.png">
+        <img data-shot="q3" src="out/dashain/shots/checkout-q3.png">
+        <img data-shot="q4" src="out/dashain/shots/checkout-q4.png">
+        <img id="hdr" src="out/dashain/shots/event-header.png">
+        <div id="browser">
+          <div class="label">Favourites</div>
+          <div class="tiles"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+          <div id="addr"><span class="ph" id="addr-ph">Search or enter website</span><span id="addr-t"></span><span class="caret" id="caret"></span><span class="bar" id="addr-bar"></span></div>
+        </div>
+        <div id="camera">
+          <div id="cam-scene">
+            <div class="poster" style="left:-230px;top:-140px;width:560px;height:793px;border-radius:4px"><img src="out/dashain/media/poster-main.jpg"></div>
+            <div class="sticker qr-sticker" style="left:112px;top:344px;width:166px;padding:9px"><div class="t">TICKETS</div><div class="qr" style="width:148px;height:148px"></div></div>
+          </div>
+          <div class="vf" style="left:70px;top:280px;border-right:0;border-bottom:0;border-top-left-radius:18px"></div>
+          <div class="vf" style="left:276px;top:280px;border-left:0;border-bottom:0;border-top-right-radius:18px"></div>
+          <div class="vf" style="left:70px;top:520px;border-right:0;border-top:0;border-bottom-left-radius:18px"></div>
+          <div class="vf" style="left:276px;top:520px;border-left:0;border-top:0;border-bottom-right-radius:18px"></div>
+          <div id="qr-lock"></div>
+          <div id="cam-banner"><i id="cam-icon"></i><div><b>martnepali.com</b>Open “DashainEvent2026 — Tickets”</div></div>
+        </div>
+        <div class="finger" id="finger"></div>
+        <div class="ripple" id="ripple"></div>
+      </div></div>
+      <div class="island"></div>
+    </div>
+    <div class="note" id="callout" style="left:260px;top:960px;width:560px;justify-content:center;border-color:rgba(251,191,36,.6)"><i>🎟️</i><span></span></div>
+    <div id="notes"></div>
+    <div id="tickets"></div>
+  </section>
+
+  <div class="finger stage-finger" id="sfinger"></div>
+  <div class="ripple stage-ripple" id="sripple"></div>
+
+  <!-- DON'T MISS OUT -->
+  <section class="layer" id="cta" style="display:none">
+    <div class="layer" style="background:radial-gradient(1100px 1000px at 50% 30%,#a50f2d 0%,#4a0716 45%,#0b0510 100%)"></div>
+    <div class="abs center" style="top:200px">
+      <div id="cta0" style="font:800 200px/.9 var(--disp);letter-spacing:-.04em">DON'T</div>
+      <div id="cta1" style="font:800 200px/.9 var(--disp);letter-spacing:-.04em">MISS</div>
+      <div id="cta2" style="font:800 240px/.9 var(--disp);letter-spacing:-.04em;color:var(--gold);text-shadow:0 0 60px rgba(251,191,36,.45)">OUT!</div>
+    </div>
+    <div class="abs center" id="cta-date" style="top:850px">
+      <div style="font:800 62px/1.1 var(--disp)">Sat 10 October · Heidelberg</div>
+      <div style="margin-top:12px;font:600 36px/1.3 var(--body);color:rgba(255,255,255,.82)">Sugam Pokhrel &amp; Bajagaja · Dinner · Dance</div>
+    </div>
+    <div class="abs" id="cta-card" style="left:90px;right:90px;top:1040px;height:300px;border-radius:40px;background:rgba(10,8,18,.6);border:1.5px solid rgba(255,255,255,.16);display:flex;align-items:center;gap:40px;padding:0 36px">
+      <div class="qr" style="width:228px;height:228px;border-radius:22px;background:#fff;padding:12px;flex:none"></div>
+      <div>
+        <div style="font:600 30px/1.2 var(--body);color:rgba(255,255,255,.7)">Scan or visit</div>
+        <div id="cta-url" style="margin-top:14px;display:inline-block;padding:18px 26px;border-radius:22px;background:linear-gradient(135deg,#ff3b5c,#b8102f);font:800 44px/1 var(--disp);box-shadow:0 14px 40px rgba(220,20,60,.5)">martnepali.com</div>
+        <div style="margin-top:18px;font:700 26px/1.2 var(--body);color:#fda4af">⚡ Early-bird already sold out</div>
+      </div>
+    </div>
+    <div class="abs center" id="cta-logos" style="top:1390px">
+      <div style="display:flex;justify-content:center;align-items:center;gap:30px">
+        <div class="badge" style="width:120px;height:120px;padding:9px"><img src="out/dashain/media/logo-npjoe.jpg"></div>
+        <span style="font:800 40px/1 var(--body);color:rgba(255,255,255,.5)">×</span>
+        <div class="badge" style="width:120px;height:120px;padding:5px"><img src="out/dashain/media/logo-neg.jpg"></div>
+      </div>
+      <div style="margin-top:18px;font:600 27px/1.35 var(--body);color:rgba(255,255,255,.75)">Presented by NPJOE e.V. &amp; Nepali Events Germany</div>
+    </div>
+  </section>
+
+  <div id="kites" class="layer" style="z-index:70;pointer-events:none"></div>
+  <div class="layer" id="flash" style="background:#fff;opacity:0;z-index:80"></div>
+</div>
+
+<template id="ticket-tpl">
+  <div class="ticket">
+    <div style="height:230px;position:relative;overflow:hidden">
+      <img src="out/dashain/media/poster-banner.jpg" style="width:100%;height:100%;object-fit:cover;object-position:50% 30%">
+      <div class="abs" style="inset:0;background:linear-gradient(180deg,rgba(20,20,31,0) 40%,#14141f 100%)"></div>
+    </div>
+    <div style="padding:4px 40px 0">
+      <div class="tk-k" style="font:700 24px/1 var(--body);letter-spacing:.2em;color:var(--gold)">YOUR TICKET</div>
+      <div style="margin-top:12px;font:800 52px/1.05 var(--disp)">DashainEvent2026</div>
+      <div style="margin-top:10px;font:600 27px/1.35 var(--body);color:rgba(255,255,255,.72)">Sat 10 Oct 2026 · Rohrbacher Kulturhaus, Heidelberg<br>Standard – Phase 2</div>
+    </div>
+    <div style="position:relative;margin:26px 0 0;height:0;border-top:3px dashed rgba(255,255,255,.18)">
+      <span class="abs" style="left:-22px;top:-22px;width:44px;height:44px;border-radius:50%;background:#07091a"></span>
+      <span class="abs" style="right:-22px;top:-22px;width:44px;height:44px;border-radius:50%;background:#07091a"></span>
+    </div>
+    <div style="display:flex;align-items:center;gap:30px;padding:30px 40px 36px">
+      <div class="qr" style="width:210px;height:210px;border-radius:20px;background:#fff;padding:12px;flex:none"></div>
+      <div>
+        <div style="display:inline-flex;align-items:center;gap:10px;padding:10px 18px;border-radius:999px;background:rgba(34,197,94,.16);color:#4ade80;font:700 26px/1 var(--body)">✓ In your email</div>
+        <div style="margin-top:16px;font:600 27px/1.35 var(--body);color:rgba(255,255,255,.75)">Show the QR at the door. See you on 10 October!</div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+const X = window.SHORTS;
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const eOut = (k) => 1 - Math.pow(1 - k, 3);
+const eOut5 = (k) => 1 - Math.pow(1 - k, 5);
+const eIO = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+const eBack = (k) => { const c = 1.9; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); };
+const css = (el, o) => { for (const k in o) el.style[k] = o[k]; };
+let seed = 11;
+const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+const q = new URLSearchParams(location.search);
+const VN = +(q.get('v') || 1);
+const V = X.V[VN];
+
+function splitWords(scope) {
+  for (const el of $$('.rv', scope)) {
+    const walk = (node) => {
+      for (const child of [...node.childNodes]) {
+        if (child.nodeType === 3) {
+          const frag = document.createDocumentFragment();
+          for (const p of child.textContent.split(/(\s+)/)) {
+            if (!p) continue;
+            if (/^\s+$/.test(p)) { frag.appendChild(document.createTextNode(' ')); continue; }
+            const w = document.createElement('span'); w.className = 'w';
+            const inner = document.createElement('span'); inner.textContent = p;
+            w.appendChild(inner); frag.appendChild(w);
+          }
+          node.replaceChild(frag, child);
+        } else if (child.nodeType === 1 && !child.classList.contains('w')) {
+          const w = document.createElement('span'); w.className = 'w';
+          const inner = document.createElement('span');
+          node.replaceChild(w, child); inner.appendChild(child); w.appendChild(inner);
+        }
+      }
+    };
+    walk(el);
+    el._words = $$('.w > span', el);
+    el._at = parseFloat(el.dataset.at || '0');
+  }
+}
+function reveal(scope, t) {
+  for (const el of $$('.rv', scope)) el._words.forEach((w, i) => {
+    const k = eOut5(prog(t, el._at + i * 0.05, el._at + i * 0.05 + 0.45));
+    w.style.transform = `translateY(${(1 - k) * 110}%)`;
+  });
+}
+function popIn(el, t, at, from = 0.5, dur = 0.4) {
+  const k = prog(t, at, at + dur);
+  el.style.opacity = clamp(k * 3);
+  el.style.transform = `scale(${lerp(from, 1, eBack(k))})`;
+}
+
+const SPARKS = [], KITES = [];
+function makeBg() {
+  for (let i = 0; i < 46; i++) {
+    const d = document.createElement('div'); d.className = 'spark'; $('#sparks').appendChild(d);
+    SPARKS.push({ el: d, x: rnd() * 1080, y0: rnd() * 1920, v: 30 + rnd() * 70, ph: rnd() * 6.28, s: 0.4 + rnd() * 0.9, sway: 10 + rnd() * 30 });
+  }
+  const cols = [['#dc143c', '#fbbf24'], ['#1d4ed8', '#7cc0ff'], ['#f59e0b', '#dc143c'], ['#16a34a', '#fbbf24']];
+  [[120, 250, 0.85], [950, 170, 1.0], [960, 1640, 0.7], [110, 1700, 0.65]].forEach(([x, y, s], i) => {
+    const [a, b] = cols[i];
+    const d = document.createElement('div'); d.className = 'kite';
+    d.innerHTML = `<svg viewBox="0 0 120 150" width="120" height="150"><path d="M60 4 L112 58 L60 112 L8 58 Z" fill="${a}"/><path d="M60 4 L112 58 L60 58 Z" fill="${b}" opacity=".9"/><path d="M60 4 V112 M8 58 H112" stroke="rgba(0,0,0,.25)" stroke-width="2"/><path d="M60 112 q-14 12 0 22 t0 22" stroke="${b}" stroke-width="3" fill="none"/></svg>`;
+    $('#kites').appendChild(d);
+    KITES.push({ el: d, x, y, s, ph: i * 1.7 });
+  });
+}
+
+window.setup = async function (qr) {
+  $('#hook' + VN).style.display = 'block';
+  splitWords(document);
+  makeBg();
+  if (qr) for (const el of $$('.qr')) el.innerHTML = qr;
+  // Tickets: one card, or a fan of four.
+  const n = V.tickets >= 4 ? 4 : 1;
+  for (let i = 0; i < n; i++) {
+    const tk = $('#ticket-tpl').content.firstElementChild.cloneNode(true);
+    $('.tk-k', tk).textContent = n > 1 ? `TICKET ${i + 1} OF ${n}` : `YOUR TICKETS · ${V.tickets}×`;
+    if (qr) $('.qr', tk).innerHTML = qr;
+    $('#tickets').appendChild(tk);
+  }
+  for (const s of $$('.qr svg')) { s.setAttribute('width', '100%'); s.setAttribute('height', '100%'); }
+  if (V.notes) for (const [, ic, text, side, y] of V.notes) {
+    const d = document.createElement('div'); d.className = 'note';
+    d.style.top = y + 'px'; d.style.left = '110px';
+    d.innerHTML = `<i>${ic}</i><span>${text}</span>`;
+    $('#notes').appendChild(d);
+  }
+  if (V.callout) $('#callout span').textContent = V.callout.text;
+  try {
+    const svg = await (await fetch('out/dashain/martnepali-logo.svg')).text();
+    $('#mn-mark').innerHTML = svg; $('#cam-icon').innerHTML = svg;
+    for (const s of $$('#mn-mark svg, #cam-icon svg')) { s.setAttribute('width', '30'); s.setAttribute('height', '36'); }
+  } catch {}
+  await document.fonts.ready;
+  await Promise.all($$('img').map((i) => i.decode().catch(() => {})));
+};
+
+// ---------- hooks ----------
+const HOOKS = {
+  1(t) {
+    const p = $('#h1-poster'), k = prog(t, 0, 0.35);
+    const shrink = eIO(prog(t, 2.0, 2.6));
+    p.style.opacity = clamp(k * 3);
+    p.style.transform = `perspective(1400px) translateY(${shrink * -60}px) scale(${lerp(0.35, 1, eOut5(k)) * lerp(1, 0.86, shrink)}) rotateX(${(1 - eOut(k)) * 30}deg) rotateZ(${Math.sin(t * 1.3) * 1}deg)`;
+    popIn($('#h1-k'), t, 0.45, 0.6);
+    const cta = $('#h1-cta');
+    popIn($('#h1-link'), t, 2.55, 0.6);
+    const pulse = t > 2.95 ? 1 + 0.05 * Math.abs(Math.sin((t - 2.95) * 7)) : 1;
+    $('#h1-link').style.transform += ` scale(${pulse})`;
+    reveal($('#hook1'), t);
+  },
+  2(t) {
+    ['#b0', '#b1', '#b2', '#b3'].forEach((id, i) => {
+      const b = $(id), k = prog(t, V.pops[i], V.pops[i] + 0.35);
+      b.style.opacity = clamp(k * 3);
+      b.style.transformOrigin = i % 2 ? '100% 100%' : '0 100%';
+      b.style.transform = `scale(${lerp(0.4, 1, eBack(k))})`;
+    });
+    const p = $('#b4'), k = prog(t, V.pops[4], V.pops[4] + 0.4);
+    p.style.opacity = clamp(k * 3); p.style.transformOrigin = '100% 100%';
+    p.style.transform = `scale(${lerp(0.4, 1, eBack(k))}) rotate(${Math.sin(t * 1.5) * 1.2}deg)`;
+  },
+  3(t) {
+    const w = $('#h3-wall'), k = prog(t, 0.0, 0.5);
+    w.style.opacity = clamp(k * 3);
+    w.style.transform = `scale(${lerp(1.25, 1, eOut5(k)) + 0.015 * Math.sin(t * 1.2)}) rotate(${-1.2 + Math.sin(t) * 0.4}deg)`;
+    const st = $('.qr-sticker', w);
+    const pulse = t > 0.9 ? 1 + 0.06 * Math.abs(Math.sin((t - 0.9) * 6)) : 1;
+    st.style.transform = `rotate(4deg) scale(${pulse})`;
+    st.style.boxShadow = `0 8px 20px rgba(0,0,0,.35), 0 0 ${t > 0.9 ? 40 * (pulse - 1) * 16 : 0}px rgba(251,191,36,.9)`;
+    reveal($('#hook3'), t);
+  },
+  4(t) {
+    popIn($('#h4-fam'), t, V.pops[0], 0.3, 0.5);
+    $('#h4-fam').style.transform += ` translateY(${Math.sin(t * 3) * 8}px)`;
+    popIn($('#h4-stu'), t, V.pops[2], 0.6);
+    reveal($('#hook4'), t);
+  },
+  5(t) {
+    ['#c0', '#c1', '#c2'].forEach((id, i) => {
+      const c = $(id), at = V.pops[i], k = prog(t, at, at + 0.35);
+      c.style.opacity = clamp(k * 3);
+      c.style.transform = `translateX(${(1 - eOut5(k)) * -120}px)`;
+      const ic = $('i', c); ic.style.transform = `scale(${lerp(0, 1, eBack(prog(t, at + 0.1, at + 0.45)))})`;
+    });
+    popIn($('#h5-ev'), t, V.pops[3], 0.6);
+    reveal($('#hook5'), t);
+  },
+};
+
+// ---------- the phone ----------
+function flowAt(t) {
+  let seg = null;
+  for (const f of V.flow) if (t >= f.from) seg = f;
+  return seg;
+}
+function phone(t) {
+  const part = $('#phonepart');
+  const on = t >= V.phone - 0.05 && t < X.ctaStart + 0.3;
+  part.style.display = on ? 'block' : 'none';
+  if (!on) return;
+  const enter = eOut5(prog(t, V.phone - 0.05, V.phone + 0.6));
+  const out = eIO(prog(t, V.ticketAt - 0.1, V.ticketAt + 0.5));
+  const ph = $('#phone');
+  ph.style.transform = `perspective(2000px) translateY(${(1 - enter) * 1000 + out * 140}px) rotateX(${(1 - enter) * 25}deg) scale(${1 - out * 0.1})`;
+  ph.style.filter = `brightness(${1 - out * 0.55})`;
+  part.style.opacity = 1 - prog(t, X.ctaStart, X.ctaStart + 0.25);
+  popIn($('#brand'), t, V.phone + 0.1, 0.7);
+
+  const f = flowAt(t) || V.flow[0];
+  const scroll = f.s0 === undefined ? 0 : lerp(f.s0, f.s1, f.a === undefined ? 0 : eIO(prog(t, f.a, f.b)));
+  for (const img of $$('#vp > img[data-shot]')) {
+    const on2 = img.dataset.shot === f.shot;
+    img.style.display = on2 ? 'block' : 'none';
+    img.style.opacity = 1; img.style.filter = '';
+    if (on2) img.style.transform = `translateY(${-scroll}px)`;
+  }
+  if (f.shot === 'city') {
+    const ev = $('#vp img[data-shot="event"]');
+    ev.style.display = 'block'; ev.style.transform = 'translateY(-120px)';
+    ev.style.filter = `brightness(${1 - 0.7 * eOut(prog(t, f.from, f.from + 0.3))})`;
+    const c = $('#vp img[data-shot="city"]');
+    c.style.opacity = eOut(prog(t, f.from, f.from + 0.3));
+    c.style.transform = `translateY(${(1 - eOut5(prog(t, f.from, f.from + 0.45))) * 120}px)`;
+  }
+  $('#hdr').style.display = f.hdr ? 'block' : 'none';
+
+  // Short 2: the browser and the typing.
+  const br = $('#browser');
+  br.style.display = f.shot === 'browser' ? 'block' : 'none';
+  if (V.typing && f.shot === 'browser') {
+    const ty = V.typing;
+    const n = Math.round(ty.text.length * prog(t, ty.a, ty.b));
+    $('#addr-t').textContent = ty.text.slice(0, n);
+    $('#addr-ph').style.display = t < ty.a - 0.25 ? 'inline' : 'none';
+    $('#caret').style.opacity = t > ty.a - 0.25 && t < ty.load && Math.floor(t * 3) % 2 === 0 ? 1 : (t > ty.a - 0.25 && t < ty.load && n < ty.text.length ? 1 : 0);
+    $('#addr-bar').style.width = eOut(prog(t, ty.load, ty.load + 0.4)) * 100 + '%';
+    $('#addr').style.transform = `translateY(${-eOut5(prog(t, ty.a - 0.3, ty.a)) * 330}px) scale(${1 + 0.05 * eOut5(prog(t, ty.a - 0.3, ty.a))})`;
+  }
+  // Short 3: the camera.
+  const cam = $('#camera');
+  cam.style.display = f.shot === 'camera' ? 'block' : 'none';
+  if (V.camera && f.shot === 'camera') {
+    const c = V.camera;
+    const settle = eOut(prog(t, V.phone, c.lock));
+    const shake = 1 - settle * 0.8;
+    $('#cam-scene').style.transform = `translate(${Math.sin(t * 7) * 6 * shake + (1 - settle) * 60}px, ${Math.cos(t * 5.3) * 5 * shake + (1 - settle) * 40}px) scale(${lerp(1.25, 1, settle)})`;
+    const lock = $('#qr-lock'), lk = eOut5(prog(t, c.lock, c.lock + 0.3));
+    css(lock, { opacity: String(lk), left: lerp(60, 118, lk) + 'px', top: lerp(270, 348, lk) + 'px', width: lerp(270, 156, lk) + 'px', height: lerp(300, 180, lk) + 'px' });
+    const bn = $('#cam-banner'), bk = eOut5(prog(t, c.banner, c.banner + 0.35));
+    bn.style.opacity = bk; bn.style.transform = `translateY(${(1 - bk) * -140}px)`;
+  }
+
+  // Step label.
+  let si = 0; V.steps.forEach(([at], i) => { if (t >= at) si = i; });
+  const sk = eOut5(prog(t - V.steps[si][0], 0, 0.3));
+  $('#step-n').textContent = si + 1;
+  $('#step-t').textContent = V.steps[si][1];
+  const last = si === V.steps.length - 1 && t >= V.ticketAt;
+  $('#step-n').style.background = last ? 'var(--green)' : 'var(--crimson)';
+  $('#step-n').textContent = last ? '✓' : si + 1;
+  css($('#step'), { transform: `translateY(${(1 - sk) * 40}px)`, opacity: String(sk) });
+
+  // Short 4's total, short 5's notes.
+  const co = $('#callout');
+  if (V.callout) {
+    const k = prog(t, V.callout.at, V.callout.at + 0.35), o = 1 - prog(t, V.callout.until, V.callout.until + 0.25);
+    co.style.display = 'flex'; co.style.opacity = clamp(k * 3) * o; co.style.transform = `scale(${lerp(0.5, 1, eBack(k))})`;
+  } else co.style.display = 'none';
+  if (V.notes) $$('#notes .note').forEach((n, i) => {
+    const [at, , , side] = V.notes[i];
+    const k = prog(t, at, at + 0.4), o = 1 - prog(t, V.ticketAt - 0.9, V.ticketAt - 0.6);
+    n.style.opacity = clamp(k * 3) * o;
+    n.style.transform = `translateX(${(1 - eOut5(k)) * side * 500}px) rotate(${side * -1.2 * (1 - eOut5(k))}deg)`;
+  });
+  // The phone dims while the notes are up.
+  if (V.notes) {
+    const dim = prog(t, V.notes[0][0], V.notes[0][0] + 0.4) * (1 - prog(t, V.ticketAt - 0.9, V.ticketAt - 0.6));
+    ph.style.filter = `brightness(${(1 - out * 0.55) * (1 - dim * 0.6)}) blur(${dim * 3}px)`;
+  }
+
+  // The ticket(s) rise out of the phone.
+  const tks = $$('#tickets .ticket');
+  tks.forEach((tk, i) => {
+    const k = prog(t, V.ticketAt + 0.1 + i * 0.12, V.ticketAt + 0.75 + i * 0.12);
+    const n = tks.length;
+    const rot = n > 1 ? (i - (n - 1) / 2) * 7 : 0;
+    const dx = n > 1 ? (i - (n - 1) / 2) * 60 : 0;
+    tk.style.zIndex = 40 + i;
+    tk.style.opacity = clamp(k * 3);
+    tk.style.transform = `perspective(1600px) translate(${dx * eOut5(k)}px, ${(1 - eOut5(k)) * 520 + (n > 1 ? Math.abs(i - (n - 1) / 2) * 30 : 0)}px) rotateX(${(1 - eOut(k)) * -35}deg) rotateZ(${rot * eOut5(k) + Math.sin(t * 1.4 + i) * 0.8}deg) scale(${lerp(0.7, n > 1 ? 0.9 : 1, eOut5(k))})`;
+  });
+}
+
+function taps(t) {
+  // Taps: in the phone, or (where = 'stage') on the page around it.
+  const fi = $('#finger'), ri = $('#ripple');
+  const sf = $('#sfinger'), sr = $('#sripple');
+  let shown = false, sshown = false;
+  for (const [at, x, y, where] of V.taps) {
+    if (t > at - 0.4 && t < at + 0.35) {
+      const [F, R] = where === 'stage' ? [sf, sr] : [fi, ri];
+      const a = prog(t, at - 0.4, at - 0.18), press = t >= at - 0.05 && t < at + 0.12;
+      css(F, { left: x + 'px', top: y + 'px', opacity: String(a * (t > at + 0.2 ? 1 - prog(t, at + 0.2, at + 0.35) : 1)), transform: `scale(${press ? 0.8 : lerp(1.4, 1, eOut(a))})` });
+      const rk = prog(t, at, at + 0.4);
+      css(R, { left: x + 'px', top: y + 'px', opacity: String(t >= at ? 1 - rk : 0), transform: `scale(${1 + rk * 1.8})` });
+      if (where === 'stage') sshown = true; else shown = true;
+    }
+  }
+  if (!shown) { fi.style.opacity = 0; ri.style.opacity = 0; }
+  if (!sshown) { sf.style.opacity = 0; sr.style.opacity = 0; }
+
+}
+
+// ---------- DON'T MISS OUT ----------
+function cta(t) {
+  const el = $('#cta');
+  const on = t >= X.ctaStart;
+  el.style.display = on ? 'block' : 'none';
+  if (!on) return;
+  el.style.opacity = prog(t, X.ctaStart, X.ctaStart + 0.2);
+  X.ctaSlams.forEach((at, i) => {
+    const e = $(['#cta0', '#cta1', '#cta2'][i]);
+    const k = prog(t, at - 0.2, at);
+    e.style.opacity = clamp(k * 4);
+    const shake = t > at && t < at + 0.25 ? Math.sin(t * 90) * 8 * (1 - prog(t, at, at + 0.25)) : 0;
+    e.style.transform = `translateX(${shake}px) scale(${lerp(2.6, 1, eOut5(k))})`;
+  });
+  const drop = X.ctaSlams[2];
+  const ph = ((t - X.G0) / X.BEAT) % 1;
+  const pulse = t > drop ? Math.exp(-ph * 7) : 0;
+  $('#cta2').style.transform += ` scale(${1 + 0.05 * pulse})`;
+  const dk = prog(t, drop + 0.05, drop + 0.45);
+  css($('#cta-date'), { opacity: String(dk), transform: `translateY(${(1 - eOut5(dk)) * 40}px)` });
+  popIn($('#cta-card'), t, drop + 0.3, 0.85, 0.45);
+  $('#cta-url').style.transform = `scale(${t > drop + 0.8 ? 1 + 0.05 * pulse : 1})`;
+  const lk = prog(t, drop + 0.6, drop + 1.0);
+  css($('#cta-logos'), { opacity: String(lk), transform: `translateY(${(1 - eOut5(lk)) * 40}px)` });
+}
+
+function background(t) {
+  css($('#g1'), { left: 380 + Math.sin(t * 0.21 + VN) * 260 - 450 + 'px', top: 300 + Math.cos(t * 0.17) * 200 - 450 + 'px' });
+  css($('#g2'), { left: 700 + Math.cos(t * 0.19 + VN) * 280 - 500 + 'px', top: 1400 + Math.sin(t * 0.23) * 220 - 500 + 'px' });
+  css($('#g3'), { left: 540 + Math.sin(t * 0.31) * 300 - 350 + 'px', top: 900 + Math.cos(t * 0.27 + VN) * 300 - 350 + 'px' });
+  for (const s of SPARKS) {
+    const y = ((s.y0 - t * s.v) % 2000 + 2000) % 2000 - 40;
+    css(s.el, { transform: `translate(${s.x + Math.sin(t * 0.8 + s.ph) * s.sway}px, ${y}px) scale(${s.s})`, opacity: String(0.35 + 0.65 * Math.abs(Math.sin(t * 1.3 + s.ph))) });
+  }
+  const kv = Math.max(1 - prog(t, V.phone - 0.4, V.phone), prog(t, X.ctaSlams[2], X.ctaSlams[2] + 0.6));
+  for (const k of KITES) {
+    const x = k.x + Math.sin(t * 0.7 + k.ph) * 30, y = k.y + Math.cos(t * 0.9 + k.ph) * 22;
+    css(k.el, { opacity: String(kv * 0.95), transform: `translate(${x - 60}px, ${y - 75}px) rotate(${Math.sin(t * 1.1 + k.ph) * 12}deg) scale(${k.s})` });
+  }
+  // A white flash on the opening hit and on OUT!.
+  const fl = Math.max(1 - prog(t, X.G0, X.G0 + 0.25), t >= X.ctaSlams[2] ? 1 - prog(t, X.ctaSlams[2], X.ctaSlams[2] + 0.25) : 0);
+  $('#flash').style.opacity = t >= X.G0 - 0.001 ? fl * 0.35 : 0;
+}
+
+window.render = function (t) {
+  background(t);
+  const hk = $('#hook' + VN);
+  const hon = t < V.phone + 0.3;
+  hk.style.display = hon ? 'block' : 'none';
+  if (hon) {
+    hk.style.opacity = 1 - prog(t, V.phone - 0.15, V.phone + 0.3);
+    HOOKS[VN](t);
+  }
+  phone(t);
+  taps(t);
+  cta(t);
+};
+
+if (!q.has('render')) addEventListener('load', async () => {
+  await window.setup(null);
+  if (q.has('play')) {
+    const t0 = performance.now();
+    const loop = () => { window.render(((performance.now() - t0) / 1000) % X.TOTAL); requestAnimationFrame(loop); };
+    loop();
+  } else window.render(parseFloat(q.get('t') || '0'));
+});
+</script>
+</body>
+</html>

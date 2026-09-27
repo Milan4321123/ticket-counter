@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Warm family short — stage</title>
+<!-- 2 · WARM: cream paper, swinging marigold garlands, jamara growing at the
+     bottom, a serif voice and NPJOE's real photos — "Dashain is family" — then
+     four tickets in one order, to Nepali folk in 6/8. Edit: specs.js (warm). -->
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,700;0,9..144,900;1,9..144,600;1,9..144,800&family=Tiro+Devanagari+Hindi&family=Caveat:wght@700&family=Inter:wght@500;600;700;800&display=block" rel="stylesheet">
+<script src="specs.js"></script>
+<script src="../stagekit.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; background: #fbf3e4; }
+  body { font-family: Inter, sans-serif; color: #2b1d12; -webkit-font-smoothing: antialiased; }
+  #frame { position: absolute; inset: 0; overflow: hidden; background: radial-gradient(1200px 1100px at 50% 40%, #fff9ee 0%, #f6e7cc 70%, #ecd6ae 100%); }
+  .layer { position: absolute; inset: 0; }
+  .serif { font-family: Fraunces, Georgia, serif; }
+  .deva { font-family: 'Tiro Devanagari Hindi', serif; }
+  .hand { font-family: Caveat, cursive; }
+  .rv { display: block; }
+  .rv .w { display: inline-block; overflow: hidden; vertical-align: top; padding: 0 .03em .12em; margin: 0 -.03em -.12em; }
+  .rv .w > span { display: inline-block; }
+  #paper { position: absolute; inset: 0; opacity: .18; mix-blend-mode: multiply; pointer-events: none; z-index: 80;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.65' numOctaves='3'/><feColorMatrix values='0 0 0 0 .45  0 0 0 0 .33  0 0 0 0 .2  0 0 0 .9 0'/></filter><rect width='400' height='400' filter='url(%23n)'/></svg>"); }
+  .snap { position: absolute; background: #fffdf7; padding: 16px 16px 62px; border-radius: 8px; box-shadow: 0 24px 50px rgba(80,50,20,.28); }
+  .snap img { display: block; object-fit: cover; }
+  .snap p { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; font: 700 40px/1 Caveat, cursive; color: #7c4a1e; }
+  .note { position: absolute; left: 0; right: 0; top: 300px; text-align: center; font: italic 800 70px/1.1 Fraunces, serif; color: #2b1d12; }
+  .kphone { box-shadow: 0 50px 90px rgba(90,55,20,.35) !important; }
+  .card { position: absolute; background: #fffaf0; border-radius: 34px; box-shadow: 0 30px 60px rgba(90,55,20,.25); border: 2px solid rgba(194,65,12,.25); }
+  .btn { display: inline-block; padding: 18px 30px; border-radius: 20px; background: #c2410c; color: #fff; font: 800 46px/1 Inter, sans-serif; box-shadow: 0 12px 28px rgba(194,65,12,.4); }
+</style>
+</head>
+<body>
+<div id="frame">
+  <svg id="garland" class="layer" width="1080" height="1920" style="z-index:60;pointer-events:none"></svg>
+  <svg id="jamara" class="layer" width="1080" height="1920" style="z-index:5;pointer-events:none"></svg>
+
+  <!-- A · Dashain is family -->
+  <section class="layer" id="A">
+    <div class="deva" id="a-deva" style="position:absolute;left:0;right:0;top:300px;text-align:center;font-size:92px;color:#c81d25">दशैं</div>
+    <div style="position:absolute;left:0;right:0;top:440px;text-align:center">
+      <div class="rv serif" data-at="0.3" style="font-size:118px;font-weight:900;letter-spacing:-.02em">Dashain is</div>
+      <div class="rv serif" data-at="0.55" style="font-size:132px;font-weight:900;font-style:italic;color:#c2410c;letter-spacing:-.02em">family.</div>
+    </div>
+    <div class="snap" id="p0" style="left:70px;top:780px"><img src="../out/dashain/media/naya-barsha-2026__guests-at-table.jpg" style="width:520px;height:350px"><p>Naya Barsha 2026</p></div>
+    <div class="snap" id="p1" style="left:470px;top:960px"><img src="../out/dashain/media/dashain-2024__sel-roti-moment.jpg" style="width:520px;height:350px"><p>Dashain 2024 · sel roti!</p></div>
+    <div class="snap" id="p2" style="left:120px;top:1230px"><img src="../out/dashain/media/dashain-2024__community-meal.jpg" style="width:520px;height:350px"><p>Dashain 2024</p></div>
+  </section>
+
+  <!-- B · the invitation -->
+  <section class="layer" id="B" style="display:none">
+    <div style="position:absolute;left:0;right:0;top:320px;text-align:center">
+      <div class="rv serif" data-at="0.05" style="font-size:76px;font-style:italic;font-weight:600;color:#7c4a1e">This year, celebrate</div>
+      <div class="rv serif" data-at="0.25" style="font-size:96px;font-weight:900;letter-spacing:-.02em">together in <span style="color:#c2410c">Heidelberg</span></div>
+    </div>
+    <div id="b-poster" style="position:absolute;left:290px;top:580px;width:500px;height:708px;padding:14px;background:linear-gradient(135deg,#f6d27a,#b7791f 50%,#f6d27a);border-radius:10px;box-shadow:0 40px 80px rgba(90,55,20,.35)">
+      <img src="../out/dashain/media/poster-main.jpg" style="width:100%;height:100%;object-fit:cover;border-radius:4px">
+    </div>
+    <div style="position:absolute;left:0;right:0;top:1340px;text-align:center">
+      <div class="rv serif" data-at="0.7" style="font-size:58px;font-weight:900">Sugam Pokhrel &amp; Bajagaja</div>
+      <div class="rv" data-at="0.95" style="margin-top:14px;font:600 38px/1.3 Inter,sans-serif;color:#7c4a1e">Live music · Dinner · Dance · Sat 10 Oct</div>
+    </div>
+  </section>
+
+  <!-- C · four tickets -->
+  <section class="layer" id="C" style="display:none">
+    <div class="note" id="note"></div>
+    <div id="phonehost" class="layer"></div>
+    <div class="card" id="total" style="left:170px;top:1010px;width:740px;padding:30px 36px;display:flex;align-items:center;gap:22px;z-index:30">
+      <span style="font-size:70px">🎟️</span>
+      <div><div class="serif" style="font-size:54px;font-weight:900">4 tickets · €200</div><div style="font:600 30px/1.3 Inter,sans-serif;color:#7c4a1e">one order for the whole family ✓</div></div>
+    </div>
+    <div id="tickethost" class="layer"></div>
+  </section>
+
+  <!-- D · the invitation, again -->
+  <section class="layer" id="D" style="display:none">
+    <div style="position:absolute;left:0;right:0;top:320px;text-align:center">
+      <div class="rv serif" data-at="0.05" style="font-size:74px;font-style:italic;font-weight:600;color:#7c4a1e">Don't miss Dashain</div>
+      <div class="rv serif" data-at="0.25" style="font-size:118px;font-weight:900;letter-spacing:-.02em;color:#c2410c">together.</div>
+    </div>
+    <div style="position:absolute;left:0;right:0;top:640px;text-align:center">
+      <div class="rv serif" data-at="0.55" style="font-size:60px;font-weight:900">Sat 10 October · Heidelberg</div>
+      <div class="rv" data-at="0.75" style="margin-top:12px;font:600 36px/1.3 Inter,sans-serif;color:#7c4a1e">Sugam Pokhrel &amp; Bajagaja · Dinner · Dance</div>
+    </div>
+    <div class="card" id="d-card" style="left:100px;right:100px;top:860px;height:330px;display:flex;align-items:center;gap:36px;padding:0 36px">
+      <div class="qr" style="width:250px;height:250px;flex:none;background:#fff;padding:10px;border-radius:18px"></div>
+      <div><div style="font:600 32px/1.2 Inter,sans-serif;color:#7c4a1e">Tickets at</div><div class="btn" style="margin-top:14px">martnepali.com</div>
+      <div style="margin-top:18px;font:700 28px/1.3 Inter,sans-serif;color:#2b1d12">🎓 Students: €5 voucher at the door</div></div>
+    </div>
+    <div id="d-logos" style="position:absolute;left:0;right:0;top:1250px;text-align:center">
+      <div style="display:flex;justify-content:center;align-items:center;gap:28px">
+        <div style="width:120px;height:120px;border-radius:50%;background:#fff;padding:9px;box-shadow:0 10px 24px rgba(90,55,20,.2)"><img src="../out/dashain/media/logo-npjoe.jpg" style="width:100%;height:100%;object-fit:contain"></div>
+        <span class="serif" style="font-size:50px;color:#b7791f">&amp;</span>
+        <div style="width:120px;height:120px;border-radius:50%;background:#fff;padding:5px;box-shadow:0 10px 24px rgba(90,55,20,.2)"><img src="../out/dashain/media/logo-neg.jpg" style="width:100%;height:100%;object-fit:contain"></div>
+      </div>
+      <div style="margin-top:16px;font:600 27px/1.35 Inter,sans-serif;color:#7c4a1e">Presented by NPJOE e.V. &amp; Nepali Events Germany</div>
+    </div>
+    <div class="deva" id="d-wish" style="position:absolute;left:0;right:0;top:1470px;text-align:center;font-size:96px;color:#c81d25">दशैंको शुभकामना!</div>
+  </section>
+  <div id="paper"></div>
+</div>
+<script>
+const { $, $$, clamp, lerp, prog, eOut, eOut5, eIO, eBack, css } = K;
+const S = SPECS.S.warm;
+let phone;
+const FLOWERS = [];
+
+function flower(cx, cy, r, c1, c2) {
+  let p = '';
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2;
+    p += `<circle cx="${(cx + Math.cos(a) * r * 0.55).toFixed(1)}" cy="${(cy + Math.sin(a) * r * 0.55).toFixed(1)}" r="${(r * 0.5).toFixed(1)}" fill="${i % 2 ? c1 : c2}"/>`;
+  }
+  return p + `<circle cx="${cx}" cy="${cy}" r="${r * 0.35}" fill="#b45309"/>`;
+}
+function makeGarland() {
+  // Two strands sagging across the top; each flower hangs on the curve.
+  const g = $('#garland');
+  let html = '';
+  [[0, 1080, 40, 190, 26, '#f59e0b', '#fbbf24'], [-40, 1120, 10, 120, 20, '#ea580c', '#f97316']].forEach(([x0, x1, y0, sag, r, a, b], s) => {
+    html += `<g class="strand" data-s="${s}">`;
+    const n = 22;
+    for (let i = 0; i <= n; i++) {
+      const u = i / n, x = x0 + (x1 - x0) * u, y = y0 + sag * 4 * u * (1 - u);
+      html += `<g class="fl" data-u="${u}">${flower(x, y, r, a, b)}</g>`;
+    }
+    html += '</g>';
+  });
+  g.innerHTML = html;
+}
+function makeJamara() {
+  let html = '';
+  let seed = 3; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 150; i++) {
+    const x = rnd() * 1100 - 10, h = 90 + rnd() * 150, lean = (rnd() - 0.5) * 60, c = ['#65a30d', '#84cc16', '#a3a635', '#d9c34a'][Math.floor(rnd() * 4)];
+    html += `<path class="blade" data-d="${rnd().toFixed(2)}" d="M${x.toFixed(1)} 1930 Q${(x + lean * 0.3).toFixed(1)} ${(1930 - h * 0.6).toFixed(1)} ${(x + lean).toFixed(1)} ${(1930 - h).toFixed(1)}" stroke="${c}" stroke-width="${(5 + rnd() * 4).toFixed(1)}" fill="none" stroke-linecap="round" style="transform-origin:${x.toFixed(0)}px 1930px"/>`;
+  }
+  $('#jamara').innerHTML = html;
+}
+
+async function setup(qr) {
+  makeGarland(); makeJamara();
+  K.splitWords(document);
+  phone = new K.Phone($('#phonehost'), { width: 520, look: 'bezel' });
+  css(phone.el, { left: '260px', top: '440px' });
+  phone.el.style.background = 'linear-gradient(145deg,#f4efe6,#d9d0c1 40%,#efe8dc)';
+  for (let i = 0; i < 4; i++) {
+    const tk = K.ticket({ theme: 'paper', qr: qr || '', label: `TICKET ${i + 1} OF 4` });
+    css(tk, { left: '220px', top: '520px', transformOrigin: '50% 90%' });
+    $('#tickethost').appendChild(tk);
+  }
+  await K.ready(qr);
+}
+
+function render(t) {
+  // Garland swings; flowers bob a little.
+  $$('#garland .strand').forEach((g, s) => { g.style.transform = `translateY(${Math.sin(t * 1.4 + s) * 6}px) rotate(${Math.sin(t * 0.9 + s * 2) * 0.6}deg)`; g.style.transformOrigin = '540px 0'; });
+  // Jamara grows at the start and again for the finale.
+  $$('#jamara .blade').forEach((b) => {
+    const d = +b.dataset.d;
+    const k = eOut(prog(t, d * 0.8, d * 0.8 + 0.9));
+    b.style.transform = `scaleY(${k * (0.85 + 0.15 * Math.sin(t * 2 + d * 9))}) rotate(${Math.sin(t * 1.6 + d * 7) * 2}deg)`;
+  });
+
+  // A · Dashain is family.
+  const A = $('#A');
+  A.style.display = t < S.invite + 0.3 ? 'block' : 'none';
+  if (t < S.invite + 0.3) {
+    A.style.opacity = 1 - prog(t, S.invite - 0.1, S.invite + 0.3);
+    K.popIn($('#a-deva'), t, 0.1, 0.6, 0.5);
+    [['#p0', -5, 0.9], ['#p1', 4, 1.3], ['#p2', -3, 1.7]].forEach(([id, rot, at], i) => {
+      const p = $(id), k = prog(t, at, at + 0.6);
+      p.style.opacity = clamp(k * 3);
+      p.style.transform = `translate(${(1 - eOut5(k)) * (i % 2 ? 500 : -500)}px, ${(1 - eOut5(k)) * 80 - eIO(prog(t, S.invite - 0.3, S.invite + 0.3)) * 200}px) rotate(${rot + (1 - eOut(k)) * (i % 2 ? 15 : -15) + Math.sin(t + i) * 0.6}deg)`;
+      $('img', p).style.transform = `scale(${1.1 - 0.1 * prog(t, at, at + 3)})`;
+    });
+    K.reveal(A, t, 0.6, 0.08);
+  }
+
+  // B · the invitation.
+  const B = $('#B'), bt = t - S.invite;
+  B.style.display = t >= S.invite && t < S.phone + 0.3 ? 'block' : 'none';
+  if (B.style.display === 'block') {
+    B.style.opacity = Math.min(prog(t, S.invite, S.invite + 0.3), 1 - prog(t, S.phone - 0.1, S.phone + 0.3));
+    const pk = prog(bt, 0.2, 0.9);
+    $('#b-poster').style.opacity = clamp(pk * 2);
+    $('#b-poster').style.transform = `perspective(1400px) rotateY(${(1 - eOut5(pk)) * 60}deg) rotate(${-2 + Math.sin(t * 1.2) * 0.8}deg) scale(${lerp(0.8, 1, eOut5(pk))})`;
+    K.reveal(B, bt, 0.6, 0.07);
+  }
+
+  // C · four tickets.
+  const C = $('#C');
+  C.style.display = t >= S.phone && t < S.cta + 0.3 ? 'block' : 'none';
+  if (C.style.display === 'block') {
+    C.style.opacity = 1 - prog(t, S.cta - 0.1, S.cta + 0.3);
+    const k = eOut5(prog(t, S.phone, S.phone + 0.7));
+    const out = eIO(prog(t, S.ticketAt - 0.1, S.ticketAt + 0.5));
+    phone.el.style.transform = `translateY(${(1 - k) * 900 + out * 160}px) rotate(${(1 - k) * 8}deg) scale(${1 - out * 0.1})`;
+    phone.el.style.filter = `brightness(${1 - out * 0.35})`;
+    phone.render(t, S);
+    let n = S.notes[0]; for (const x of S.notes) if (t >= x[0]) n = x;
+    const note = $('#note'), nk = eOut5(prog(t, n[0], n[0] + 0.4));
+    note.textContent = t >= S.ticketAt ? '4 tickets, straight to your email' : n[1];
+    const nt = t >= S.ticketAt ? S.ticketAt : n[0];
+    const nk2 = eOut5(prog(t, nt, nt + 0.4));
+    note.style.opacity = nk2; note.style.transform = `translateY(${(1 - nk2) * 30}px)`;
+    const to = $('#total'), tk = prog(t, S.total.at, S.total.at + 0.4), tout = 1 - prog(t, S.total.until, S.total.until + 0.25);
+    to.style.opacity = clamp(tk * 3) * tout; to.style.transform = `scale(${lerp(0.6, 1, eBack(tk))}) rotate(-2deg)`;
+    $$('#tickethost .kticket').forEach((el, i) => {
+      const kk = prog(t, S.ticketAt + 0.1 + i * 0.15, S.ticketAt + 0.8 + i * 0.15);
+      const rot = (i - 1.5) * 7, dx = (i - 1.5) * 60;
+      el.style.zIndex = 40 + i;
+      el.style.opacity = clamp(kk * 3);
+      el.style.transform = `translate(${dx * eOut5(kk)}px, ${(1 - eOut5(kk)) * 600 + Math.abs(i - 1.5) * 30}px) rotate(${rot * eOut5(kk) + Math.sin(t * 1.3 + i) * 0.7}deg) scale(${lerp(0.7, 0.88, eOut5(kk))})`;
+    });
+  }
+
+  // D · the finale.
+  const D = $('#D'), dt = t - S.cta;
+  D.style.display = t >= S.cta ? 'block' : 'none';
+  if (t >= S.cta) {
+    D.style.opacity = prog(dt, 0, 0.3);
+    K.reveal(D, dt, 0.6, 0.07);
+    K.popIn($('#d-card'), dt, 0.9, 0.8, 0.5);
+    const lk = prog(dt, 1.3, 1.7);
+    css($('#d-logos'), { opacity: String(lk), transform: `translateY(${(1 - eOut5(lk)) * 30}px)` });
+    const wk = K.popIn($('#d-wish'), dt, 1.8, 0.6, 0.6);
+  }
+}
+window.setup = setup; window.render = render;
+K.standalone(setup, render, S.TOTAL);
+</script>
+</body>
+</html>

@@ -1,0 +1,837 @@
+/* ======================================================================
+   Motion and depth on /e/[slug] — EventDepth sets .event-page[data-depth]
+   ("3d" on an event, "flat" on a shop) and feeds these variables:
+     --hp   hero scrolled away, 0 … 1
+     --hq   the late part of that, 0 … 1 (the text only leaves once read)
+     --mx / --my   mouse over the hero, -1 … 1 (laptops only)
+     --deal the ticket grid's arrival, 0 … 1
+     --gx / --gy   mouse over one ticket, in %
+   Without the attribute (no JS, "reduce motion") none of this applies.
+   ====================================================================== */
+
+/* ---------------- The hero ---------------- */
+
+/* The cover drifts slower than the page and grows a little as it goes, so the
+   page seems to slide over it. Scaled from the bottom edge so the top never
+   shows a gap. Poster keeps its own blurred fill. */
+.event-page[data-depth] .event-hero:not(.event-hero--poster) .event-hero-still,
+.event-page[data-depth] .event-hero:not(.event-hero--poster) .event-hero-video {
+  transform-origin: 50% 100%;
+  transform: translate3d(calc(var(--mx, 0) * -10px), calc(var(--hp, 0) * 18% + var(--my, 0) * -6px), 0)
+    scale(calc(1.03 + var(--hp, 0) * 0.4));
+  transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+  will-change: transform;
+}
+
+/* The title block lies back into the screen as it leaves. */
+.event-page[data-depth='3d'] .event-hero-inner {
+  transform-origin: 50% 100%;
+  transform: perspective(1100px) translate3d(0, calc(var(--hq, 0) * -30px), calc(var(--hq, 0) * -180px))
+    rotateX(calc(var(--hq, 0) * 26deg));
+  opacity: calc(1 - var(--hq, 0) * 0.85);
+}
+
+/* ---------------- The floating scene (HeroDepth) ---------------- */
+
+.dz {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  perspective: 900px;
+  perspective-origin: 70% 40%;
+}
+
+.dz-item {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  transform-style: preserve-3d;
+  /* Near things move further — that difference IS the depth. */
+  transform: translate3d(
+    calc(var(--mx, 0) * var(--z) * -46px),
+    calc(var(--my, 0) * var(--z) * -30px + var(--hp, 0) * (0.35 + var(--z)) * -260px),
+    calc(var(--z) * 160px - 80px)
+  );
+  transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+  opacity: calc(0.4 + var(--z) * 0.5);
+}
+
+.dz-spin {
+  display: block;
+  animation-delay: var(--d, 0s);
+}
+
+/* Classic: tickets turning in the air, and two soft lights. */
+.dz-orb {
+  width: var(--s);
+  height: var(--s);
+  margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2);
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--accent, #8b5cf6) 0%, transparent 65%);
+  filter: blur(18px);
+  opacity: 0.32;
+  animation: dz-breathe 9s ease-in-out infinite;
+}
+
+.dz-ticket {
+  position: relative;
+  width: var(--s);
+  height: calc(var(--s) * 0.52);
+  border-radius: 10px;
+  background:
+    linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.35) 45%, transparent 58%) 0 0 / 260% 100%,
+    linear-gradient(135deg, var(--accent, #8b5cf6), var(--pink, #ec4899));
+  -webkit-mask:
+    radial-gradient(circle at 0 50%, transparent 8px, #000 8.5px) left / 51% 100% no-repeat,
+    radial-gradient(circle at 100% 50%, transparent 8px, #000 8.5px) right / 51% 100% no-repeat;
+  mask:
+    radial-gradient(circle at 0 50%, transparent 8px, #000 8.5px) left / 51% 100% no-repeat,
+    radial-gradient(circle at 100% 50%, transparent 8px, #000 8.5px) right / 51% 100% no-repeat;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+  filter: blur(calc((1 - var(--z)) * 2.4px));
+  animation:
+    dz-turn-ticket 10s ease-in-out infinite,
+    dz-glint 5s ease-in-out infinite;
+  animation-delay: var(--d, 0s), calc(var(--d, 0s) * 0.7);
+}
+
+.dz-ticket::before {
+  content: '';
+  position: absolute;
+  top: 10%;
+  bottom: 10%;
+  left: 70%;
+  border-left: 1.5px dashed rgba(255, 255, 255, 0.55);
+}
+
+.dz-ticket-face {
+  position: absolute;
+  left: 12%;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: calc(var(--s) * 0.11);
+  letter-spacing: 0.14em;
+}
+
+.dz-ticket-face b {
+  font-weight: 900;
+}
+
+.dz-ticket-face i {
+  font-style: normal;
+  font-weight: 600;
+  opacity: 0.8;
+  margin-top: 0.3em;
+}
+
+@keyframes dz-turn-ticket {
+  0%,
+  100% {
+    transform: translateY(0) rotateX(14deg) rotateY(-38deg) rotateZ(-9deg);
+  }
+  50% {
+    transform: translateY(-16px) rotateX(-12deg) rotateY(34deg) rotateZ(7deg);
+  }
+}
+
+@keyframes dz-glint {
+  0%,
+  60% {
+    background-position: 130% 0, 0 0;
+  }
+  100% {
+    background-position: -40% 0, 0 0;
+  }
+}
+
+@keyframes dz-breathe {
+  50% {
+    transform: scale(1.18);
+    opacity: 0.45;
+  }
+}
+
+/* Poster: light sweeping behind the poster, dust in the beam. */
+.dz-beam {
+  position: absolute;
+  top: -30%;
+  right: 10%;
+  width: 34%;
+  height: 160%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  transform-origin: 50% 0;
+  animation: dz-beam 11s ease-in-out infinite alternate;
+}
+
+.dz-beam-b {
+  right: 26%;
+  width: 22%;
+  animation-duration: 15s;
+  animation-delay: -6s;
+}
+
+@keyframes dz-beam {
+  from {
+    transform: rotate(22deg);
+  }
+  to {
+    transform: rotate(-10deg);
+  }
+}
+
+.dz-mote {
+  width: var(--s);
+  height: var(--s);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+  animation: dz-drift 12s ease-in-out infinite;
+}
+
+.dz-mote-gold {
+  background: #e9d3a4;
+  box-shadow: 0 0 10px rgba(233, 211, 164, 0.7);
+}
+
+@keyframes dz-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translate3d(12px, -46px, 30px);
+    opacity: 0.9;
+  }
+}
+
+/* The poster turns toward the mouse, leans back as the hero leaves, and a
+   glare follows it. Its float moves `translate`, which adds to the transform
+   instead of replacing it. */
+.event-page[data-depth='3d'] .evl-poster-card {
+  animation: dz-float 8s ease-in-out infinite;
+  transform: translateY(-50%) perspective(1000px) rotateY(calc(-10deg + var(--mx, 0) * 14deg))
+    rotateX(calc(var(--my, 0) * -10deg + var(--hq, 0) * 22deg)) rotateZ(2deg);
+  transition: transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.event-page[data-depth='3d'] .evl-poster-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 25%,
+    rgba(255, 255, 255, 0.24) calc(45% + var(--mx, 0) * 22%),
+    transparent 65%
+  );
+  mix-blend-mode: overlay;
+}
+
+@keyframes dz-float {
+  50% {
+    translate: 0 -12px;
+  }
+}
+
+@media (max-width: 760px) {
+  .event-page[data-depth='3d'] .evl-poster-card {
+    transform: perspective(900px) rotateY(calc(-14deg + var(--hp, 0) * 34deg)) rotateX(calc(5deg + var(--hp, 0) * 12deg))
+      rotateZ(2deg);
+  }
+}
+
+/* Festival: confetti tumbling through the hero; the kites drift with depth. */
+.dz-fall {
+  top: -4%;
+}
+
+.dz-confetti {
+  width: var(--s);
+  height: calc(var(--s) * 0.45);
+  border-radius: 2px;
+  background: hsl(var(--h, 50) 95% 64%);
+  animation: dz-fall calc(6.5s + var(--z) * 3s) linear infinite;
+  animation-delay: var(--d, 0s);
+}
+
+@keyframes dz-fall {
+  0% {
+    transform: translate3d(0, -20px, 0) rotateX(0) rotateY(0) rotateZ(0);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(46px, min(92vh, 780px), 0) rotateX(760deg) rotateY(380deg) rotateZ(160deg);
+    opacity: 0;
+  }
+}
+
+.event-page[data-depth='3d'] .evl-kites {
+  transform: translate3d(calc(var(--mx, 0) * -22px), calc(var(--hp, 0) * -160px), 0);
+  transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* Neon: glowing wireframe cubes and a ring turning in space; the grid floor
+   flattens as the hero scrolls away. */
+.dz-cube {
+  position: relative;
+  width: var(--s);
+  height: var(--s);
+  transform-style: preserve-3d;
+  animation: dz-turn 18s linear infinite;
+  animation-delay: var(--d, 0s);
+}
+
+.dz-face {
+  position: absolute;
+  inset: 0;
+  border: 1.5px solid #ec4899;
+  background: rgba(236, 72, 153, 0.05);
+  box-shadow:
+    0 0 14px rgba(236, 72, 153, 0.8),
+    inset 0 0 14px rgba(236, 72, 153, 0.45);
+}
+
+.dz-cube-cyan .dz-face {
+  border-color: #22d3ee;
+  background: rgba(34, 211, 238, 0.05);
+  box-shadow:
+    0 0 14px rgba(34, 211, 238, 0.8),
+    inset 0 0 14px rgba(34, 211, 238, 0.45);
+}
+
+.dz-face-f {
+  transform: translateZ(calc(var(--s) / 2));
+}
+.dz-face-b {
+  transform: rotateY(180deg) translateZ(calc(var(--s) / 2));
+}
+.dz-face-l {
+  transform: rotateY(-90deg) translateZ(calc(var(--s) / 2));
+}
+.dz-face-r {
+  transform: rotateY(90deg) translateZ(calc(var(--s) / 2));
+}
+.dz-face-t {
+  transform: rotateX(90deg) translateZ(calc(var(--s) / 2));
+}
+.dz-face-u {
+  transform: rotateX(-90deg) translateZ(calc(var(--s) / 2));
+}
+
+@keyframes dz-turn {
+  from {
+    transform: rotateX(-24deg) rotateY(0deg) rotateZ(8deg);
+  }
+  to {
+    transform: rotateX(-24deg) rotateY(360deg) rotateZ(8deg);
+  }
+}
+
+.dz-ring {
+  width: var(--s);
+  height: var(--s);
+  border-radius: 50%;
+  border: 2px solid #22d3ee;
+  box-shadow:
+    0 0 16px rgba(34, 211, 238, 0.85),
+    inset 0 0 16px rgba(34, 211, 238, 0.5);
+  animation: dz-ring 9s linear infinite;
+}
+
+@keyframes dz-ring {
+  from {
+    transform: rotateX(68deg) rotateY(0deg) rotateZ(0deg);
+  }
+  to {
+    transform: rotateX(68deg) rotateY(20deg) rotateZ(360deg);
+  }
+}
+
+.event-page[data-depth='3d'] .evl-grid {
+  transform: perspective(420px) rotateX(calc(62deg + var(--hp, 0) * 18deg)) rotateZ(calc(var(--mx, 0) * 2deg));
+  transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* Editorial: the day, huge and outlined, far behind; two rules drawing in. */
+.dz-numeral {
+  left: auto;
+  right: 4%;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+  font-size: clamp(9rem, 28vw, 24rem);
+  font-weight: 600;
+  line-height: 0.8;
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(246, 239, 228, 0.24);
+  opacity: 1;
+}
+
+.dz-rule {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(233, 211, 164, 0.55), transparent);
+  transform: scaleX(0);
+  animation: dz-draw 2.2s 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+
+.dz-rule-a {
+  top: 18%;
+}
+
+.dz-rule-b {
+  top: 82%;
+  animation-delay: 0.7s;
+}
+
+@keyframes dz-draw {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Phone: the title runs the full width under the cover, so the scene lives in
+   the space around it, and quieter. */
+@media (max-width: 640px) {
+  .event-hero:has(.event-hero-media) .dz {
+    top: calc(100vw / 2.162);
+  }
+
+  .dz-item {
+    opacity: calc(0.22 + var(--z) * 0.34);
+  }
+
+  /* Solid objects behind a full-width title get in the way of reading it —
+     a phone keeps only the soft ones: lights, confetti, dust, the big date. */
+  .dz-item:has(.dz-ticket, .dz-cube, .dz-ring) {
+    display: none;
+  }
+}
+
+/* ---------------- The tickets: dealt onto a lit stage ---------------- */
+
+.event-page[data-depth='3d'] #tickets .tier-grid-2 {
+  position: relative;
+  isolation: isolate;
+  perspective: 1300px;
+  perspective-origin: 50% 20%;
+}
+
+/* A pool of light on the floor under them, brightening as they land. */
+.event-page[data-depth='3d'] #tickets .tier-grid-2::after {
+  content: '';
+  position: absolute;
+  left: -6%;
+  right: -6%;
+  bottom: -46px;
+  height: 110px;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(50% 50% at 50% 50%, var(--accent-soft, rgba(139, 92, 246, 0.3)), transparent 72%);
+  opacity: var(--deal, 0);
+  filter: blur(6px);
+}
+
+.event-page[data-depth='3d'] #tickets .tier-grid-2 .tier-card {
+  transform-origin: 50% 60%;
+  transition:
+    transform 0.16s linear,
+    opacity 0.2s linear,
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.event-page[data-depth='3d'] #tickets .tier-grid-2 .tier-card.is-tilt {
+  border-color: rgba(139, 92, 246, 0.65);
+  box-shadow:
+    0 30px 60px -24px rgba(0, 0, 0, 0.65),
+    0 22px 50px -22px rgba(139, 92, 246, 0.55);
+}
+
+/* The light on a ticket: follows the mouse, and sweeps once across each
+   ticket as it lands. */
+.tk-shine {
+  display: none;
+}
+
+.event-page[data-depth='3d'] .tk-shine {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.event-page[data-depth='3d'] .tk-shine::before,
+.event-page[data-depth='3d'] .tk-shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.event-page[data-depth='3d'] .tk-shine::before {
+  background: radial-gradient(360px circle at var(--gx, 50%) var(--gy, 0%), rgba(255, 255, 255, 0.14), transparent 45%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.event-page[data-depth='3d'] .is-tilt .tk-shine::before {
+  opacity: 1;
+}
+
+.event-page[data-depth='3d'] .tk-shine::after {
+  background: linear-gradient(110deg, transparent 38%, rgba(255, 255, 255, 0.16) 50%, transparent 62%) 0 0 / 250% 100%;
+  background-position: 160% 0;
+}
+
+.event-page[data-depth='3d'] .is-dealt .tk-shine::after {
+  animation: dz-sweep 1.3s 0.1s cubic-bezier(0.3, 0.6, 0.2, 1) backwards;
+}
+
+@keyframes dz-sweep {
+  from {
+    background-position: 160% 0;
+  }
+  to {
+    background-position: -60% 0;
+  }
+}
+
+/* ---------------- Sections coming in ---------------- */
+
+.event-page[data-depth] .container.dz-pre > *,
+.event-page[data-depth] .tier-card.dz-pre {
+  opacity: 0;
+}
+
+/* An event: each part folds up out of the page, one after another. The 3D is
+   in the keyframes (perspective() inside transform), never a lasting style —
+   once it has played the element holds no transform at all. */
+.event-page[data-depth='3d'] .container.dz-in > * {
+  animation: dz-fold 0.95s cubic-bezier(0.2, 0.75, 0.2, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 85ms);
+}
+
+@keyframes dz-fold {
+  from {
+    opacity: 0;
+    transform: perspective(1100px) translate3d(0, 60px, -140px) rotateX(26deg);
+  }
+}
+
+/* A shop: straight up, no tilt. */
+.event-page[data-depth='flat'] .container.dz-in > *,
+.event-page[data-depth='flat'] .tier-card.dz-in {
+  animation: dz-rise 0.65s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+@keyframes dz-rise {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dz {
+    display: none;
+  }
+}
+
+@media print {
+  .dz,
+  .tk-shine {
+    display: none !important;
+  }
+
+  .event-page[data-depth] .container.dz-pre > *,
+  .event-page[data-depth] .tier-card.dz-pre {
+    opacity: 1 !important;
+  }
+}
+
+/* ======================================================================
+   The WebGL stage (HoloStage / holoScene) and the futuristic finish
+   ====================================================================== */
+
+.holo {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1.4s ease;
+}
+
+.holo canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.has-holo .holo {
+  opacity: 1;
+}
+
+/* The 3D ticket now carries the cover, so the full-size copy behind it steps
+   back: blurred, darker, a little bigger — a room for the ticket to float in. */
+.event-hero--stage .event-hero-still {
+  transition: filter 1.4s ease, opacity 1.4s ease;
+}
+
+.has-holo .event-hero-still {
+  filter: blur(26px) saturate(1.5) brightness(0.55);
+}
+
+.has-holo .dz {
+  opacity: 0;
+  transition: opacity 0.8s ease;
+}
+
+.has-holo .evl-poster-card {
+  display: none;
+}
+
+.event-hero--stage {
+  touch-action: pan-y;
+}
+
+/* A laptop: the title wraps before it reaches the ticket (which starts at
+   about 61% of the width — see layoutStage in holoScene). */
+@media (min-width: 761px) {
+  .event-hero--stage:not(.event-hero--poster) h1,
+  .event-hero--stage:not(.event-hero--poster) .hero-meta {
+    max-width: min(calc(57vw - 20px), calc(9vw + 500px));
+  }
+
+  .event-hero--poster.has-holo .event-hero-inner {
+    padding-right: min(44%, 440px);
+  }
+}
+
+/* Phone: the cover band becomes a proper stage for the ticket. Rendered this
+   tall from the server, so nothing jumps when the 3D arrives; without WebGL
+   the band shows the cover over its own blurred copy, as before. */
+@media (max-width: 640px) {
+  .event-hero--stage {
+    --band: 64vw;
+  }
+
+  .event-page .event-hero--stage:not(.event-hero--poster) {
+    padding-top: var(--band);
+  }
+
+  .event-hero--stage:not(.event-hero--poster) .event-hero-media {
+    height: var(--band);
+  }
+
+  .event-hero--stage .event-avatar-edge {
+    top: calc(var(--band) - 38px);
+  }
+
+  .event-hero--stage .holo,
+  .event-hero--stage:has(.event-hero-media) .dz {
+    bottom: auto;
+    height: var(--band);
+  }
+
+  .event-hero--stage .dz {
+    top: 0;
+  }
+
+  /* Poster: its portrait ticket needs a taller stage, only once it exists. */
+  .event-page .event-hero--poster.has-holo {
+    --band: 104vw;
+    padding-top: var(--band);
+  }
+
+  /* Over the ticket, a plain photo would fight it. */
+  .has-holo .event-hero-still {
+    opacity: 0.6;
+  }
+}
+
+/* ---------------- The title: a scan of light, a flicker of colour ---------------- */
+
+.event-page[data-depth='3d'] .event-hero h1 {
+  position: relative;
+  animation: dz-glitch 1.6s 0.2s steps(1) 1 backwards;
+}
+
+.event-page[data-depth='3d'] .event-hero h1::after {
+  content: '';
+  position: absolute;
+  top: -8%;
+  bottom: -8%;
+  left: 0;
+  width: 18%;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  mix-blend-mode: overlay;
+  transform: skewX(-18deg) translateX(-160%);
+  animation: dz-scan 1.5s 0.35s cubic-bezier(0.5, 0, 0.2, 1) 1 both;
+}
+
+@keyframes dz-scan {
+  to {
+    transform: skewX(-18deg) translateX(700%);
+    opacity: 0;
+  }
+}
+
+@keyframes dz-glitch {
+  0% {
+    filter: drop-shadow(3px 0 rgba(255, 0, 90, 0.8)) drop-shadow(-3px 0 rgba(0, 230, 255, 0.8));
+  }
+  8% {
+    filter: drop-shadow(-2px 0 rgba(255, 0, 90, 0.8)) drop-shadow(2px 0 rgba(0, 230, 255, 0.8));
+    transform: translateX(2px);
+  }
+  14% {
+    filter: drop-shadow(0 3px 20px rgba(0, 0, 0, 0.5));
+    transform: none;
+  }
+  22% {
+    filter: drop-shadow(2px 0 rgba(255, 0, 90, 0.7)) drop-shadow(-2px 0 rgba(0, 230, 255, 0.7));
+    transform: translateX(-1px);
+  }
+  28%,
+  100% {
+    filter: drop-shadow(0 3px 20px rgba(0, 0, 0, 0.5));
+    transform: none;
+  }
+}
+
+/* "Live event" with a live dot. */
+.event-page[data-depth='3d'] .event-hero .hero-kicker::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 9px;
+  vertical-align: 2px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7);
+  animation: dz-live 1.8s ease-out infinite;
+}
+
+@keyframes dz-live {
+  70% {
+    box-shadow: 0 0 0 9px rgba(52, 211, 153, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0);
+  }
+}
+
+/* The main button: a beam of light running round its edge. */
+@property --dz-ang {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.event-page[data-depth] .event-hero-actions .btn-primary {
+  position: relative;
+  isolation: isolate;
+}
+
+.event-page[data-depth] .event-hero-actions .btn-primary::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  z-index: -1;
+  padding: 2px;
+  border-radius: inherit;
+  background: conic-gradient(from var(--dz-ang), transparent 0 62%, #fff 72%, var(--pink, #ec4899) 80%, transparent 90%);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  animation: dz-orbit 2.8s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes dz-orbit {
+  to {
+    --dz-ang: 360deg;
+  }
+}
+
+/* ---------------- Holographic foil on the ticket cards ---------------- */
+
+.event-page[data-depth='3d'] .tk-foil {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+      115deg,
+      rgba(255, 0, 128, 0.9),
+      rgba(255, 204, 0, 0.9),
+      rgba(0, 255, 200, 0.9),
+      rgba(0, 128, 255, 0.9),
+      rgba(204, 0, 255, 0.9),
+      rgba(255, 0, 128, 0.9)
+    )
+    0 0 / 300% 300%;
+  background-position: calc(var(--foil, 0.5) * 100%) calc(var(--foil, 0.5) * 60%);
+  mix-blend-mode: overlay;
+  opacity: 0.1;
+  transition: opacity 0.3s ease;
+}
+
+.event-page[data-depth='3d'] .is-tilt .tk-foil {
+  opacity: 0.22;
+}
+
+.tk-foil {
+  display: none;
+}
+
+/* ---------------- Scroll progress ---------------- */
+
+.dz-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 120;
+  height: 2px;
+  pointer-events: none;
+  transform-origin: 0 50%;
+  transform: scaleX(var(--sp, 0));
+  background: linear-gradient(90deg, var(--accent, #8b5cf6), var(--pink, #ec4899), #fff);
+  box-shadow: 0 0 12px var(--accent-glow, rgba(139, 92, 246, 0.6));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .holo,
+  .dz-progress {
+    display: none;
+  }
+}

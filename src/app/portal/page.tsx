@@ -141,8 +141,8 @@ export default async function PortalDashboardPage({
             {tr('hub.namaste')}, {firstName} 🙏
           </h1>
           <div className="hub-hello-actions">
-            {/* Only appears where the browser can install, or on iPhone with the how-to. */}
-            <InstallAppButton label="Install the seller app" />
+            {/* The real prompt where the browser has one, the exact taps everywhere else. */}
+            <InstallAppButton label="Install the seller app" appName={platformNameFromEnv()} />
             <LogoutButton quiet />
           </div>
         </header>

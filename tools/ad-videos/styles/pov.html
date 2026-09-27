@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>POV short — stage</title>
+<!-- 3 · POV: made to look like a creator's own TikTok — "POV: your friend
+     says…", the meme cut (with a tape stop), then the phone full screen with
+     white caption boxes and red hand-drawn circles, to a lo-fi beat.
+     Edit: specs.js (pov). -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;700;800;900&family=Caveat:wght@700&display=block" rel="stylesheet">
+<script src="specs.js"></script>
+<script src="../stagekit.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; background: #000; }
+  body { font-family: Inter, sans-serif; color: #fff; -webkit-font-smoothing: antialiased; }
+  #frame { position: absolute; inset: 0; overflow: hidden; background: #000; }
+  .layer { position: absolute; inset: 0; }
+  .cap { position: absolute; left: 70px; right: 70px; text-align: center; }
+  .cap span.box { display: inline; color: #111; font: 800 54px/1.62 Inter, sans-serif; }
+  .cap .pw { background: #fff; padding: 5px 14px; margin: 0 -7px; border-radius: 10px; }
+  .rv .w { display: inline-block; }
+  .sticker { position: absolute; left: 50%; background: #fff; color: #111; border-radius: 28px; padding: 22px 34px; font: 800 50px/1.15 Inter, sans-serif; box-shadow: 0 16px 40px rgba(0,0,0,.45); white-space: nowrap; }
+  #grade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255,170,90,.10), rgba(255,120,60,.06)); mix-blend-mode: soft-light; z-index: 85; pointer-events: none; }
+  #grain { position: absolute; inset: -200px; opacity: .08; mix-blend-mode: overlay; pointer-events: none; z-index: 86;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/></filter><rect width='300' height='300' filter='url(%23n)'/></svg>"); }
+  #ink path { fill: none; stroke: #ff2d55; stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 3px 6px rgba(0,0,0,.35)); }
+</style>
+</head>
+<body>
+<div id="frame">
+  <div class="layer" id="blurbg" style="background:url(../out/dashain/media/poster-main.jpg) center/cover;filter:blur(40px) brightness(.55);transform:scale(1.2)"></div>
+
+  <!-- The POV opening -->
+  <section class="layer" id="open">
+    <div id="o-poster" style="position:absolute;left:170px;top:560px;width:740px;height:1048px;border-radius:26px;overflow:hidden;box-shadow:0 40px 90px rgba(0,0,0,.6)"><img src="../out/dashain/media/poster-main.jpg" style="width:100%;height:100%;object-fit:cover"></div>
+    <div class="cap" id="c-pov" style="top:190px"><span class="box">POV: your friend says Sugam Pokhrel is playing Heidelberg on 10 Oct 😳</span></div>
+    <div class="cap" id="c-meme" style="top:250px;display:none"><span class="box" style="font-size:66px">me, 2 seconds later:</span></div>
+  </section>
+
+  <!-- The phone, full screen -->
+  <section class="layer" id="phonepart" style="display:none">
+    <div id="phonehost" class="layer"></div>
+    <svg id="ink" class="layer" width="1080" height="1920" style="z-index:20"></svg>
+    <div class="cap" id="cap" style="z-index:25"><span class="box"></span></div>
+    <div id="tickethost" class="layer" style="z-index:30"></div>
+    <div id="party" class="layer" style="z-index:31;font-size:120px"></div>
+  </section>
+
+  <!-- The end card, sticker style -->
+  <section class="layer" id="end" style="display:none">
+    <div class="sticker" id="k0" style="top:250px">📍 Heidelberg · Sat 10 Oct</div>
+    <div class="sticker" id="k1" style="top:420px">🎤 Sugam Pokhrel &amp; Bajagaja</div>
+    <div class="sticker" id="k2" style="top:640px;font-size:78px;padding:30px 44px;background:#ff2d55;color:#fff">🔗 martnepali.com</div>
+    <div id="k3" style="position:absolute;left:50%;top:880px;width:380px;margin-left:-190px;background:#fff;border-radius:34px;padding:24px;box-shadow:0 16px 40px rgba(0,0,0,.45)">
+      <div class="qr" style="width:332px;height:332px"></div>
+      <div style="text-align:center;margin-top:12px;font:800 32px/1 Inter,sans-serif;color:#111">scan for tickets</div>
+    </div>
+    <div class="cap" id="k4" style="top:1390px"><span class="box">early bird already gone 👀 don't sleep on this</span></div>
+    <div id="k5" style="position:absolute;left:0;right:0;top:1580px;display:flex;justify-content:center;align-items:center;gap:20px;font:700 26px/1.2 Inter,sans-serif;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.6)">
+      <div style="width:90px;height:90px;border-radius:50%;background:#fff;padding:6px"><img src="../out/dashain/media/logo-npjoe.jpg" style="width:100%;height:100%;object-fit:contain"></div>
+      <div style="width:90px;height:90px;border-radius:50%;background:#fff;padding:4px"><img src="../out/dashain/media/logo-neg.jpg" style="width:100%;height:100%;object-fit:contain"></div>
+      <span>by NPJOE e.V. &amp; Nepali Events Germany</span>
+    </div>
+  </section>
+  <div id="grade"></div>
+  <div id="grain"></div>
+</div>
+<script>
+const { $, $$, clamp, lerp, prog, eOut, eOut5, eIO, eBack, css } = K;
+const S = SPECS.S.pov;
+const SC = 1080 / 390;
+let phone;
+const CAP_Y = [860, 1440, 1110, 1480, 700, 1560];
+
+// A wobbly hand-drawn loop around (x, y) (screen px), as an SVG path.
+function scribble(cx, cy, rx, ry, seed) {
+  let s = seed; const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  const pts = [];
+  for (let i = 0; i <= 44; i++) {
+    const a = -2.2 + (i / 44) * (Math.PI * 2 + 0.5);
+    const j = 1 + (r() - 0.5) * 0.08;
+    pts.push([cx + Math.cos(a) * rx * j, cy + Math.sin(a) * ry * j]);
+  }
+  return 'M' + pts.map((p) => p.map((v) => v.toFixed(1)).join(' ')).join(' L');
+}
+
+async function setup(qr) {
+  K.splitWords(document);
+  phone = new K.Phone($('#phonehost'), { width: 1080, look: 'full', addrTop: true });
+  css(phone.el, { left: '0px', top: '0px' });
+  // The ink: one path per circle.
+  $('#ink').innerHTML = S.circles.map(([, , x, y, rx, ry], i) => `<path d="${scribble(x * SC, y * SC, rx * SC, ry * SC, 7 + i * 13)}"/>`).join('')
+    + `<path id="arrow" d="M ${(S.circles[0][2] + 130) * SC} ${(S.circles[0][3] - 150) * SC} q -60 20 -95 110 m 0 0 l -8 -52 m 8 52 l 45 -22"/>`;
+  for (const p of $$('#ink path')) { const L = p.getTotalLength(); p.style.strokeDasharray = L; p.dataset.len = L; }
+  const tk = K.ticket({ theme: 'dark', qr: qr || '' });
+  css(tk, { left: '220px', top: '560px' });
+  $('#tickethost').appendChild(tk);
+  $('#party').innerHTML = ['🎉', '🕺', '💃', '🎶'].map((e, i) => `<span style="position:absolute;left:${[110, 820, 140, 830][i]}px;top:${[420, 470, 1500, 1460][i]}px">${e}</span>`).join('');
+  await K.ready(qr);
+}
+
+function wordsIn(el, t, at, stagger = 0.07) {
+  const ws = el._ws || (el._ws = (() => {
+    const box = $('.box', el);
+    const words = box.textContent.split(' ');
+    box.innerHTML = words.map((w) => `<span class="pw" style="display:inline-block">${w}</span>`).join(' ');
+    return $$('.pw', box);
+  })());
+  ws.forEach((w, i) => {
+    const k = prog(t, at + i * stagger, at + i * stagger + 0.18);
+    w.style.opacity = k > 0 ? 1 : 0;
+    w.style.transform = `scale(${lerp(0.5, 1, eBack(k))})`;
+  });
+}
+
+function render(t) {
+  const hand = (a) => `translate(${Math.sin(t * 1.3) * 5 * a}px, ${Math.cos(t * 1.1) * 6 * a}px) rotate(${Math.sin(t * 0.8) * 0.4 * a}deg)`;
+  $('#grain').style.transform = `translate(${(Math.floor(t * 24) * 37) % 200 - 100}px, ${(Math.floor(t * 24) * 53) % 200 - 100}px)`;
+
+  // Opening: POV caption, then the meme cut.
+  const O = $('#open');
+  O.style.display = t < S.phone ? 'block' : 'none';
+  if (t < S.phone) {
+    const meme = t >= S.meme;
+    const punch = eOut5(prog(t, 0.15, 0.4));
+    const zoom = meme ? 1.35 + 0.1 * prog(t, S.meme, S.phone) : lerp(0.9, 1, punch);
+    $('#o-poster').style.transform = `${hand(1)} scale(${zoom})`;
+    $('#o-poster').style.filter = meme ? 'grayscale(1) contrast(1.2)' : '';
+    $('#c-pov').style.display = meme ? 'none' : 'block';
+    $('#c-meme').style.display = meme ? 'block' : 'none';
+    if (!meme) wordsIn($('#c-pov'), t, 0.25, 0.08);
+    else { const k = prog(t, S.meme, S.meme + 0.15); $('#c-meme').style.transform = `scale(${lerp(1.4, 1, eOut5(k))})`; }
+  }
+
+  // The phone, full screen.
+  const PP = $('#phonepart');
+  PP.style.display = t >= S.phone && t < S.endCard ? 'block' : 'none';
+  if (PP.style.display === 'block') {
+    const blur = eOut(prog(t, S.ticketAt, S.ticketAt + 0.4));
+    const f = phone.render(t, S);
+    phone.el.style.transform = `${hand(0.5)} scale(${1 + 0.02 * blur})`;
+    phone.el.style.filter = blur ? `blur(${blur * 14}px) brightness(${1 - blur * 0.45})` : '';
+    // Ink.
+    $$('#ink path').forEach((p, i) => {
+      const c = i < S.circles.length ? S.circles[i] : S.circles[0];
+      const [from, until] = c;
+      const k = eOut(prog(t, from, from + 0.35));
+      p.style.strokeDashoffset = (1 - k) * +p.dataset.len;
+      p.style.opacity = t >= from && t < until + 0.15 ? 1 - prog(t, until, until + 0.15) : 0;
+    });
+    // Captions.
+    let ci = 0; S.captions.forEach(([at], i) => { if (t >= at) ci = i; });
+    const cap = $('#cap');
+    if (cap._i !== ci) { cap._i = ci; $('.box', cap).textContent = S.captions[ci][1]; cap._ws = null; }
+    cap.style.top = CAP_Y[ci] + 'px';
+    wordsIn(cap, t, S.captions[ci][0], 0.06);
+    // The ticket, and a little party.
+    const tk = $('.kticket'), tkk = prog(t, S.ticketAt + 0.1, S.ticketAt + 0.6);
+    tk.style.opacity = clamp(tkk * 3);
+    tk.style.transform = `translateY(${(1 - eOut5(tkk)) * 700}px) rotate(${(1 - eOut5(tkk)) * 10 + Math.sin(t * 1.4) * 0.8}deg)`;
+    $$('#party span').forEach((e, i) => { const k = prog(t, S.ticketAt + 0.5 + i * 0.12, S.ticketAt + 0.85 + i * 0.12); e.style.opacity = k > 0 ? 1 : 0; e.style.transform = `scale(${lerp(0, 1, eBack(k))}) rotate(${Math.sin(t * 4 + i) * 10}deg)`; });
+  }
+
+  // End card.
+  const E = $('#end');
+  E.style.display = t >= S.endCard ? 'block' : 'none';
+  if (t >= S.endCard) {
+    const et = t - S.endCard;
+    [['#k0', 0.15, -3], ['#k1', 0.4, 2], ['#k2', 0.7, -2]].forEach(([id, at, rot]) => {
+      const k = prog(et, at, at + 0.3);
+      const el = $(id);
+      el.style.opacity = k > 0 ? 1 : 0;
+      el.style.transform = `translateX(-50%) rotate(${rot}deg) scale(${lerp(0.4, 1, eBack(k)) * (id === '#k2' && et > 1.2 ? 1 + 0.03 * Math.sin((et - 1.2) * 7) : 1)})`;
+    });
+    K.popIn($('#k3'), et, 1.0, 0.5, 0.35);
+    $('#k3').style.transform += ' rotate(3deg)';
+    wordsIn($('#k4'), et, 1.4, 0.06);
+    const lk = prog(et, 1.9, 2.3);
+    css($('#k5'), { opacity: String(lk), transform: `translateY(${(1 - eOut5(lk)) * 30}px)` });
+  }
+}
+window.setup = setup; window.render = render;
+K.standalone(setup, render, S.TOTAL);
+</script>
+</body>
+</html>

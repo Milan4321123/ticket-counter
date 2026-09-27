@@ -18,7 +18,7 @@ import './globals.css';
 // `btn bz-search-btn`), and the bazaar's denser version is meant to win those
 // ties. Its own header comment explains why it is a separate file at all.
 import './bazaar.css';
-import { ServiceWorkerRegistrar } from '@/components/AppInstall';
+import { INSTALL_PROMPT_CATCHER, InstallFooterLink, InstallNudge, ServiceWorkerRegistrar } from '@/components/AppInstall';
 import { Suspense } from 'react';
 import HeaderNav from '@/components/HeaderNav';
 import SignedInToast from '@/components/SignedInToast';
@@ -121,6 +121,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang={lang} className={`${sora.variable}${lang === 'en' ? '' : ' tx-wait'}`}>
       <body>
+        {/* First thing in the body: Chrome's install prompt can fire before
+            React hydrates, and a late listener never sees it. */}
+        <script dangerouslySetInnerHTML={{ __html: INSTALL_PROMPT_CATCHER }} />
         {/* Everything the dictionary does not cover, in the visitor's language. */}
         {lang !== 'en' && <AutoTranslate lang={lang} />}
         <ServiceWorkerRegistrar />
@@ -197,6 +200,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <LangSwitch lang={lang} label={tr('nav.language')} />
                 </Suspense>
               </div>
+              <InstallFooterLink appName={PLATFORM_NAME} />
             </div>
             <nav aria-label="Footer">
               <p className="footer-heading">Explore</p>
@@ -260,6 +264,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* Asked before anything is loaded, and only where something would be.
             Analytics above stays inert until this is answered. */}
         <ConsentBanner />
+        {/* On phones: offers the app once (the real prompt on Android, the
+            exact taps on iPhone). Waits for the question above. */}
+        <InstallNudge appName={PLATFORM_NAME} />
       </body>
     </html>
   );
