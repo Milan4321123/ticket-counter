@@ -4,8 +4,9 @@
 //
 // Three pieces, all reading the same detection:
 //   · ServiceWorkerRegistrar — root layout; registers public/sw.js.
-//   · InstallNudge — root layout; on a PHONE, a small sheet offers the app
-//     once (again only after 14 days if dismissed). Android Chrome gets the
+//   · InstallNudge — root layout; on a PHONE, a small sheet offers the app at
+//     most once every 30 days, and only to someone actually browsing (a few
+//     pages in) or holding a fresh ticket. Android Chrome gets the
 //     real install prompt; everything else gets the exact taps for that
 //     browser, because iPhones have no install prompt at all.
 //   · InstallAppButton / InstallFooterLink — a button that always works: the
@@ -373,18 +374,35 @@ function InstallSheet({
 // ---------------------------------------------------------------------------
 // The nudge (phones only, root layout)
 
+/**
+ * When the sheet was last SHOWN — not only dismissed. It used to count only a
+ * press of "close", so a visitor who read on past it, or tapped a link while
+ * it was up, got it again on every single page, nine seconds in. Being shown
+ * is the ask; it is not repeated for a month either way. (The key keeps its
+ * old name so a visitor who already said no keeps that answer.)
+ */
 const DISMISS_KEY = 'mn.install.dismissed';
-const DISMISS_DAYS = 14;
+const NUDGE_EVERY_DAYS = 30;
+/** Pages a visitor browses in this visit before the sheet may appear. */
+const PAGES_BEFORE_NUDGE = 3;
+/**
+ * Pages seen in this visit — in memory only, so nothing more is stored on the
+ * device. A reload starts it over, which only makes the sheet rarer.
+ */
+let pagesThisVisit = 0;
+let lastCountedPath = '';
 
 /** Pages where a sheet would get in the way, or that are not for buyers. */
 const NO_NUDGE = [/^\/portal/, /^\/admin/, /^\/scan/, /^\/demo/, /checkout/, /^\/offline/, /^\/c\//, /^\/contact/];
 
-function dismissedRecently(): boolean {
+function shownRecently(): boolean {
   try {
     const at = Number(localStorage.getItem(DISMISS_KEY) || 0);
-    return Date.now() - at < DISMISS_DAYS * 86_400_000;
+    return Date.now() - at < NUDGE_EVERY_DAYS * 86_400_000;
   } catch {
-    return false;
+    // No storage (private mode): we could not remember the answer, so never
+    // ask on our own — the footer link still works.
+    return true;
   }
 }
 
@@ -414,13 +432,25 @@ export function InstallNudge({ appName }: { appName: string }) {
   const blocked = NO_NUDGE.some((r) => r.test(pathname));
 
   useEffect(() => {
+    if (pathname !== lastCountedPath) {
+      lastCountedPath = pathname;
+      pagesThisVisit += 1;
+    }
+  }, [pathname]);
+
+  useEffect(() => {
     if (!state || !state.phone || state.standalone || blocked || consentPending) return;
-    if (dismissedRecently()) return;
-    // Let the page be read first. On a fresh ticket, sooner: that is the
-    // moment the app is worth the most.
-    const t = window.setTimeout(() => setOpen(true), ticketPage ? 2500 : 9000);
+    if (shownRecently()) return;
+    // Only someone who is actually browsing — a single glance at one page is
+    // not an invitation. A fresh ticket is the exception: that is the moment
+    // the app is worth the most (QR codes offline at the door).
+    if (!ticketPage && pagesThisVisit < PAGES_BEFORE_NUDGE) return;
+    const t = window.setTimeout(() => {
+      rememberDismiss(); // shown = asked; not again for a month
+      setOpen(true);
+    }, ticketPage ? 2500 : 12000);
     return () => window.clearTimeout(t);
-  }, [state, blocked, consentPending, ticketPage]);
+  }, [state, blocked, consentPending, ticketPage, pathname]);
 
   // Navigating somewhere the sheet does not belong closes it (without
   // counting as a "no").

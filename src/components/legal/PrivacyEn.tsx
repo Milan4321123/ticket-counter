@@ -320,7 +320,7 @@ export default function PrivacyEn({ f }: { f: PrivacyFacts }) {
               </tr>
               <tr>
                 <td className="mono small">mn.install.dismissed</td>
-                <td className="small">You dismissed the “install the app” hint</td>
+                <td className="small">When the “install the app” hint was last shown, so it appears at most once a month</td>
                 <td className="small">until you clear storage</td>
               </tr>
               <tr>

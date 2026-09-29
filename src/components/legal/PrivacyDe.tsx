@@ -336,7 +336,7 @@ export default function PrivacyDe({ f }: { f: PrivacyFacts }) {
               </tr>
               <tr>
                 <td className="mono small">mn.install.dismissed</td>
-                <td className="small">Hinweis zur App-Installation ausgeblendet</td>
+                <td className="small">Zeitpunkt, zu dem der Hinweis zur App-Installation zuletzt angezeigt wurde (höchstens einmal im Monat)</td>
                 <td className="small">bis Sie den Speicher löschen</td>
               </tr>
               <tr>
