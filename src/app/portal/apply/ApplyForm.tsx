@@ -49,7 +49,7 @@ export default function ApplyForm({ listings, initial }: { listings: Choice[]; i
         </span>
         <h2>Application sent</h2>
         <p className="muted">
-          We will look at your page and write to <strong>{email}</strong>. Your demo is kept for 30 days while
+          We will look at your page and write to <strong translate="no">{email}</strong>. Your demo is kept for 30 days while
           you wait — you can keep improving the page, and whatever it looks like on approval is what moves into
           your account.
         </p>
@@ -123,6 +123,16 @@ export default function ApplyForm({ listings, initial }: { listings: Choice[]; i
       </label>
 
       {error && <div className="notice notice-error">{error}</div>}
+      {/* What happens to the application — information beside the button, not
+          an "I agree" tick: reviewing it is what the person is asking for. */}
+      <p className="muted small" style={{ margin: 0 }}>
+        Your details go to the MartNepali team, who read them to decide on your account and write back to you.
+        Details:{' '}
+        <a href="/privacy" target="_blank" rel="noopener">
+          Privacy
+        </a>
+        .
+      </p>
       <button type="submit" className="btn btn-brand btn-lg" disabled={busy || !eventId}>
         {busy ? 'Sending…' : 'Send my application'}
       </button>

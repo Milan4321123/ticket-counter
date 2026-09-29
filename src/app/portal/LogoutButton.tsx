@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { forgetPersonalCaches } from '@/components/AppInstall';
 
 export default function LogoutButton({ quiet = false }: { quiet?: boolean }) {
   const router = useRouter();
@@ -15,6 +16,8 @@ export default function LogoutButton({ quiet = false }: { quiet?: boolean }) {
     } catch {
       // Even if the request fails, leave the portal.
     }
+    // Pages this device kept offline go with the session (public/sw.js).
+    await forgetPersonalCaches();
     router.push('/portal/login');
     router.refresh();
   }

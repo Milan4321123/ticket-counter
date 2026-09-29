@@ -67,5 +67,8 @@ export async function POST() {
   res.cookies.set(COOKIE_NAME, '', expire);
   res.cookies.set(PREAUTH_COOKIE_NAME, '', expire);
   res.cookies.set(SCAN_COOKIE_NAME, '', expire);
+  // Drop cached copies of admin pages with the session. Not "storage": that
+  // would also wipe the cookie-banner choice and the basket.
+  res.headers.set('Clear-Site-Data', '"cache"');
   return res;
 }

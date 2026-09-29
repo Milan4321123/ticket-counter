@@ -9,8 +9,8 @@ export default function OfflinePage() {
       <p className="feed-kicker">No connection</p>
       <h1 className="page-title">You are offline</h1>
       <p className="muted" style={{ maxWidth: 480, margin: '0 auto 18px' }}>
-        This page needs the internet. Your tickets and orders you have opened before still work — open them from your
-        confirmation email or your browser history, and show the QR code as usual.
+        This page needs the internet. Tickets you have opened on this device in the last 60 days still work — open
+        them from your confirmation email or your browser history, and show the QR code as usual.
       </p>
       <Link href="/" className="btn btn-brand">
         Try again

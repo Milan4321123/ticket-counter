@@ -20,6 +20,7 @@ No test framework is installed. The runner is Node's own (`node:test` +
 | `harness.test.ts` | the harness testing itself — the fixtures reach the real lib functions, and the database really is empty and really is a temp file. |
 | `tenancy.test.ts` | the exception to the naming rule: one AREA, not one module. Tenant isolation and privacy are properties of how `events`/`orders`/`analytics`/`retention`/`marketing`/`cards`/`stalls` behave *together*, and its fixture — two organizers with the same buyers, the same tier keys and the same promo code string — is the whole point. |
 | `orders.per-address-ceiling.test.ts` | the other exception: it calls an exported route handler (`POST /api/orders`) in-process. The anti-hoarding ceiling is written inline in that handler and exists in no lib function, so a test here could only re-derive its formula — and agree with a broken one. In-process means a plain `Request` object: no server, no socket, and SMTP unset so every send short-circuits. |
+| `ask.no-consent-tick.test.ts` | another in-process route call (`POST /api/events/[id]/ask`): the rule that an emailed question needs no "I agree" tick lives only in that handler. |
 | `*.test.ts` | one file per module under test, named after it. |
 
 ## The database

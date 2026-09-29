@@ -74,7 +74,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
     features: [
       {
         title: 'Install it like an app',
-        benefit: 'Add to home screen on any phone; tickets and orders you have opened still show their QR code with no signal.',
+        benefit: 'Add to home screen on any phone; tickets you have opened still show their QR code with no signal.',
         links: [live('/', 'Open on your phone')],
       },
       {

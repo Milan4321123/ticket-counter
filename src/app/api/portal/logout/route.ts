@@ -9,5 +9,8 @@ export async function POST() {
     path: '/',
     maxAge: 0,
   });
+  // Drop cached copies of the hub's pages with the session. Not "storage": that
+  // would also wipe the cookie-banner choice and the basket.
+  res.headers.set('Clear-Site-Data', '"cache"');
   return res;
 }

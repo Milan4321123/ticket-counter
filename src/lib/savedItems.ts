@@ -1,8 +1,12 @@
 // The shopper's own two lists — "saved for later" and "recently viewed" — and
 // the ONLY place on the site that keeps them.
 //
-// They live in localStorage, on the shopper's own device, and they never leave
-// it. That is a decision, not a shortcut. Saving a jar of achar for Saturday is
+// They live in the shopper's own browser and they never leave it — "saved"
+// in localStorage (the shopper asked for it to be kept), "recently viewed" in
+// sessionStorage, which the browser empties when the tab is closed. Nobody
+// asks for a history, so it is not kept past the visit it is useful in (TDDDG
+// §25: only what is strictly needed for the service the visitor is using may
+// be stored on their device without asking). That is a decision, not a shortcut. Saving a jar of achar for Saturday is
 // not worth an account, and the moment a list like this is written server-side
 // it becomes a record of what a named person was looking at, which then needs a
 // retention rule, an export, an erasure path and a line in the privacy notice.
@@ -12,7 +16,7 @@
 //
 // Safe on the client, and safe on the server by accident rather than by luck:
 // nothing here imports the database, and every storage access goes through
-// storage() below, which returns null when there is no localStorage at all —
+// storage() below, which returns null when there is no storage at all —
 // so a stray call during a server render is a no-op instead of a crash.
 
 /**
@@ -57,6 +61,11 @@ export interface SavedItem {
  * up with a saved list that renders half-empty cards forever.
  */
 export const SAVED_KEY = 'martnepali.saved.v1';
+/**
+ * The same name as when it lived in localStorage — now a sessionStorage key.
+ * The old localStorage copy is deleted the first time the list is touched
+ * (dropLegacyRecent), so a history written before the move does not linger.
+ */
 export const RECENT_KEY = 'martnepali.recent.v1';
 
 /**
@@ -84,12 +93,31 @@ export const MAX_RECENT = 20;
  * gets a site where saving quietly does nothing, which is the behaviour they
  * asked their browser for.
  */
-function storage(): Storage | null {
+function storage(key: string): Storage | null {
   try {
+    if (key === RECENT_KEY) {
+      dropLegacyRecent();
+      return globalThis.sessionStorage ?? null;
+    }
     const store = globalThis.localStorage;
     return store ?? null;
   } catch {
     return null;
+  }
+}
+
+let legacyRecentDropped = false;
+/**
+ * "Recently viewed" used to be written to localStorage, where it outlived the
+ * visit indefinitely. Delete that copy — once per page load, best effort.
+ */
+function dropLegacyRecent(): void {
+  if (legacyRecentDropped) return;
+  try {
+    globalThis.localStorage?.removeItem(RECENT_KEY);
+    legacyRecentDropped = true;
+  } catch {
+    // No localStorage, or it refuses: nothing there to delete.
   }
 }
 
@@ -139,7 +167,7 @@ function isSavedItem(value: unknown): value is SavedItem {
  * wrote it. Same-origin paths only, always.
  */
 export function readList(key: string): SavedItem[] {
-  const store = storage();
+  const store = storage(key);
   if (!store) return [];
   let raw: string | null = null;
   try {
@@ -179,7 +207,7 @@ export function readList(key: string): SavedItem[] {
  * Throwing here would surface a storage problem as a broken save button.
  */
 function writeList(key: string, list: SavedItem[]): void {
-  const store = storage();
+  const store = storage(key);
   if (!store) return;
   const capped = list.slice(0, limitFor(key));
   try {
@@ -244,7 +272,7 @@ export function remember(item: SavedItem): void {
 
 /** Forget a whole list. Used by the Clear buttons on the saved page. */
 export function clearList(key: string): void {
-  const store = storage();
+  const store = storage(key);
   if (!store) return;
   try {
     store.removeItem(key);

@@ -74,7 +74,7 @@ const SEED_PATHS = [
  * order page is somebody's own receipt; the scanner is door security), plus
  * the two routes that exist to send mail or file a row.
  */
-const OFF_LIMITS = [/^\/admin\b/, /^\/portal\b/, /^\/scan\b/, /^\/order\//, /^\/ticket\//, /^\/c\//, /^\/api\//, /^\/unsubscribe\b/];
+const OFF_LIMITS = [/^\/admin\b/, /^\/portal\b/, /^\/scan\b/, /^\/order\//, /^\/ticket\//, /^\/c\//, /^\/subscription\//, /^\/account\b/, /^\/api\//, /^\/unsubscribe\b/];
 
 /**
  * Not pages. The build's own assets are linked from every document and they

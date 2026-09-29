@@ -191,6 +191,9 @@ export default function SavedItems() {
             </h2>
             {clearButton(RECENT_KEY, 'Clear history')}
           </div>
+          <p className="muted small" style={{ margin: '6px 0 0' }}>
+            Only for this tab — forgotten when you close it.
+          </p>
           <div className="bz-grid" style={{ marginTop: 14 }}>
             {recent.map((row) => (
               <SavedCard key={row.href} row={row} />

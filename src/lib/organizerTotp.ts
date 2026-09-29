@@ -23,6 +23,7 @@ import crypto from 'crypto';
 import QRCode from 'qrcode';
 import { getDb } from './db';
 import { platformNameFromEnv } from './platform';
+import { openSecret, sealSecret } from './secretBox';
 import { base32Encode, totpStepFor, verifyTotpAgainstSecret } from './totp';
 
 const DIGITS = 6;
@@ -33,28 +34,66 @@ function platformName(): string {
 }
 
 interface TotpRow {
+  /**
+   * Whether a secret is stored at all — sealed, legacy plaintext, or sealed
+   * under a key that no longer opens it. What "enrolled" is decided on, so an
+   * unreadable secret FAILS CLOSED: login keeps demanding a code (which then
+   * cannot verify) rather than quietly dropping the second factor.
+   */
+  stored: boolean;
+  /** The base32 secret in the clear, or null when none is stored or it cannot be opened. */
   secret: string | null;
   enabled: number;
   /** Highest 30-second step already spent by this account. */
   lastStep: number;
 }
 
+// AT REST the secret is sealed with lib/secretBox (AES-256-GCM, key derived
+// from APP_SECRET), the same box that holds sellers' payment credentials: it is
+// the whole of the second factor, and a database backup or a stray `.dump`
+// must not hand it out. Rows written before this change hold the plaintext
+// base32 string; they are still read, and re-sealed the first time they are.
+// A base32 secret is [A-Z2-7] only, so it can never be mistaken for the box's
+// `v1.<iv>.<ct>.<tag>` format.
+const SEALED_PREFIX = 'v1.';
+
+function isSealed(stored: string): boolean {
+  return stored.startsWith(SEALED_PREFIX);
+}
+
 function readRow(organizerId: string): TotpRow | null {
-  return (
-    (getDb()
-      .prepare(
-        `SELECT totp_secret AS secret, totp_enabled AS enabled,
-                COALESCE(totp_last_step, 0) AS lastStep
-           FROM organizers WHERE id = ?`
-      )
-      .get(organizerId) as TotpRow | undefined) ?? null
-  );
+  const row = getDb()
+    .prepare(
+      `SELECT totp_secret AS stored, totp_enabled AS enabled,
+              COALESCE(totp_last_step, 0) AS lastStep
+         FROM organizers WHERE id = ?`
+    )
+    .get(organizerId) as { stored: string | null; enabled: number; lastStep: number } | undefined;
+  if (!row) return null;
+  const stored = row.stored ?? '';
+  let secret: string | null = null;
+  if (stored && isSealed(stored)) {
+    secret = openSecret(stored);
+  } else if (stored) {
+    secret = stored;
+    // Legacy plaintext: seal it now. Conditional on the value still being the
+    // one just read, so a concurrent enrolment is never overwritten. Best
+    // effort — without APP_SECRET there is no key, and the read must still work.
+    try {
+      getDb()
+        .prepare(`UPDATE organizers SET totp_secret = ? WHERE id = ? AND totp_secret = ?`)
+        .run(sealSecret(stored), organizerId, stored);
+    } catch {
+      /* no key to seal with — try again on the next read */
+    }
+  }
+  return { stored: Boolean(stored), secret, enabled: row.enabled, lastStep: row.lastStep };
 }
 
 /** True once this organizer has confirmed a code — i.e. login now demands one. */
 export function organizerTotpEnabled(organizerId: string): boolean {
   const row = readRow(organizerId);
-  return Boolean(row && row.enabled === 1 && row.secret);
+  return Boolean(row && row.enabled === 1 && row.stored);
 }
 
 /**
@@ -68,7 +107,7 @@ export function organizerTotpEnabled(organizerId: string): boolean {
  */
 export function organizerTotpPending(organizerId: string): boolean {
   const row = readRow(organizerId);
-  return Boolean(row && row.enabled !== 1 && row.secret);
+  return Boolean(row && row.enabled !== 1 && row.stored);
 }
 
 /**
@@ -82,9 +121,14 @@ export function organizerTotpPending(organizerId: string): boolean {
 export function startOrganizerTotpEnrolment(organizerId: string): string {
   const row = readRow(organizerId);
   if (!row) throw new Error('Unknown organizer');
-  if (row.enabled === 1 && row.secret) return row.secret;
+  if (row.enabled === 1 && row.stored) {
+    if (row.secret) return row.secret;
+    throw new Error('The stored authenticator secret cannot be opened (was APP_SECRET changed?)');
+  }
   const secret = base32Encode(crypto.randomBytes(20)); // 160-bit
-  getDb().prepare(`UPDATE organizers SET totp_secret = ?, totp_enabled = 0 WHERE id = ?`).run(secret, organizerId);
+  getDb()
+    .prepare(`UPDATE organizers SET totp_secret = ?, totp_enabled = 0 WHERE id = ?`)
+    .run(sealSecret(secret), organizerId);
   return secret;
 }
 

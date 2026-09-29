@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { forgetPersonalCaches } from '@/components/AppInstall';
 
 export default function LogoutButton() {
   const router = useRouter();
@@ -15,6 +16,8 @@ export default function LogoutButton() {
     } catch {
       // Even if the request fails, leave the admin area.
     }
+    // Pages this device kept offline go with the session (public/sw.js).
+    await forgetPersonalCaches();
     router.push('/');
     router.refresh();
   }

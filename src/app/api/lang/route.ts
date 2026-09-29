@@ -15,6 +15,13 @@ export async function GET(req: Request) {
   const backRaw = url.searchParams.get('back') ?? '/';
   const back = backRaw.startsWith('/') && !backRaw.startsWith('//') ? backRaw : '/';
   const res = NextResponse.redirect(`${getBaseUrl()}${back}`, 303);
-  res.cookies.set(LANG_COOKIE, lang, { path: '/', sameSite: 'lax', maxAge: 365 * 24 * 3600 });
+  res.cookies.set(LANG_COOKIE, lang, {
+    path: '/',
+    sameSite: 'lax',
+    // Same rule as every other cookie this site sets: HTTPS-only in
+    // production, plain in local development (http://localhost).
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 365 * 24 * 3600,
+  });
   return res;
 }

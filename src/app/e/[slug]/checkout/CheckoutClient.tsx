@@ -307,7 +307,6 @@ interface Touched {
   name?: boolean;
   email?: boolean;
   student?: boolean;
-  privacy?: boolean;
 }
 
 /**
@@ -433,20 +432,25 @@ export default function CheckoutClient({
   const [payerOpen, setPayerOpen] = useState(false);
   const [payerName, setPayerName] = useState('');
   const [studentAck, setStudentAck] = useState(false);
-  // Consent is an ACTION, not a notice. Nobody may hand us a name and an email
-  // without having ticked this themselves — it starts false, it is never
-  // pre-ticked, and no payment button works until it is on.
-  const [privacyAck, setPrivacyAck] = useState(false);
-  // The SEPARATE, optional "keep me posted" consent. Also never pre-ticked —
-  // and unlike the privacy tick above it gates nothing: checkout works exactly
-  // the same whether this is on or off.
+  // No "I agree" tick for the order itself: the name and email are what the
+  // contract needs (Art. 6(1)(b) GDPR), and a consent nobody can refuse without
+  // losing the order is not a consent. The notice beside the pay button says
+  // who receives them instead.
+  //
+  // The SEPARATE, optional "keep me posted" consent. Never pre-ticked, and it
+  // gates nothing: checkout works exactly the same whether this is on or off.
   const [marketingOptIn, setMarketingOptIn] = useState(false);
   const [touched, setTouched] = useState<Touched>({});
   const [message, setMessage] = useState<InlineMessage | null>(null);
   const [busy, setBusy] = useState(false); // mock / transfer / stripe request in flight
   const [capturing, setCapturing] = useState(false); // PayPal capture in flight
   const [sdkState, setSdkState] = useState<'loading' | 'ready' | 'error'>('loading');
-
+  /**
+   * Whether the buyer has asked for PayPal. PayPal's SDK is loaded from
+   * paypal.com only after this — loading it on sight would hand every visitor's
+   * IP address and device details to PayPal just for opening checkout.
+   */
+  const [paypalRequested, setPaypalRequested] = useState(false);
   /**
    * Which way the buyer is paying. The listing's routes, instant ones first,
    * and the first of them pre-selected: a seller who connected PayPal or
@@ -561,7 +565,7 @@ export default function CheckoutClient({
   );
   const slotMissing = slotsRequired && !pickupSlot;
   const formReady =
-    totalQty > 0 && nameOk && emailOk && ackOk && privacyAck && !choicesMissing && !slotMissing;
+    totalQty > 0 && nameOk && emailOk && ackOk && !choicesMissing && !slotMissing;
   /** The restaurant fields every order request carries (ignored by the server for events). */
   const kitchenFields = () => ({
     pickupSlot: slotsRequired ? pickupSlot : undefined,
@@ -578,8 +582,9 @@ export default function CheckoutClient({
   /**
    * WHY the pay buttons are off, in the buyer's words. One flat "fill in your
    * details" line was honest while details were the only thing that could be
-   * missing; with a consent tick in the mix it sends someone back to re-read
-   * fields they already filled, hunting for a mistake that is not there.
+   * missing; with choices, a time slot or the student tick in the mix it sends
+   * someone back to re-read fields they already filled, hunting for a mistake
+   * that is not there.
    */
   const blockedReason =
     totalQty === 0
@@ -594,9 +599,7 @@ export default function CheckoutClient({
         ? 'Fill in your name and email to continue.'
         : !ackOk
           ? 'Confirm the student ID requirement to continue.'
-          : !privacyAck
-            ? 'Tick the privacy box above to continue — we cannot take your details without it.'
-            : null;
+          : null;
 
   const working = busy || capturing;
 
@@ -674,7 +677,7 @@ export default function CheckoutClient({
   }
 
   function markAllTouched() {
-    setTouched({ name: true, email: true, student: true, privacy: true });
+    setTouched({ name: true, email: true, student: true });
   }
 
   // ---------------- Discount code (voucher or the seller's own) ----------------
@@ -914,10 +917,18 @@ export default function CheckoutClient({
 
   // ---------------- PayPal flow ----------------
 
-  // Load the PayPal JS SDK once — as soon as the listing offers PayPal, not
-  // only once it is chosen, so the buttons are ready the moment it is.
+  // A page that already loaded the SDK (the buyer pressed "Pay with PayPal"
+  // earlier in this visit) has nothing left to protect: show PayPal's buttons.
   useEffect(() => {
-    if (!paypalClientId) return;
+    if (window.paypal) setPaypalRequested(true);
+  }, []);
+
+  // Load the PayPal JS SDK once — and only once the buyer has pressed our own
+  // "Pay with PayPal" button. Loading it on sight (as this page used to) sent
+  // every visitor's IP address and device details to paypal.com the moment
+  // checkout opened, whether or not they ever meant to pay with PayPal.
+  useEffect(() => {
+    if (!paypalClientId || !paypalRequested) return;
     if (window.paypal) {
       setSdkState('ready');
       return;
@@ -947,7 +958,7 @@ export default function CheckoutClient({
     script.onload = () => setSdkState('ready');
     script.onerror = () => setSdkState('error');
     document.body.appendChild(script);
-  }, [paypalClientId, config.currency]);
+  }, [paypalClientId, paypalRequested, config.currency]);
 
   // Render the PayPal buttons once the SDK is ready — and re-render them
   // whenever the free/paid boundary is crossed. The RSVP branch unmounts the
@@ -959,7 +970,7 @@ export default function CheckoutClient({
   // `method` is a dependency for the same reason: choosing bank transfer
   // unmounts the PayPal box, and choosing PayPal again needs fresh buttons.
   useEffect(() => {
-    if (method !== 'paypal' || !paypalClientId || sdkState !== 'ready' || isFreeOrder) return;
+    if (method !== 'paypal' || !paypalClientId || !paypalRequested || sdkState !== 'ready' || isFreeOrder) return;
     if (buttonsRenderedRef.current || !paypalBoxRef.current) return;
     if (!window.paypal?.Buttons) {
       setSdkState('error');
@@ -1083,7 +1094,7 @@ export default function CheckoutClient({
       buttonsRenderedRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [method, paypalClientId, sdkState, isFreeOrder]);
+  }, [method, paypalClientId, paypalRequested, sdkState, isFreeOrder]);
 
   // Every change to the picks is remembered (after the first restore).
   useEffect(() => {
@@ -1801,7 +1812,7 @@ export default function CheckoutClient({
                 disabled={working}
               />
               <p className={`muted small ${styles.hint}`}>
-                Only if it is not <strong>{name.trim() || 'your own name'}</strong> — paying from a
+                Only if it is not <strong translate={name.trim() ? 'no' : undefined}>{name.trim() || 'your own name'}</strong> — paying from a
                 partner&rsquo;s, a parent&rsquo;s or a shared account is completely fine, the seller
                 just needs to know whose name to look for.
               </p>
@@ -1883,37 +1894,11 @@ export default function CheckoutClient({
             </a>{' '}
             <span className="small">(opens in a new tab, so you keep your selection)</span>
           </p>
-
-          {/* The consent itself. Reading the note is not agreeing to it, so the
-              tick lives INSIDE the note rather than below it — you cannot reach
-              it without scrolling past what you are agreeing to. */}
-          <label className={`checkbox-row ${styles.privacyConsent}`}>
-            <input
-              type="checkbox"
-              checked={privacyAck}
-              onChange={(e) => {
-                setPrivacyAck(e.target.checked);
-                setTouched((t) => ({ ...t, privacy: true }));
-              }}
-              disabled={working}
-            />
-            <span>
-              <strong>I agree</strong> that my name and email may be passed to the{' '}
-              {isShop ? 'seller' : 'organizer'} of this {v.listing} so my {v.codes} can be issued, and
-              I have read the privacy note (Datenschutz).
-            </span>
-          </label>
-          {touched.privacy && !privacyAck && (
-            <p className={styles.fieldError} style={{ marginTop: 6 }}>
-              Please tick the box above to continue — we cannot take your details without it.
-            </p>
-          )}
         </div>
 
-        {/* The OPTIONAL "keep me posted" box — deliberately quieter than the
-            required privacy tick above (muted, smaller, no border), because
-            visual parity would read as "also required". Never pre-ticked, and
-            nothing on this page waits for it. */}
+        {/* The OPTIONAL "keep me posted" box — deliberately quiet (muted,
+            smaller, no border), because anything louder would read as
+            "required". Never pre-ticked, and nothing on this page waits for it. */}
         <div className="muted small" style={{ marginTop: 14 }}>
           <label className="checkbox-row" style={{ fontWeight: 400 }}>
             <input
@@ -2198,6 +2183,37 @@ export default function CheckoutClient({
                   </p>
                 )}
               </>
+            ) : !paypalRequested ? (
+              /* Step one of two: OUR button. PayPal's script is fetched from
+                 paypal.com only once this is pressed, so a visitor who never
+                 chooses PayPal never talks to PayPal at all. Step two is
+                 PayPal's own buttons, rendered below once the script is in. */
+              <>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-lg btn-block"
+                  onClick={() => {
+                    setMessage(null);
+                    setPaypalRequested(true);
+                  }}
+                  disabled={!formReady || working}
+                >
+                  {`Pay ${formatMoney(payableCents, config.currency)} with PayPal`}
+                </button>
+                <p className={`muted small ${styles.hint}`}>
+                  Opens PayPal — PayPal&rsquo;s script loads only when you click.
+                </p>
+                {!formReady && (
+                  <p className={`muted small ${styles.hint}`}>
+                    {blockedReason}
+                  </p>
+                )}
+                <p className={`muted small ${styles.hint}`}>
+                  Pay securely with PayPal or a debit/credit card, into {sellerWord}&rsquo;s own PayPal account.
+                  You are only charged once you approve the payment
+                  {payment.paypal?.sandbox ? ' — this listing is in PayPal sandbox (test) mode, no real money moves' : ''}.
+                </p>
+              </>
             ) : sdkState === 'error' ? (
               <div className="notice notice-error">
                 We could not load the PayPal buttons. Please refresh the page and try again
@@ -2234,6 +2250,26 @@ export default function CheckoutClient({
               </>
             )}
           </>
+        )}
+
+        {/* Who gets the buyer's details, beside the button that sends them.
+            Information, not a tick-box: the order cannot exist without a name
+            and an email, so asking for "consent" to it would be a consent
+            nobody is free to refuse (the legal basis is the contract itself). */}
+        {(isFreeOrder || methods.length > 0) && (
+          <p className={`muted small ${styles.hint}`}>
+            Your details go to <strong translate={organizerName ? 'no' : undefined}>{organizerName || sellerWord}</strong>, who sells these {v.units} and
+            needs them to issue and check your order. MartNepali provides the booking software. Details:{' '}
+            <a
+              href="/privacy"
+              target="_blank"
+              rel="noopener"
+              style={{ color: 'var(--brand-text)', fontWeight: 600 }}
+            >
+              Privacy
+            </a>
+            .
+          </p>
         )}
       </div>
     </div>

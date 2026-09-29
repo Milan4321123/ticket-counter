@@ -74,16 +74,6 @@
   line-height: 1.6;
 }
 
-/* The consent tick, inside the Datenschutz box rather than under it. Separated
-   by a rule so it reads as an action to take, not another sentence to skim. */
-.privacyConsent {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
-  color: var(--text);
-  font-size: 0.9rem;
-}
-
 /* The recommended payment route, called out in green.
    Green because it is the fast one, not because it is the one we earn from —
    we earn nothing either way. PayPal clears in seconds and a transfer takes

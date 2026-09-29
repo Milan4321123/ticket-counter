@@ -1,8 +1,9 @@
 'use client';
 
 // Renders nothing. Drops the item the shopper is currently looking at onto the
-// "recently viewed" list in their own browser, and does nothing else — no
-// beacon, no fetch, no id sent anywhere. See lib/savedItems.
+// "recently viewed" list in their own browser — in sessionStorage, so it is
+// gone when the tab is closed — and does nothing else: no beacon, no fetch, no
+// id sent anywhere. See lib/savedItems.
 import { useEffect, useRef } from 'react';
 import { remember } from '@/lib/savedItems';
 import type { SavedItem } from '@/lib/savedItems';

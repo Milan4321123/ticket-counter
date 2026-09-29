@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { platformContactEmail } from '@/lib/platform';
 import ContactForm from './ContactForm';
 import CreatorChat from '@/components/CreatorChat';
+import { geminiEnabled } from '@/lib/gemini';
 
 // The contact address comes from an env var — read it fresh.
 export const dynamic = 'force-dynamic';
@@ -58,7 +59,7 @@ export default async function ContactPage({
               request fills itself in and goes straight to Milan, who replies by email.
             </p>
           </header>
-          <CreatorChat />
+          <CreatorChat ai={geminiEnabled({ personal: true })} />
           <div className="cc-under">
             <p className="muted small">
               The self-service page is free and already included —{' '}

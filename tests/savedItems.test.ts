@@ -1,8 +1,9 @@
 /**
  * THE SHOPPER'S TWO LISTS.
  *
- * "Saved for later" and "recently viewed" live in localStorage on the
- * shopper's own device and never reach the server — which is the whole point
+ * "Saved for later" (localStorage) and "recently viewed" (sessionStorage,
+ * gone when the tab closes) live on the shopper's own device and never reach
+ * the server — which is the whole point
  * of them (no account, no record of what a named person browsed, nothing to
  * retain, export or erase). It also means nothing on the server side can go
  * wrong with them, and so nothing was testing them at all.
@@ -45,10 +46,15 @@ class FakeStorage {
 }
 
 const store = new FakeStorage();
+const session = new FakeStorage();
 // Installed before the module is imported, because storage() reads the global
 // at call time — but a test that relied on that ordering by accident would be
 // a test that breaks when somebody memoises it.
 (globalThis as unknown as { localStorage: FakeStorage }).localStorage = store;
+(globalThis as unknown as { sessionStorage: FakeStorage }).sessionStorage = session;
+// A history left in localStorage by the version before "recently viewed" moved
+// to sessionStorage. The first touch of the list must delete it.
+store.setItem('martnepali.recent.v1', '[]');
 
 const { MAX_RECENT, MAX_SAVED, RECENT_KEY, SAVED_KEY, clearList, isSaved, readList, remember, toggleSaved } =
   await import('../src/lib/savedItems.ts');
@@ -66,6 +72,24 @@ function item(n: number) {
     at: 1_700_000_000_000 + n,
   };
 }
+
+test('recently viewed lives only for the tab: sessionStorage, and the old localStorage copy is deleted', () => {
+  assert.notEqual(store.raw(RECENT_KEY), null, 'fixture check: a legacy history is present');
+  remember(item(1));
+  assert.equal(store.raw(RECENT_KEY), null, 'the legacy localStorage history is gone');
+  assert.ok(session.raw(RECENT_KEY)?.includes(item(1).href), 'the new entry is in sessionStorage');
+  remember(item(2));
+  assert.equal(store.raw(RECENT_KEY), null, 'and nothing is ever written back to localStorage');
+  assert.deepEqual(
+    readList(RECENT_KEY).map((r) => r.href),
+    [item(2).href, item(1).href]
+  );
+  // Saved-for-later is something the shopper asked to keep, so it stays put.
+  clearList(SAVED_KEY);
+  toggleSaved(item(5));
+  assert.ok(store.raw(SAVED_KEY)?.includes(item(5).href));
+  assert.equal(session.raw(SAVED_KEY), null);
+});
 
 test('saving is a toggle, and it reports the state it just moved to', () => {
   clearList(SAVED_KEY);
@@ -141,14 +165,20 @@ test('a browser that refuses to read reads as empty, not as a crash', () => {
 });
 
 test('with no storage at all — a server render — every call is a quiet no-op', () => {
-  const real = (globalThis as unknown as { localStorage?: unknown }).localStorage;
-  delete (globalThis as unknown as { localStorage?: unknown }).localStorage;
+  const g = globalThis as unknown as { localStorage?: unknown; sessionStorage?: unknown };
+  const real = g.localStorage;
+  const realSession = g.sessionStorage;
+  delete g.localStorage;
+  delete g.sessionStorage;
   try {
     assert.deepEqual(readList(SAVED_KEY), []);
+    assert.deepEqual(readList(RECENT_KEY), []);
     assert.equal(isSaved('/x'), false);
     assert.doesNotThrow(() => remember(item(9)));
     assert.doesNotThrow(() => clearList(SAVED_KEY));
+    assert.doesNotThrow(() => clearList(RECENT_KEY));
   } finally {
-    (globalThis as unknown as { localStorage?: unknown }).localStorage = real;
+    g.localStorage = real;
+    g.sessionStorage = realSession;
   }
 });

@@ -20,8 +20,11 @@ const MAX_QUESTION = 500;
  * later on the chance that the thing they asked has been answered, which meant
  * the answer used to reach everyone except the person who wanted it.
  *
- * Giving an address turns this into personal data, so the consent tick appears
- * only when there is something to consent to, and gates the send.
+ * Giving an address turns this into personal data. What happens to it is said
+ * in a notice above the button — not asked as an "I agree" tick: sending the
+ * answer to the address is exactly what the person is asking for (Art. 6(1)(b)
+ * GDPR), and a consent they could not refuse without losing the answer would
+ * not be a consent at all.
  */
 export default function AskOrganizerForm({
   eventId,
@@ -33,7 +36,6 @@ export default function AskOrganizerForm({
   const [question, setQuestion] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [privacyAck, setPrivacyAck] = useState(false);
   // Honeypot — invisible to people, irresistible to form-filling bots. Same
   // trick the contact form uses.
   const [website, setWebsite] = useState('');
@@ -45,10 +47,7 @@ export default function AskOrganizerForm({
   const emailGiven = trimmedEmail.length > 0;
   const emailOk = !emailGiven || EMAIL_RE.test(trimmedEmail);
   const questionOk = question.trim().length >= 3;
-  // The tick is required only when an address was actually typed — demanding
-  // consent for data nobody gave would be theatre.
-  const consentOk = !emailGiven || privacyAck;
-  const ready = questionOk && emailOk && consentOk;
+  const ready = questionOk && emailOk;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -67,7 +66,6 @@ export default function AskOrganizerForm({
           escalate: true,
           askerName: name.trim(),
           askerEmail: trimmedEmail,
-          privacyAck,
           website,
         }),
       });
@@ -179,24 +177,22 @@ export default function AskOrganizerForm({
           </p>
         )}
 
-        {/* Appears only once an address has been typed: there is nothing to
-            consent to until there is. */}
-        {emailGiven && (
-          <label className="checkbox-row ask-form-consent">
-            <input
-              type="checkbox"
-              checked={privacyAck}
-              onChange={(e) => setPrivacyAck(e.target.checked)}
-              disabled={busy}
-            />
-            <span>
-              <strong>I agree</strong> that my name and email may be passed to the organizer so they can
-              answer me, and that they are erased after the event.{' '}
-              <a href="/privacy" target="_blank" rel="noopener" style={{ color: 'var(--accent)' }}>
-                Privacy · Datenschutz
-              </a>
-            </span>
-          </label>
+        {/* What happens to what is typed here, above the button that sends
+            it. This form goes to the organizer directly (escalate: true below),
+            never to the AI — but answered questions become part of what the
+            page's AI helper reads, so that is said too. */}
+        {started && (
+          <p className="muted small" style={{ margin: '10px 0 0' }}>
+            Your question goes to <span translate="no">{organizerName}</span>
+            {emailGiven ? ', with your name and email so they can answer you' : ''}. If they answer it,
+            question and answer are published on this page (never your name or email), and the page&rsquo;s AI
+            helper (Google Gemini or Anthropic Claude) may use them to answer others from the event&rsquo;s own
+            information.{emailGiven ? ' Your name and email are erased after the event.' : ''} Details:{' '}
+            <a href="/privacy" target="_blank" rel="noopener" style={{ color: 'var(--accent)' }}>
+              Privacy
+            </a>
+            .
+          </p>
         )}
 
         <div
@@ -237,11 +233,7 @@ export default function AskOrganizerForm({
         </button>
         {!ready && !busy && (
           <p className="muted small" style={{ margin: '8px 0 0', textAlign: 'center' }}>
-            {!questionOk
-              ? 'Type your question to continue.'
-              : !emailOk
-                ? 'Check the email address to continue.'
-                : 'Tick the box to continue — we cannot take your email without it.'}
+            {!questionOk ? 'Type your question to continue.' : 'Check the email address to continue.'}
           </p>
         )}
       </form>

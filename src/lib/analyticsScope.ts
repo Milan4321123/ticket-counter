@@ -11,6 +11,9 @@
 //   /c/<code>                    a customer card; the code is the whole
 //                                security model (lib/cards)
 //   /scan?...                    a signed, time-limited door-scanner link
+//   /subscription/<token>        a subscriber's own box: the token is the
+//                                login-free credential that shows and cancels it
+//   /account                     a signed-in buyer's own orders and details
 //   /admin, /portal              back offices whose URLs carry listing and
 //                                order ids
 //
@@ -42,6 +45,8 @@ export const ANALYTICS_PRIVATE_PREFIXES: readonly string[] = [
   '/order/',
   '/ticket/',
   '/c/',
+  '/subscription/',
+  '/account',
   '/scan',
   '/admin',
   '/portal',

@@ -65,6 +65,28 @@ export function ServiceWorkerRegistrar() {
   return null;
 }
 
+/**
+ * On sign-out: delete every page the service worker kept (offline tickets),
+ * leaving only the static assets. Done from the page AND by the worker (it
+ * also does this itself when it sees the sign-out POST, public/sw.js), because
+ * a page can be open without the worker controlling it. Never throws.
+ */
+export async function forgetPersonalCaches(): Promise<void> {
+  try {
+    navigator.serviceWorker?.controller?.postMessage({ type: 'mn:forget-personal' });
+  } catch {
+    /* no worker */
+  }
+  try {
+    const keys = (await globalThis.caches?.keys()) ?? [];
+    await Promise.all(
+      keys.filter((k) => k.startsWith('mn-') && !k.endsWith('-static')).map((k) => caches.delete(k))
+    );
+  } catch {
+    /* no Cache Storage (private mode, old browser) — nothing was kept */
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Where are we?
 

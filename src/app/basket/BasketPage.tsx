@@ -65,6 +65,8 @@ export default function BasketPage({ customer }: { customer: { name: string; ema
   const orderable = groups.filter((g) => !g.example);
   const total = orderable.reduce((n, g) => n + g.subtotal, 0);
   const cardCount = orderable.filter((g) => g.card).length;
+  /** Everyone the checkout's name and email go to — one order per seller. */
+  const sellers = [...new Set(orderable.map((g) => g.seller))];
   const method: 'card' | 'transfer' = payWith ?? (cardCount > 0 ? 'card' : 'transfer');
   const currency = orderable[0]?.currency ?? groups[0]?.currency ?? 'EUR';
 
@@ -302,6 +304,19 @@ export default function BasketPage({ customer }: { customer: { name: string; ema
               ? 'Each seller has their own secure card page. Pay one, and you come straight back here for the next — the money goes directly to each seller.'
               : 'Your items are held for you. Next you see each seller’s payment details — bank transfer or PayPal — with a QR code for your banking app. Nothing is charged here.'}
           </p>
+          {orderable.length > 0 && (
+            /* Who receives the name and email, beside the button that sends
+               them — information, not a tick-box (see the single checkout). */
+            <p className="muted small" style={{ margin: 0 }}>
+              Your details go to <strong translate="no">{sellers.join(', ')}</strong>, who{' '}
+              {sellers.length === 1 ? 'sells these items and needs' : 'sell these items and need'} them to issue
+              and check your order. MartNepali provides the booking software. Details:{' '}
+              <a href="/privacy" target="_blank" rel="noopener">
+                Privacy
+              </a>
+              .
+            </p>
+          )}
           {!customer && (
             <p className="muted small" style={{ margin: 0 }}>
               <Link href="/account">Sign in</Link> to keep your basket and orders on every device.

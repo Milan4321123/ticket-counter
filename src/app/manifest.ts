@@ -3,8 +3,8 @@ import { platformNameFromEnv } from '@/lib/platform';
 
 /**
  * Installable app (PWA). "Add to home screen" gives buyers the bazaar and
- * their tickets one tap away — tickets and order pages keep working offline at
- * the door (public/sw.js) — and gives sellers the hub as an app on the phone
+ * their tickets one tap away — ticket pages opened in the last 60 days keep
+ * working offline at the door (public/sw.js) — and gives sellers the hub as an app on the phone
  * they run the counter with.
  */
 export default function manifest(): MetadataRoute.Manifest {

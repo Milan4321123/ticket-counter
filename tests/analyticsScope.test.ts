@@ -29,6 +29,10 @@ test('every page whose URL is itself a credential is excluded', () => {
     '/c/9f2b8c1d4e6a7b3c5d8e9f0a1b2c3d4e',
     '/scan',
     '/scan/session',
+    // A subscriber's box: the token IS the login-free credential.
+    '/subscription/3f9a2c1b7d8e4f6a0b1c2d3e4f5a6b7c',
+    // A signed-in buyer's own orders and details.
+    '/account',
   ];
   for (const pathname of secrets) {
     assert.equal(isPrivatePath(pathname), true, `${pathname} carries a credential and must never be tagged`);

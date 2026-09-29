@@ -107,6 +107,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const body = raw as {
         askerName?: unknown;
         askerEmail?: unknown;
+        /** Sent by older copies of the form. Accepted and ignored — see below. */
         privacyAck?: unknown;
         website?: unknown;
       };
@@ -142,14 +143,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       // An address is OPTIONAL — asking anonymously stays a real choice, and
       // the question is answered on the page either way. But the moment one is
       // given this stops being an anonymous question and becomes personal data,
-      // so it must be valid and it must be consented to. The tick is checked
-      // here and not only in the browser: a form is not a security boundary.
+      // so it must be valid. It is NOT gated on an "I agree" tick any more:
+      // emailing the answer is what the asker is requesting (Art. 6(1)(b)
+      // GDPR), and the form says what happens to the address instead. A
+      // privacyAck still sent by an older copy of the form is simply ignored.
       if (askerEmail) {
         if (!EMAIL_RE.test(askerEmail)) {
           return apiError(400, 'That email address does not look right — please check it.');
-        }
-        if (body.privacyAck !== true) {
-          return apiError(400, 'Please tick the box to confirm we may use your email to send you the answer.');
         }
         // Nobody else's inbox becomes a target through this form.
         if (!rateLimit(`ask:escalate:email:${askerEmail}`, ESCALATE_EMAIL_LIMIT, ESCALATE_WINDOW_MS)) {

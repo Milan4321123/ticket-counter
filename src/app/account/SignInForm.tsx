@@ -97,7 +97,7 @@ export default function SignInForm({ google, back = '/' }: { google: boolean; ba
       ) : (
         <form onSubmit={verify} className="acc-form">
           <label htmlFor="acc-code">
-            The 6-digit code we sent to <strong>{email}</strong>
+            The 6-digit code we sent to <strong translate="no">{email}</strong>
           </label>
           <input
             id="acc-code"
@@ -133,6 +133,17 @@ export default function SignInForm({ google, back = '/' }: { google: boolean; ba
           {error}
         </p>
       )}
+      {/* What signing in does with the address — information, not a tick:
+          an account is what the person is asking for (Art. 6(1)(b) GDPR). */}
+      <p className="muted small" style={{ margin: '12px 0 0' }}>
+        Your email is used to sign you in and to show your orders and basket on every device; a cookie keeps you
+        signed in for up to 60 days, or until you sign out.{google ? ' With Google, Google tells us your name and email address.' : ''}{' '}
+        Details:{' '}
+        <a href="/privacy" target="_blank" rel="noopener">
+          Privacy
+        </a>
+        .
+      </p>
     </div>
   );
 }

@@ -6,9 +6,11 @@
 // what the admin (every item) and the seller (their own items) are shown.
 //
 // Nothing personal is kept: the device is a random token the visitor's own
-// browser made up (components/WishButton), stored here only as a hash. No
-// name, no email, no IP.
+// browser made up (components/WishButton), stored here only as a keyed hash
+// that is DIFFERENT FOR EVERY ITEM (deviceKey below). No name, no email, no IP
+// — and no way to tell from the table that two wishes came from one browser.
 import crypto from 'node:crypto';
+import { getSigningSecret } from './auth';
 import { getDb } from './db';
 import { readListingName } from './exampleShop';
 import type { EventRow, EventTierRow } from './events';
@@ -28,14 +30,94 @@ function db() {
       CREATE INDEX IF NOT EXISTS item_wishes_event ON item_wishes (event_id);
     `);
     ready = true;
+    unlinkLegacyDevices(d);
   }
   return d;
 }
 
-/** A browser's own random token, as stored: never the token itself. */
-export function deviceKey(token: string): string | null {
+// ---------------------------------------------------------------------------
+// The device column
+//
+// It used to hold sha256('wish:' + token) — the SAME value on every item one
+// browser wished for, so the table quietly recorded "this device wanted these
+// twelve things", a browsing profile keyed by a stable pseudonym. Now it is
+//
+//     HMAC(key, eventId | tierKey | sha256('wish:' + token))
+//
+// keyed from APP_SECRET (which lives in the environment, not in this
+// database): one browser's wishes on two items share nothing, and without the
+// key the rows cannot even be tested against a known token.
+//
+// Why the old hash is the HMAC's input rather than the raw token: it makes the
+// migration exact. An old row holds precisely that inner hash, so it can be
+// rewritten to its new value in place, without the token — and "has this
+// device already wished this item" keeps answering correctly for everybody
+// who wished before the change. No reset. Old rows are 32 hex characters and
+// new ones 64, which is how the migration tells them apart and why it is safe
+// to run on every start.
+//
+// Rotating APP_SECRET changes every key and so resets the dedup (a returning
+// device could wish once more per item); the counts themselves are unaffected.
+// ---------------------------------------------------------------------------
+
+const LEGACY_LEN = 32;
+
+/** The inner, unkeyed digest — exactly what the column held before. */
+function legacyDigest(token: string): string {
+  return crypto.createHash('sha256').update(`wish:${token}`).digest('hex').slice(0, LEGACY_LEN);
+}
+
+let cachedKey: Buffer | null = null;
+function wishKey(): Buffer {
+  if (cachedKey) return cachedKey;
+  let secret = getSigningSecret();
+  if (!secret) {
+    // Development without APP_SECRET (production refuses to run without one).
+    // A random key kept in kv, so dedup survives a restart. Weaker — it sits in
+    // the same database — but a local database is not what this protects.
+    const d = getDb();
+    d.prepare(`INSERT INTO kv (key, value) VALUES ('dev_wish_key', ?) ON CONFLICT(key) DO NOTHING`).run(
+      crypto.randomBytes(32).toString('hex')
+    );
+    secret = (d.prepare(`SELECT value FROM kv WHERE key = 'dev_wish_key'`).get() as { value: string }).value;
+  }
+  cachedKey = Buffer.from(crypto.hkdfSync('sha256', secret, 'martnepali:wishes', 'item-device', 32));
+  return cachedKey;
+}
+
+function itemDevice(eventId: string, tierKey: string, inner: string): string {
+  return crypto.createHmac('sha256', wishKey()).update(`${eventId}\n${tierKey}\n${inner}`).digest('hex');
+}
+
+/**
+ * This browser's pseudonym FOR THIS ITEM, as stored: never the token itself,
+ * and never the same value on two items. Null for a token that is not one of
+ * ours.
+ */
+export function deviceKey(token: string, eventId: string, tierKey: string): string | null {
   if (!/^[a-z0-9]{16,64}$/i.test(token)) return null;
-  return crypto.createHash('sha256').update(`wish:${token}`).digest('hex').slice(0, 32);
+  return itemDevice(eventId, tierKey, legacyDigest(token));
+}
+
+/** Rewrite rows still holding the old cross-item hash. Idempotent. */
+function unlinkLegacyDevices(d: ReturnType<typeof getDb>): void {
+  const old = d
+    .prepare(`SELECT event_id AS eventId, tier_key AS tierKey, device FROM item_wishes WHERE length(device) = ?`)
+    .all(LEGACY_LEN) as { eventId: string; tierKey: string; device: string }[];
+  if (!old.length) return;
+  // OR IGNORE: should a new-format row for the same device and item already
+  // exist, the old one is a duplicate of it and is simply dropped below.
+  const move = d.prepare(
+    `UPDATE OR IGNORE item_wishes SET device = ? WHERE event_id = ? AND tier_key = ? AND device = ?`
+  );
+  const drop = d.prepare(`DELETE FROM item_wishes WHERE event_id = ? AND tier_key = ? AND device = ?`);
+  d.transaction(() => {
+    for (const r of old) {
+      if (move.run(itemDevice(r.eventId, r.tierKey, r.device), r.eventId, r.tierKey, r.device).changes === 0) {
+        drop.run(r.eventId, r.tierKey, r.device);
+      }
+    }
+  })();
 }
 
 /** Why an item is wished for rather than bought — for the labels on the lists. */
