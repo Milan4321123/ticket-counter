@@ -132,10 +132,7 @@ export default function TermsPage() {
             </p>
             <p>
               (2) Die Nutzung ist <strong>unentgeltlich</strong>. Der Betreiber erhebt keine Gebühren und
-              keine Provisionen und erhält keine Zahlungen von Käuferinnen und Käufern. Kostenpflichtige
-              Leistungen könnten künftig nur nach vorheriger Ankündigung und aufgrund einer gesonderten
-              Vereinbarung eingeführt werden; eine Zahlungspflicht entsteht nie ohne Ihre ausdrückliche
-              Zustimmung.
+              keine Provisionen und erhält keine Zahlungen von Käuferinnen und Käufern.
             </p>
             <p style={{ marginBottom: 0 }}>
               (3) Ein Anspruch auf bestimmte Funktionen besteht nicht. Der Betreiber kann Funktionen ändern,

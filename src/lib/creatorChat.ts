@@ -1,7 +1,7 @@
 // Server-only: "Talk to the creator" (/contact) — a chat instead of a form.
 // The assistant asks one short question at a time and fills a structured
 // request as it goes: what they want, their event or business, when and
-// where, how big, budget or timing, looks they like, then name and email.
+// where, how big, timing, looks they like, then name and email.
 // When it has enough, the visitor sends it — the same contact request (and
 // the same emails) the form makes, with the conversation attached.
 //
@@ -100,7 +100,7 @@ const Q: Record<AskLang, Record<'summary' | 'event' | 'when' | 'name' | 'email' 
     event: 'Lovely. Which event or business is it for?',
     when: 'When and where is it, and roughly how many people?',
     name: 'Great — who should Milan reply to? Your name, please.',
-    email: 'And your email address, so he can send you ideas and a price?',
+    email: 'And your email address, so he can send you some ideas?',
     ready: 'That is everything — check the request on the right and send it. Milan replies by email.',
   },
   de: {
@@ -108,7 +108,7 @@ const Q: Record<AskLang, Record<'summary' | 'event' | 'when' | 'name' | 'email' 
     event: 'Schön. Für welches Event oder welches Geschäft?',
     when: 'Wann und wo ist es, und ungefähr wie viele Leute?',
     name: 'Super — wem soll Milan antworten? Dein Name bitte.',
-    email: 'Und deine E-Mail-Adresse, damit er dir Ideen und einen Preis schicken kann?',
+    email: 'Und deine E-Mail-Adresse, damit er dir Ideen schicken kann?',
     ready: 'Das ist alles — prüfe die Anfrage und schick sie ab. Milan antwortet per E-Mail.',
   },
   ne: {
@@ -116,7 +116,7 @@ const Q: Record<AskLang, Record<'summary' | 'event' | 'when' | 'name' | 'email' 
     event: 'राम्रो। कुन कार्यक्रम वा व्यवसायका लागि?',
     when: 'कहिले र कहाँ, अनि लगभग कति जना?',
     name: 'ठिक छ — मिलनले कसलाई जवाफ दिने? तपाईंको नाम।',
-    email: 'अनि इमेल ठेगाना, ताकि उहाँले विचार र मूल्य पठाउन सकून्?',
+    email: 'अनि इमेल ठेगाना, ताकि उहाँले विचार पठाउन सकून्?',
     ready: 'सबै भयो — अनुरोध हेरेर पठाउनुहोस्। मिलनले इमेलमा जवाफ दिनुहुन्छ।',
   },
   rn: {
@@ -124,7 +124,7 @@ const Q: Record<AskLang, Record<'summary' | 'event' | 'when' | 'name' | 'email' 
     event: 'Ramro. Kun event wa business ko lagi?',
     when: 'Kahile ra kaha, ani lagbhag kati jana?',
     name: 'Thik cha — Milan le kaslai reply garne? Tapaiko naam.',
-    email: 'Ani email address, taki uhale idea ra price pathaun sakun?',
+    email: 'Ani email address, taki uhale idea pathaun sakun?',
     ready: 'Sabai bhayo — request herera pathaunus. Milan le email ma reply garnuhuncha.',
   },
 };
@@ -215,10 +215,11 @@ export async function aiTurn(messages: ChatTurn[], fields: CreatorFields, owner:
       'at a time, and never ask for something they already told you. Chat like a person: answer greetings and small talk ' +
       '("k cha, sanchai xa?" → "Sanchai chu, hajur? …"), and answer general questions briefly — selling on MartNepali is free ' +
       'and anyone can make their own page at /organizers; custom design, festival sites and apps are what ' +
-      `${owner} quotes personally — then steer back with ONE question. ` +
+      `${owner} talks through personally. Never mention prices, quotes, fees or budgets — the platform is free and ` +
+      `${owner} does not sell services — then steer back with ONE question. ` +
       'Collect, in a natural order: what they want (summary), ' +
       'their event or business (eventName), when (eventWhen) and where (eventWhere), how many people (expectedPeople), ' +
-      'budget or deadline if they have one (budget), pages or looks they like (looks), then their name and email. ' +
+      'a deadline if they have one (budget), pages or looks they like (looks), then their name and email. ' +
       'Organization and phone only if offered. If they are a TICKET BUYER asking about an order, tell them kindly that ' +
       'their tickets are in their email and at /account, and that questions about an event go to its organizer on the ' +
       'event page — kind "general". A seller account request is kind "organizer-account"; design/site/app work is ' +
@@ -264,7 +265,7 @@ export function requestMessage(fields: CreatorFields): string {
     fields.eventWhen && `When: ${fields.eventWhen}`,
     fields.eventWhere && `Where: ${fields.eventWhere}`,
     fields.expectedPeople && `People: ${fields.expectedPeople}`,
-    fields.budget && `Budget / timing: ${fields.budget}`,
+    fields.budget && `Timing / deadline: ${fields.budget}`,
     fields.looks && `Looks they like: ${fields.looks}`,
     fields.phone && `Phone: ${fields.phone}`,
     fields.organization && `Organization: ${fields.organization}`,

@@ -258,7 +258,7 @@ export default function ContactForm({ contactEmail, intent = 'custom-design' }: 
         <p className="muted small" style={{ margin: '6px 0 0' }}>
           {wantsAccount
             ? 'A person reads it — if it looks right, we email you your sign-in.'
-            : 'Dates, budget, and a link to anything you like the look of all help — but a couple of sentences is a perfectly good start.'}
+            : 'Dates and a link to anything you like the look of both help — but a couple of sentences is a perfectly good start.'}
         </p>
       </div>
 

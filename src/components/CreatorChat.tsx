@@ -59,7 +59,7 @@ const ROWS: { key: keyof Fields; label: string; icon: string }[] = [
   { key: 'eventWhen', label: 'When', icon: '📅' },
   { key: 'eventWhere', label: 'Where', icon: '📍' },
   { key: 'expectedPeople', label: 'How many people', icon: '👥' },
-  { key: 'budget', label: 'Budget / timing', icon: '💶' },
+  { key: 'budget', label: 'Timing / deadline', icon: '🗓' },
   { key: 'looks', label: 'Looks you like', icon: '🎨' },
   { key: 'name', label: 'Your name', icon: '🙂' },
   { key: 'email', label: 'Email', icon: '✉️' },

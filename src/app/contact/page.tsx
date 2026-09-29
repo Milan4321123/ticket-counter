@@ -168,8 +168,7 @@ export default async function ContactPage({
               <p className="feed-hero-sub anim-fade-up anim-d2" style={{ marginTop: 18 }}>
                 <strong>Tried it and want more?</strong> That is what this page is for. Custom pages
                 are built for one event rather than picked from a set of themes, so the place to
-                start is a conversation — send the form below and Milan comes back to you with ideas
-                and a price.
+                start is a conversation — send the form below and Milan comes back to you with ideas.
               </p>
             </>
           )}
