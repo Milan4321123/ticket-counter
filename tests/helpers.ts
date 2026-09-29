@@ -34,7 +34,14 @@ import {
 } from '../src/lib/events.ts';
 import { claimInventory } from '../src/lib/inventory.ts';
 import { createOrder, finalizePaidOrder, getOrder, type OrderRow, type PaymentMethod, type TicketRow } from '../src/lib/orders.ts';
-import { createOrganizer, type OrganizerRow } from '../src/lib/organizers.ts';
+import {
+  acceptLegalTerms,
+  createOrganizer,
+  getOrganizer,
+  setOrganizerLegalDetails,
+  type OrganizerLegalDetails,
+  type OrganizerRow,
+} from '../src/lib/organizers.ts';
 import { createPromoCode, type PromoInput, type PromoRow } from '../src/lib/promos.ts';
 import type { EventKind } from '../src/lib/types.ts';
 
@@ -77,7 +84,19 @@ function uniq(prefix: string): string {
 }
 
 export function makeOrganizer(
-  overrides: { email?: string; name?: string; planPaidUntil?: string | null; notes?: string } = {}
+  overrides: {
+    email?: string;
+    name?: string;
+    planPaidUntil?: string | null;
+    notes?: string;
+    /**
+     * Also fill in the legal details and accept the current terms + AVV — what
+     * a real account must have done before the publish route lets a listing go
+     * live (lib/organizers legalStepsMissing). Off by default, so a fixture
+     * organizer is born exactly like a new account.
+     */
+    legal?: boolean | Partial<OrganizerLegalDetails>;
+  } = {}
 ): OrganizerRow {
   // The real constructor: it is what mints the id, hashes the initial
   // password and sets must_change_password.
@@ -87,7 +106,28 @@ export function makeOrganizer(
     planPaidUntil: overrides.planPaidUntil,
     notes: overrides.notes,
   });
+  if (overrides.legal) {
+    return completeLegal(organizer.id, overrides.legal === true ? {} : overrides.legal);
+  }
   return organizer;
+}
+
+/**
+ * Put an organizer through both legal steps with the real lib functions: the
+ * seller's legal identity, then acceptance of the current terms + AVV. Returns
+ * the re-read row, so the caller sees what the gate will see.
+ */
+export function completeLegal(organizerId: string, details: Partial<OrganizerLegalDetails> = {}): OrganizerRow {
+  setOrganizerLegalDetails(organizerId, {
+    legalName: details.legalName ?? 'Testverein Darmstadt e.V.',
+    legalAddress: details.legalAddress ?? 'Teststraße 1\n64283 Darmstadt',
+    legalRepresentative: details.legalRepresentative ?? 'Test Vorstand',
+    legalRegister: details.legalRegister ?? 'Amtsgericht Darmstadt, VR 0000',
+    legalContactEmail: details.legalContactEmail ?? '',
+  });
+  const accepted = acceptLegalTerms(organizerId);
+  if (!accepted.ok) throw new Error(`completeLegal: ${accepted.error}`);
+  return getOrganizer(organizerId)!;
 }
 
 // ---------------- Events and tiers ----------------

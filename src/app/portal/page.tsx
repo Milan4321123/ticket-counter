@@ -26,6 +26,7 @@ import InstallAppButton from '@/components/AppInstall';
 import { IconCheck, IconEdit, IconGear, IconInbox, IconMessage, IconReceipt, IconScan, IconShield, IconStar, IconTag, IconTicket } from './HubIcons';
 import PlanExpired from './PlanExpired';
 import PortalNav from './PortalNav';
+import LegalBanner from './LegalBanner';
 import { requirePortalOrganizer } from './guard';
 import { platformNameFromEnv } from '@/lib/platform';
 
@@ -138,7 +139,7 @@ export default async function PortalDashboardPage({
       <div className="container hub-home">
         <header className="hub-hello hub-hello-slim anim-fade-up">
           <h1>
-            {tr('hub.namaste')}, {firstName} 🙏
+            {tr('hub.namaste')}, <span translate="no">{firstName}</span> 🙏
           </h1>
           <div className="hub-hello-actions">
             {/* The real prompt where the browser has one, the exact taps everywhere else. */}
@@ -146,6 +147,9 @@ export default async function PortalDashboardPage({
             <LogoutButton quiet />
           </div>
         </header>
+
+        {/* Legal details + terms/AVV still to do: publishing waits on it. */}
+        <LegalBanner variant="card" />
 
         {/* A demo account opens on its three businesses: pick one, land on its
             tool board, and every page's "All tools" brings you back. */}
@@ -305,7 +309,7 @@ export default async function PortalDashboardPage({
 
         <p className="hub-note">
           Your account is free, and so is publishing — no fees, and never a cut of your sales. Signed in as{' '}
-          {organizer.email}.
+          <span translate="no">{organizer.email}</span>.
         </p>
       </div>
 

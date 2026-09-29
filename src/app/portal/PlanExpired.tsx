@@ -32,7 +32,7 @@ export default function PlanExpired({ organizer }: { organizer: OrganizerRow }) 
           </p>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <LogoutButton />
-            <span className="muted small">Signed in as {organizer.email}</span>
+            <span className="muted small">Signed in as <span translate="no">{organizer.email}</span></span>
           </div>
         </div>
       </div>

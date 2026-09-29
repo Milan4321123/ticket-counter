@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import PrintButton from '@/components/PrintButton';
 import { getEventById, getEventTier } from '@/lib/events';
 import { getOrganizer } from '@/lib/organizers';
+import { getSellerIdentity, sellerAddressOneLine } from '@/lib/sellerIdentity';
 import { getOrder, getTicketByCode } from '@/lib/orders';
 import { ticketQrDataUrl } from '@/lib/tickets';
 import { vocabFor } from '@/lib/vocab';
@@ -32,8 +33,12 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
   const order = getOrder(ticket.orderId);
   const event = order ? getEventById(order.eventId) : null;
   const organizer = event ? getOrganizer(event.organizerId) : null;
+  // Their legal name and address once they filled them in (the seller of
+  // record, printed on what the buyer carries to the door), else the account name.
+  const seller = event ? getSellerIdentity(event.organizerId) : null;
   const issuerName =
-    organizer?.name?.trim() || (event?.kind === 'shop' ? 'the seller' : 'the organizer');
+    seller?.displayName || organizer?.name?.trim() || (event?.kind === 'shop' ? 'the seller' : 'the organizer');
+  const issuerAddress = seller ? sellerAddressOneLine(seller) : '';
   const eventVenue = event ? [event.venueName, event.city].filter(Boolean).join(', ') : '';
   const tierName =
     (order ? getEventTier(order.eventId, ticket.tierId)?.name : undefined) ?? ticket.tierId;
@@ -64,7 +69,12 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
               <div style={{ color: '#555', fontSize: '0.85rem' }}>{eventVenue}</div>
             ) : null}
             <div style={{ color: '#555', fontSize: '0.85rem', marginBottom: 14 }}>
-              {isShop ? 'Sold by' : 'Issued by'} {issuerName}
+              {isShop ? 'Sold by' : 'Issued by'} <span translate="no">{issuerName}</span>
+              {issuerAddress ? (
+                <div translate="no" style={{ fontSize: '0.75rem' }}>
+                  {issuerAddress}
+                </div>
+              ) : null}
             </div>
           </>
         ) : null}
@@ -81,7 +91,7 @@ export default async function TicketPage({ params }: { params: Promise<{ code: s
           <div style={{ fontWeight: 800, fontSize: '1.05rem', marginTop: 4 }}>{seatLabel(seat)}</div>
         ) : null}
         <div style={{ color: '#555', fontSize: '0.85rem', marginTop: 8 }}>
-          {isShop ? 'Ordered by' : 'Ticket holder'}: {ticket.buyerName}
+          {isShop ? 'Ordered by' : 'Ticket holder'}: <span translate="no">{ticket.buyerName}</span>
         </div>
         <div style={{ marginTop: 12 }}>
           {ticket.checkedInAt ? (

@@ -71,6 +71,8 @@ import {
 } from '@/lib/ticketState';
 import { platformName } from '@/lib/platform';
 import { currentOrganizer, getOrganizer } from '@/lib/organizers';
+import { getSellerIdentitiesBulk, getSellerIdentity } from '@/lib/sellerIdentity';
+import SellerBlock from '@/components/legal/SellerBlock';
 import { listingOpenTo } from '@/lib/demo';
 import { cleanTableLabel, parseSlotConfig } from '@/lib/kitchen';
 import {
@@ -519,6 +521,8 @@ export default async function EventPage({ params, searchParams }: Params) {
   // The stall cards below are feed tiles by another name, so they get the feed's
   // one-shot read rather than five statements each. See lib/feedSnapshot.
   const stallSnapshot = loadFeedSnapshot(stalls.map((st) => st.shop));
+  // Each stall card names its seller: one read for all of them, not one per card.
+  const stallSellers = getSellerIdentitiesBulk(stalls.map((st) => st.shop.organizerId));
   // Same day arithmetic as stalls.ts itself: dates compare as ISO strings.
   const today = new Date().toISOString().slice(0, 10);
   const hostStalls = !isShop
@@ -570,7 +574,10 @@ export default async function EventPage({ params, searchParams }: Params) {
   // is. The organizer's real name is used, not the platform's: they are who is
   // putting the event on, and Google attributes the event to them.
   const organizer = getOrganizer(event.organizerId);
-  const organizerDisplayName = organizer?.name?.trim() || 'the organizer';
+  // The seller of record: their legal name once they have filled it in
+  // (portal Settings → Legal details), their account name until then.
+  const seller = getSellerIdentity(event.organizerId);
+  const organizerDisplayName = seller?.displayName || organizer?.name?.trim() || 'the organizer';
 
   // ---------------- The seller's referral offer ----------------
   //
@@ -605,7 +612,7 @@ export default async function EventPage({ params, searchParams }: Params) {
     ),
     totalRemaining: availability.totalRemaining,
     images: ogImage ? [absoluteUrl(ogImage)] : [],
-    organizerName: organizer?.name?.trim() || SITE_NAME,
+    organizerName: seller?.displayName || organizer?.name?.trim() || SITE_NAME,
   });
 
   // ---------------- The logistics facts ----------------
@@ -1252,7 +1259,8 @@ export default async function EventPage({ params, searchParams }: Params) {
                   "the organizer" when the account row has no name — generic,
                   but still an honest answer to "whose event is this?". */}
               <p className="muted small">
-                {isShop ? 'Sold by' : 'Presented by'} <strong>{organizerDisplayName}</strong>.{' '}
+                {isShop ? 'Sold by' : 'Presented by'} <strong translate="no">{organizerDisplayName}</strong>
+                {/\.$/.test(organizerDisplayName) ? '' : '.'}{' '}
                 {isShop
                   ? 'Your order is placed with them, and your payment goes straight to their own account — it never passes through us.'
                   : 'Tickets for this event are sold by them, and your payment goes straight to their own account — it never passes through us.'}
@@ -1276,6 +1284,14 @@ export default async function EventPage({ params, searchParams }: Params) {
                   <WaitlistForm eventId={event.id} kind={event.kind} checkoutHref={checkoutHref} />
                 </div>
               )}
+              {/* Their Impressum, in short: address, who represents them, the
+                  register entry — only what they filled in. Nothing renders
+                  until they do; the seller line above already names them. */}
+              <SellerBlock
+                seller={seller}
+                kind={isShop ? 'shop' : 'event'}
+                style={{ maxWidth: 560, marginTop: 16 }}
+              />
             </div>
 
             {asideBesideGoods && (
@@ -1350,7 +1366,7 @@ export default async function EventPage({ params, searchParams }: Params) {
                 // The one label ticketState words generically: a paused SHOP
                 // reads "Orders closed" to a buyer, not "Sales closed".
                 const chip = shopState.kind === 'closed' ? 'Orders closed' : shopState.badge;
-                const sellerName = getOrganizer(shop.organizerId)?.name?.trim() || 'the organizer';
+                const sellerName = stallSellers.get(shop.organizerId)?.displayName || 'the organizer';
                 const stillUrl = listingStillUrl(shop, stallSnapshot.photos.get(shop.id) ?? []);
                 const accent = parsePageDesign(shop.pageDesign).accent ?? 'violet';
                 return (
@@ -1387,7 +1403,7 @@ export default async function EventPage({ params, searchParams }: Params) {
                       {/* The disclosed-agent line, non-negotiable: every buyer
                           surface that shows a stall names its seller. */}
                       <div className="event-card-meta">
-                        Sold by <strong>{sellerName}</strong>
+                        Sold by <strong translate="no">{sellerName}</strong>
                       </div>
                       {link.stallPickupInfo ? (
                         <div className="event-card-meta">{link.stallPickupInfo}</div>

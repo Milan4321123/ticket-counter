@@ -281,7 +281,36 @@ function createDb(): Database.Database {
   migrateSeats(db);
   migrateSubscriptions(db);
   migrateCustomers(db);
+  migratePrivacy(db);
   return db;
+}
+
+/**
+ * DSGVO groundwork (Sep 2026).
+ *
+ * organizers.legal_*: who the seller legally IS — a Verein's registered name,
+ * its address, who represents it. Buyers are owed that before they hand over
+ * their details (Art. 13 GDPR names the controller; the seller of a ticket is
+ * that controller), and a Verein's page needs it as its own Impressum. Empty
+ * until the organizer fills it in; lib/organizers owns reading and writing it.
+ *
+ * organizers.legal_accepted_*: which version of the platform terms and the
+ * Auftragsverarbeitungsvertrag (Art. 28 GDPR) the organizer accepted, and
+ * when. Art. 28(9) allows the processing contract in electronic form, so a
+ * recorded acceptance of a published text is the contract.
+ */
+function migratePrivacy(db: Database.Database): void {
+  const orgCols = (db.pragma(`table_info(organizers)`) as { name: string }[]).map((c) => c.name);
+  const add = (col: string, ddl: string) => {
+    if (!orgCols.includes(col)) db.exec(`ALTER TABLE organizers ADD COLUMN ${col} ${ddl}`);
+  };
+  add('legal_name', `TEXT NOT NULL DEFAULT ''`);
+  add('legal_address', `TEXT NOT NULL DEFAULT ''`);
+  add('legal_representative', `TEXT NOT NULL DEFAULT ''`);
+  add('legal_register', `TEXT NOT NULL DEFAULT ''`);
+  add('legal_contact_email', `TEXT NOT NULL DEFAULT ''`);
+  add('legal_accepted_version', `TEXT`);
+  add('legal_accepted_at', `TEXT`);
 }
 
 /**

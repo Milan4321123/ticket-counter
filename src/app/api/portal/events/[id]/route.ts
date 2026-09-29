@@ -23,6 +23,7 @@ import { isShopCategory } from '@/lib/categories';
 import { getConnection } from '@/lib/paymentConnections';
 import { readJsonLimited, BodyTooLargeError } from '@/lib/http';
 import { organizerTotpEnabled } from '@/lib/organizerTotp';
+import { legalPublishBlocker } from '@/lib/organizers';
 import {
   PAYOUT_DELAY_MS,
   effectivePayout,
@@ -812,6 +813,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         if (requireAuthenticatorToPublish() && !organizerTotpEnabled(organizer.id)) {
           missing.push(`set up your authenticator app in Settings — it is required before you can sell ${v.units}`);
         }
+        // Buyers must be told who they are buying from and who handles their
+        // data, and the organizer must have concluded the AVV (Art. 28 GDPR)
+        // in the CURRENT version before this platform processes a single
+        // buyer's details for them. Only this draft -> published step is
+        // gated: a listing that is already live keeps selling, even after a
+        // terms update, and nothing here ever takes one offline.
+        const legal = legalPublishBlocker(organizer);
+        if (legal) missing.push(legal);
         need(missing.length === 0, `Almost there — before publishing, please ${missing.join(', ')}.`);
       }
       if (status !== event.status) {

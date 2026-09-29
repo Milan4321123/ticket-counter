@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import DemoBanner from './DemoBanner';
+import LegalBanner from './LegalBanner';
 import type { EventKind } from '@/lib/types';
 
 interface PortalNavEvent {
@@ -13,7 +14,7 @@ interface PortalNavEvent {
 
 interface Props {
   /** Which top-level portal link is the current page. */
-  active?: 'events' | 'reviews' | 'settings';
+  active?: 'events' | 'reviews' | 'settings' | 'legal';
   /** When set, a second row shows the event name and its section tabs. */
   event?: PortalNavEvent;
   /** Which event tab is the current page. */
@@ -32,6 +33,10 @@ export default function PortalNav({ active, event, tab }: Props) {
       {/* Server component inside a server component: renders nothing unless the
           signed-in account is a try-it-yourself demo. */}
       <DemoBanner />
+      {/* Until the legal details and the terms + AVV are done (lib/organizers
+          legalStepsMissing). Not on the dashboard, which shows the fuller card
+          itself, nor on the Legal page, which IS the fix. */}
+      {!(active === 'events' && !event) && active !== 'legal' && <LegalBanner />}
       {/* One slim line up to the level above: a tool → its listing's tool
           board, the tool board or an account page → Home. The home screen
           itself is the top and has none. */}

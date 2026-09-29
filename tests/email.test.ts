@@ -213,6 +213,46 @@ test('the payment instructions name the seller whose account the money goes to',
   }
 });
 
+test('every buyer mail closes by naming the seller of record — with their address once given', async () => {
+  // The disclosed-agent rule in one line per mail: WHO the contract is with,
+  // where they are, and that the platform is only the software. Until the
+  // organizer fills in their legal details the line still names them.
+  const bare = makeOrganizer({ name: 'Sunita Rai' });
+  const bareShop = makeEvent({
+    organizerId: bare.id,
+    kind: 'shop',
+    name: 'Bare Kitchen',
+    tiers: [{ tierKey: 'momo', name: 'Momo', priceCents: 950 }],
+  });
+  const { order: bareOrder } = makePaidOrder({ eventId: bareShop.id, items: [{ tierId: 'momo', quantity: 1 }] });
+  const bareBody = await bodyOf(() => sendTicketEmail(bareOrder.id));
+  assert.match(bareBody, /Seller\/Veranstalter: (<span translate="no">)?Sunita Rai/);
+  assert.match(bareBody, /provides the booking software only/);
+
+  const verein = makeOrganizer({
+    name: 'Ram',
+    legal: {
+      legalName: 'Nepali Samaj Darmstadt e.V.',
+      legalAddress: 'Musterstraße 1\n64283 Darmstadt',
+      legalRepresentative: 'Ram Sharma',
+    },
+  });
+  const event = makeEvent({
+    organizerId: verein.id,
+    name: 'Dashain Night',
+    tiers: [{ tierKey: 'std', name: 'Standard', priceCents: 1500 }],
+  });
+  const { order } = makePaidOrder({ eventId: event.id, items: [{ tierId: 'std', quantity: 1 }] });
+  const body = await bodyOf(() => sendTicketEmail(order.id));
+  assert.match(body, /Nepali Samaj Darmstadt e\.V\., Musterstraße 1, 64283 Darmstadt/, 'name and address, together');
+  assert.match(body, /vertreten durch (<span translate="no">)?Ram Sharma/);
+  assert.match(body, /provides the booking software only/);
+
+  const reserved = makeOrder({ eventId: event.id, items: [{ tierId: 'std', quantity: 1 }], paymentMode: 'transfer' });
+  const instructions = await bodyOf(() => sendTransferInstructionsEmail(reserved.id));
+  assert.match(instructions, /Seller\/Veranstalter: (<span translate="no">)?Nepali Samaj Darmstadt e\.V\./);
+});
+
 // ---------------------------------------------------------------------------
 // THE ORGANIZER'S MAIL
 // ---------------------------------------------------------------------------

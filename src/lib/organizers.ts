@@ -7,6 +7,7 @@ import { getDb } from './db';
 import { getSigningSecret } from './auth';
 import { burnOrganizerLoginCodes } from './loginCode';
 import { burnOrganizerResetCodes } from './passwordReset';
+import { LEGAL_TERMS_VERSION } from './legal';
 
 export const ORGANIZER_COOKIE_NAME = 'organizer_session';
 export const ORGANIZER_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // a week
@@ -33,6 +34,20 @@ export interface OrganizerRow {
    * site, simulated payments, no emails, deleted after a day.
    */
   isDemo: boolean;
+  /**
+   * Who the seller legally IS (see OrganizerLegalDetails below) — shown to
+   * buyers as the Veranstalter / seller of record, and the controller named in
+   * the AVV. All '' until the organizer fills them in on /portal/settings.
+   */
+  legalName: string;
+  legalAddress: string;
+  legalRepresentative: string;
+  legalRegister: string;
+  legalContactEmail: string;
+  /** Which LEGAL_TERMS_VERSION of /terms + /avv they accepted; null = never. */
+  legalAcceptedVersion: string | null;
+  /** ISO timestamp of that acceptance. */
+  legalAcceptedAt: string | null;
 }
 
 const ORG_COLS = `
@@ -42,7 +57,14 @@ const ORG_COLS = `
   created_at AS createdAt,
   (password_hash != '') AS hasPassword,
   must_change_password AS mustChangePassword,
-  is_demo AS isDemo
+  is_demo AS isDemo,
+  legal_name AS legalName,
+  legal_address AS legalAddress,
+  legal_representative AS legalRepresentative,
+  legal_register AS legalRegister,
+  legal_contact_email AS legalContactEmail,
+  legal_accepted_version AS legalAcceptedVersion,
+  legal_accepted_at AS legalAcceptedAt
 `;
 
 function toRow(r: Record<string, unknown> | undefined): OrganizerRow | null {
@@ -217,6 +239,204 @@ export function checkOrganizerLogin(email: string, password: string): OrganizerR
  */
 export function organizerPlanActive(o: OrganizerRow): boolean {
   return o.status === 'active';
+}
+
+// ---------------- Legal identity + terms/AVV acceptance ----------------
+//
+// Two separate facts about an organizer, both needed before a listing can go
+// live (see legalStepsMissing):
+//
+//  1. WHO they legally are — a Verein's registered name, its postal address,
+//     who represents it. Buyers are owed that before they hand over money and
+//     personal data (they are buying FROM this party, and it is the controller
+//     of their data under Art. 13 GDPR), and it doubles as the organizer's
+//     Impressum on their pages. Naming the seller also keeps the platform a
+//     disclosed agent rather than the seller of record (§3 Abs. 11 UStG).
+//  2. That they accepted the platform terms and concluded the
+//     Auftragsverarbeitungsvertrag (Art. 28 GDPR) in the CURRENT version —
+//     LEGAL_TERMS_VERSION in lib/legal. Bumping that constant re-asks everyone.
+//
+// Already-published listings are never taken down by any of this: the gate
+// only stands in front of the draft → published step.
+
+/** Field limits — shared by the API validation and the form's maxLength. */
+export const LEGAL_LIMITS = {
+  name: 120,
+  address: 300,
+  representative: 160,
+  register: 80,
+  contactEmail: 254,
+} as const;
+
+/** The five editable fields, as the portal form and API speak them. */
+export interface OrganizerLegalDetails {
+  legalName: string;
+  legalAddress: string;
+  legalRepresentative: string;
+  legalRegister: string;
+  legalContactEmail: string;
+}
+
+const EMAIL_RE = /^[^\s@<>()[\]\\,;:"]+@[^\s@<>()[\]\\,;:"]+\.[^\s@<>()[\]\\,;:"]{2,}$/;
+// C0/C1 control characters, apart from the tab, CR and LF that pasting an
+// address can legitimately bring along (they are normalised away below).
+// eslint-disable-next-line no-control-regex
+const CONTROL_RE = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/;
+
+/** One line of text: inner whitespace (newlines included) collapsed to a space. */
+function oneLine(s: string): string {
+  return s.replace(/\s+/g, ' ').trim();
+}
+
+/** A postal address: one line per entry, blank lines and edge spaces dropped. */
+export function normalizeLegalAddress(s: string): string {
+  return s
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((l) => l.replace(/[ \t]+/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
+/**
+ * Validate the legal-details form. Every field may be empty here (a half-filled
+ * form still saves); completeness is legalDetailsComplete's question. Returns
+ * the cleaned values, or the first problem in words a person can act on.
+ */
+export function validateLegalDetails(
+  input: unknown
+): { ok: true; value: OrganizerLegalDetails } | { ok: false; error: string } {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return { ok: false, error: 'Nothing to save.' };
+  const body = input as Record<string, unknown>;
+  const text = (key: keyof OrganizerLegalDetails): string | null => {
+    const v = body[key];
+    if (v === undefined || v === null) return '';
+    return typeof v === 'string' ? v : null;
+  };
+  const raw = {
+    legalName: text('legalName'),
+    legalAddress: text('legalAddress'),
+    legalRepresentative: text('legalRepresentative'),
+    legalRegister: text('legalRegister'),
+    legalContactEmail: text('legalContactEmail'),
+  };
+  for (const v of Object.values(raw)) {
+    if (v === null) return { ok: false, error: 'Every field must be text.' };
+    if (CONTROL_RE.test(v)) return { ok: false, error: 'Please remove the special characters from your details.' };
+  }
+  const value: OrganizerLegalDetails = {
+    legalName: oneLine(raw.legalName!),
+    legalAddress: normalizeLegalAddress(raw.legalAddress!),
+    legalRepresentative: oneLine(raw.legalRepresentative!),
+    legalRegister: oneLine(raw.legalRegister!),
+    legalContactEmail: oneLine(raw.legalContactEmail!).toLowerCase(),
+  };
+  if (value.legalName.length > LEGAL_LIMITS.name) {
+    return { ok: false, error: `The legal name can be at most ${LEGAL_LIMITS.name} characters.` };
+  }
+  if (value.legalAddress.length > LEGAL_LIMITS.address) {
+    return { ok: false, error: `The address can be at most ${LEGAL_LIMITS.address} characters.` };
+  }
+  if (value.legalAddress.split('\n').length > 6) {
+    return { ok: false, error: 'The address can have at most 6 lines.' };
+  }
+  if (value.legalRepresentative.length > LEGAL_LIMITS.representative) {
+    return { ok: false, error: `“Represented by” can be at most ${LEGAL_LIMITS.representative} characters.` };
+  }
+  if (value.legalRegister.length > LEGAL_LIMITS.register) {
+    return { ok: false, error: `The register entry can be at most ${LEGAL_LIMITS.register} characters.` };
+  }
+  if (value.legalContactEmail) {
+    if (value.legalContactEmail.length > LEGAL_LIMITS.contactEmail || !EMAIL_RE.test(value.legalContactEmail)) {
+      return { ok: false, error: 'The contact email does not look like an email address.' };
+    }
+  }
+  return { ok: true, value };
+}
+
+/** Store the (already validated) legal details. Acceptance is left as it is. */
+export function setOrganizerLegalDetails(id: string, d: OrganizerLegalDetails): void {
+  getDb()
+    .prepare(
+      `UPDATE organizers SET legal_name = ?, legal_address = ?, legal_representative = ?,
+         legal_register = ?, legal_contact_email = ? WHERE id = ?`
+    )
+    .run(d.legalName, d.legalAddress, d.legalRepresentative, d.legalRegister, d.legalContactEmail, id);
+}
+
+/** Enough to name the seller and the AVV's controller: a legal name and an address. */
+export function legalDetailsComplete(o: Pick<OrganizerRow, 'legalName' | 'legalAddress'>): boolean {
+  return Boolean(o.legalName.trim() && o.legalAddress.trim());
+}
+
+/** Accepted the terms + AVV in the version published right now. */
+export function legalTermsCurrent(o: Pick<OrganizerRow, 'legalAcceptedVersion'>): boolean {
+  return o.legalAcceptedVersion === LEGAL_TERMS_VERSION;
+}
+
+/**
+ * Accounts the legal gate does not apply to: try-it-yourself demos (they never
+ * publish and never sell — lib/demo) and the site's own example shops from
+ * scripts/seed-bazaar.mjs (@seed.invalid addresses; checkout refuses orders on
+ * them). Neither has a real seller behind it to name, nor any buyer data to
+ * process, so there is no contract to conclude.
+ */
+export function organizerLegalExempt(o: Pick<OrganizerRow, 'isDemo' | 'email'>): boolean {
+  return o.isDemo || o.email.trim().toLowerCase().endsWith('@seed.invalid');
+}
+
+export type LegalStep = 'details' | 'accept';
+
+/** What is still to do on /portal/legal before this account may publish. */
+export function legalStepsMissing(o: OrganizerRow): LegalStep[] {
+  if (organizerLegalExempt(o)) return [];
+  const steps: LegalStep[] = [];
+  if (!legalDetailsComplete(o)) steps.push('details');
+  if (!legalTermsCurrent(o)) steps.push('accept');
+  return steps;
+}
+
+/**
+ * The publish route's words for legalStepsMissing, or null when nothing is
+ * missing. One sentence the organizer can act on, naming where to do it.
+ */
+export function legalPublishBlocker(o: OrganizerRow): string | null {
+  const steps = legalStepsMissing(o);
+  if (steps.length === 0) return null;
+  const parts: string[] = [];
+  if (steps.includes('details')) parts.push('add your legal name and address (who buyers are buying from)');
+  if (steps.includes('accept')) {
+    parts.push(
+      o.legalAcceptedVersion
+        ? `accept the updated terms and data processing agreement (version ${LEGAL_TERMS_VERSION})`
+        : 'accept the terms and the data processing agreement (AVV)'
+    );
+  }
+  return `${parts.join(' and ')} — both on the Legal page of your portal (/portal/legal)`;
+}
+
+/**
+ * Record acceptance of the current terms + AVV. Refused until the legal name
+ * and address are filled in: the AVV names the controller, and a contract with
+ * nobody in particular is not one.
+ */
+export function acceptLegalTerms(
+  id: string,
+  now: Date = new Date()
+): { ok: true; version: string; acceptedAt: string } | { ok: false; error: string } {
+  const o = getOrganizer(id);
+  if (!o) return { ok: false, error: 'We could not find your account.' };
+  if (!legalDetailsComplete(o)) {
+    return {
+      ok: false,
+      error: 'Please add your legal name and postal address first — the agreement has to say who it is with.',
+    };
+  }
+  const acceptedAt = now.toISOString();
+  getDb()
+    .prepare(`UPDATE organizers SET legal_accepted_version = ?, legal_accepted_at = ? WHERE id = ?`)
+    .run(LEGAL_TERMS_VERSION, acceptedAt, id);
+  return { ok: true, version: LEGAL_TERMS_VERSION, acceptedAt };
 }
 
 // ---------------- Sessions (HMAC cookie: 'org.<id>.<exp>.<mac>') ----------------

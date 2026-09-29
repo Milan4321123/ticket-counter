@@ -2,11 +2,12 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { isAdminRequest } from '@/lib/auth';
 import { listAllEvents } from '@/lib/events';
-import { listOrganizers } from '@/lib/organizers';
+import { legalDetailsComplete, legalTermsCurrent, listOrganizers, organizerLegalExempt } from '@/lib/organizers';
 import { signupReference } from '@/lib/platform';
 import AddOrganizerForm from './AddOrganizerForm';
 import ConfirmSignup from './ConfirmSignup';
 import OrganizerActions from './OrganizerActions';
+import DeleteOrganizerButton from './DeleteOrganizerButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,6 +105,7 @@ export default async function AdminOrganizersPage() {
                   <th>Email</th>
                   <th>Status</th>
                   <th>Events</th>
+                  <th>Legal</th>
                   <th>Created</th>
                   <th></th>
                 </tr>
@@ -127,6 +129,27 @@ export default async function AdminOrganizersPage() {
                       </span>
                     </td>
                     <td>{eventCounts.get(o.id) ?? 0}</td>
+                    {/* Legal details (seller identity) complete, and which
+                        terms + AVV version they accepted when (lib/organizers). */}
+                    <td className="small" style={{ whiteSpace: 'nowrap' }}>
+                      {organizerLegalExempt(o) ? (
+                        <span className="muted">exempt</span>
+                      ) : (
+                        <>
+                          <span className={`badge ${legalDetailsComplete(o) ? 'badge-green' : 'badge-amber'}`}>
+                            details {legalDetailsComplete(o) ? 'yes' : 'no'}
+                          </span>{' '}
+                          <span
+                            className={`badge ${legalTermsCurrent(o) ? 'badge-green' : 'badge-amber'}`}
+                            title={o.legalAcceptedAt ?? undefined}
+                          >
+                            {o.legalAcceptedVersion
+                              ? `AVV ${o.legalAcceptedVersion} · ${(o.legalAcceptedAt ?? '').slice(0, 10)}`
+                              : 'AVV not accepted'}
+                          </span>
+                        </>
+                      )}
+                    </td>
                     <td className="mono small">{o.createdAt.slice(0, 10)}</td>
                     <td>
                       {o.status === 'pending' ? (
@@ -135,12 +158,26 @@ export default async function AdminOrganizersPage() {
                           <span className="mono">{signupReference(o.id)}</span>
                         </span>
                       ) : (
-                        <OrganizerActions
-                          organizerId={o.id}
-                          name={o.name}
-                          email={o.email}
-                          status={o.status}
-                        />
+                        <>
+                          <OrganizerActions
+                            organizerId={o.id}
+                            name={o.name}
+                            email={o.email}
+                            status={o.status}
+                          />
+                          {/* Art. 28(3)(g): at the end of the contract the
+                              processor deletes the controller's data. Only a
+                              DISABLED account — nobody signed in, nothing on
+                              sale — and only after typing its email. */}
+                          {o.status === 'disabled' && (
+                            <DeleteOrganizerButton
+                              organizerId={o.id}
+                              name={o.name}
+                              email={o.email}
+                              events={eventCounts.get(o.id) ?? 0}
+                            />
+                          )}
+                        </>
                       )}
                     </td>
                   </tr>

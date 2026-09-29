@@ -44,6 +44,7 @@ import { WAITLIST_NOTIFIED_RETENTION_DAYS } from './retention';
 import { whatsappShareUrl } from './whatsapp';
 import type { ContactRequestRow } from './contact';
 import { everyLabel, getSubscription, subscriptionManageUrl } from './subscriptions';
+import { getSellerIdentity, sellerAddressOneLine } from './sellerIdentity';
 
 export function isEmailConfigured(): boolean {
   // ANY of the three From addresses counts, not EMAIL_FROM specifically.
@@ -164,14 +165,33 @@ function platformName(): string {
  * instead of stopping a ticket mail.
  */
 function organizerDisplayName(organizerId: string): string {
-  try {
-    const row = getDb().prepare(`SELECT name FROM organizers WHERE id = ?`).get(organizerId) as
-      | { name: string }
-      | undefined;
-    return row?.name?.trim() ?? '';
-  } catch {
-    return '';
-  }
+  // The seller's LEGAL name once they have filled it in (a Verein's registered
+  // name), else their account name — lib/sellerIdentity, the same answer every
+  // buyer page gives. That module is DB-only, so the reason above still holds.
+  return getSellerIdentity(organizerId)?.displayName ?? '';
+}
+
+/**
+ * The seller-of-record line every buyer mail closes with: who the buyer's
+ * contract is with, where they are, and that the platform only runs the
+ * software. The address appears once the organizer has entered it in their
+ * portal; until then the line still names them. Never throws — a footer must
+ * not stop a ticket mail.
+ */
+function sellerFooter(organizerId: string): { html: string; text: string } {
+  const seller = getSellerIdentity(organizerId);
+  const name = seller?.displayName || 'the organizer';
+  const address = seller ? sellerAddressOneLine(seller) : '';
+  const rep = seller?.representative ? `, vertreten durch ${seller.representative}` : '';
+  const platform = platformName();
+  const tail = `${platform} provides the booking software only.`;
+  return {
+    text: `Seller/Veranstalter: ${name}${address ? `, ${address}` : ''}${rep}. ${tail}`,
+    html:
+      `Seller/Veranstalter: <span translate="no">${escapeHtml(name)}${address ? `, ${escapeHtml(address)}` : ''}</span>` +
+      `${rep ? `, vertreten durch <span translate="no">${escapeHtml(seller!.representative)}</span>` : ''}. ` +
+      escapeHtml(tail),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -879,6 +899,7 @@ export async function sendTicketEmail(
         `${escapeHtml(event.name)}${whenLine ? ` · ${escapeHtml(whenLine)}` : ''}`,
         escapeHtml(venue),
         `Order ${escapeHtml(orderId)}`,
+        sellerFooter(event.organizerId).html,
         `You are getting this because you ordered on ${escapeHtml(platformName())}.`,
       ],
     });
@@ -942,7 +963,11 @@ export async function sendTicketEmail(
             ]
           : []),
       ],
-      footer: [[event.name, whenLine, venue].filter(Boolean).join(' · '), `Order ${orderId}`],
+      footer: [
+        [event.name, whenLine, venue].filter(Boolean).join(' · '),
+        `Order ${orderId}`,
+        wrapText(sellerFooter(event.organizerId).text),
+      ],
     });
 
     const mailed = await sendMailAs('buyers', {
@@ -1248,6 +1273,7 @@ export async function sendTransferInstructionsEmail(
         `${escapeHtml(event.name)}${whenLine ? ` · ${escapeHtml(whenLine)}` : ''}`,
         escapeHtml(venue),
         `Order ${escapeHtml(orderId)}`,
+        sellerFooter(event.organizerId).html,
         `You are getting this because you reserved ${escapeHtml(v.units)} on ${escapeHtml(platformName())}.`,
       ],
     });
@@ -1307,7 +1333,11 @@ export async function sendTransferInstructionsEmail(
         '',
         wrapText(`If no payment arrives by ${deadlineDisplay}, ${releasedSentence}.`),
       ],
-      footer: [[event.name, whenLine, venue].filter(Boolean).join(' · '), `Order ${orderId}`],
+      footer: [
+        [event.name, whenLine, venue].filter(Boolean).join(' · '),
+        `Order ${orderId}`,
+        wrapText(sellerFooter(event.organizerId).text),
+      ],
     });
 
     const mailed = await sendMailAs('buyers', {
@@ -1678,6 +1708,7 @@ export async function sendBuyerPaymentReminderEmail(
         `${escapeHtml(event.name)}${whenLine ? ` · ${escapeHtml(whenLine)}` : ''}`,
         escapeHtml(venue),
         `Order ${escapeHtml(orderId)}`,
+        sellerFooter(event.organizerId).html,
         `You are getting this because you reserved ${escapeHtml(v.units)} on ${escapeHtml(platformName())}.`,
       ],
     });
@@ -1727,7 +1758,11 @@ export async function sendBuyerPaymentReminderEmail(
           `Your QR ${v.codes} arrive by email the moment the organizer confirms your payment.`
         ),
       ],
-      footer: [[event.name, whenLine, venue].filter(Boolean).join(' · '), `Order ${orderId}`],
+      footer: [
+        [event.name, whenLine, venue].filter(Boolean).join(' · '),
+        `Order ${orderId}`,
+        wrapText(sellerFooter(event.organizerId).text),
+      ],
     });
 
     const mailed = await sendMailAs('buyers', {
@@ -2540,7 +2575,7 @@ export async function sendWaitlistSpotsOpenEmail(
             `${WAITLIST_NOTIFIED_RETENTION_DAYS} days.`
         ),
       ],
-      footer: [[event.name, whenLine, venue].filter(Boolean).join(' · ')],
+      footer: [[event.name, whenLine, venue].filter(Boolean).join(' · '), wrapText(sellerFooter(event.organizerId).text)],
     });
 
     const mailed = await sendMailAs('buyers', {
@@ -2558,6 +2593,7 @@ export async function sendWaitlistSpotsOpenEmail(
         footerLines: [
           `${escapeHtml(event.name)}${whenLine ? ` · ${escapeHtml(whenLine)}` : ''}`,
           escapeHtml(venue),
+          sellerFooter(event.organizerId).html,
           `You are getting this because you joined the waitlist for this ${escapeHtml(v.listing)} on ${escapeHtml(platformName())}. It is the only email the waitlist ever sends.`,
         ],
       }),
@@ -3327,6 +3363,7 @@ export async function sendOrderReadyEmail(orderId: string): Promise<{ sent: bool
       text: renderText({
         headline,
         lines: [`Hi ${order.buyerName},`, '', wrapText(line), '', ...(atTable ? [] : [`Your code: ${orderUrl}`])],
+        footer: [wrapText(sellerFooter(event.organizerId).text)],
       }),
       html: renderEmail({
         title: headline,
@@ -3334,7 +3371,7 @@ export async function sendOrderReadyEmail(orderId: string): Promise<{ sent: bool
         kicker: atTable ? 'On its way' : 'Ready to collect',
         headline,
         bodyHtml,
-        footerLines: [`Sold by ${escapeHtml(seller)} · ${escapeHtml(platformName())}`],
+        footerLines: [sellerFooter(event.organizerId).html],
       }),
     });
   } catch (e) {
@@ -3379,14 +3416,18 @@ export async function sendSubscriptionEmail(
       replyTo: replyToBuyers(),
       to: sub.buyerEmail,
       subject: headline,
-      text: renderText({ headline, lines: [`Hi ${sub.buyerName},`, '', wrapText(line), '', `Manage: ${manage}`] }),
+      text: renderText({
+        headline,
+        lines: [`Hi ${sub.buyerName},`, '', wrapText(line), '', `Manage: ${manage}`],
+        footer: [wrapText(sellerFooter(event.organizerId).text)],
+      }),
       html: renderEmail({
         title: headline,
         preheader: line,
         kicker: 'Subscribe & save',
         headline,
         bodyHtml,
-        footerLines: [`Sold by ${escapeHtml(seller)} · ${escapeHtml(platformName())}`],
+        footerLines: [sellerFooter(event.organizerId).html],
       }),
     });
   } catch (e) {

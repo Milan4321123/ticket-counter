@@ -1,5 +1,13 @@
+import Link from 'next/link';
 import { listEventsForOrganizer } from '@/lib/events';
-import { organizerPlanActive } from '@/lib/organizers';
+import {
+  LEGAL_LIMITS,
+  legalDetailsComplete,
+  legalTermsCurrent,
+  organizerLegalExempt,
+  organizerPlanActive,
+} from '@/lib/organizers';
+import LegalDetailsForm from './LegalDetailsForm';
 import { organizerTotpEnabled, organizerTotpPending } from '@/lib/organizerTotp';
 
 import { getReferralRewardSettings, organizerCurrency } from '@/lib/referrals';
@@ -68,11 +76,11 @@ export default async function PortalSettingsPage() {
         >
           <div className="summary-row">
             <span className="muted">Name</span>
-            <span>{organizer.name}</span>
+            <span translate="no">{organizer.name}</span>
           </div>
           <div className="summary-row">
             <span className="muted">Email</span>
-            <span>{organizer.email}</span>
+            <span translate="no">{organizer.email}</span>
           </div>
           <div className="summary-row">
             <span className="muted">Account</span>
@@ -86,6 +94,48 @@ export default async function PortalSettingsPage() {
           <p className="muted small" style={{ margin: '8px 0 0' }}>
             Your buyers are yours: every order is on its listing&rsquo;s Orders page. We use their details only to send
             tickets and the reminders you switch on — never to sell or advertise.
+          </p>
+        </SettingsRow>
+
+        {/* Who the seller legally is — named to buyers on every page, ticket and
+            email, and the controller in the AVV (/portal/legal). */}
+        <SettingsRow
+          id="legal"
+          icon="⚖️"
+          title="Legal details shown to buyers / Angaben zum Anbieter"
+          status={
+            legalDetailsComplete(organizer)
+              ? `${organizer.legalName}${
+                  organizerLegalExempt(organizer) || legalTermsCurrent(organizer) ? '' : ' · terms not accepted yet'
+                }`
+              : organizerLegalExempt(organizer)
+                ? 'Not needed in a demo'
+                : 'Missing — needed before you can publish'
+          }
+          tone={
+            organizerLegalExempt(organizer)
+              ? 'plain'
+              : legalDetailsComplete(organizer) && legalTermsCurrent(organizer)
+                ? 'on'
+                : 'warn'
+          }
+        >
+          <LegalDetailsForm
+            initial={{
+              legalName: organizer.legalName,
+              legalAddress: organizer.legalAddress,
+              legalRepresentative: organizer.legalRepresentative,
+              legalRegister: organizer.legalRegister,
+              legalContactEmail: organizer.legalContactEmail,
+            }}
+            limits={LEGAL_LIMITS}
+          />
+          <p className="muted small" style={{ margin: '12px 0 0' }}>
+            Terms and data processing agreement (AVV):{' '}
+            <Link href="/portal/legal">
+              {legalTermsCurrent(organizer) ? 'accepted — view or print yours' : 'review and accept them here'}
+            </Link>
+            .
           </p>
         </SettingsRow>
 

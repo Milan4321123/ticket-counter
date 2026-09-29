@@ -18,6 +18,9 @@ import {
 } from '@/lib/events';
 import { isEmailConfigured } from '@/lib/email';
 import { currentOrganizer, getOrganizer } from '@/lib/organizers';
+import { getSellerIdentity } from '@/lib/sellerIdentity';
+import SellerBlock from '@/components/legal/SellerBlock';
+import { platformName } from '@/lib/platform';
 import { girocodePayload } from '@/lib/girocode';
 import { formatMoney } from '@/lib/money';
 import { getBaseUrl } from '@/lib/config';
@@ -204,7 +207,7 @@ export default async function OrderPage({
             Being prepared
           </span>
         ) : null}
-        {kitchenInfo.note ? <div className="small muted">Your note: “{kitchenInfo.note}”</div> : null}
+        {kitchenInfo.note ? <div className="small muted">Your note: “<span translate="no">{kitchenInfo.note}</span>”</div> : null}
       </div>
     ) : null;
 
@@ -212,6 +215,18 @@ export default async function OrderPage({
   // looking at a stranger's IBAN and deciding whether to send real money to it.
   // The one person who can settle that is the organizer whose account it is.
   const organizer = event ? getOrganizer(event.organizerId) : null;
+  // The seller of record, named on every state of this page that is about
+  // paying or holding what was bought: their legal identity once filled in,
+  // their account name until then.
+  const seller = event ? getSellerIdentity(event.organizerId) : null;
+  const sellerBlock = event ? (
+    <SellerBlock
+      seller={seller}
+      kind={event.kind === 'shop' ? 'shop' : 'event'}
+      platformName={platformName()}
+      fallback
+    />
+  ) : null;
 
   // Offered while the order is still awaiting payment too, not only once paid —
   // people block the evening out the moment they reserve. Only for event-kind
@@ -296,9 +311,10 @@ export default async function OrderPage({
           <CheckPaymentButton orderId={order.id} />
         </div>
         <p className="muted small anim-fade-up anim-d3" style={{ marginTop: 14 }}>
-          The payment goes to {organizer?.name?.trim() || 'the seller'} directly — the card page is run by Stripe on
+          The payment goes to {seller?.displayName || organizer?.name?.trim() || 'the seller'} directly — the card page is run by Stripe on
           their own account, and {'the platform'} never sees your card details.
         </p>
+        {sellerBlock}
       </div>
     );
   }
@@ -434,7 +450,7 @@ export default async function OrderPage({
               <div>
                 <div className="tier-name">Your QR tickets arrive</div>
                 <p className="muted small" style={{ margin: '2px 0 0' }}>
-                  They&rsquo;re emailed to <strong>{shown.buyerEmail}</strong> and appear right
+                  They&rsquo;re emailed to <strong translate="no">{shown.buyerEmail}</strong> and appear right
                   here on this page.
                 </p>
               </div>
@@ -544,6 +560,7 @@ export default async function OrderPage({
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ color: 'var(--brand-text)', fontWeight: 600, wordBreak: 'break-all' }}
+                  translate="no"
                 >
                   {paypal.handle}
                 </a>
@@ -660,7 +677,7 @@ export default async function OrderPage({
               <span className="muted small" style={rowLabelStyle}>
                 Account holder
               </span>
-              <span>{bank.accountHolder}</span>
+              <span translate="no">{bank.accountHolder}</span>
             </div>
             <div className="copy-row">
               <span className="muted small" style={rowLabelStyle}>
@@ -744,6 +761,7 @@ export default async function OrderPage({
           confirmed. These instructions have been emailed to you as well.
         </p>
         <p className="mono small muted">Order ID: {order.id}</p>
+        {sellerBlock}
         {organizerWhatsApp}
       </div>
     );
@@ -783,6 +801,7 @@ export default async function OrderPage({
             your order ID <span className="mono">{order.id}</span> and you&rsquo;ll receive your
             tickets (if seats are still available) or a full refund.
           </p>
+          {sellerBlock}
           <p className="anim-fade-up anim-d3">
             <Link href={checkoutHref} className="btn btn-primary">
               Book again at checkout
@@ -1094,7 +1113,7 @@ export default async function OrderPage({
               Anything that belongs to your address rather than to this one order —{' '}
               {rewardsOffered ? `any thank-you codes ${sellerName} has given you, and ` : ''}your
               own card with {sellerName} — opens from the link we email to{' '}
-              <strong>{shown.buyerEmail}</strong>. That link rides in the confirmation for this
+              <strong translate="no">{shown.buyerEmail}</strong>. That link rides in the confirmation for this
               order: tap it, whether the message reached you minutes ago or seasons ago, and they
               appear right here on this page. If it is not in that inbox, ask {sellerName}.
             </p>
@@ -1103,7 +1122,7 @@ export default async function OrderPage({
               Anything that belongs to your address rather than to this one order —{' '}
               {rewardsOffered ? `any thank-you codes ${sellerName} has given you, and ` : ''}your
               own card with {sellerName} — opens only from a link that travels by email to{' '}
-              <strong>{shown.buyerEmail}</strong>, and this site is not sending email at the moment.
+              <strong translate="no">{shown.buyerEmail}</strong>, and this site is not sending email at the moment.
               So that link cannot reach you right now, and we would rather say so than promise you a
               message. Nothing here is lost — your {v.codes} below are unaffected — and {sellerName}{' '}
               can tell you directly what you are holding.
@@ -1173,11 +1192,11 @@ export default async function OrderPage({
         ) : null}
         <div className="summary-row">
           <span className="muted">Name</span>
-          <span>{shown.buyerName}</span>
+          <span translate="no">{shown.buyerName}</span>
         </div>
         <div className="summary-row">
           <span className="muted">Email</span>
-          <span>{shown.buyerEmail}</span>
+          <span translate="no">{shown.buyerEmail}</span>
         </div>
         {items.map((it) => {
           const seatsPerUnit = tierFor(it.tierId)?.seatsPerUnit ?? 1;
@@ -1283,9 +1302,10 @@ export default async function OrderPage({
                 strangers will see over their words. lib/reviews stores exactly
                 this — a first name and an initial, frozen at write time — and
                 the address they ordered with never goes near a review. */}
-            Your name shows as <strong>&ldquo;First L.&rdquo;</strong> — never your surname in full,
-            never your email address. The seller can reply to you in public; they cannot edit or take
-            down what you wrote.
+            Your reviews are signed{' '}
+            <strong translate="no">&ldquo;{reviewable[0]?.byline ?? 'First L.'}&rdquo;</strong> — never your
+            surname in full, never your email address. The seller can reply to you in public; they cannot
+            edit or take down what you wrote. You can delete your own review here at any time.
           </p>
           <div style={{ display: 'grid', gap: 14 }}>
             {reviewable.map((it) => (
@@ -1297,6 +1317,7 @@ export default async function OrderPage({
                 itemName={it.name}
                 existing={it.existing}
                 maxChars={MAX_REVIEW_CHARS}
+                byline={it.byline}
               />
             ))}
           </div>
@@ -1317,6 +1338,7 @@ export default async function OrderPage({
           you if email is configured.
         </p>
       </div>
+      {sellerBlock}
     </div>
   );
 }

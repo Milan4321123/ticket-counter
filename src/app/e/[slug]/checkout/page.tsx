@@ -10,6 +10,9 @@ import CityCheck from '@/components/CityCheck';
 import { vocabFor } from '@/lib/vocab';
 import { expireOverdueTransferReservations } from '@/lib/orders';
 import { getOrganizer } from '@/lib/organizers';
+import { getSellerIdentity } from '@/lib/sellerIdentity';
+import SellerBlock from '@/components/legal/SellerBlock';
+import { platformName } from '@/lib/platform';
 import { paymentOptionsFor } from '@/lib/paymentConnections';
 import { subscriptionOffer } from '@/lib/subscriptions';
 import { currentCustomer } from '@/lib/customers';
@@ -112,7 +115,10 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
 
   // Who the "keep me posted" box is ABOUT. The consent is per-organizer, so
   // the box must name them — a tick about "somebody" is not informed consent.
-  const organizerName = getOrganizer(event.organizerId)?.name?.trim() ?? '';
+  // The seller of record names both the box and the block under the form:
+  // their legal name once they filled it in, their account name until then.
+  const seller = getSellerIdentity(event.organizerId);
+  const organizerName = seller?.displayName || getOrganizer(event.organizerId)?.name?.trim() || '';
 
   // Which ways to pay this listing offers, resolved from the seller's own
   // settings and connections (lib/paymentConnections). Through
@@ -149,7 +155,7 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
   const customer = event.isDemo ? null : await currentCustomer();
   // The picks here are mirrored into the cross-seller basket (lib/basket), so
   // leaving and coming back — or shopping elsewhere first — keeps them.
-  const sellerName = getOrganizer(event.organizerId)?.name?.trim() || 'the seller';
+  const sellerName = organizerName || 'the seller';
   const basketLines = Object.fromEntries(
     getEventTiers(event.id)
       .map((t) => [t.tierKey, basketLineFor(event, t, sellerName, t.mediaId ? mediaUrl(t.mediaId, 'card', null) : null)] as const)
@@ -235,6 +241,19 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
       refCode={refCode}
       otherCities={otherCities}
     />
+      {/* Who the buyer is contracting with, before they pay: the seller's
+          legal identity (always at least their name), and that the platform is
+          only the software. Rendered here rather than inside the client form so
+          the seller is named even before any script has run. */}
+      <div className="container container-narrow">
+        <SellerBlock
+          seller={seller}
+          kind={event.kind === 'shop' ? 'shop' : 'event'}
+          platformName={platformName()}
+          fallback
+          style={{ margin: '8px 0 32px' }}
+        />
+      </div>
     </>
   );
 }

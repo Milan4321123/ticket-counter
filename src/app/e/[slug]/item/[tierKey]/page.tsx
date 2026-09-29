@@ -55,6 +55,8 @@ import { basketLineFor } from '@/lib/basket';
 import { formatMoney, subscribeDiscountCents } from '@/lib/money';
 import { subscriptionOffer } from '@/lib/subscriptions';
 import { getOrganizer } from '@/lib/organizers';
+import { getSellerIdentity } from '@/lib/sellerIdentity';
+import SellerBlock from '@/components/legal/SellerBlock';
 import { boughtTogether, moreFromShop, othersOnShelf } from '@/lib/relatedItems';
 import { listReviewsForItem, ratingForItem } from '@/lib/reviews';
 import type { SavedItem } from '@/lib/savedItems';
@@ -318,7 +320,9 @@ export default async function ItemPage({ params, searchParams }: Params) {
   }));
 
   const organizer = getOrganizer(event.organizerId);
-  const sellerName = organizer?.name?.trim() || 'the organizer';
+  // The seller of record — legal name once filled in, account name until then.
+  const seller = getSellerIdentity(event.organizerId);
+  const sellerName = seller?.displayName || organizer?.name?.trim() || 'the organizer';
   const basketLine = basketLineFor(event, tier, sellerName, tier.mediaId ? mediaUrl(tier.mediaId, 'card', null) : null);
 
   // The shop's own name with the "(example shop)" mark split off, so the mark
@@ -414,7 +418,7 @@ export default async function ItemPage({ params, searchParams }: Params) {
     images: ogImage ? [absoluteUrl(ogImage)] : [],
     // The disclosed seller, not this platform — the same name the page prints
     // under the button. See the note in lib/seo itemJsonLd.
-    sellerName: organizer?.name?.trim() || SITE_NAME,
+    sellerName: seller?.displayName || organizer?.name?.trim() || SITE_NAME,
     url: itemUrl,
     rating,
   });
@@ -759,11 +763,14 @@ export default async function ItemPage({ params, searchParams }: Params) {
               what turns the whole ticket value into this platform's turnover
               (§3 Abs. 11 UStG), so this line goes wherever a price does. */}
           <p className="muted small" style={{ marginTop: 14 }}>
-            {isShop ? 'Sold by' : 'Presented by'} <strong>{sellerName}</strong>.{' '}
+            {isShop ? 'Sold by' : 'Presented by'} <strong translate="no">{sellerName}</strong>
+                {/\.$/.test(sellerName) ? '' : '.'}{' '}
             {isShop
               ? 'Your order is placed with them, and your payment goes straight to their own account — it never passes through us.'
               : 'Tickets for this event are sold by them, and your payment goes straight to their own account — it never passes through us.'}
           </p>
+          {/* Their short Impressum — only what they filled in; nothing until then. */}
+          <SellerBlock seller={seller} kind={isShop ? 'shop' : 'event'} style={{ maxWidth: 560 }} />
           {/* The shop behind this item, one tap away: its whole range in the
               bazaar, so a shopper who came for one achar can fill a basket. */}
           {isShop && (
@@ -884,7 +891,7 @@ export default async function ItemPage({ params, searchParams }: Params) {
               (§3 Abs. 11 UStG). Everything in this panel is one shop's, which
               is why one line covers all of it. */}
           <p className="muted small" style={{ margin: '10px 0 0' }}>
-            Sold by <strong>{sellerName}</strong> — every price here is theirs, and each of these
+            Sold by <strong translate="no">{sellerName}</strong> — every price here is theirs, and each of these
             is ordered from them and paid straight to them.
           </p>
         </section>

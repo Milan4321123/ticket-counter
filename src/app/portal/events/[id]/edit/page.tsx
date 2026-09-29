@@ -27,7 +27,7 @@ import {
 import { listAnnouncementAudience } from '@/lib/marketing';
 import { MAX_PHOTOS_PER_EVENT, MAX_VIDEOS_PER_EVENT } from '@/lib/media';
 import { getStats } from '@/lib/orders';
-import { organizerPlanActive } from '@/lib/organizers';
+import { legalStepsMissing, organizerPlanActive } from '@/lib/organizers';
 import PlanExpired from '../../../PlanExpired';
 import PortalNav from '../../../PortalNav';
 import { requirePortalOrganizer } from '../../../guard';
@@ -147,6 +147,14 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
       ok: organizerTotpEnabled(organizer.id),
       label: `Set up your authenticator app (Settings) — required before you can sell ${vocabFor(event.kind).units}`,
       href: '/portal/settings',
+    }]),
+    // Same rule as the publish route (lib/organizers legalPublishBlocker):
+    // legal details filled in, terms + AVV accepted in the current version.
+    // Demo and example accounts are exempt there and so absent here.
+    ...(organizer.isDemo ? [] : [{
+      ok: legalStepsMissing(organizer).length === 0,
+      label: 'Add your legal details and accept the terms + data processing agreement (Legal page)',
+      href: '/portal/legal',
     }]),
   ];
 
