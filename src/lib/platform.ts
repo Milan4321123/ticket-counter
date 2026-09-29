@@ -59,20 +59,20 @@ export function emailFromOrganizers(): string {
 /**
  * Where replies should actually go, per audience.
  *
- * Defaults to the From address, which is right once the domain can receive mail.
- * It is overridable because sending and receiving are separate services and they
- * arrive at different times: a domain can be authenticated for SENDING within
- * minutes while having no mailbox at all, and in that window a Reply-To of
- * tickets@yourdomain bounces every reply a buyer sends. Point these at an inbox
- * that exists — a personal address is fine — until real mailboxes are in place,
- * then delete them.
+ * Defaults to the support mailbox (SUPPORT_EMAIL), NOT the From address.
+ * Sending and receiving are separate services: the From address is whatever
+ * the mail provider has verified for SENDING, and for a long stretch that was
+ * an address on eventsticketbuy.com — a domain that had lapsed, so every reply
+ * a buyer or organizer wrote vanished. The support mailbox is a real inbox on
+ * the platform's own domain, so a reply always reaches a person, whatever the
+ * sending setup is. EMAIL_REPLY_TO_* still override it per audience.
  */
 export function replyToBuyers(): string {
-  return (process.env.EMAIL_REPLY_TO_BUYERS || '').trim() || bareAddress(emailFromBuyers());
+  return (process.env.EMAIL_REPLY_TO_BUYERS || '').trim() || SUPPORT_EMAIL;
 }
 
 export function replyToOrganizers(): string {
-  return (process.env.EMAIL_REPLY_TO_ORGANIZERS || '').trim() || bareAddress(emailFromOrganizers());
+  return (process.env.EMAIL_REPLY_TO_ORGANIZERS || '').trim() || SUPPORT_EMAIL;
 }
 
 /** Just the address part of a "Name <a@b.c>" header, for use as a Reply-To. */
@@ -82,34 +82,31 @@ export function bareAddress(from: string): string {
 }
 
 /**
- * Where people reach the team — shown on /contact, /privacy and /impressum and
- * used as the "to" address for contact-form enquiries. PLATFORM_CONTACT_EMAIL
- * overrides it; otherwise SUPPORT_EMAIL below.
- */
-export function platformContactEmail(): string {
-  const explicit = (process.env.PLATFORM_CONTACT_EMAIL || '').trim();
-  if (explicit) return explicit;
-
-  // Falls back to the platform's own support address on its own domain.
-  //
-  // It once fell back to the first ADMIN_EMAIL, which was backwards in the
-  // worst way: that is the inbox that receives ADMIN SIGN-IN CODES, and this
-  // function's value is printed on /contact, /privacy and /organizers — the
-  // platform was publishing the single address most worth attacking. Later it
-  // fell back to the organizer sending address, which in production was a
-  // mailbox on eventsticketbuy.com: a domain whose registration lapsed, so
-  // everything written to it vanished. The Impressum (§5 DDG) and the privacy
-  // notice require an address that actually reaches the operator, so the
-  // default is now a fixed one on the platform's own domain.
-  return SUPPORT_EMAIL;
-}
-
-/**
- * The platform's public support address — Impressum, privacy requests,
- * /contact. It must be able to RECEIVE: martnepali.com needs MX records (or
- * a forwarding service) pointing somewhere a person reads.
+ * The platform's public support address — Impressum, privacy requests, the
+ * AVV, /contact, and the inbox contact-form enquiries are sent to. A real
+ * Microsoft 365 mailbox on the platform's own domain (MX checked 2026-09-30).
  */
 export const SUPPORT_EMAIL = 'support@martnepali.com';
+
+/**
+ * Where people reach the team. Fixed in code, deliberately NOT read from an
+ * environment variable any more.
+ *
+ * It used to honour PLATFORM_CONTACT_EMAIL, and production's value of it was
+ * support@eventsticketbuy.com — a domain whose registration had lapsed, so
+ * every message to it vanished. After the Impressum, the Datenschutzerklärung
+ * and the AVV went live, all three still printed that dead address, because a
+ * forgotten setting on the host outranked the code. A legal page has to reach
+ * the operator (§ 5 DDG, Art. 13(1)(a) GDPR), so the address now lives here,
+ * where changing it is a reviewed commit rather than an invisible setting.
+ *
+ * Before that it fell back to the first ADMIN_EMAIL — the inbox that receives
+ * ADMIN SIGN-IN CODES — which published the single address most worth
+ * attacking. Never point this at the admin inbox.
+ */
+export function platformContactEmail(): string {
+  return SUPPORT_EMAIL;
+}
 
 /**
  * Short per-organizer reference, e.g. 'NEPCON-1A2B3C4D'.

@@ -24,13 +24,13 @@ export function operatorAddressLines(): string[] {
 }
 
 /**
- * The address for Impressum, privacy requests and the AVV. OPERATOR_EMAIL wins;
- * otherwise the platform's support address (support@martnepali.com unless
- * PLATFORM_CONTACT_EMAIL overrides it). Callers still offer the contact form
- * beside it, so the Impressum always has a second fast channel.
+ * The address for Impressum, privacy requests and the AVV: the platform's
+ * support mailbox (SUPPORT_EMAIL in lib/platform — fixed in code on purpose,
+ * see platformContactEmail). Callers still offer the contact form beside it,
+ * so the Impressum always has a second fast channel.
  */
 export function operatorEmail(): string {
-  return (process.env.OPERATOR_EMAIL || '').trim() || platformContactEmail();
+  return platformContactEmail();
 }
 
 /** Optional telephone for the Impressum. Not required when email + form exist. */
