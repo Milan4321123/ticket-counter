@@ -6,8 +6,9 @@ import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
 import { getDb } from './db';
-import { getEventMedia, getEventVideos, getMediaById, type EventMediaRow } from './events';
-import { deleteVariants } from './imageVariants';
+import { getCropForSlot, getEventMedia, getEventVideos, getMediaById, type EventMediaRow } from './events';
+import { carryVariantsOver, deleteVariants, sourceStamp } from './imageVariants';
+import { stripMetadata, stripMetadataFile, type StripFileOutcome } from './stripMetadata';
 
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB per photo
 export const MAX_PHOTOS_PER_EVENT = 12;
@@ -131,7 +132,11 @@ export async function saveEventPhoto(eventId: string, mime: string, bytes: Buffe
   const fileName = `${id}.${EXT_BY_MIME[realMime]}`;
   const dir = uploadsDir(eventId);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, fileName), bytes);
+  // Without the camera's metadata: GPS, device, owner, the uncropped Exif
+  // thumbnail. A home seller's phone photo would otherwise publish their home
+  // address. Byte-level and lossless (lib/stripMetadata); the orientation flag
+  // is kept so portraits stay upright.
+  fs.writeFileSync(path.join(dir, fileName), stripMetadata(bytes));
 
   const sort = getEventMedia(eventId).length;
   getDb()
@@ -227,7 +232,13 @@ export function saveEventVideo(eventId: string, mime: string, bytes: Buffer): Ev
   const sort = existing.length;
   const dir = uploadsDir(eventId);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, fileName), bytes);
+  const filePath = path.join(dir, fileName);
+  fs.writeFileSync(filePath, bytes);
+  // Phone videos carry the recording location (udta/©xyz, Apple's location
+  // key in meta). Patched on disk rather than in `bytes`: in place, through a
+  // file descriptor, so a 60 MB upload is not copied a second time in memory.
+  // Nothing can serve the file yet — its row does not exist until below.
+  stripMetadataFile(filePath);
 
   const tx = db.transaction(() => {
     db.prepare(`INSERT INTO event_media (id, event_id, file_name, mime, sort) VALUES (?, ?, ?, ?, ?)`).run(
@@ -280,4 +291,145 @@ export function deleteEventVideo(eventId: string, mediaId?: string): boolean {
   });
   tx();
   return true;
+}
+
+// ---------------- Metadata backfill ----------------
+//
+// Uploads are cleaned on arrival (above), but every photo and video stored
+// BEFORE that still carries its camera metadata, and /api/media serves the
+// originals publicly. This sweep cleans them once.
+//
+// Shaped for a 512 MB instance: one file at a time, a few per tick, a pause
+// between ticks, photos read whole (they are capped at 5 MB) and videos patched
+// through a file descriptor without being read at all. Progress is written to
+// kv after EVERY file, so a restart or a deploy resumes where it stopped instead
+// of starting over; once finished the marker says so and the sweep costs one
+// SELECT per process lifetime.
+
+const BACKFILL_KEY = 'migration:media_metadata_strip_v1';
+const BACKFILL_FILES_PER_TICK = 3;
+const BACKFILL_TICK_GAP_MS = 250;
+/** Let a freshly started process serve its first requests before any disk work. */
+const BACKFILL_START_DELAY_MS = 5_000;
+
+interface BackfillState {
+  /** The last event_media.id handled; rows are walked in ascending id order. */
+  cursor: string;
+  scanned: number;
+  stripped: number;
+  /** When the sweep finished (ISO), or null while it is still running. */
+  done: string | null;
+}
+
+function readBackfillState(): BackfillState {
+  const fresh: BackfillState = { cursor: '', scanned: 0, stripped: 0, done: null };
+  const row = getDb().prepare(`SELECT value FROM kv WHERE key = ?`).get(BACKFILL_KEY) as { value: string } | undefined;
+  if (!row) return fresh;
+  try {
+    const v = JSON.parse(row.value) as Partial<BackfillState>;
+    return {
+      cursor: typeof v.cursor === 'string' ? v.cursor : '',
+      scanned: Number(v.scanned) || 0,
+      stripped: Number(v.stripped) || 0,
+      done: typeof v.done === 'string' ? v.done : null,
+    };
+  } catch {
+    // An unreadable marker restarts the sweep. That is safe: stripping is
+    // idempotent, so a second pass over a clean file writes nothing.
+    return fresh;
+  }
+}
+
+function writeBackfillState(state: BackfillState): void {
+  getDb()
+    .prepare(`INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`)
+    .run(BACKFILL_KEY, JSON.stringify(state));
+}
+
+/**
+ * Strip one stored original in place. A photo whose bytes changed keeps its
+ * rendered variants (same pixels, new cache key — see carryVariantsOver), so
+ * cleaning the catalogue never turns into re-rendering it.
+ */
+export function stripStoredMedia(media: EventMediaRow): StripFileOutcome {
+  const file = mediaFilePath(media);
+  let before: fs.Stats;
+  try {
+    before = fs.statSync(file);
+  } catch {
+    return 'missing';
+  }
+  const outcome = stripMetadataFile(file, { maxImageBytes: 4 * MAX_IMAGE_BYTES });
+  if (outcome === 'stripped' && media.mime.startsWith('image/')) {
+    try {
+      const crops = (['cover', 'profile', 'poster'] as const).map((slot) => getCropForSlot(media.id, slot));
+      carryVariantsOver(media, sourceStamp(before), sourceStamp(fs.statSync(file)), crops);
+    } catch {
+      // The variants simply render again on demand.
+    }
+  }
+  return outcome;
+}
+
+/**
+ * Process up to `maxFiles` stored media files past the saved cursor.
+ * Synchronous from first read to last write, so no request in this process can
+ * delete or replace a file while it is being cleaned. Exported for tests and
+ * manual runs; production goes through armMediaMetadataBackfill().
+ */
+export function runMediaMetadataBackfillStep(maxFiles = BACKFILL_FILES_PER_TICK): { done: boolean; processed: number } {
+  const state = readBackfillState();
+  if (state.done) return { done: true, processed: 0 };
+
+  const rows = getDb()
+    .prepare(
+      `SELECT id, event_id AS eventId, file_name AS fileName, mime, sort, created_at AS createdAt
+       FROM event_media WHERE id > ? ORDER BY id LIMIT ?`
+    )
+    .all(state.cursor, maxFiles) as EventMediaRow[];
+
+  if (rows.length === 0) {
+    state.done = new Date().toISOString();
+    writeBackfillState(state);
+    console.log(`[media] metadata backfill finished: ${state.scanned} files checked, ${state.stripped} cleaned.`);
+    return { done: true, processed: 0 };
+  }
+
+  for (const row of rows) {
+    if (stripStoredMedia(row) === 'stripped') state.stripped++;
+    state.scanned++;
+    state.cursor = row.id;
+    writeBackfillState(state);
+  }
+  return { done: false, processed: rows.length };
+}
+
+/**
+ * The once-per-process flag lives on globalThis, not in this module: Next can
+ * hold more than one instance of a lib module (dev reloads, separate bundler
+ * layers), and two sweepers would each think they were the only one.
+ */
+const ARMED = Symbol.for('media.metadataBackfill.armed');
+
+/**
+ * Start the backfill in the background, once per process. Cheap to call on
+ * every request (a flag check after the first call) and never blocks one: the
+ * work runs in short timer ticks, off any request's path, and swallows its own
+ * errors. A process that hits an error stops sweeping; the next one resumes
+ * from the saved cursor.
+ */
+export function armMediaMetadataBackfill(): void {
+  const g = globalThis as { [ARMED]?: boolean };
+  if (g[ARMED]) return;
+  g[ARMED] = true;
+  const tick = () => {
+    let done = true;
+    try {
+      done = runMediaMetadataBackfillStep().done;
+    } catch (e) {
+      console.error('[media] metadata backfill stopped:', e);
+    }
+    if (!done) setTimeout(tick, BACKFILL_TICK_GAP_MS).unref();
+  };
+  setTimeout(tick, BACKFILL_START_DELAY_MS).unref();
 }

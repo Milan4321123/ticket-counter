@@ -2,7 +2,8 @@ import fs from 'fs';
 import { NextResponse } from 'next/server';
 import { getCropForSlot, getMediaById, type CropSlot } from '@/lib/events';
 import { getVariant, isVariantName, type VariantName } from '@/lib/imageVariants';
-import { mediaFilePath } from '@/lib/media';
+import { armMediaMetadataBackfill, mediaFilePath } from '@/lib/media';
+import { stripMetadata } from '@/lib/stripMetadata';
 
 export const dynamic = 'force-dynamic';
 
@@ -103,6 +104,9 @@ function fileStream(
  */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  // Cleans the media stored before uploads were stripped on arrival — once,
+  // in the background, a few files per tick. A no-op after the first call.
+  armMediaMetadataBackfill();
   const media = getMediaById(id);
   if (!media) return new NextResponse('Not found', { status: 404 });
   const filePath = mediaFilePath(media);
@@ -182,7 +186,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   }
 
   try {
-    const bytes = fs.readFileSync(servePath);
+    let bytes: Buffer = fs.readFileSync(servePath);
+    // The original (no variant asked for, or the variant failed) is served
+    // without its camera metadata even if the backfill has not reached it yet.
+    // Byte-level, so this costs a segment walk, not a decode; a file that is
+    // already clean comes back as the same buffer. Variants are sharp output
+    // and never carry metadata.
+    if (servePath === filePath) bytes = stripMetadata(bytes);
     return new NextResponse(new Uint8Array(bytes), {
       headers: {
         'Content-Type': serveMime,

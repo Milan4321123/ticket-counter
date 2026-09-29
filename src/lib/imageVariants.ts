@@ -130,6 +130,48 @@ function derivedName(
   return `${mediaId}-${variant}-${key}.jpg`;
 }
 
+/** The source file's part of the cache key (see derivedName). */
+export function sourceStamp(stat: { size: number; mtimeMs: number }): string {
+  return `${stat.size}:${stat.mtimeMs}`;
+}
+
+/**
+ * Re-point already-rendered derivatives at a source whose BYTES changed but
+ * whose PIXELS did not — the metadata strip (lib/stripMetadata) is the one
+ * caller. Without this, cleaning every stored photo would change every cache
+ * key at once and the next page loads would re-render the whole catalogue in
+ * sharp, which is precisely the burst that once OOM-killed the 512 MB instance.
+ *
+ * Renames only the names this photo can be asked for today: each variant with
+ * the automatic framing and with each framing in `crops`. Older framings'
+ * files were already unreachable and stay so. Returns how many moved.
+ */
+export function carryVariantsOver(
+  media: EventMediaRow,
+  oldStamp: string,
+  newStamp: string,
+  crops: (CropRect | null)[]
+): number {
+  if (oldStamp === newStamp) return 0;
+  const dir = derivedDir(media.eventId);
+  let moved = 0;
+  for (const variant of Object.keys(VARIANTS) as VariantName[]) {
+    const spec = VARIANTS[variant];
+    for (const crop of [null, ...crops]) {
+      const from = path.join(dir, derivedName(media.id, variant, oldStamp, spec, crop));
+      const to = path.join(dir, derivedName(media.id, variant, newStamp, spec, crop));
+      try {
+        if (!fs.existsSync(from) || fs.existsSync(to)) continue;
+        fs.renameSync(from, to);
+        moved++;
+      } catch {
+        // Not there, or gone meanwhile: it simply renders again on demand.
+      }
+    }
+  }
+  return moved;
+}
+
 /** A crop rectangle in whole pixels, guaranteed to sit inside `width`x`height`. */
 interface PixelRegion {
   left: number;
@@ -188,8 +230,7 @@ export async function getVariant(
 
   let stamp: string;
   try {
-    const stat = fs.statSync(source);
-    stamp = `${stat.size}:${stat.mtimeMs}`;
+    stamp = sourceStamp(fs.statSync(source));
   } catch {
     return null;
   }
