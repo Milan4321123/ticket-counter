@@ -7,6 +7,8 @@ import { readListingName } from '@/lib/exampleShop';
 import { platformContactEmail } from '@/lib/platform';
 import ApproveAccountButton from './ApproveAccountButton';
 import MarkHandledButton from './MarkHandledButton';
+import DeleteRequestButton from './DeleteRequestButton';
+import { CONTACT_REQUEST_RETENTION_DAYS } from '@/lib/retention';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,8 +51,8 @@ function applicationDetails(r: ContactRequestRow): [string, string][] {
 function WhoCells({ request }: { request: ContactRequestRow }) {
   return (
     <>
-      <td style={{ fontWeight: 600 }}>{request.name}</td>
-      <td className="small">
+      <td style={{ fontWeight: 600 }} translate="no">{request.name}</td>
+      <td className="small" translate="no">
         <a href={`mailto:${request.email}`} style={{ color: 'var(--accent)' }}>
           {request.email}
         </a>
@@ -97,7 +99,7 @@ export default async function AdminContactPage() {
             <a href={`mailto:${contactEmail}`} style={{ color: 'var(--accent)' }}>
               {contactEmail}
             </a>
-            .
+            . Requests are deleted automatically {CONTACT_REQUEST_RETENTION_DAYS} days after they arrive.
           </p>
         </div>
         <Link href="/admin" className="btn btn-sm">
@@ -195,11 +197,15 @@ export default async function AdminContactPage() {
                       </td>
                       <td>
                         {r.organizerId ? (
-                          <span className="muted small">Account created</span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 170 }}>
+                            <span className="muted small">Account created</span>
+                            <DeleteRequestButton requestId={r.id} name={r.name} />
+                          </div>
                         ) : (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 170 }}>
                             <ApproveAccountButton requestId={r.id} name={r.name} email={r.email} />
                             {r.status === 'new' && <MarkHandledButton requestId={r.id} />}
+                            <DeleteRequestButton requestId={r.id} name={r.name} />
                           </div>
                         )}
                       </td>
@@ -265,11 +271,14 @@ export default async function AdminContactPage() {
                       </span>
                     </td>
                     <td>
-                      {r.status === 'new' ? (
-                        <MarkHandledButton requestId={r.id} />
-                      ) : (
-                        <span className="muted small">Done</span>
-                      )}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {r.status === 'new' ? (
+                          <MarkHandledButton requestId={r.id} />
+                        ) : (
+                          <span className="muted small">Done</span>
+                        )}
+                        <DeleteRequestButton requestId={r.id} name={r.name} />
+                      </div>
                     </td>
                   </tr>
                 ))}

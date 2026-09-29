@@ -115,9 +115,52 @@ export function setCustomerName(id: string, name: string): void {
     .run(name.replace(/[\u0000-\u001F\u007F]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120), id);
 }
 
-/** Delete the account (not the orders — those belong to the sellers' books). */
-export function deleteCustomer(id: string): void {
-  getDb().prepare(`DELETE FROM customers WHERE id = ?`).run(id);
+/**
+ * Delete the account and everything that exists only because of it — the
+ * saved basket and any sign-in code waiting for its address — in one
+ * transaction. NOT the orders: those are the sellers' records (each seller is
+ * the controller of its own sales) and are erased on their own clock by
+ * lib/retention.ts, or earlier on request through the admin erase tool.
+ *
+ * Signing out is implied: a session cookie names the account id, and
+ * currentCustomer() answers null once that row is gone. Returns false when
+ * there was no such account.
+ */
+export function deleteCustomer(id: string): boolean {
+  const db = getDb();
+  return db.transaction(() => {
+    const row = db.prepare(`SELECT email FROM customers WHERE id = ?`).get(id) as { email: string } | undefined;
+    if (!row) return false;
+    db.prepare(`DELETE FROM customer_baskets WHERE customer_id = ?`).run(id);
+    db.prepare(`DELETE FROM customer_login_codes WHERE email = ?`).run(row.email);
+    db.prepare(`DELETE FROM customers WHERE id = ?`).run(id);
+    return true;
+  })();
+}
+
+/** Delete every account for this address (there is at most one), with baskets and codes. */
+export function deleteCustomersByEmail(email: string): { customers: number; baskets: number; loginCodes: number } {
+  const db = getDb();
+  const address = (email || '').trim();
+  return db.transaction(() => {
+    const ids = (db.prepare(`SELECT id FROM customers WHERE email = ?`).all(address) as { id: string }[]).map(
+      (r) => r.id
+    );
+    let baskets = 0;
+    for (const id of ids) baskets += db.prepare(`DELETE FROM customer_baskets WHERE customer_id = ?`).run(id).changes;
+    const loginCodes = db.prepare(`DELETE FROM customer_login_codes WHERE email = ?`).run(address).changes;
+    const customers = db.prepare(`DELETE FROM customers WHERE email = ?`).run(address).changes;
+    return { customers, baskets, loginCodes };
+  })();
+}
+
+/** The raw account row, for the customer's own data export. */
+export function customerAccountRow(id: string): Record<string, unknown> | null {
+  return (
+    (getDb()
+      .prepare(`SELECT id, email, name, google_sub AS googleSub, created_at AS createdAt, last_login_at AS lastLoginAt FROM customers WHERE id = ?`)
+      .get(id) as Record<string, unknown> | undefined) ?? null
+  );
 }
 
 // ---------------------------------------------------------------------------

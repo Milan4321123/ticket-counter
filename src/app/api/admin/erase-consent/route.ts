@@ -1,21 +1,24 @@
 import { NextResponse } from 'next/server';
 import { isAdminRequest } from '@/lib/auth';
-import { eraseCustomerCards } from '@/lib/cards';
-import { eraseMarketingConsent } from '@/lib/marketing';
+import { erasePersonEverywhere } from '@/lib/erasure';
 import { clientIp, rateLimit } from '@/lib/ratelimit';
 import type { ApiErrorResponse } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Erase an address from everything that outlives the after-event buyer
- * erasure, on request — the marketing consent book AND any customer cards.
+ * Erase an address from EVERYTHING, on request (Art. 17 GDPR) — not only the
+ * records that outlive the after-event sweep, but also everything the sweep
+ * would reach later: orders (anonymised in place, exactly like the sweep),
+ * review bylines, subscriptions, the customer account with its basket and
+ * sign-in codes, referral-voucher addresses, contact requests, waitlists,
+ * questions, the marketing consent book and customer cards.
  *
- * Those two are the whole of it, and that is not a coincidence: they are the
- * only records that survive lib/retention.ts, and each survives for the same
- * reason, that the person ASKED for it. So "delete everything about me" has to
- * take both, or the promise is only half kept. Anything added later that
- * outlives retention belongs in this handler on the day it is written.
+ * The table list lives in lib/erasure.ts (erasePersonEverywhere), beside the
+ * Art. 15 export that reads the same tables, so the two cannot drift. Orders
+ * still awaiting payment are NOT erased — erasing them would make a late
+ * transfer impossible to confirm — and come back in the report for the admin
+ * to cancel first.
  *
  * This is the button behind a legal promise: /privacy and the unsubscribe page
  * both say the do-not-email record is erased entirely when its owner asks, and
@@ -55,11 +58,21 @@ export async function POST(req: Request) {
       );
     }
 
-    const erased = eraseMarketingConsent(email);
-    // Cards go in the same request, across every seller: somebody asking to be
-    // forgotten is asking the platform, not one organizer (lib/cards.ts).
-    const cardsErased = eraseCustomerCards(email);
-    return NextResponse.json({ ok: true, erased, cardsErased });
+    // Across every seller: somebody asking to be forgotten is asking the
+    // platform, not one organizer.
+    const report = erasePersonEverywhere(email);
+    console.log(
+      `Admin erasure: ${report.orders} order(s) anonymised, ${report.ordersInFlight.length} left awaiting payment, ` +
+        `${report.customers} account(s), ${report.subscriptions} subscription(s), ${report.marketingConsents} consent(s), ` +
+        `${report.customerCards} card(s) deleted.`
+    );
+    return NextResponse.json({
+      ok: true,
+      report,
+      // The two numbers the panel used to read, kept for anything still asking.
+      erased: report.marketingConsents,
+      cardsErased: report.customerCards,
+    });
   } catch (e) {
     console.error('POST /api/admin/erase-consent failed:', e);
     return NextResponse.json(

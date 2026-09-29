@@ -1014,6 +1014,29 @@ export interface DeletedEventSummary {
   media: number;
   /** Payout-audit rows removed with the event — they hold IBANs in full. */
   payoutChanges: number;
+  /** Buyers' reviews of this listing's items. */
+  reviews: number;
+  /** Waitlist addresses for this listing. */
+  waitlist: number;
+  /** Subscribe & save standing orders on this listing (each names a buyer). */
+  subscriptions: number;
+}
+
+/**
+ * Every table in the database that has a column of exactly this name. Used by
+ * the delete paths (here and lib/erasure.ts) as a safety net, so a table a
+ * feature adds later cannot silently keep rows for a listing or an organizer
+ * that no longer exists.
+ */
+export function tablesWithColumn(db: ReturnType<typeof getDb>, column: string): string[] {
+  const tables = db
+    .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`)
+    .all() as { name: string }[];
+  return tables
+    .map((t) => t.name)
+    .filter((name) =>
+      (db.pragma(`table_info("${name.replace(/"/g, '""')}")`) as { name: string }[]).some((c) => c.name === column)
+    );
 }
 
 /**
@@ -1059,9 +1082,30 @@ export function deleteEventCompletely(eventId: string): DeletedEventSummary {
     payoutChanges: (
       db.prepare(`SELECT COUNT(*) AS n FROM payout_changes WHERE event_id = ?`).get(eventId) as { n: number }
     ).n,
+    reviews: 0,
+    waitlist: 0,
+    subscriptions: 0,
   };
 
   const tx = db.transaction(() => {
+    // Rows that name a BUYER and point at this listing (or at its orders).
+    // They go before the orders: item_reviews carries real foreign keys to
+    // both the event and the order, and waitlist to the event, so leaving them
+    // made this whole delete throw. Subscriptions have no foreign key, which is
+    // worse — they survived silently, a buyer's name, address and kitchen note
+    // attached to a listing that no longer exists.
+    summary.reviews = db
+      .prepare(
+        `DELETE FROM item_reviews
+         WHERE event_id = ? OR order_id IN (SELECT id FROM orders WHERE event_id = ?)`
+      )
+      .run(eventId, eventId).changes;
+    summary.waitlist = db.prepare(`DELETE FROM waitlist WHERE event_id = ?`).run(eventId).changes;
+    summary.subscriptions = db.prepare(`DELETE FROM subscriptions WHERE event_id = ?`).run(eventId).changes;
+    // A promo code scoped to this one listing can never be spent again.
+    // Organizer-wide codes (event_id NULL or '') are the organizer's and stay.
+    db.prepare(`DELETE FROM promo_codes WHERE event_id = ?`).run(eventId);
+
     // Sales: tickets and items hang off orders, so they go first.
     db.prepare(`DELETE FROM seat_holds WHERE event_id = ?`).run(eventId);
     db.prepare(`DELETE FROM tickets WHERE order_id IN (SELECT id FROM orders WHERE event_id = ?)`).run(eventId);
@@ -1095,13 +1139,25 @@ export function deleteEventCompletely(eventId: string): DeletedEventSummary {
     db.prepare(`DELETE FROM marketing_sends WHERE event_id = ?`).run(eventId);
 
     // The door-scanner revocation counter is keyed per event (lib/auth), so it
-    // would otherwise outlive every link it was ever counting for.
+    // would otherwise outlive every link it was ever counting for. The
+    // capacity-change log (lib/capacity) is keyed the same way.
     db.prepare(`DELETE FROM kv WHERE key = ?`).run(`scan_epoch:${eventId}`);
+    db.prepare(`DELETE FROM kv WHERE key = ?`).run(`capacity_log:${eventId}`);
 
     // Stall links (lib/stalls.ts) reference this listing from EITHER side —
     // as the host event or as the shop — so both directions go with it. The
     // link is consent only, never money, so nothing here needs a husk.
     db.prepare(`DELETE FROM event_stalls WHERE host_event_id = ? OR shop_event_id = ?`).run(eventId, eventId);
+
+    // The safety net: every OTHER table with an event_id column — the lazily
+    // created ones (listing_translations, anything a feature adds later) — so
+    // "every trace of it" stays true without this list having to be
+    // remembered each time a table is born. Everything named above has already
+    // gone, so for those this matches nothing. Table names come from
+    // sqlite_master (our own schema), never from input.
+    for (const table of tablesWithColumn(db, 'event_id')) {
+      db.prepare(`DELETE FROM "${table}" WHERE event_id = ?`).run(eventId);
+    }
 
     db.prepare(`DELETE FROM events WHERE id = ?`).run(eventId);
   });

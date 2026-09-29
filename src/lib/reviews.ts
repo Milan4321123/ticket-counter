@@ -212,11 +212,17 @@ function authorNameForOrder(order: { buyerName: string; buyerEmail: string; buye
  * tiers stay — the buyer bought the thing, and whether it is still on sale is
  * not their business.
  */
-export function reviewableItems(orderId: string): { tierKey: string; name: string; existing: ReviewRow | null }[] {
+export function reviewableItems(
+  orderId: string
+): { tierKey: string; name: string; existing: ReviewRow | null; byline: string }[] {
   const order = getOrder(orderId);
   if (!order || order.status !== 'paid') return [];
   const shop = getEventById(order.eventId);
   if (!shop || shop.kind !== 'shop') return [];
+  // The exact byline writeReview would store for this order right now, so the
+  // form can show the buyer what strangers will read BEFORE they post —
+  // computed by the same function, so the preview and the fact cannot differ.
+  const byline = authorNameForOrder(order);
 
   const tiers = new Map(getEventTiers(shop.id).map((t) => [t.tierKey, t]));
   const mine = new Map(
@@ -227,13 +233,44 @@ export function reviewableItems(orderId: string): { tierKey: string; name: strin
     ).map((r) => [r.tierKey, r])
   );
 
-  const out: { tierKey: string; name: string; existing: ReviewRow | null }[] = [];
+  const out: { tierKey: string; name: string; existing: ReviewRow | null; byline: string }[] = [];
   for (const line of getOrderItems(orderId)) {
     const tier = tiers.get(line.tierId);
     if (!tier) continue;
-    out.push({ tierKey: tier.tierKey, name: tier.name, existing: mine.get(tier.tierKey) ?? null });
+    out.push({ tierKey: tier.tierKey, name: tier.name, existing: mine.get(tier.tierKey) ?? null, byline });
   }
   return out;
+}
+
+/**
+ * The buyer takes their own review back (Art. 17 GDPR) — through the same
+ * emailed-token door that let them write it; the route checks the token.
+ *
+ * A PUBLISHED review is deleted outright, seller reply and all: the words were
+ * the buyer's, and a reply to nothing means nothing.
+ *
+ * A review the platform HID is emptied instead of deleted — its words and its
+ * byline go, the row stays as a hidden husk. Deleting it would free the
+ * UNIQUE (order, item) slot, and "delete, then post again" would be a way
+ * round moderation; an empty hidden row shows nobody anything and holds
+ * nothing about the person.
+ *
+ * Returns what happened, or 'none' when there was nothing to take back.
+ */
+export function deleteOwnReview(orderId: string, tierKey: string): 'deleted' | 'emptied' | 'none' {
+  const db = getDb();
+  const row = db
+    .prepare(`SELECT id, status FROM item_reviews WHERE order_id = ? AND tier_key = ?`)
+    .get(orderId, (tierKey || '').trim()) as { id: string; status: string } | undefined;
+  if (!row) return 'none';
+  if (row.status === 'hidden') {
+    db.prepare(
+      `UPDATE item_reviews SET body = '', author_name = ?, updated_at = datetime('now') WHERE id = ?`
+    ).run(ANONYMOUS_BUYER_NAME, row.id);
+    return 'emptied';
+  }
+  db.prepare(`DELETE FROM item_reviews WHERE id = ?`).run(row.id);
+  return 'deleted';
 }
 
 /**
@@ -528,8 +565,9 @@ export function setSellerReply(reviewId: string, organizerId: string, reply: str
  * published review carrying an old "hidden because…" note would be read as a
  * warning about a review that is, in fact, fine.
  *
- * Nothing is ever deleted. A hidden row still counts as that order's review,
- * so its author cannot slip a second one past the UNIQUE by being moderated.
+ * Moderation never deletes. A hidden row still counts as that order's review,
+ * so its author cannot slip a second one past the UNIQUE by being moderated —
+ * which is also why deleteOwnReview empties a hidden row instead of removing it.
  */
 export function setReviewStatus(reviewId: string, status: 'published' | 'hidden', reason: string): boolean {
   const text = status === 'hidden' ? (reason || '').trim().slice(0, MAX_REPLY_CHARS) : '';
@@ -554,10 +592,10 @@ export function setReviewStatus(reviewId: string, status: 'published' | 'hidden'
  * was erased.
  *
  * Idempotent: a second run touches no row, because the name is already the
- * label it would be set to.
+ * label it would be set to. Returns how many reviews lost a name.
  */
-export function anonymizeReviewsForOrder(orderId: string): void {
-  getDb()
+export function anonymizeReviewsForOrder(orderId: string): number {
+  return getDb()
     .prepare(`UPDATE item_reviews SET author_name = ? WHERE order_id = ? AND author_name <> ?`)
-    .run(ANONYMOUS_BUYER_NAME, orderId, ANONYMOUS_BUYER_NAME);
+    .run(ANONYMOUS_BUYER_NAME, orderId, ANONYMOUS_BUYER_NAME).changes;
 }

@@ -41,6 +41,12 @@ export interface ReviewFormProps {
   existing: ReviewRow | null;
   /** MAX_REVIEW_CHARS, passed down from the server — see the note above. */
   maxChars: number;
+  /**
+   * The exact byline a review from this order is signed with ("Sunita T."),
+   * computed by lib/reviews from the same function that stores it — shown
+   * BEFORE the buyer posts, so what strangers will read is never a surprise.
+   */
+  byline?: string;
 }
 
 /** What POST /api/reviews answers with when it saved something. */
@@ -92,6 +98,7 @@ export default function ReviewForm({
   itemName,
   existing,
   maxChars,
+  byline,
 }: ReviewFormProps) {
   // Unique per instance: an order with six items renders six of these, and six
   // radio groups called "rating" with six inputs called "rating-3" would be one
@@ -102,6 +109,9 @@ export default function ReviewForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedReview | null>(null);
+  // Set once the buyer has taken their review back this visit: the form is
+  // blank again and says so, rather than showing words that no longer exist.
+  const [removed, setRemoved] = useState(false);
 
   // Counted on the TRIMMED text, because that is the string writeReview
   // measures and stores. Counting the raw box instead would let the form say
@@ -118,8 +128,9 @@ export default function ReviewForm({
   // for one sentence only — whether a hidden review is still hidden — and
   // getting it from the last answer the server gave is the only way to be sure
   // the page is not describing a state it has since left.
-  const current: SavedReview | null =
-    saved ?? (existing ? { authorName: existing.authorName, status: existing.status } : null);
+  const current: SavedReview | null = removed
+    ? null
+    : (saved ?? (existing ? { authorName: existing.authorName, status: existing.status } : null));
   const hidden = current?.status === 'hidden';
 
   async function submit(e: React.FormEvent) {
@@ -148,12 +159,47 @@ export default function ReviewForm({
         // response should not be able to tell somebody their review is hidden.
         status: data.status === 'hidden' ? 'hidden' : 'published',
       });
+      setRemoved(false);
       setBusy(false);
     } catch {
       setError('Could not reach the server — please check your connection and try again.');
       setBusy(false);
     }
   }
+
+  /**
+   * Take the review back — the buyer's own words are theirs to withdraw
+   * (Art. 17 GDPR), through the same emailed-token door that let them write.
+   */
+  async function remove() {
+    if (busy) return;
+    if (!window.confirm(`Delete your review of ${itemName}? It disappears from the shop page.`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/reviews', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, token, tierKey }),
+      });
+      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!res.ok || !data?.ok) {
+        setError(data?.error ?? 'That could not be deleted — please try again.');
+        setBusy(false);
+        return;
+      }
+      setSaved(null);
+      setRemoved(true);
+      setRating(null);
+      setText('');
+      setBusy(false);
+    } catch {
+      setError('Could not reach the server — please check your connection and try again.');
+      setBusy(false);
+    }
+  }
+
+  const hasReview = !removed && Boolean(saved || existing);
 
   return (
     <form className="bz-rev-form" onSubmit={submit}>
@@ -256,6 +302,12 @@ export default function ReviewForm({
         </div>
       )}
 
+      {removed && !error && (
+        <div className="notice notice-success" role="status">
+          Deleted — your review is gone from the shop page.
+        </div>
+      )}
+
       {saved && !error && (
         <div className="notice notice-success" role="status">
           {hidden ? (
@@ -270,7 +322,7 @@ export default function ReviewForm({
           ) : saved.authorName ? (
             <>
               Saved — thank you. It appears on the shop page signed{' '}
-              <strong>{saved.authorName}</strong>.
+              <strong translate="no">{saved.authorName}</strong>.
             </>
           ) : (
             <>Saved — thank you.</>
@@ -280,7 +332,7 @@ export default function ReviewForm({
 
       {/* The standing state of an existing review, shown before anything is
           submitted this visit. It says the door is open, not that it is shut. */}
-      {!saved && existing && (
+      {!saved && !removed && existing && (
         <p className="muted small" style={{ margin: 0 }}>
           {hidden ? (
             <>
@@ -289,7 +341,7 @@ export default function ReviewForm({
             </>
           ) : (
             <>
-              You wrote this one already, signed <strong>{existing.authorName}</strong>. Change whatever
+              You wrote this one already, signed <strong translate="no">{existing.authorName}</strong>. Change whatever
               you like and save again — the shop page will show the new version.
             </>
           )}
@@ -301,12 +353,24 @@ export default function ReviewForm({
           <>
             <span className="spinner" aria-hidden /> Saving…
           </>
-        ) : existing || saved ? (
+        ) : hasReview ? (
           'Save changes'
         ) : (
           'Post my review'
         )}
       </button>
+      {/* The byline, said BEFORE the buyer presses the button: exactly what
+          strangers will read above their words. */}
+      {byline && !hasReview && (
+        <p className="muted small" style={{ margin: 0 }}>
+          It will be signed <strong translate="no">{byline}</strong> — never your full surname or your email.
+        </p>
+      )}
+      {hasReview && (
+        <button type="button" className="btn btn-sm" onClick={() => void remove()} disabled={busy}>
+          Delete my review
+        </button>
+      )}
       {/* Why the button is waiting, said in words. role="status" rather than a
           live count, because this sentence only changes when the form crosses
           from postable to not — once, which is exactly how often it is worth

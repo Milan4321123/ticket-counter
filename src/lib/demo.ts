@@ -27,7 +27,8 @@
 import crypto from 'crypto';
 import sharp from 'sharp';
 import { getDb } from './db';
-import { deleteEventCompletely, getEventById, makeUniqueSlug, newId, type EventRow } from './events';
+import { getEventById, makeUniqueSlug, newId, type EventRow } from './events';
+import { purgeOrganizer } from './erasure';
 import { SoldOutError } from './inventory';
 import { mediaFilePath, saveEventPhoto } from './media';
 import { getEventBySlug, getEventMedia } from './events';
@@ -109,37 +110,11 @@ export function deleteDemoAccount(organizerId: string): void {
   if (!row) return;
   if (!row.isDemo) throw new Error('Refusing to delete a real organizer account as a demo');
 
-  const events = db.prepare(`SELECT id FROM events WHERE organizer_id = ?`).all(organizerId) as { id: string }[];
-  for (const { id } of events) {
-    // Rows deleteEventCompletely leaves alone (it keeps buyers' reviews and
-    // waitlist entries for a real listing's own reasons) — a demo keeps nothing.
-    for (const table of ['item_reviews', 'waitlist', 'promo_codes']) {
-      const exists = db.prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`).get(table);
-      if (exists) db.prepare(`DELETE FROM ${table} WHERE event_id = ?`).run(id);
-    }
-    deleteEventCompletely(id);
-  }
-  const tx = db.transaction(() => {
-    for (const table of [
-      'promo_codes',
-      'referral_vouchers',
-      'customer_cards',
-      'marketing_consents',
-      'contact_requests',
-      'organizer_password_reset',
-      'organizer_step_up',
-      'organizer_login_code',
-      'organizer_payment_connections',
-      'payout_changes',
-    ]) {
-      // Some of these are created lazily by their own feature, so a fresh
-      // database may not have them yet.
-      const exists = db.prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`).get(table);
-      if (exists) db.prepare(`DELETE FROM ${table} WHERE organizer_id = ?`).run(organizerId);
-    }
-    db.prepare(`DELETE FROM organizers WHERE id = ? AND is_demo = 1`).run(organizerId);
-  });
-  tx();
+  // The same teardown a real organizer gets when the platform deletes them
+  // (lib/erasure): every listing through deleteEventCompletely, then every
+  // organizer-scoped row, then the account — one list, so the demo sweep and
+  // the admin's delete can never disagree about what "everything" is.
+  purgeOrganizer(organizerId);
 }
 
 export function liveDemoCount(): number {

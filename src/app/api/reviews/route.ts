@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { BodyTooLargeError, readJsonLimited } from '@/lib/http';
 import { verifyOrderAccessToken } from '@/lib/orders';
 import { clientIp, rateLimit } from '@/lib/ratelimit';
-import { writeReview } from '@/lib/reviews';
+import { deleteOwnReview, writeReview } from '@/lib/reviews';
 import type { ApiErrorResponse } from '@/lib/types';
 
 /**
@@ -191,6 +191,51 @@ export async function POST(req: Request) {
     }
   } catch (e) {
     console.error('POST /api/reviews failed:', e);
+    return apiError(500, 'Something went wrong. Please try again.');
+  }
+}
+
+/**
+ * PUBLIC: the buyer takes back their own review of one item (Art. 17 GDPR).
+ *
+ * Exactly the same door as POST above — the token from the buyer's own email
+ * is the whole authentication, for the same reason: the seller knows every
+ * order id, and must not be able to delete the reviews of their goods by
+ * naming them. What "taking back" means (delete, or empty a hidden row so it
+ * cannot be used to dodge moderation) is lib/reviews' deleteOwnReview.
+ */
+export async function DELETE(req: Request) {
+  try {
+    if (!rateLimit(`reviews:ip:${clientIp(req)}`, IP_LIMIT, IP_WINDOW_MS)) {
+      return apiError(429, 'That is a lot of changes at once — please wait a minute and try again.');
+    }
+    let raw: unknown;
+    try {
+      raw = await readJsonLimited(req);
+    } catch (e) {
+      if (e instanceof BodyTooLargeError) return apiError(413, 'That request was too large.');
+      return apiError(400, 'That request could not be read — please reload the page and try again.');
+    }
+    const body = (raw ?? {}) as { orderId?: unknown; token?: unknown; tierKey?: unknown };
+    const orderId = typeof body.orderId === 'string' ? body.orderId.trim() : '';
+    const token = typeof body.token === 'string' ? body.token : '';
+    const tierKey = typeof body.tierKey === 'string' ? body.tierKey.trim() : '';
+    if (!orderId || !tierKey) {
+      return apiError(400, 'That form is missing something — please open your order again from the link in your email.');
+    }
+    if (!verifyOrderAccessToken(orderId, token)) {
+      return apiError(
+        403,
+        'Reviews can only be changed from the link in your order confirmation email — please open your order from there and try again.'
+      );
+    }
+    if (!rateLimit(`reviews:order:${orderId}`, ORDER_LIMIT, ORDER_WINDOW_MS)) {
+      return apiError(429, 'That is a lot of changes at once — please wait a few minutes and try again.');
+    }
+    const outcome = deleteOwnReview(orderId, tierKey);
+    return NextResponse.json({ ok: true, outcome });
+  } catch (e) {
+    console.error('DELETE /api/reviews failed:', e);
     return apiError(500, 'Something went wrong. Please try again.');
   }
 }

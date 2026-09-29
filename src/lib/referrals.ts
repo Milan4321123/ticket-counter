@@ -570,6 +570,12 @@ export function listUnredeemedVouchers(organizerId: string, referrerEmail: strin
  * counting a lifetime of vouchers against a restarted count would leave
  * somebody who earned five under an old deal unable to earn a sixth. Both
  * sides move together, or neither does.
+ *
+ * RETENTION: lib/retention.ts erases referrer_email on SPENT vouchers — but
+ * only once this person has no un-erased paid order left with the organizer.
+ * Until then their referrals still count, and a voucher that stopped counting
+ * here would be issued a second time. After it, countPaidReferrals is zero for
+ * every referral they ever made, so nothing this function returns can matter.
  */
 function countVouchersFor(organizerId: string, referrerEmail: string, since: string | null): number {
   const window = since ? `AND earned_at >= ?` : '';

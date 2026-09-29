@@ -16,6 +16,15 @@
 //   node scripts/backup.mjs --out /mnt/x     -> writes there instead
 //   node scripts/backup.mjs --with-uploads   -> also tars the uploaded media
 //   node scripts/backup.mjs --keep 14        -> prune backups older than N days
+//   node scripts/backup.mjs --prune-only --dry-run -> list what the age limit would delete
+//
+// AGE LIMIT, ALWAYS ON: backups older than MAX_BACKUP_AGE_DAYS (30) are deleted
+// on every run, whether or not --keep is given — a backup is a copy of every
+// buyer's details, and the retention sweep erasing them in the live database
+// means little if a months-old copy still holds them. --keep can only make the
+// window SHORTER. The number mirrors BACKUP_RETENTION_DAYS in
+// src/lib/retention.ts, which /privacy quotes: change one, change both. (This
+// is a plain .mjs script run outside Next, so it cannot import that file.)
 //
 // Restore: stop the app, put the backup file at data/tickets.db (delete any
 // leftover tickets.db-wal / tickets.db-shm beside it), start the app.
@@ -31,9 +40,63 @@ function arg(name, fallback = null) {
   return next && !next.startsWith('--') ? next : true;
 }
 
+/** Mirrors BACKUP_RETENTION_DAYS in src/lib/retention.ts — see the note above. */
+const MAX_BACKUP_AGE_DAYS = 30;
+
 const dataDir = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const dbPath = path.join(dataDir, 'tickets.db');
 const outDir = typeof arg('out') === 'string' ? arg('out') : path.join(dataDir, 'backups');
+
+/**
+ * When a backup was taken: the stamp in its own name (tickets-2026-08-16T21-42-12.db),
+ * which survives a copy or a restore from elsewhere; the file's mtime only when
+ * the name carries no readable stamp.
+ */
+function takenAtMs(file, full) {
+  const m = /^(?:tickets|uploads)-(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})/.exec(file);
+  if (m) {
+    const t = Date.parse(`${m[1]}T${m[2]}:${m[3]}:${m[4]}Z`);
+    if (Number.isFinite(t)) return t;
+  }
+  return fs.statSync(full).mtimeMs;
+}
+
+/**
+ * Delete every backup older than `days` in outDir (only files this script
+ * names: tickets-* and uploads-*). With dryRun, only lists them.
+ */
+function pruneOlderThan(days, dryRun) {
+  if (!fs.existsSync(outDir)) return [];
+  const cutoff = Date.now() - days * 86_400_000;
+  const pruned = [];
+  for (const entry of fs.readdirSync(outDir)) {
+    if (!/^(tickets|uploads)-/.test(entry)) continue;
+    const full = path.join(outDir, entry);
+    if (takenAtMs(entry, full) < cutoff) {
+      if (!dryRun) fs.unlinkSync(full);
+      pruned.push(entry);
+    }
+  }
+  return pruned;
+}
+
+function runPrune(dryRun) {
+  const keep = Number(arg('keep'));
+  const days = Number.isFinite(keep) && keep > 0 ? Math.min(keep, MAX_BACKUP_AGE_DAYS) : MAX_BACKUP_AGE_DAYS;
+  const pruned = pruneOlderThan(days, dryRun);
+  if (pruned.length) {
+    console.log(
+      `${dryRun ? 'Would prune' : 'Pruned'} ${pruned.length} backup file(s) older than ${days} days:\n  ` + pruned.join('\n  ')
+    );
+  } else {
+    console.log(`No backups older than ${days} days.`);
+  }
+}
+
+if (arg('prune-only')) {
+  runPrune(Boolean(arg('dry-run')));
+  process.exit(0);
+}
 
 if (!fs.existsSync(dbPath)) {
   console.error(`No database at ${dbPath} — nothing to back up.`);
@@ -91,17 +154,6 @@ if (arg('with-uploads')) {
   }
 }
 
-const keep = Number(arg('keep'));
-if (Number.isFinite(keep) && keep > 0) {
-  const cutoff = Date.now() - keep * 86_400_000;
-  let pruned = 0;
-  for (const entry of fs.readdirSync(outDir)) {
-    if (!/^(tickets|uploads)-/.test(entry)) continue;
-    const full = path.join(outDir, entry);
-    if (fs.statSync(full).mtimeMs < cutoff) {
-      fs.unlinkSync(full);
-      pruned++;
-    }
-  }
-  if (pruned) console.log(`Pruned ${pruned} backup file(s) older than ${keep} days.`);
-}
+// Always, after a successful backup: the age limit (and --keep, if shorter).
+// The backup just taken is seconds old, so it can never be the one pruned.
+runPrune(Boolean(arg('dry-run')));

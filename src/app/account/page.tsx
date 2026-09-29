@@ -4,6 +4,7 @@ import { formatMoney } from '@/lib/money';
 import { orderUrlForBuyerEmail } from '@/lib/orders';
 import { readListingName } from '@/lib/exampleShop';
 import { everyLabel } from '@/lib/subscriptions';
+import { BUYER_RETENTION_DAYS, CUSTOMER_INACTIVE_DAYS, UNDATED_ORDER_RETENTION_DAYS } from '@/lib/retention';
 import SignInForm from './SignInForm';
 
 export const dynamic = 'force-dynamic';
@@ -30,9 +31,9 @@ function statusLabel(status: string, mode: string): { text: string; tone: string
 export default async function AccountPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; saved?: string; back?: string }>;
+  searchParams: Promise<{ error?: string; saved?: string; back?: string; deleted?: string; delete?: string }>;
 }) {
-  const { error, saved, back: rawBack } = await searchParams;
+  const { error, saved, back: rawBack, deleted, delete: deleteAsk } = await searchParams;
   // Where to go after signing in: a same-site path the link asked for (e.g.
   // the checkout), otherwise the homepage.
   const back = rawBack && rawBack.startsWith('/') && !rawBack.startsWith('//') ? rawBack : '/';
@@ -49,6 +50,13 @@ export default async function AccountPage({
             you a code.
           </p>
           {error && ERRORS[error] && <div className="notice notice-error">{ERRORS[error]}</div>}
+          {deleted && (
+            <div className="notice notice-success" role="status">
+              Your account is deleted, with your saved basket, and you are signed out. Your orders stay with
+              the sellers you bought from until they are erased automatically — to have that happen sooner,{' '}
+              <Link href="/contact">write to us</Link>.
+            </div>
+          )}
           <SignInForm google={googleSignInConfigured()} back={back} />
           <p className="muted small acc-seller">
             Selling here? <Link href="/portal/login">Organizer sign-in →</Link>
@@ -67,8 +75,18 @@ export default async function AccountPage({
       <header className="acc-head anim-fade-up">
         <div>
           <p className="feed-kicker">Your account</p>
-          <h1 className="page-title">{first ? `Namaste, ${first}` : 'Your orders'}</h1>
-          <p className="muted">{customer.email}</p>
+          <h1 className="page-title">
+            {first ? (
+              <>
+                Namaste, <span translate="no">{first}</span>
+              </>
+            ) : (
+              'Your orders'
+            )}
+          </h1>
+          <p className="muted" translate="no">
+            {customer.email}
+          </p>
         </div>
         <form method="post" action="/api/account/logout">
           <button className="btn btn-sm">Sign out</button>
@@ -112,7 +130,9 @@ export default async function AccountPage({
         <h2>Orders &amp; tickets</h2>
         {orders.length === 0 ? (
           <div className="acc-empty">
-            <p>Nothing yet. Orders you place with {customer.email} show up here.</p>
+            <p>
+              Nothing yet. Orders you place with <span translate="no">{customer.email}</span> show up here.
+            </p>
             <p>
               <Link href="/" className="btn btn-sm">
                 Browse events
@@ -182,6 +202,50 @@ export default async function AccountPage({
         <form method="post" action="/api/account/name" className="acc-name">
           <input name="name" defaultValue={customer.name} placeholder="Your name" maxLength={120} aria-label="Your name" />
           <button className="btn btn-sm">Save</button>
+        </form>
+      </section>
+
+      {/* Art. 15 / 20 GDPR: everything held about this (verified) address, as
+          one file. lib/erasure.collectPersonalData reads the same tables the
+          admin's erase tool writes, so the two cannot drift. */}
+      <section className="acc-section anim-fade-up anim-d2" id="data">
+        <h2>Your data</h2>
+        <p className="muted small">
+          Download everything held under <span translate="no">{customer.email}</span> — your account, orders
+          with their items and tickets, subscriptions, reviews, customer cards, keep-me-posted choices,
+          waitlists and messages — as one file (JSON), with how long each is kept.
+        </p>
+        <a href="/api/account/export" className="btn btn-sm" download>
+          Download my data
+        </a>
+      </section>
+
+      {/* Art. 17 GDPR: the account is the customer's own, and so is deleting it. */}
+      <section className="acc-section anim-fade-up anim-d2" id="delete">
+        <h2>Delete my account</h2>
+        <p className="muted small">
+          This deletes your account, your saved basket and any sign-in code, and signs you out. Your{' '}
+          <strong>orders are not part of your account</strong>: each one is the seller&rsquo;s record of a sale
+          and stays with them until it is erased automatically — {BUYER_RETENTION_DAYS} days after the event
+          (for shops, after collection; for listings without a date, {UNDATED_ORDER_RETENTION_DAYS} days after
+          the order). To have them erased sooner, <Link href="/contact">write to us</Link>. Accounts nobody
+          signs in to for {CUSTOMER_INACTIVE_DAYS} days are deleted automatically.
+        </p>
+        {deleteAsk === 'confirm' && (
+          <div className="notice notice-error small" role="alert">
+            Type DELETE in the box to confirm — nothing was deleted.
+          </div>
+        )}
+        <form method="post" action="/api/account/delete" className="acc-name">
+          <input
+            name="confirm"
+            placeholder="Type DELETE"
+            aria-label="Type DELETE to confirm"
+            autoComplete="off"
+            required
+            pattern="[Dd][Ee][Ll][Ee][Tt][Ee]"
+          />
+          <button className="btn btn-sm btn-danger">Delete my account</button>
         </form>
       </section>
     </div>

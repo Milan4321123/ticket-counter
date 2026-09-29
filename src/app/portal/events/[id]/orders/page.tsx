@@ -195,7 +195,7 @@ export default async function PortalOrdersPage({
                     <div className="muted small">
                       {o.itemsSummary} · reserved {o.createdAt.slice(0, 10)}
                     </div>
-                    {kitchenLines.get(o.id) && <div className="small" style={{ color: 'var(--amber)' }}>{kitchenLines.get(o.id)!.line}</div>}
+                    {kitchenLines.get(o.id) && <div className="small" style={{ color: 'var(--amber)' }} translate="no">{kitchenLines.get(o.id)!.line}</div>}
                     {o.buyerPhone && !o.buyerErasedAt && (
                       <a className="small" href={`tel:${o.buyerPhone.replace(/[^\d+]/g, '')}`} translate="no">
                         📞 {o.buyerPhone}
@@ -299,7 +299,7 @@ export default async function PortalOrdersPage({
 
       {query && (
         <p className="muted small">
-          Showing results for &ldquo;{query}&rdquo; —{' '}
+          Showing results for &ldquo;<span translate="no">{query}</span>&rdquo; —{' '}
           <Link href={`/portal/events/${event.id}/orders`} style={{ color: 'var(--accent)' }}>
             clear
           </Link>
@@ -322,17 +322,29 @@ export default async function PortalOrdersPage({
           <div className="oc-list">
             {orders.map((o) => {
               const reference = o.paymentMode === 'transfer' ? o.paymentReference : null;
-              const k = kitchenLines.get(o.id);
+              // Erased by the retention sweep (or on the buyer's request): the
+              // person is gone — name, contact, payer and their free-text note —
+              // and only the seller's arithmetic stays. An order erased before
+              // the note was part of erasure may still carry one in the
+              // database until the next sweep scrubs it; it never reaches here.
+              const erased = Boolean(o.buyerErasedAt);
+              const k0 = kitchenLines.get(o.id);
+              const k =
+                erased && k0?.note
+                  ? { ...k0, note: '', line: k0.line.split(' — ').filter((p) => p !== `“${k0.note}”`).join(' — ') }
+                  : k0;
               const items = o.itemsSummary.split(/,\s(?=\d+×)/).map((line) => {
                 const m = /^(\d+)×\s*(.*)$/.exec(line);
                 return m ? { qty: m[1], name: m[2] } : { qty: '', name: line };
               });
               const awaitingPay = o.paymentMode === 'transfer' && o.status === 'claimed';
               const gone = o.status === 'cancelled' || o.status === 'failed';
-              const phone = o.buyerErasedAt ? '' : o.buyerPhone;
+              const phone = erased ? '' : o.buyerPhone;
               const dial = phone.replace(/[^\d+]/g, '');
               const wa = /^(\+|00)/.test(dial) ? dial.replace(/^\+|^00/, '') : '';
-              const initials = o.buyerName
+              const initials = erased
+                ? ''
+                : o.buyerName
                 .split(/\s+/)
                 .map((w) => w[0] ?? '')
                 .join('')
@@ -391,7 +403,7 @@ export default async function PortalOrdersPage({
                       <span aria-hidden="true">💬</span> {k.note}
                     </blockquote>
                   )}
-                  {o.payerName.trim() && (
+                  {o.payerName.trim() && !erased && (
                     <p className="oc-payer small">
                       Paying as <strong translate="no">{o.payerName.trim()}</strong>
                     </p>
@@ -409,10 +421,14 @@ export default async function PortalOrdersPage({
                           </a>
                         )}
                       </>
+                    ) : erased ? (
+                      <span className="oc-nophone muted small">
+                        Contact details erased under the privacy policy
+                      </span>
                     ) : (
                       <span className="oc-nophone muted small">No phone given</span>
                     )}
-                    {!o.buyerErasedAt && (
+                    {!erased && (
                       <a className="oc-btn" href={`mailto:${o.buyerEmail}`} title={o.buyerEmail} translate="no">
                         ✉ {o.buyerEmail}
                       </a>
@@ -423,7 +439,9 @@ export default async function PortalOrdersPage({
                     {reference ? <ReferenceTag reference={reference} /> : <span />}
                     <div className="oc-actions">
                       {o.status === 'paid' ? (
-                        <ResendButton orderId={o.id} demo={organizer.isDemo} />
+                        // Nothing can be re-sent to an erased buyer: there is
+                        // no address left (lib/email refuses it too).
+                        erased ? null : <ResendButton orderId={o.id} demo={organizer.isDemo} />
                       ) : awaitingPay ? (
                         <TransferActions
                           orderId={o.id}
@@ -432,7 +450,7 @@ export default async function PortalOrdersPage({
                           amountDisplay={formatMoney(o.totalCents, o.currency)}
                           reference={o.paymentReference}
                         />
-                      ) : o.paymentMode === 'transfer' && gone ? (
+                      ) : o.paymentMode === 'transfer' && gone && !erased ? (
                         <TransferActions
                           variant="late"
                           orderId={o.id}

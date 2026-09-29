@@ -182,7 +182,9 @@ export default function ItemReviews({ rating, reviews, itemName, sellerName }: I
                       of "four out of five" waiting to drift out of step with
                       the summary above it. */}
                   <Stars rating={{ count: 1, average: review.rating, stars: starsOf(review.rating) }} />
-                  <span className="bz-rev-author">{review.authorName}</span>
+                  <span className="bz-rev-author" translate="no">
+                    {review.authorName}
+                  </span>
                   {/* On every row, and it is a fact rather than a flourish: a
                       row in item_reviews exists only because writeReview()
                       found a PAID order for this exact item behind it. There
