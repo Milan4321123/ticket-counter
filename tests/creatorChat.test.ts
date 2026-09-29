@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { aiTurn, EMPTY_FIELDS, modelRequestState, modelTranscript, requestMessage, scriptedTurn } from '../src/lib/creatorChat';
+import { aiTurn, detectKind, EMPTY_FIELDS, isIntentOnly, modelRequestState, modelTranscript, requestMessage, scriptedTurn, type ChatTurn, type CreatorFields } from '../src/lib/creatorChat';
 
 const HELLO = 'Namaste 🙏 What would you like us to make?';
 
@@ -17,6 +17,68 @@ test('small talk gets an answer, and never becomes part of the request', () => {
   );
   assert.equal(t2.fields.summary, 'hamro Dashain party ko lagi website chahiyo');
   assert.match(t2.reply, /Kun event/);
+});
+
+/** Plays a whole scripted conversation; returns the fields and every reply. */
+function converse(lines: string[]): { fields: CreatorFields; replies: string[] } {
+  const msgs: ChatTurn[] = [{ from: 'bot', text: HELLO }];
+  let fields = EMPTY_FIELDS;
+  const replies: string[] = [];
+  for (const line of lines) {
+    msgs.push({ from: 'me', text: line });
+    const t = scriptedTurn(msgs, fields);
+    fields = t.fields;
+    replies.push(t.reply);
+    msgs.push({ from: 'bot', text: t.reply });
+  }
+  return { fields, replies };
+}
+
+test('a problem report is a message for the team — no event questions', () => {
+  const { fields, replies } = converse(['there is a problem in your site', 'Ram', 'ram@example.de']);
+  assert.equal(fields.kind, 'general');
+  assert.equal(fields.summary, 'there is a problem in your site');
+  assert.equal(fields.name, 'Ram');
+  assert.equal(fields.eventName, '');
+  assert.ok(replies.every((r) => !/Which event|When and where/.test(r)), replies.join(' | '));
+  assert.match(replies[1], /so he can reply to you/);
+});
+
+test('"Something else" and "I have a question" ask for the message first, typos and all', () => {
+  for (const opener of ['Something else', 'A question or a problem', 'nothing just ask general quesrions', 'Ich habe eine Frage', 'mero euta prashna cha']) {
+    const { fields, replies } = converse([opener, 'Can I pay at the door?', 'Sita', 'sita@example.de']);
+    assert.equal(fields.kind, 'general', opener);
+    assert.equal(fields.summary, 'Can I pay at the door?', opener);
+    assert.equal(fields.name, 'Sita', opener);
+    assert.doesNotMatch(replies[0], /Which event|Lovely/, opener);
+  }
+});
+
+test('wanting to sell asks what and under which name — not an event date', () => {
+  const { fields, replies } = converse(['I want to sell here', 'Momo and sel roti from my kitchen', 'Himalaya Kitchen', 'Hari', 'hari@example.de']);
+  assert.equal(fields.kind, 'organizer-account');
+  assert.equal(fields.summary, 'Momo and sel roti from my kitchen');
+  assert.equal(fields.eventName, 'Himalaya Kitchen');
+  assert.equal(fields.name, 'Hari');
+  assert.ok(replies.every((r) => !/When and where/.test(r)));
+});
+
+test('a page request still gets the event questions', () => {
+  const { fields } = converse(['A custom page for my event', 'Dashain Night', '10 Oct', 'Ram', 'ram@example.de']);
+  assert.equal(fields.kind, 'custom-design');
+  assert.equal(fields.eventName, 'Dashain Night');
+  assert.equal(fields.eventWhen, '10 Oct');
+});
+
+test('kind detection: "your site" is the platform, a website is a page request', () => {
+  assert.equal(detectKind('there is a problem in your site'), 'general');
+  assert.equal(detectKind('Auf eurer Seite funktioniert der Checkout nicht'), 'general');
+  assert.equal(detectKind('A website for our festival'), 'custom-design');
+  assert.equal(detectKind('I want to sell momo'), 'organizer-account');
+  assert.equal(detectKind('My order confirmation never came'), 'general');
+  assert.equal(isIntentOnly('Can I pay at the door?', 'general'), false);
+  assert.equal(isIntentOnly('the checkout does not load', 'general'), false);
+  assert.equal(isIntentOnly('Something else', 'general'), true);
 });
 
 test('the request sent on is the brief and the notes — not the chat', () => {

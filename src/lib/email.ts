@@ -1819,8 +1819,11 @@ export async function sendContactRequestToTeam(
     const lead = wantsAccount
       ? `${strong(request.name)} is asking for an organizer account. Read it, then approve it in the inbox to ` +
         `create the account and email them their sign-in details.`
-      : `${strong(request.name)} would like to talk about a page for their event. Hit reply — this mail goes ` +
-        `straight back to them.`;
+      : request.kind === 'general'
+        ? `${strong(request.name)} sent a message — a question, a problem with the site, or something else. ` +
+          `Hit reply — this mail goes straight back to them.`
+        : `${strong(request.name)} would like to talk about a page for their event. Hit reply — this mail goes ` +
+          `straight back to them.`;
 
     // Only rows they actually filled in — a table of dashes reads as a worse
     // application than it is.
@@ -1914,23 +1917,36 @@ export async function sendContactRequestAck(
     const name = platformName();
     const contactEmail = platformContactEmail();
     const wantsAccount = request.kind === 'organizer-account';
+    const isMessage = request.kind === 'general';
+    // No price, no quote, no "what it would cost": the platform is free and
+    // its operator does not sell services (lib/platform, student permit).
+    const what = wantsAccount ? 'application' : isMessage ? 'message' : 'request';
+    const writeBack = `Thanks for getting in touch. We have your ${what}, and a real person will read it and write back within a couple of days${
+      wantsAccount || isMessage ? '' : ' with some ideas'
+    }.`;
+    const goodToKnowHtml = wantsAccount
+      ? `<strong>What happens next</strong><br>We read what you told us about your event. If it all looks ` +
+        `right we set your account up and email you the sign-in details. The account is free, and so is ` +
+        `publishing. Forgot to mention something? Just reply.`
+      : isMessage
+        ? `<strong>Good to know</strong><br>A question about a ticket you bought, or about an event itself, is ` +
+          `answered fastest by its organizer — they are named on the event page and on your order confirmation.`
+        : `<strong>Good to know</strong><br>The standard event page — photos, video, ticket tiers, QR tickets ` +
+          `and door scanning — is free and already included.`;
+    const goodToKnowText = wantsAccount
+      ? `WHAT HAPPENS NEXT: we read what you told us about your event. If it all looks right we set ` +
+        `your account up and email you the sign-in details. The account is free, and so is publishing. ` +
+        `Forgot to mention something? Just reply.`
+      : isMessage
+        ? `GOOD TO KNOW: a question about a ticket you bought, or about an event itself, is answered fastest ` +
+          `by its organizer — they are named on the event page and on your order confirmation.`
+        : `GOOD TO KNOW: the standard event page (photos, video, ticket tiers, QR tickets and door ` +
+          `scanning) is free and already included.`;
 
     const bodyHtml =
       pHtml(`Hi ${escapeHtml(request.name)},`) +
-      pHtml(
-        `Thanks for getting in touch. We have your ${wantsAccount ? 'application' : 'request'}, and a real ` +
-          `person will read it and write back within a couple of days` +
-          `${wantsAccount ? '' : ' with ideas and what it would cost'}.`,
-        20
-      ) +
-      calloutHtml(
-        wantsAccount
-          ? `<strong>What happens next</strong><br>We read what you told us about your event. If it all looks ` +
-              `right we set your account up and email you the sign-in details. The account is free, and so is ` +
-              `publishing. Forgot to mention something? Just reply.`
-          : `<strong>Good to know</strong><br>The standard event page — photos, video, ticket tiers, QR tickets ` +
-              `and door scanning — is free and already included. What we quote you for is the design work on top.`
-      ) +
+      pHtml(writeBack, 20) +
+      calloutHtml(goodToKnowHtml) +
       quoteHtml('What you sent us', multilineHtml(request.message)) +
       pHtml(
         `Anything to add? Just reply to this email, or write to ` +
@@ -1943,20 +1959,9 @@ export async function sendContactRequestAck(
       lines: [
         `Hi ${request.name},`,
         '',
-        wrapText(
-          `Thanks for getting in touch. We have your ${wantsAccount ? 'application' : 'request'}, and a real ` +
-            `person will read it and write back within a couple of days` +
-            `${wantsAccount ? '.' : ' with ideas and what it would cost.'}`
-        ),
+        wrapText(writeBack),
         '',
-        wrapText(
-          wantsAccount
-            ? `WHAT HAPPENS NEXT: we read what you told us about your event. If it all looks right we set ` +
-                `your account up and email you the sign-in details. The account is free, and so is publishing. ` +
-                `Forgot to mention something? Just reply.`
-            : `GOOD TO KNOW: the standard event page (photos, video, ticket tiers, QR tickets and door ` +
-                `scanning) is free and already included. What we quote you for is the design work on top.`
-        ),
+        wrapText(goodToKnowText),
         '',
         'WHAT YOU SENT US',
         request.message,

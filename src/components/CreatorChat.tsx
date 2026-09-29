@@ -51,8 +51,8 @@ const EMPTY: Fields = {
 };
 
 const HELLO =
-  'Namaste 🙏 I am Milan’s assistant. What would you like us to make — a custom page for your event, a festival website, an app, or something else? Just tell me, in any language.';
-const IDEAS = ['A custom page for my event', 'A website for our festival', 'An app for my shop or restaurant', 'Something else'];
+  'Namaste 🙏 I am Milan’s assistant. Want a custom page for your event, or to sell here — or do you have a question or a problem with the site? Just tell me, in any language.';
+const IDEAS = ['A custom page for my event', 'I want to sell here', 'A question or a problem', 'Something else'];
 const ROWS: { key: keyof Fields; label: string; icon: string }[] = [
   { key: 'summary', label: 'What you want', icon: '✨' },
   { key: 'eventName', label: 'Event or business', icon: '🎪' },
@@ -64,6 +64,24 @@ const ROWS: { key: keyof Fields; label: string; icon: string }[] = [
   { key: 'name', label: 'Your name', icon: '🙂' },
   { key: 'email', label: 'Email', icon: '✉️' },
 ];
+/**
+ * The card shows what THIS kind of request needs: a question needs no event
+ * date, so a visitor with a problem is not shown six empty rows to fill.
+ */
+const ROWS_BY_KIND: Record<Fields['kind'], { key: keyof Fields; label: string; icon: string }[]> = {
+  'custom-design': ROWS,
+  'organizer-account': [
+    { key: 'summary', label: 'What you want to sell', icon: '🛍' },
+    { key: 'eventName', label: 'Shop, business or event', icon: '🏪' },
+    { key: 'name', label: 'Your name', icon: '🙂' },
+    { key: 'email', label: 'Email', icon: '✉️' },
+  ],
+  general: [
+    { key: 'summary', label: 'Your message', icon: '💬' },
+    { key: 'name', label: 'Your name', icon: '🙂' },
+    { key: 'email', label: 'Email', icon: '✉️' },
+  ],
+};
 const STORE = 'creator:chat:v1';
 
 export default function CreatorChat({ owner = 'Milan', ai = false }: { owner?: string; /** Whether replies come from Gemini on this server (lib/gemini, personal). */ ai?: boolean }) {
@@ -119,12 +137,22 @@ export default function CreatorChat({ owner = 'Milan', ai = false }: { owner?: s
     setBusy(true);
     setError('');
     try {
-      const res = await fetch('/api/contact/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: next, fields }),
-      });
-      const d = (await res.json().catch(() => null)) as { reply?: string; fields?: Fields; ready?: boolean; error?: string } | null;
+      const ask = async () => {
+        const res = await fetch('/api/contact/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: next, fields }),
+        });
+        return (await res.json().catch(() => null)) as { reply?: string; fields?: Fields; ready?: boolean; error?: string } | null;
+      };
+      // A reply that is not a reply (the server restarting for a deploy
+      // answers with an error page for a moment): try once more, quietly,
+      // before telling the visitor anything went wrong.
+      let d = await ask().catch(() => null);
+      if (!d?.reply && !d?.error) {
+        await new Promise((r) => setTimeout(r, 1500));
+        d = await ask();
+      }
       if (d?.fields) setFields({ ...EMPTY, ...d.fields });
       setReady(Boolean(d?.ready));
       setTurns((t) => [...t, { from: 'bot', text: d?.reply ?? d?.error ?? 'Sorry — that did not go through. Try again in a moment.' }]);
@@ -161,8 +189,9 @@ export default function CreatorChat({ owner = 'Milan', ai = false }: { owner?: s
     }
   }
 
-  const filled = ROWS.filter((r) => fields[r.key].trim()).length;
-  const pct = Math.round((filled / ROWS.length) * 100);
+  const rows = ROWS_BY_KIND[fields.kind] ?? ROWS;
+  const filled = rows.filter((r) => fields[r.key].trim()).length;
+  const pct = Math.round((filled / rows.length) * 100);
 
   const card = (
     <aside className={`cc-card${ready ? ' is-ready' : ''}`} aria-label="Your request">
@@ -176,7 +205,7 @@ export default function CreatorChat({ owner = 'Milan', ai = false }: { owner?: s
         </div>
       </header>
       <ul className="cc-rows">
-        {ROWS.map((r) => {
+        {rows.map((r) => {
           const v = fields[r.key].trim();
           return (
             <li key={r.key} className={v ? 'is-set' : ''}>
@@ -280,7 +309,7 @@ export default function CreatorChat({ owner = 'Milan', ai = false }: { owner?: s
         {/* Phone: the request as a strip that opens. */}
         <button type="button" className="cc-strip" onClick={() => setOpenCard((o) => !o)} aria-expanded={openCard}>
           <span className="cc-ring cc-ring-sm" style={{ ['--p' as string]: `${pct}%` }} aria-hidden="true" />
-          Your request · {filled}/{ROWS.length}
+          Your request · {filled}/{rows.length}
           {ready && !sent ? ' · ready to send' : ''} {openCard ? '▴' : '▾'}
         </button>
         {!sent && (

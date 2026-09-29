@@ -94,40 +94,99 @@ export interface ChatTurn {
   text: string;
 }
 
-const Q: Record<AskLang, Record<'summary' | 'event' | 'when' | 'name' | 'email' | 'ready', string>> = {
+type QKey = 'summary' | 'message' | 'sell' | 'shop' | 'event' | 'when' | 'name' | 'email' | 'emailReply' | 'ready';
+const Q: Record<AskLang, Record<QKey, string>> = {
   en: {
     summary: 'What would you like us to make — a custom page for an event, a bigger festival site, an app, or something else? A sentence is enough.',
+    message: 'Of course — what would you like to ask or tell Milan? Write it in a sentence or two.',
+    sell: 'Great — what would you like to sell here: tickets for an event, food, or things from your shop? A sentence is enough.',
+    shop: 'And what is your shop, business or event called?',
     event: 'Lovely. Which event or business is it for?',
     when: 'When and where is it, and roughly how many people?',
     name: 'Great — who should Milan reply to? Your name, please.',
     email: 'And your email address, so he can send you some ideas?',
-    ready: 'That is everything — check the request on the right and send it. Milan replies by email.',
+    emailReply: 'And your email address, so he can reply to you?',
+    ready: 'That is everything — check your request and send it. Milan replies by email.',
   },
   de: {
     summary: 'Was dürfen wir für dich bauen — eine eigene Event-Seite, eine Festival-Website, eine App oder etwas anderes? Ein Satz reicht.',
+    message: 'Gern — was möchtest du Milan fragen oder sagen? Ein, zwei Sätze reichen.',
+    sell: 'Super — was möchtest du hier verkaufen: Tickets für ein Event, Essen oder Sachen aus deinem Geschäft? Ein Satz reicht.',
+    shop: 'Und wie heißt dein Geschäft, dein Betrieb oder dein Event?',
     event: 'Schön. Für welches Event oder welches Geschäft?',
     when: 'Wann und wo ist es, und ungefähr wie viele Leute?',
     name: 'Super — wem soll Milan antworten? Dein Name bitte.',
     email: 'Und deine E-Mail-Adresse, damit er dir Ideen schicken kann?',
+    emailReply: 'Und deine E-Mail-Adresse, damit er dir antworten kann?',
     ready: 'Das ist alles — prüfe die Anfrage und schick sie ab. Milan antwortet per E-Mail.',
   },
   ne: {
     summary: 'हामीले के बनाइदिऊँ — कार्यक्रमको आफ्नै पेज, ठूलो फेस्टिभल साइट, एप, वा अरू केही? एक वाक्य पुग्छ।',
+    message: 'हुन्छ — मिलनलाई के सोध्न वा भन्न चाहनुहुन्छ? एक-दुई वाक्य पुग्छ।',
+    sell: 'राम्रो — यहाँ के बेच्न चाहनुहुन्छ: कार्यक्रमको टिकट, खाना, वा पसलको सामान? एक वाक्य पुग्छ।',
+    shop: 'अनि तपाईंको पसल, व्यवसाय वा कार्यक्रमको नाम के हो?',
     event: 'राम्रो। कुन कार्यक्रम वा व्यवसायका लागि?',
     when: 'कहिले र कहाँ, अनि लगभग कति जना?',
     name: 'ठिक छ — मिलनले कसलाई जवाफ दिने? तपाईंको नाम।',
     email: 'अनि इमेल ठेगाना, ताकि उहाँले विचार पठाउन सकून्?',
+    emailReply: 'अनि इमेल ठेगाना, ताकि उहाँले तपाईंलाई जवाफ दिन सकून्?',
     ready: 'सबै भयो — अनुरोध हेरेर पठाउनुहोस्। मिलनले इमेलमा जवाफ दिनुहुन्छ।',
   },
   rn: {
     summary: 'Hamile ke banaidiun — event ko aafnai page, thulo festival site, app, wa aru kei? Euta sentence pugcha.',
+    message: 'Huncha — Milan lai ke sodhna wa bhanna chahanuhuncha? Ek-dui sentence pugcha.',
+    sell: 'Ramro — yaha ke bechna chahanuhuncha: event ko ticket, khana, wa pasal ko saman? Euta sentence pugcha.',
+    shop: 'Ani tapaiko pasal, business wa event ko naam ke ho?',
     event: 'Ramro. Kun event wa business ko lagi?',
     when: 'Kahile ra kaha, ani lagbhag kati jana?',
     name: 'Thik cha — Milan le kaslai reply garne? Tapaiko naam.',
     email: 'Ani email address, taki uhale idea pathaun sakun?',
+    emailReply: 'Ani email address, taki uhale tapailai reply garna sakun?',
     ready: 'Sabai bhayo — request herera pathaunus. Milan le email ma reply garnuhuncha.',
   },
 };
+
+/**
+ * What a visitor's first real message is ABOUT, in any of the chat's
+ * languages. A problem report is always a message for the support inbox —
+ * "there is a problem on your site" mentions a site but is not asking for
+ * one. Then building something (a page, a website, an app), then wanting to
+ * sell here (an account). Anything else is a message to the team: a question
+ * needs no event date, and a message nobody could classify still arrives.
+ */
+const PROBLEM_WORDS =
+  /\b(problem|problems|issue|issues|error|bug|broken|not working|doesn'?t work|does not work|won'?t|can'?t|cannot|failed|wrong|fehler|kaputt|geht nicht|funktioniert nicht|kaam gardaina|chaldaina|samasya)\b|समस्या|चल्दैन|गर्दैन/i;
+const BUILD_WORDS =
+  /\b(page|pages|website|websites|web site|app|apps|design|webseite|homepage|landing ?page|portfolio)\b|(?<!\b(?:your|the|this|ur|on|eure[rn]?|deine[rn]?|tapaiko)\s)\bsite\b|पेज|वेबसाइट|एप/i;
+const SELL_WORDS =
+  /\b(sell|selling|seller|account|sign ?up|register|open (a|my) (shop|store)|list my|verkaufen|verkäufer|konto|anmelden|registrieren|bechna|bechne|bechnu|khata)\b|बेच|खाता/i;
+/** Words that ANNOUNCE a question or a wish to sell, rather than being it. */
+const META_WORDS =
+  /\b(ask\w*|quest\w*|ques\w*|frage\w*|sodh\w*|prashna|sell\w*|verkauf\w*|bechn?\w*|something else|anything else|etwas anderes|aru kei)\b|प्रश्न|सोध|बेच/i;
+/** Exact "what kind" phrases — the chat's own chips among them. */
+const INTENT_ONLY =
+  /^\W*(something else|anything else|other|(i have |just |a |some )*(general )?(question|questions)( or (a )?problem)?|(i )?(want|would like|like) to (ask|sell)( something| here)?|(just )?ask( general)?( questions?)?|sell here|etwas anderes|(eine )?frage|ich (habe|hab) (eine )?frage|ich möchte (etwas )?(fragen|verkaufen)|aru kei|prashna cha|sodhnu cha|bechna chahanchu)\W*$/i;
+
+export function detectKind(text: string): CreatorFields['kind'] {
+  if (PROBLEM_WORDS.test(text)) return 'general';
+  if (BUILD_WORDS.test(text)) return 'custom-design';
+  if (SELL_WORDS.test(text)) return 'organizer-account';
+  return 'general';
+}
+
+/**
+ * "Something else", "I have a question", "I want to sell here" (typos and
+ * all) only say what kind of thing is coming: the chat asks for it next. A
+ * real question or a problem report is the message itself.
+ */
+export function isIntentOnly(said: string, kind: CreatorFields['kind']): boolean {
+  if (kind === 'custom-design') return false;
+  const clean = said.replace(/^(nothing|no|nah|ok|okay),?\s+/i, '').trim();
+  if (INTENT_ONLY.test(clean)) return true;
+  if (said.includes('?') || PROBLEM_WORDS.test(said)) return false;
+  const words = clean.split(/\s+/).length;
+  return words <= 2 || (words <= 6 && META_WORDS.test(clean));
+}
 
 /**
  * The scripted conversation, for when the AI is busy: whatever is missing
@@ -150,26 +209,46 @@ export function scriptedTurn(messages: ChatTurn[], fields: CreatorFields): { rep
   const phone = email ? undefined : findPhones(lastMe)[0];
   if (phone) f.phone = phone.slice(0, 60);
   const said = phone ? lastMe.split(phone).join(' ').replace(/\s+/g, ' ').trim() : lastMe;
+  const asked = (k: QKey) => lastBot.endsWith(q[k]);
+  // The opening greeting (or anything we did not ask) — the first real answer.
+  const opening = !(Object.keys(q) as QKey[]).some(asked);
   if (said && !email) {
-    // Only a real sentence says what they want — not "ok" or "hmm".
-    if (lastBot.endsWith(q.summary) || (!f.summary && !Object.values(q).some((x) => lastBot.endsWith(x)))) {
-      if (said.split(/\s+/).length >= 3) f.summary = said.slice(0, 600);
-    }
-    else if (lastBot.endsWith(q.event)) f.eventName = said.slice(0, 160);
-    else if (lastBot.endsWith(q.when)) f.eventWhen = said.slice(0, 160);
-    else if (lastBot.endsWith(q.name)) f.name = said.slice(0, 120);
+    const words = said.split(/\s+/).length;
+    if (!f.summary && (opening || asked('summary'))) {
+      f.kind = detectKind(said);
+      // "Something else", "I have a question", "I want to sell" is the intent,
+      // not the message itself — ask for that next (isIntentOnly).
+      if (!isIntentOnly(said, f.kind)) {
+        // Only a real sentence says what they want — not "ok" or "hmm".
+        if (words >= 3 || (f.kind === 'general' && said.length >= 10)) f.summary = said.slice(0, 600);
+      }
+    } else if (asked('message') || asked('sell')) {
+      if (said.length >= 10 || words >= 3) f.summary = said.slice(0, 600);
+    } else if (asked('event') || asked('shop')) f.eventName = said.slice(0, 160);
+    else if (asked('when')) f.eventWhen = said.slice(0, 160);
+    else if (asked('name')) f.name = said.slice(0, 120);
   }
+  // Each kind asks only what it needs: a question needs no event date.
+  const design = f.kind === 'custom-design';
   const next = !f.summary
-    ? q.summary
-    : !f.eventName
+    ? f.kind === 'general'
+      ? q.message
+      : f.kind === 'organizer-account'
+        ? q.sell
+        : q.summary
+    : design && !f.eventName
       ? q.event
-      : !f.eventWhen
+      : design && !f.eventWhen
         ? q.when
-        : !f.name
-          ? q.name
-          : !EMAIL_RE.test(f.email)
-            ? q.email
-            : q.ready;
+        : f.kind === 'organizer-account' && !f.eventName
+          ? q.shop
+          : !f.name
+            ? q.name
+            : !EMAIL_RE.test(f.email)
+              ? design
+                ? q.email
+                : q.emailReply
+              : q.ready;
   return { reply: hello + next, fields: f };
 }
 
