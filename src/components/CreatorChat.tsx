@@ -76,6 +76,7 @@ export default function CreatorChat({ owner = 'Milan', ai = false }: { owner?: s
   const [error, setError] = useState('');
   const [openCard, setOpenCard] = useState(false);
   const log = useRef<HTMLDivElement>(null);
+  const mobileCard = useRef<HTMLDivElement>(null);
   const speechBase = useRef('');
 
   // The conversation survives a reload in this tab.
@@ -101,6 +102,13 @@ export default function CreatorChat({ owner = 'Milan', ai = false }: { owner?: s
   useEffect(() => {
     log.current?.scrollTo({ top: log.current.scrollHeight, behavior: 'smooth' });
   }, [turns, busy]);
+  // Phone: the opened request sits BELOW the chat, full height — bring its top
+  // into view so the visitor sees it arrive, with the send button under it.
+  useEffect(() => {
+    if (!openCard) return;
+    const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    mobileCard.current?.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'start' });
+  }, [openCard]);
 
   async function talk(text: string) {
     const said = text.trim();
@@ -275,7 +283,6 @@ export default function CreatorChat({ owner = 'Milan', ai = false }: { owner?: s
           Your request · {filled}/{ROWS.length}
           {ready && !sent ? ' · ready to send' : ''} {openCard ? '▴' : '▾'}
         </button>
-        {openCard && <div className="cc-card-mobile">{card}</div>}
         {!sent && (
           <form
             className="cc-input"
@@ -303,6 +310,14 @@ export default function CreatorChat({ owner = 'Milan', ai = false }: { owner?: s
           </form>
         )}
       </section>
+      {/* Phone: the opened request, below the chat rather than squeezed inside
+          it — the chat has a fixed height, and a card nested in it had to be
+          scrolled in a sliver of screen to reach its send button. */}
+      {openCard && (
+        <div className="cc-card-mobile" ref={mobileCard}>
+          {card}
+        </div>
+      )}
       <div className="cc-card-desk">{card}</div>
     </div>
   );

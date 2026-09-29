@@ -10211,9 +10211,8 @@ html.tx-wait body {
   }
   .cc-card-mobile {
     display: block;
-    margin: 8px 10px 0;
-    max-height: 45vh;
-    overflow-y: auto;
+    /* Below the chat, at its full height: the page scrolls, not the card. */
+    scroll-margin-top: 80px;
   }
   .cc-card-mobile .cc-card {
     position: static;
