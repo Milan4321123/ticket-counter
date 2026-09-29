@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { clientIp, rateLimit } from '@/lib/ratelimit';
-import { isAcceptedAudioMime, transcribeAudio } from '@/lib/transcribe';
+import { isAcceptedAudioMime, transcribeAudio, transcriptionAvailable } from '@/lib/transcribe';
 import type { ApiErrorResponse } from '@/lib/types';
 
 /**
@@ -18,6 +18,7 @@ import type { ApiErrorResponse } from '@/lib/types';
  *   - per request size, so nobody uploads an album.
  */
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 /** ~1 minute of the 16 kHz mono WAV the client uploads, plus base64 overhead. */
 const MAX_AUDIO_BYTES = 3 * 1024 * 1024;
@@ -33,11 +34,27 @@ const GLOBAL_KEY = 'transcribe:all';
 const GLOBAL_LIMIT = 240;
 const GLOBAL_WINDOW_MS = 60 * 60_000;
 
+/**
+ * Whether voice typing works here at all — components/SpeechInput asks once
+ * per page and shows no mic when it does not (no key, or Gemini's unpaid tier,
+ * which may not be sent a voice: lib/transcribe).
+ */
+export function GET() {
+  return NextResponse.json({ available: transcriptionAvailable() }, { headers: { 'Cache-Control': 'no-store' } });
+}
+
 function tooMany(message: string) {
   return NextResponse.json({ error: message } satisfies ApiErrorResponse, { status: 429 });
 }
 
 export async function POST(req: Request) {
+  // Not available: say so before reading (or rate-counting) a recording.
+  if (!transcriptionAvailable()) {
+    return NextResponse.json(
+      { error: 'Voice typing is not set up on this server — please type instead.' } satisfies ApiErrorResponse,
+      { status: 503 }
+    );
+  }
   // rateLimit() returns TRUE when the call is allowed — the limit is the !.
   if (!rateLimit(`transcribe:${clientIp(req)}`, PER_IP_LIMIT, PER_IP_WINDOW_MS)) {
     return tooMany('That is a lot of dictation in a short time — please type this one in.');

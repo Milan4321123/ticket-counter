@@ -19,6 +19,14 @@
 // Same key as the rest of the AI features — one Google AI Studio project, one
 // free-tier allowance shared between them. That sharing is why the model choice
 // below matters so much.
+//
+// A recording of someone's voice is personal data, and on Gemini's unpaid tier
+// Google may keep and review what it is sent. So transcription only runs when
+// a billed Gemini key is configured — GEMINI_PAID_API_KEY, or GEMINI_PAID_TIER
+// for GEMINI_API_KEY — and today's paid cap has room (lib/gemini `personal`);
+// otherwise it is "not set up", and the mic buttons do not appear at all
+// (transcriptionAvailable, read by components/SpeechInput via GET /api/transcribe).
+import { geminiEnabled, geminiKeyFor } from './gemini';
 
 /**
  * Deliberately the lite model, and not a matter of taste.
@@ -86,6 +94,11 @@ const ACCEPTED_MIME = new Set([
   'audio/flac',
 ]);
 
+/** Whether voice typing can work on this server — the mic is only shown when it can. */
+export function transcriptionAvailable(): boolean {
+  return geminiEnabled({ personal: true });
+}
+
 export function isAcceptedAudioMime(mime: string): boolean {
   return ACCEPTED_MIME.has(mime.split(';')[0].trim().toLowerCase());
 }
@@ -113,7 +126,8 @@ export async function transcribeAudio(
   audioBase64: string,
   mime: string
 ): Promise<TranscribeResult> {
-  const key = process.env.GEMINI_API_KEY;
+  // A voice is personal data: never to Gemini's unpaid tier.
+  const key = geminiKeyFor({ personal: true });
   if (!key) {
     return {
       ok: false,

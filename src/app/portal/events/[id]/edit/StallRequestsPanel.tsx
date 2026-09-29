@@ -152,7 +152,7 @@ export default function StallRequestsPanel({
   function statusBadge(link: ShopStallLink) {
     switch (link.status) {
       case 'requested':
-        return <span className="badge badge-amber">Requested — waiting for {link.hostOrganizerName}</span>;
+        return <span className="badge badge-amber">Requested — waiting for <span translate="no">{link.hostOrganizerName}</span></span>;
       case 'approved':
         return link.hostPast ? (
           <span className="badge">The event is over</span>

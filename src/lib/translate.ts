@@ -6,10 +6,18 @@
 // second visitor to see "Collect on Saturdays" in German gets it from disk,
 // instantly and for free. New strings are capped per day (DAILY_NEW_LIMIT) so a
 // bot cannot run up the AI bill; over the cap, the English simply stays.
+//
+// Only PUBLISHED page text belongs here — that is what lets this run on
+// Gemini's unpaid tier (lib/gemini `personal: false`). Buyers' names, emails,
+// notes and codes are kept out twice: the page marks them translate="no" /
+// data-private (components/AutoTranslate skips those), and pageTextsToTranslate
+// below refuses anything shaped like contact details or a site code even if a
+// request bypasses the browser.
 import crypto from 'crypto';
 import { getDb } from './db';
-import { geminiJson } from './gemini';
+import { geminiEnabled, geminiJson } from './gemini';
 import type { Lang } from './i18n';
+import { looksPersonal } from './personalText';
 
 export const MAX_TEXT_LEN = 1200;
 export const MAX_BATCH = 80;
@@ -18,6 +26,15 @@ const DAILY_NEW_LIMIT = 20_000;
 // and a cut-off reply loses the WHOLE batch, not just its last line.
 const MODEL_CHUNK = 15;
 const PARALLEL = 3;
+
+/**
+ * Marker for the one-time purge below. Until September 2026 the page
+ * translator also sent names, order notes and similar that were on screen
+ * without a translate="no" mark, and this cache kept them. Everything cached
+ * before the marks were added is dropped once; the page text is simply
+ * translated again on the next views.
+ */
+export const PII_PURGE_MARKER = 'migration:translations_pii_purge_v1';
 
 let ready = false;
 function db() {
@@ -33,9 +50,27 @@ function db() {
         PRIMARY KEY (lang, hash)
       )
     `);
+    d.transaction(() => {
+      if (d.prepare(`SELECT 1 FROM kv WHERE key = ?`).get(PII_PURGE_MARKER)) return;
+      d.exec(`DELETE FROM translations`);
+      d.prepare(`INSERT INTO kv (key, value) VALUES (?, ?)`).run(PII_PURGE_MARKER, new Date().toISOString());
+    })();
     ready = true;
   }
   return d;
+}
+
+/**
+ * What the page translator may send on, from an untrusted request body: only
+ * strings, only within the size limits — and never one that carries an email
+ * address, a phone number, an IBAN or one of the site's codes (lib/personalText).
+ */
+export function pageTextsToTranslate(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((t): t is string => typeof t === 'string' && t.trim().length > 0 && t.length <= MAX_TEXT_LEN)
+    .filter((t) => !looksPersonal(t))
+    .slice(0, MAX_BATCH);
 }
 
 const hashOf = (s: string) => crypto.createHash('sha1').update(s).digest('hex');
@@ -71,7 +106,8 @@ Rules:
 
 Input:
 ${JSON.stringify(texts)}`;
-  const out = await geminiJson(prompt, { maxOutputTokens: 8192, timeoutMs: 25_000 });
+  // Published page and listing text only (see the top of this file).
+  const out = await geminiJson(prompt, { personal: false, maxOutputTokens: 8192, timeoutMs: 25_000 });
   if (!Array.isArray(out) || out.length !== texts.length) return texts.map(() => null);
   return out.map((v) => (typeof v === 'string' && v.trim() ? v : null));
 }
@@ -94,7 +130,7 @@ export async function translateTexts(lang: Lang, texts: string[]): Promise<Recor
     if (row) result[t] = row.out;
     else missing.push(t);
   }
-  if (missing.length === 0 || !process.env.GEMINI_API_KEY || !takeBudget(missing.length)) return result;
+  if (missing.length === 0 || !geminiEnabled({ personal: false }) || !takeBudget(missing.length)) return result;
 
   const put = d.prepare(
     `INSERT INTO translations (lang, hash, src, out) VALUES (?, ?, ?, ?) ON CONFLICT(lang, hash) DO NOTHING`

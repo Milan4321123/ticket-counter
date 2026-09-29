@@ -51,6 +51,21 @@ interface Props {
   hint?: string;
 }
 
+/**
+ * Whether the server can transcribe at all (GET /api/transcribe). It cannot
+ * without a Gemini key, and it may not on Gemini's unpaid tier — a voice is
+ * personal data (lib/transcribe). Asked once per page load, shared by every
+ * mic on the page; any failure counts as "no".
+ */
+let serverCheck: Promise<boolean> | null = null;
+function serverTranscribes(): Promise<boolean> {
+  serverCheck ??= fetch('/api/transcribe', { method: 'GET', cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d: { available?: unknown } | null) => d?.available === true)
+    .catch(() => false);
+  return serverCheck;
+}
+
 /** True when this browser can record at all. */
 function canRecord(): boolean {
   return (
@@ -59,6 +74,28 @@ function canRecord(): boolean {
     !!navigator.mediaDevices?.getUserMedia &&
     typeof window.MediaRecorder !== 'undefined'
   );
+}
+
+/**
+ * Whether a mic should be shown at all: this browser can record AND the server
+ * can transcribe. False on the server render and until the check lands, so
+ * the first client render agrees with the server. Also for decorative mics
+ * elsewhere (the Ask pill), which must not promise voice input that is off.
+ */
+export function useVoiceTyping(): boolean {
+  const [ok, setOk] = useState(false);
+  useEffect(() => {
+    let live = true;
+    if (canRecord()) {
+      void serverTranscribes().then((yes) => {
+        if (yes && live) setOk(true);
+      });
+    }
+    return () => {
+      live = false;
+    };
+  }, []);
+  return ok;
 }
 
 /**
@@ -141,7 +178,7 @@ function toBase64(blob: Blob): Promise<string> {
 }
 
 export default function SpeechInput({ onText, onStart, label, hint }: Props) {
-  const [available, setAvailable] = useState(false);
+  const available = useVoiceTyping();
   const [phase, setPhase] = useState<Phase>('idle');
   const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -157,9 +194,8 @@ export default function SpeechInput({ onText, onStart, label, hint }: Props) {
   onTextRef.current = onText;
   onStartRef.current = onStart;
 
-  // Checked in an effect so the server render and the first client render agree.
   useEffect(() => {
-    setAvailable(canRecord());
+    cancelledRef.current = false;
     return () => {
       cancelledRef.current = true;
       if (timerRef.current) clearInterval(timerRef.current);
@@ -352,8 +388,8 @@ function micErrorMessage(e: unknown): string {
     }, 1000);
   }
 
-  // Renders nothing where recording is impossible, so callers can mount it
-  // unconditionally next to a textarea that still works.
+  // Renders nothing where recording or transcription is impossible, so callers
+  // can mount it unconditionally next to a textarea that still works.
   if (!available) return null;
 
   const busy = phase === 'working';

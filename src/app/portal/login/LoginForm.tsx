@@ -141,7 +141,7 @@ export default function LoginForm() {
           {factor === 'email' ? (
             <>
               Your password was correct. We sent a 6-digit code to{' '}
-              <strong>{sentTo || 'the address on your account'}</strong> — type it in below. It
+              <strong translate={sentTo ? 'no' : undefined}>{sentTo || 'the address on your account'}</strong> — type it in below. It
               expires in 10 minutes.
             </>
           ) : (

@@ -6,13 +6,16 @@
 // {"confident":boolean,"answer":string} verdict grounded in a context block —
 // so the provider selection lives here exactly once:
 //
-//   1. Google Gemini (free tier) when GEMINI_API_KEY is set,
-//   2. Anthropic (Haiku) when the Gemini call fails or the key is missing,
+//   1. Google Gemini when GEMINI_API_KEY is set — and, because what reaches
+//      this ladder is text a person typed, only on a billed key within the
+//      daily paid cap (GEMINI_PAID_API_KEY / GEMINI_PAID_TIER, lib/gemini),
+//   2. Anthropic (Haiku) when the Gemini call fails, is not allowed, or the
+//      key is missing,
 //   3. null when no provider produced a usable answer.
 //
 // Callers decide what null means for them (escalate to the organizer, or a
-// friendly "not sure" message). They distinguish "no keys configured at all"
-// via geminiEnabled() / ANTHROPIC_API_KEY themselves.
+// friendly "not sure" message). They distinguish "no provider at all" via
+// geminiEnabled({ personal: true }) / ANTHROPIC_API_KEY themselves.
 import Anthropic from '@anthropic-ai/sdk';
 import { geminiEnabled, geminiJson } from './gemini';
 import { platformNameFromEnv } from './platform';
@@ -67,14 +70,23 @@ export async function jsonWithBestModel<T>(
   schemaHint: string,
   schema: Record<string, unknown>,
   parse: (value: unknown) => T | null,
-  /** Room for LIST-shaped replies; the default keeps one-answer callers as they were. */
-  opts: { maxTokens?: number; geminiOutputTokens?: number } = {}
+  opts: {
+    /**
+     * Can the prompt contain personal data (lib/gemini)? Required, so every
+     * caller chooses; true keeps it off Gemini's unpaid tier (Anthropic's
+     * commercial API still answers when its key is set).
+     */
+    personal: boolean;
+    /** Room for LIST-shaped replies; the default keeps one-answer callers as they were. */
+    maxTokens?: number;
+    geminiOutputTokens?: number;
+  }
 ): Promise<T | null> {
-  if (geminiEnabled()) {
+  if (geminiEnabled(opts)) {
     const prompt = `${systemRules}\n\n${schemaHint}\n\n${userPrompt}`;
     const raw = opts.geminiOutputTokens
-      ? await geminiJson(prompt, { maxOutputTokens: opts.geminiOutputTokens, timeoutMs: 30_000 })
-      : await geminiJson(prompt);
+      ? await geminiJson(prompt, { personal: opts.personal, maxOutputTokens: opts.geminiOutputTokens, timeoutMs: 30_000 })
+      : await geminiJson(prompt, { personal: opts.personal });
     const parsed = parse(raw);
     if (parsed) return parsed;
     // Gemini failed (quota, network, bad shape) — fall through to Anthropic.
@@ -104,6 +116,10 @@ export async function jsonWithBestModel<T>(
  * Ask the best available model to answer `userPrompt` under `systemRules`,
  * expecting strict JSON {"confident":boolean,"answer":string}.
  *
+ * Every caller passes a visitor's own question (event Q&A, the help bot, the
+ * homepage Ask chat), so this is always a PERSONAL call: never Gemini's
+ * unpaid tier.
+ *
  * Returns null when no provider is configured OR every configured provider
  * failed/refused — callers treat both as "no AI answer this time".
  */
@@ -112,7 +128,7 @@ export async function answerWithBestModel(
   userPrompt: string,
   schemaHint: string
 ): Promise<BestModelAnswer | null> {
-  return jsonWithBestModel(systemRules, userPrompt, schemaHint, ANSWER_SCHEMA, parseBestModelAnswer);
+  return jsonWithBestModel(systemRules, userPrompt, schemaHint, ANSWER_SCHEMA, parseBestModelAnswer, { personal: true });
 }
 
 /**

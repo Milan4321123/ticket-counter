@@ -262,7 +262,7 @@ function ProviderCard({
             <>
               <span className="badge badge-green">Connected</span>{' '}
               {connection.sandbox && <span className="badge badge-amber">Test mode</span>}
-              <div className="muted small" style={{ marginTop: 2 }}>
+              <div className="muted small" style={{ marginTop: 2 }} translate={connection.accountLabel ? 'no' : undefined}>
                 {connection.accountLabel || 'Your own account'}
               </div>
             </>

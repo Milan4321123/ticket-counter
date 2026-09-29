@@ -342,6 +342,8 @@ export default function ChatWidget({ title, subtitle, placeholder, endpoint, ext
             className={`chat-bubble ${m.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-assistant'}${
               m.tone === 'muted' ? ' chat-bubble-muted' : ''
             }${m.tone === 'error' ? ' chat-bubble-error' : ''}`}
+            // The visitor's own words never go to the page translator.
+            translate={m.role === 'user' ? 'no' : undefined}
           >
             {m.text}
             {/* Plain text link rather than a button: this is an offer inside a

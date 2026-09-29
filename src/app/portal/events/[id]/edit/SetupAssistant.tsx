@@ -1421,7 +1421,7 @@ export default function SetupAssistant({
         </header>
         <div className="sa-log ab-log" ref={logRef} aria-live="polite">
           {messages.map((m, i) => (
-            <div key={i} className={`sa-msg sa-${m.from}`}>
+            <div key={i} className={`sa-msg sa-${m.from}`} translate={m.from === 'me' ? 'no' : undefined}>
               {m.text ? <p style={{ whiteSpace: 'pre-line' }}>{m.links ? withLinks(m.text) : m.text}</p> : null}
               {m.links && m.links.length > 0 && (
                 <div className="ks-presets" style={{ marginTop: 8 }}>

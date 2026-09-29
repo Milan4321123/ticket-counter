@@ -571,7 +571,8 @@ export async function aiFilters(text: string, prev: AskFilters | null): Promise<
       '"events":{"q":string,"city":string,"from":"YYYY-MM-DD"|"","to":"YYYY-MM-DD"|"","whenLabel":string}}. ' +
       'q is one or two English product or event words (e.g. "momo", "achar", "dhaka topi", "dashain") or "". ' +
       'Prices are in euro cents. shopping=false when the message is not asking to find items or events.',
-    { timeoutMs: 8000 }
+    // The visitor's own chat message: personal, never to the unpaid tier.
+    { personal: true, timeoutMs: 8000 }
   ).catch(() => null);
   if (!raw || typeof raw !== 'object' || (raw as { shopping?: unknown }).shopping !== true) return null;
   const clean = cleanFilters(raw);

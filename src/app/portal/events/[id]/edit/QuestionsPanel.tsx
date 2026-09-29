@@ -161,7 +161,7 @@ export default function QuestionsPanel({ eventId, questions, answeredCount }: Pr
           <div className="small" style={{ marginTop: 6 }}>
             {q.askerEmail ? (
               <span className="badge badge-green">
-                Your answer is emailed to {q.askerEmail}
+                Your answer is emailed to <span translate="no">{q.askerEmail}</span>
               </span>
             ) : (
               <span className="badge">Asked anonymously — answer appears on your page only</span>
@@ -177,6 +177,8 @@ export default function QuestionsPanel({ eventId, questions, answeredCount }: Pr
             onChange={(e) => setDrafts((d) => ({ ...d, [q.id]: e.target.value }))}
             disabled={busyId !== null}
             aria-label={`Your answer to: ${q.question}`}
+            // The label quotes the visitor's private question: not for the page translator.
+            data-private-attrs=""
           />
           {errors[q.id] ? (
             <div className="notice notice-error small" style={{ margin: '10px 0 0' }}>

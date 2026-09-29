@@ -132,7 +132,9 @@ export default function HostStallsPanel({
                   ) : (
                     <span style={{ fontWeight: 700 }}>{r.shopName}</span>
                   )}
-                  <span className="muted small">sold by {r.sellerName}</span>
+                  <span className="muted small">
+                    sold by <span translate="no">{r.sellerName}</span>
+                  </span>
                   <span className="muted small">asked {r.requestedAt.slice(0, 10)}</span>
                 </div>
                 <p className="muted small" style={{ margin: '6px 0 0' }}>
@@ -142,7 +144,7 @@ export default function HostStallsPanel({
                 </p>
                 {r.message ? (
                   <div className="small" style={{ marginTop: 8, padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8 }}>
-                    &ldquo;{r.message}&rdquo;
+                    &ldquo;<span translate="no">{r.message}</span>&rdquo;
                   </div>
                 ) : null}
                 {errors[r.id] ? (
@@ -188,7 +190,9 @@ export default function HostStallsPanel({
                   ) : (
                     <span style={{ fontWeight: 700 }}>{s.shopName}</span>
                   )}
-                  <span className="muted small">sold by {s.sellerName}</span>
+                  <span className="muted small">
+                    sold by <span translate="no">{s.sellerName}</span>
+                  </span>
                   {/* The same rule the public page reads (stallVisibleOnEventPage),
                       so this tick can never disagree with what buyers see. */}
                   {s.visible ? (

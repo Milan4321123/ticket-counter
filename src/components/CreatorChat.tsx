@@ -3,8 +3,16 @@
 // "Talk to the creator" — /contact as a conversation instead of a form. The
 // assistant (api/contact/chat) asks one short question at a time; beside the
 // chat the request fills itself in, line by line. When it is complete, one
-// tap (with the privacy tick) sends it to Milan with the conversation — the
-// same record and emails the form makes. The form stays below as a fallback.
+// tap sends it to Milan — the same record and emails the form makes. The form
+// stays below as a fallback.
+//
+// Privacy, in the order the visitor meets it: a line above the chat says,
+// before anything is typed, whether answers come from an AI and asks for no
+// sensitive details; what they type is marked translate="no" so the page
+// translator never sends it anywhere; and the send step INFORMS (Art. 13
+// GDPR) rather than asking for a tick — answering a request someone sent us
+// rests on Art. 6(1)(b)/(f), and a mandatory "I agree" box would pretend it
+// were consent.
 import { useEffect, useRef, useState } from 'react';
 import SpeechInput from './SpeechInput';
 
@@ -58,13 +66,12 @@ const ROWS: { key: keyof Fields; label: string; icon: string }[] = [
 ];
 const STORE = 'creator:chat:v1';
 
-export default function CreatorChat({ owner = 'Milan' }: { owner?: string }) {
+export default function CreatorChat({ owner = 'Milan', ai = false }: { owner?: string; /** Whether replies come from Gemini on this server (lib/gemini, personal). */ ai?: boolean }) {
   const [turns, setTurns] = useState<Turn[]>([{ from: 'bot', text: HELLO }]);
   const [fields, setFields] = useState<Fields>(EMPTY);
   const [ready, setReady] = useState(false);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
-  const [consent, setConsent] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
   const [openCard, setOpenCard] = useState(false);
@@ -121,14 +128,14 @@ export default function CreatorChat({ owner = 'Milan' }: { owner?: string }) {
   }
 
   async function send() {
-    if (!ready || !consent || busy) return;
+    if (!ready || busy) return;
     setBusy(true);
     setError('');
     try {
       const res = await fetch('/api/contact/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: turns, fields, send: true, consent: true }),
+        body: JSON.stringify({ messages: turns, fields, send: true }),
       });
       const d = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
       if (d?.ok) {
@@ -183,14 +190,14 @@ export default function CreatorChat({ owner = 'Milan' }: { owner?: string }) {
         </p>
       ) : ready ? (
         <div className="cc-send">
-          <label className="cc-consent">
-            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-            <span>
-              I agree that these details and this conversation are stored and used to answer my request (read only by the team, no
-              mailing list; delete any time). <a href="/privacy" target="_blank" rel="noopener">Privacy</a>
-            </span>
-          </label>
-          <button type="button" className="btn btn-brand btn-lg btn-block" onClick={() => void send()} disabled={!consent || busy}>
+          <p className="cc-info" style={{ margin: 0, fontSize: '0.8rem', opacity: 0.85 }}>
+            Sending passes these details to {owner}, who uses them only to answer your request (Art. 6(1)(b) and (f) GDPR) — no
+            mailing list, and you can have them deleted any time.{' '}
+            <a href="/privacy" target="_blank" rel="noopener">
+              Privacy
+            </a>
+          </p>
+          <button type="button" className="btn btn-brand btn-lg btn-block" onClick={() => void send()} disabled={busy}>
             {busy ? 'Sending…' : `Send to ${owner} →`}
           </button>
           {error && <p className="cc-error">{error}</p>}
@@ -227,9 +234,21 @@ export default function CreatorChat({ owner = 'Milan' }: { owner?: string }) {
             </button>
           )}
         </header>
+        <p
+          className="cc-notice"
+          style={{ margin: 0, padding: '8px 16px', fontSize: '0.78rem', opacity: 0.75, borderBottom: '1px solid rgba(255, 255, 255, 0.07)' }}
+        >
+          {ai ? 'Answers in this chat come from an AI (Google Gemini).' : 'Answers in this chat are automated.'} Please
+          don&rsquo;t type sensitive personal details.{' '}
+          <a href="/privacy" target="_blank" rel="noopener">
+            Privacy
+          </a>
+        </p>
         <div className="cc-log" ref={log}>
           {turns.map((m, i) => (
-            <div key={i} className={`cc-msg cc-${m.from}`}>
+            // What the visitor typed — and any reply that may echo it — is never
+            // sent to the page translator. Only the opening greeting is ours.
+            <div key={i} className={`cc-msg cc-${m.from}`} translate={i === 0 && m.from === 'bot' ? undefined : 'no'}>
               {m.text}
             </div>
           ))}

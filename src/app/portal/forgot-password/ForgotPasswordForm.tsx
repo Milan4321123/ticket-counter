@@ -165,7 +165,7 @@ export default function ForgotPasswordForm() {
     return (
       <form key="code" className="anim-fade-up" onSubmit={submitReset}>
         <p style={{ marginTop: 0 }}>
-          If <strong>{sentTo || email}</strong> has an account, a 6-digit code is on its way. Type it
+          If <strong translate="no">{sentTo || email}</strong> has an account, a 6-digit code is on its way. Type it
           below with the password you would like from now on.
         </p>
         {error && <div className="notice notice-error">{error}</div>}

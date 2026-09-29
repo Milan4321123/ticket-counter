@@ -303,7 +303,8 @@ export default function BankForm({ eventId, kind, initial, queued, routes, conne
               <strong>
                 {r.title} {r.on ? '✓' : ''}
               </strong>
-              <span>{r.line}</span>
+              {/* A connected account's label (its email or name) is the seller's, not page text. */}
+              <span translate={r.key !== 'transfer' && r.needs === null ? 'no' : undefined}>{r.line}</span>
             </button>
           ))}
         </div>

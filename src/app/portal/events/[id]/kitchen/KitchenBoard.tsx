@@ -266,6 +266,9 @@ export default function KitchenBoard({
                 {list.map((t) => (
                   <article
                     key={t.orderId}
+                    // Its aria-label names the buyer: kept from the page translator
+                    // (components/AutoTranslate); the card's own words still translate.
+                    data-private-attrs=""
                     ref={(el) => {
                       if (el) cardEls.current.set(t.orderId, el);
                       else cardEls.current.delete(t.orderId);

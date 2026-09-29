@@ -503,6 +503,7 @@ export default function DetailsForm({ eventId, isDraft, kind, initial }: Props) 
               value={whatsappName}
               onChange={(e) => setWhatsappName(e.target.value)}
               placeholder={initial.accountName}
+              data-private-attrs=""
               maxLength={60}
             />
           </div>

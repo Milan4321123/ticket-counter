@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { Lang } from '@/lib/i18n';
-import SpeechInput from './SpeechInput';
+import SpeechInput, { useVoiceTyping } from './SpeechInput';
 import StoryPlayer from './StoryPlayer';
 import { blurOnTouch, focusUnlessTouch, scrollChat } from '@/lib/chatScroll';
 
@@ -159,6 +159,8 @@ export default function AskBar({ lang = 'en', where = 'home' }: { lang?: Lang; w
   const w = where === 'bazaar' ? { ...base, ideas: base.shop } : base;
   const [open, setOpen] = useState(false);
   const [tick, setTick] = useState(0);
+  // The little mic in the pill promises voice input — only where it works.
+  const voice = useVoiceTyping();
 
   // The pill's hint cycles through what you could ask.
   useEffect(() => {
@@ -180,9 +182,11 @@ export default function AskBar({ lang = 'en', where = 'home' }: { lang?: Lang; w
                 ? w.pill
                 : `${w.ideas[(tick - 1) % w.ideas.length]}…`}
           </span>
-          <span className="ab-mic" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
-          </span>
+          {voice && (
+            <span className="ab-mic" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
+            </span>
+          )}
         </span>
       </button>
       {open && <AskOverlay w={w} onClose={() => setOpen(false)} />}

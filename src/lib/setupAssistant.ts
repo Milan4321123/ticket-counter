@@ -10,8 +10,10 @@
 //   · a calendar date as YYYY-MM-DD, in the future, for events only;
 //   · a shop's shelf from the fixed category list, or nothing;
 //   · at most 10 ticket types / items, names ≤ 60 characters.
-// With no AI (no key, busy, quota), a plain-rules reader still picks out
-// prices, dates, capacity and a city — less, but never wrong in the same way.
+// With no AI (no key, busy, quota — or Gemini's unpaid tier, which may not be
+// sent what a seller types: lib/gemini `personal`), a plain-rules reader still
+// picks out prices, dates, capacity and a city — less, but never wrong in the
+// same way.
 import { geminiJson } from './gemini';
 import { SHOP_CATEGORIES } from './categories';
 
@@ -321,6 +323,9 @@ export function soundsLikeFood(said: string): boolean {
 export async function proposeSetup(said: string, kind: 'event' | 'shop'): Promise<SetupAnswer> {
   const suggested = wantsSuggestions(said);
   const raw = (await geminiJson(prompt(kind, said), {
+    // What the seller typed or dictated: free text that can name people or
+    // carry a phone number — never to the unpaid tier.
+    personal: true,
     maxOutputTokens: suggested ? 6000 : 2000,
     timeoutMs: suggested ? 30_000 : 20_000,
   })) as Record<string, unknown> | null;

@@ -194,7 +194,9 @@ export default async function PortalReviewsPage({
               return (
                 <div key={r.id} id={`r-${r.id}`} className="card anim-fade-up">
                   <div className="bz-rev-head">
-                    <span className="bz-rev-author">{r.authorName}</span>
+                    <span className="bz-rev-author" translate="no">
+                      {r.authorName}
+                    </span>
                     <Stars rating={oneReview(r.rating)} />
                     {r.status === 'hidden' && <span className="badge badge-red">Taken down</span>}
                     <span className="bz-rev-date">{reviewDate(r.createdAt)}</span>
@@ -213,7 +215,10 @@ export default async function PortalReviewsPage({
                   </p>
 
                   {r.body ? (
-                    <p className="bz-rev-body">{r.body}</p>
+                    // A review the platform took down is no longer published text.
+                    <p className="bz-rev-body" translate={r.status === 'hidden' ? 'no' : undefined}>
+                      {r.body}
+                    </p>
                   ) : (
                     <p className="muted small" style={{ margin: '7px 0 0' }}>
                       They rated it and left it there — no words.

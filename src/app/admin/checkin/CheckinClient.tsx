@@ -341,7 +341,7 @@ export default function CheckinClient({
               {result.card.heldForDays} {result.card.heldForDays === 1 ? 'day' : 'days'}
               {result.card.lastSeenAt ? ` · last seen ${result.card.lastSeenAt} (UTC)` : ''}
             </div>
-            <div className={`small ${styles.resultDetail}`}>{result.card.email}</div>
+            <div className={`small ${styles.resultDetail}`} translate="no">{result.card.email}</div>
             {result.card.vouchers.length > 0 ? (
               <div className={styles.resultDetail}>
                 Unspent codes:{' '}

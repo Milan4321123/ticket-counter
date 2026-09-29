@@ -5,6 +5,39 @@
 // so quota errors (429) are an expected, normal condition: every failure of
 // any kind returns null and the caller (src/lib/assistant.ts) falls back to
 // Anthropic or to organizer-answered questions. Nothing here ever throws.
+//
+// PERSONAL DATA, AND GOOGLE'S OWN TERMS. The Gemini API Additional Terms say
+// two things that matter here (checked 2026-09-30):
+//   · "You may use only Paid Services when making API Clients available to
+//     users in the European Economic Area" — this site's visitors are. So the
+//     project behind the key is meant to have billing on, full stop.
+//   · Only paid services come with Google's data processing terms, and on the
+//     unpaid tier (outside the EEA) content may be used to improve Google's
+//     products.
+// So text that can contain somebody's personal data (a visitor's question, a
+// voice recording, the contact chat, what a seller types into an assistant)
+// only ever goes to a BILLED project. Every call has to say which kind it is
+// (`personal`, required), so a new caller cannot forget to choose. Which key a
+// call uses (routeFor):
+//
+//   personal     → GEMINI_PAID_API_KEY (a billed project) when set; else
+//                  GEMINI_API_KEY only if GEMINI_PAID_TIER=1 says its own
+//                  project is billed; else refused.
+//   not personal → the billed key whenever one is configured; otherwise
+//   (published      GEMINI_API_KEY as it is (it only ever carries published
+//    page text)     page and listing text).
+//
+// A PAID call first takes one unit of a site-wide daily bucket (lib/aiQuota),
+// and only climbs the lite rungs of the model ladder (a full flash model costs
+// ~5x). Personal calls and page translation have SEPARATE buckets
+// (geminiPaidDailyCap / geminiPaidTranslateDailyCap in lib/legal), so a burst
+// of translation — the first German visitor after a deploy — can never use up
+// the day's visitor questions, and each bucket puts a hard ceiling on the
+// bill. A refused call — not allowed, or its bucket used up — returns null
+// exactly as if no key were configured, and the caller's existing fallback
+// takes over. Never an error.
+import { hasAiQuota, takeAiQuota } from './aiQuota';
+import { geminiPaidApiKey, geminiPaidDailyCap, geminiPaidTranslateDailyCap } from './legal';
 
 /**
  * The models tried, in order, for every question.
@@ -36,6 +69,12 @@ const MODEL_LADDER = Array.from(
   )
 );
 
+/** GEMINI_MODEL, when set: the operator's explicit choice, allowed on paid calls even if it is not a lite model. */
+const EXPLICIT_MODEL = (process.env.GEMINI_MODEL || '').trim();
+
+/** Paid calls use the lite models only — the full flash rungs cost about five times as much. */
+const PAID_LADDER = MODEL_LADDER.filter((m) => /lite/i.test(m) || m === EXPLICIT_MODEL);
+
 const modelUrl = (model: string) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
@@ -43,6 +82,8 @@ const modelUrl = (model: string) =>
  * A model that just said "busy" (503) or "quota" (429) is skipped for a while,
  * so the next visitor does not wait for the same refusal again. 404 (retired)
  * is benched for an hour. Per server process; a restart forgets it, harmlessly.
+ * Keyed per key AND model: the free project's quota says nothing about the
+ * paid one's.
  */
 const benchedUntil = new Map<string, number>();
 const BENCH_MS: Record<number, number> = { 503: 60_000, 500: 60_000, 429: 5 * 60_000, 404: 60 * 60_000 };
@@ -63,8 +104,96 @@ function warnThrottled(message: string) {
   console.warn(message);
 }
 
-export function geminiEnabled(): boolean {
-  return Boolean(process.env.GEMINI_API_KEY);
+/** The site-wide daily bucket every PAID personal-content call is counted against (lib/aiQuota). */
+export const PAID_BUCKET = 'gemini-paid:all';
+/** The separate daily bucket for PAID page/listing translation calls. */
+export const PAID_TRANSLATE_BUCKET = 'gemini-paid:translate';
+const paidBucket = (kind: { personal: boolean }) =>
+  kind.personal
+    ? { key: PAID_BUCKET, perDay: geminiPaidDailyCap() }
+    : { key: PAID_TRANSLATE_BUCKET, perDay: geminiPaidTranslateDailyCap() };
+
+/** GEMINI_PAID_TIER: GEMINI_API_KEY's own project is billed, so every call on it costs. */
+function wholeProjectBilled(): boolean {
+  const v = (process.env.GEMINI_PAID_TIER || '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes';
+}
+
+interface Route {
+  key: string;
+  /** Billed: counted against PAID_BUCKET, lite models only. */
+  paid: boolean;
+}
+
+/** Which key a call of this kind would use, and whether it is billed — or null: may not be made at all. */
+function routeFor(kind: { personal: boolean }): Route | null {
+  const free = (process.env.GEMINI_API_KEY || '').trim();
+  const paidKey = geminiPaidApiKey();
+  if (kind.personal) {
+    if (paidKey) return { key: paidKey, paid: true };
+    if (free && wholeProjectBilled()) return { key: free, paid: true };
+    return null;
+  }
+  // Google's terms want billed services for EEA visitors, so a billed key,
+  // when there is one, carries translation too.
+  if (paidKey) return { key: paidKey, paid: true };
+  if (free) return { key: free, paid: wholeProjectBilled() };
+  return null;
+}
+
+/**
+ * Whether a Gemini call of this kind can happen right now: a key it may use
+ * is configured (for personal content, a billed one) and — for a paid call —
+ * today's paid cap still has room. Counts nothing; geminiJson /
+ * takeGeminiRoute do that when a call is really made.
+ */
+export function geminiEnabled(kind: { personal: boolean }): boolean {
+  const route = routeFor(kind);
+  if (!route) return false;
+  return !route.paid || hasAiQuota([paidBucket(kind)]);
+}
+
+const warned = new Set<string>();
+/** Once per process and reason: say why a configured key is not being used. */
+function warnOnce(reason: string, message: string) {
+  if (warned.has(reason)) return;
+  warned.add(reason);
+  console.warn(message);
+}
+
+/**
+ * For ONE call about to be made: the key to use and whether it is paid —
+ * with a paid call already counted against today's cap — or null when the
+ * call may not be made (not allowed, or the paid cap is used up). The caller
+ * then falls back exactly as with no key.
+ */
+function takeGeminiRoute(kind: { personal: boolean }): Route | null {
+  const route = routeFor(kind);
+  if (!route) {
+    if (kind.personal && process.env.GEMINI_API_KEY) {
+      warnOnce(
+        'personal',
+        'Gemini: not sending content that can contain personal data — the unpaid tier has no data processing terms. ' +
+          'Set GEMINI_PAID_API_KEY (a billed project) or GEMINI_PAID_TIER=1 (GEMINI_API_KEY is billed).'
+      );
+    }
+    return null;
+  }
+  if (route.paid && !takeAiQuota([paidBucket(kind)])) {
+    const bucket = paidBucket(kind);
+    warnOnce(
+      `cap:${bucket.key}:${new Date().toISOString().slice(0, 10)}`,
+      `Gemini: today's ${bucket.perDay} paid ${kind.personal ? 'calls' : 'translation calls'} are used up ` +
+        `(${kind.personal ? 'GEMINI_PAID_DAILY_CAP' : 'GEMINI_PAID_TRANSLATE_DAILY_CAP'}) — falling back until tomorrow.`
+    );
+    return null;
+  }
+  return route;
+}
+
+/** For callers that talk to Gemini themselves (lib/transcribe): the key for ONE call (counted if paid), or null. */
+export function geminiKeyFor(kind: { personal: boolean }): string | null {
+  return takeGeminiRoute(kind)?.key ?? null;
 }
 
 /** The slice of the generateContent response we actually read. */
@@ -80,6 +209,14 @@ interface GeminiResponse {
  */
 export interface GeminiOptions {
   /**
+   * REQUIRED: can this prompt contain personal data? True for anything a
+   * person typed or said that is not already published page text — a
+   * visitor's question or chat message, a seller's notes to an assistant, a
+   * recording. False only for published listing and page text (translation).
+   * A personal prompt is refused (null) unless GEMINI_PAID_TIER is set.
+   */
+  personal: boolean;
+  /**
    * Output budget. The default suits a one-paragraph answer.
    *
    * Raise it for anything that has to return a LIST: the model spends this same
@@ -94,14 +231,17 @@ export interface GeminiOptions {
   timeoutMs?: number;
 }
 
-export async function geminiJson(prompt: string, options: GeminiOptions = {}): Promise<unknown> {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) return null;
+export async function geminiJson(prompt: string, options: GeminiOptions): Promise<unknown> {
+  const route = takeGeminiRoute(options);
+  if (!route) return null;
+  const { key } = route;
+  const benchKey = (model: string) => `${route.paid ? 'paid' : 'free'}:${model}`;
 
   const started = Date.now();
   // Every model failed within the last minute: do not make this visitor wait
-  // through the same failures again — the caller has its own fallback.
-  const ladder = MODEL_LADDER.filter((m) => (benchedUntil.get(m) ?? 0) <= started);
+  // through the same failures again — the caller has its own fallback. A paid
+  // call only ever tries the lite models.
+  const ladder = (route.paid ? PAID_LADDER : MODEL_LADDER).filter((m) => (benchedUntil.get(benchKey(m)) ?? 0) <= started);
 
   // An overall budget, so a visitor never waits more than ~12s for "busy".
   // Callers that asked for a longer per-model wait (list-shaped generators)
@@ -119,7 +259,7 @@ export async function geminiJson(prompt: string, options: GeminiOptions = {}): P
     // Busy, over quota, retired, or hung past the timeout: skip it for a while
     // so the next visitor does not wait for the same failure.
     const bench = outcome.status ? BENCH_MS[outcome.status] : outcome.timedOut ? 60_000 : 0;
-    if (bench) benchedUntil.set(model, Date.now() + bench);
+    if (bench) benchedUntil.set(benchKey(model), Date.now() + bench);
   }
   return null;
 }
@@ -169,7 +309,7 @@ async function geminiJsonOnce(
       }
       if (res.status === 401 || res.status === 403) {
         warnThrottled(
-          `Gemini rejected the API key (${res.status}). Check GEMINI_API_KEY — the assistant is falling back ` +
+          `Gemini rejected the API key (${res.status}). Check GEMINI_API_KEY / GEMINI_PAID_API_KEY — the assistant is falling back ` +
             `to organizer-answered questions until it is valid.`
         );
         return { kind: 'stop' };

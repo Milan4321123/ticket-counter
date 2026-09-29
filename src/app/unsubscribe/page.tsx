@@ -59,7 +59,7 @@ export default async function UnsubscribePage({ searchParams }: Params) {
         <div className="card anim-fade-up">
           <h1 className="card-title">You are unsubscribed</h1>
           <p>
-            <strong>{verified.email}</strong> will not hear about {organizerName}&rsquo;s new
+            <strong translate="no">{verified.email}</strong> will not hear about {organizerName}&rsquo;s new
             listings — there is nothing more to do, and it never expires.
           </p>
           <p>
@@ -97,7 +97,7 @@ export default async function UnsubscribePage({ searchParams }: Params) {
       <div className="card anim-fade-up">
         <h1 className="card-title">Unsubscribe from {organizerName}?</h1>
         <p>
-          One press and <strong>{verified.email}</strong> will not hear about {organizerName}
+          One press and <strong translate="no">{verified.email}</strong> will not hear about {organizerName}
           &rsquo;s new listings again — it works immediately, needs no sign-in, and never expires.
         </p>
         <form action={unsubscribe}>

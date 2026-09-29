@@ -103,7 +103,13 @@ export default async function CustomerCardPage({ params, searchParams }: Params)
           Your card with {sellerName}
         </p>
         <h1 className="page-title" style={{ margin: '4px 0 0' }}>
-          {view.holderName ? `Hello, ${view.holderName}` : 'Hello again'}
+          {view.holderName ? (
+            <>
+              Hello, <span translate="no">{view.holderName}</span>
+            </>
+          ) : (
+            'Hello again'
+          )}
         </h1>
         <p className="muted small" style={{ margin: '6px 0 0' }}>
           Held since {heldSince}. Show this at {v.where} and {sellerName} will know you.

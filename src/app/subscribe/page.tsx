@@ -58,7 +58,7 @@ export default async function SubscribeConfirmPage({ searchParams }: Params) {
         <div className="card anim-fade-up">
           <h1 className="card-title">You are on the list</h1>
           <p>
-            <strong>{verified.email}</strong> will hear when {organizerName} announces something
+            <strong translate="no">{verified.email}</strong> will hear when {organizerName} announces something
             new — at most one email per new listing, each with its own unsubscribe button.
           </p>
           <p style={{ marginBottom: 0 }}>
@@ -112,7 +112,7 @@ export default async function SubscribeConfirmPage({ searchParams }: Params) {
       <div className="card anim-fade-up">
         <h1 className="card-title">Hear from {organizerName}?</h1>
         <p>
-          One press and <strong>{verified.email}</strong> gets an email when {organizerName}{' '}
+          One press and <strong translate="no">{verified.email}</strong> gets an email when {organizerName}{' '}
           announces something new — at most one per new listing, each with a one-button
           unsubscribe that works immediately and forever.
         </p>

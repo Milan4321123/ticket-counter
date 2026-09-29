@@ -10,33 +10,64 @@
 //
 // Only text nodes' VALUES are changed, never the nodes themselves, so React
 // keeps working on the same DOM. What is never sent away: form fields, code,
-// anything marked translate="no", strings that look like an email address, a
-// link or an IBAN, and the pages that list buyers' orders and details.
+// anything marked translate="no" or data-private (every buyer, customer,
+// reviewer or asker name, email, phone, note and address is rendered inside
+// one), strings that look like an email address, a phone number, a link, an
+// IBAN or one of the site's codes (lib/personalText — checked again on the
+// server), and the routes in SKIP_ROUTE.
+//
+// Why it matters: the text goes to Google's Gemini (unpaid tier, no processing
+// terms — lib/gemini) and into a cache shared by every visitor (lib/translate).
+// Only the site's own and the sellers' PUBLISHED words may make that trip.
 import { useEffect } from 'react';
 import type { Lang } from '@/lib/i18n';
+import { looksPersonal } from '@/lib/personalText';
 
 /**
  * Pages never translated: the platform's own admin and the staff door
  * scanner. The seller's orders, kitchen, check-in, live screen, insights and
  * statements ARE translated — every buyer name, email, note and reference on
- * them is marked translate="no", so only the page's own words are sent.
+ * them is marked translate="no", so only the page's own words are sent. So
+ * are a buyer's own pages (order, ticket, account, customer card, subscribe):
+ * a German buyer needs those in German most of all, and on each of them the
+ * person's details are a few marked lines, not the page.
  */
 const SKIP_ROUTE = /^\/(admin|scan)(\/|$)/;
 const SKIP_INSIDE =
-  'script,style,noscript,textarea,input,code,pre,kbd,samp,svg,[translate="no"],.notranslate,[contenteditable="true"],.mono';
+  'script,style,noscript,textarea,input,code,pre,kbd,samp,svg,[translate="no"],[data-private],.notranslate,[contenteditable="true"],.mono';
+/**
+ * Marks that keep an element's own attributes (a title or aria-label with a
+ * buyer's name) at home too. data-private-attrs protects ONLY the element's
+ * own attributes, for a card whose label names someone but whose text is ours.
+ */
+const PRIVATE_MARK = '[translate="no"],[data-private],[data-private-attrs],.notranslate';
 const ATTRS = ['placeholder', 'title', 'aria-label'] as const;
 const LETTER = /\p{L}/u;
 const DEVANAGARI = /[ऀ-ॿ]/;
 const PRIVATE = /@|https?:\/\/|www\.|\b[A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){3,}/;
 const CODE_LIKE = /^[#A-Z0-9-]{2,40}$/;
 const STORE_MAX = 5000;
+/**
+ * The browser's own copy of translations. v1 was written before names and
+ * notes were kept out, so it is dropped (with the server's cache, lib/translate).
+ */
+const STORE_PREFIX = 'tx:v2:';
+const OLD_PREFIXES = ['tx:v1:'];
 
 export default function AutoTranslate({ lang }: { lang: Lang }) {
   useEffect(() => {
     if (lang === 'en') return;
     const root = document.documentElement;
-    const storeKey = `tx:v1:${lang}`;
+    const storeKey = `${STORE_PREFIX}${lang}`;
     const cache = new Map<string, string>();
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && OLD_PREFIXES.some((p) => k.startsWith(p))) localStorage.removeItem(k);
+      }
+    } catch {
+      // No storage: nothing old to clear.
+    }
     try {
       const saved = JSON.parse(localStorage.getItem(storeKey) ?? '{}') as Record<string, string>;
       for (const [k, v] of Object.entries(saved)) cache.set(k, v);
@@ -58,6 +89,7 @@ export default function AutoTranslate({ lang }: { lang: Lang }) {
       LETTER.test(s) &&
       !PRIVATE.test(s) &&
       !CODE_LIKE.test(s) &&
+      !looksPersonal(s) &&
       !(lang === 'ne' && DEVANAGARI.test(s));
 
     const skipped = (el: Element | null) => !el || Boolean(el.closest(SKIP_INSIDE));
@@ -99,7 +131,7 @@ export default function AutoTranslate({ lang }: { lang: Lang }) {
     }
 
     function visitAttrs(el: Element) {
-      if (skipped(el.parentElement)) return;
+      if (skipped(el.parentElement) || el.matches(PRIVATE_MARK)) return;
       for (const attr of ATTRS) {
         const value = el.getAttribute(attr);
         if (!value) continue;

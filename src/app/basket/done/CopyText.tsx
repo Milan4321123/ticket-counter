@@ -9,7 +9,10 @@ export default function CopyText({ label, value, mono, strong }: { label: string
   return (
     <div className="bk-copy">
       <span className="bk-copy-label">{label}</span>
-      <span className={`bk-copy-value${mono ? ' mono' : ''}${strong ? ' is-strong' : ''}`}>{value}</span>
+      {/* A value to copy — account holder, IBAN, reference — is data, never page text to translate. */}
+      <span className={`bk-copy-value${mono ? ' mono' : ''}${strong ? ' is-strong' : ''}`} translate="no">
+        {value}
+      </span>
       <button
         type="button"
         className="bk-copy-btn"

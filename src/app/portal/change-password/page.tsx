@@ -38,7 +38,7 @@ export default async function PortalChangePasswordPage() {
           <FirstPasswordForm />
         </div>
         <p className="muted small" style={{ textAlign: 'center', marginTop: 16 }}>
-          Signed in as {organizer.email}. Not you? <LogoutButton />
+          Signed in as <span translate="no">{organizer.email}</span>. Not you? <LogoutButton />
         </p>
       </div>
     </div>

@@ -25,10 +25,14 @@ export function aiDesignerEnabled(): boolean {
 
 /**
  * The visitor Q&A assistant runs on Gemini (GEMINI_API_KEY) with Anthropic
- * as fallback — it is available when EITHER key is set.
+ * as fallback. What it is sent — a visitor's question, a seller's own notes —
+ * can contain personal data, so Gemini only counts with a billed key and room
+ * in today's paid cap (lib/gemini); without it the assistant is available only
+ * when ANTHROPIC_API_KEY is set, and otherwise behaves as with no key at all
+ * (questions go to the organizer).
  */
 export function aiAssistantEnabled(): boolean {
-  return geminiEnabled() || Boolean(process.env.ANTHROPIC_API_KEY);
+  return geminiEnabled({ personal: true }) || Boolean(process.env.ANTHROPIC_API_KEY);
 }
 
 export interface AssistantContext {
@@ -75,9 +79,9 @@ function looksLikeKeyboardMash(question: string): boolean {
 /**
  * Answer a visitor's question STRICTLY from the organizer-provided context.
  * Anything the context doesn't cover escalates to the organizer instead of
- * being guessed. Routed through assistant.answerWithBestModel — Gemini free
- * tier first, Anthropic Haiku as fallback (visitor Q&A is high-volume,
- * low-stakes); 'unavailable' only when NEITHER key is configured.
+ * being guessed. Routed through assistant.answerWithBestModel — Gemini first
+ * (paid tier only: the question is the visitor's own words), Anthropic Haiku as
+ * fallback; 'unavailable' when neither may be used.
  */
 export async function answerVisitorQuestion(ctx: AssistantContext, question: string): Promise<AssistantResult> {
   if (!aiAssistantEnabled()) return { kind: 'unavailable' };
@@ -323,7 +327,9 @@ export async function suggestEventFaqs(input: FaqSuggestInput): Promise<FaqSugge
       parseFaqSuggestions,
       // A whole FAQ is far longer than one visitor answer, and on Gemini the
       // model's own thinking eats the budget first — see geminiJsonRoomy.
-      { maxTokens: 1600, geminiOutputTokens: 3000 }
+      // Personal: the seller's own notes are free text and can name people or
+      // carry a phone number; they are not published page text.
+      { personal: true, maxTokens: 1600, geminiOutputTokens: 3000 }
     );
 
     if (!result) {
