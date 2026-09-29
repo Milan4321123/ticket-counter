@@ -237,8 +237,22 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <li>
                   <Link href="/portal/login">Organizer sign-in</Link>
                 </li>
+                {/* The legal pages. German law wants the Impressum and the
+                    Datenschutzerklärung reachable from every page in one
+                    click, which is what a site-wide footer is for; the terms
+                    and the AVV are here so an organizer can read what they
+                    are agreeing to before they sign up. */}
+                <li>
+                  <Link href="/impressum">Impressum · Legal notice</Link>
+                </li>
                 <li>
                   <Link href="/privacy">Privacy · Datenschutz</Link>
+                </li>
+                <li>
+                  <Link href="/terms">Nutzungsbedingungen · Seller terms</Link>
+                </li>
+                <li>
+                  <Link href="/avv">AVV · Data processing agreement</Link>
                 </li>
                 {/* No public link to /scan. The scanner is reached ONLY through
                     the signed, time-limited link an organizer generates for

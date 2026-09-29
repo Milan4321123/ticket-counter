@@ -60,6 +60,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/digest`, changeFrequency: 'weekly', priority: 0.5 },
     { url: `${base}/contact`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/privacy`, changeFrequency: 'yearly', priority: 0.3 },
+    // The other public legal pages. Low priority — nobody searches for them —
+    // but listed, so the Impressum and the terms an organizer is asked to
+    // accept are as findable as everything else.
+    { url: `${base}/impressum`, changeFrequency: 'yearly', priority: 0.2 },
+    { url: `${base}/terms`, changeFrequency: 'yearly', priority: 0.2 },
+    { url: `${base}/avv`, changeFrequency: 'yearly', priority: 0.2 },
   ];
 
   const eventPages: MetadataRoute.Sitemap = events.map((event) => ({

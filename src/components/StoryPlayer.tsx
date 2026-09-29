@@ -150,7 +150,7 @@ function Player({ story, start, end, onClose }: { story: Story; start?: number; 
                   <Link href="/organizers" className="btn btn-brand" onClick={onClose}>
                     ▶ Try it free
                   </Link>
-                  <a href="mailto:support@eventsticketbuy.com?subject=A%20video%20for%20my%20page" className="btn">
+                  <a href="mailto:support@martnepali.com?subject=A%20video%20for%20my%20page" className="btn">
                     🎬 Want a video like this?
                   </a>
                 </>

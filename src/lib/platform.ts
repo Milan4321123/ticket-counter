@@ -82,32 +82,34 @@ export function bareAddress(from: string): string {
 }
 
 /**
- * Where organizers reach the team — shown on /contact and used as the "to"
- * address for custom-page enquiries. Falls back to the first ADMIN_EMAIL entry
- * (the inbox that already receives admin sign-in codes), then to a demo
- * address so the page never renders an empty mailto link.
+ * Where people reach the team — shown on /contact, /privacy and /impressum and
+ * used as the "to" address for contact-form enquiries. PLATFORM_CONTACT_EMAIL
+ * overrides it; otherwise SUPPORT_EMAIL below.
  */
 export function platformContactEmail(): string {
   const explicit = (process.env.PLATFORM_CONTACT_EMAIL || '').trim();
   if (explicit) return explicit;
 
-  // Falls back to the ORGANIZER sending address, then to EMAIL_FROM, and then to
-  // nothing at all.
+  // Falls back to the platform's own support address on its own domain.
   //
-  // It used to fall back to the first ADMIN_EMAIL, which was backwards in the
+  // It once fell back to the first ADMIN_EMAIL, which was backwards in the
   // worst way: that is the inbox that receives ADMIN SIGN-IN CODES, and this
-  // function's value is printed on /contact, /privacy and /organizers. The
-  // platform was publishing the single address most worth attacking, and
-  // pointing at it as the place to write — so anyone deciding to phish the owner
-  // was told which mailbox to aim at, on a public page, by us.
-  //
-  // The old 'hello@nepaliconcert.com' last resort was no better: a domain
-  // nobody here owns, so mail to it disappears while looking like it worked.
-  // Empty is the honest answer, and every caller already handles it — the pages
-  // hide the line and sendContactRequestToTeam refuses rather than guessing.
-  const organizerFrom = bareAddress(emailFromOrganizers());
-  return organizerFrom || '';
+  // function's value is printed on /contact, /privacy and /organizers — the
+  // platform was publishing the single address most worth attacking. Later it
+  // fell back to the organizer sending address, which in production was a
+  // mailbox on eventsticketbuy.com: a domain whose registration lapsed, so
+  // everything written to it vanished. The Impressum (§5 DDG) and the privacy
+  // notice require an address that actually reaches the operator, so the
+  // default is now a fixed one on the platform's own domain.
+  return SUPPORT_EMAIL;
 }
+
+/**
+ * The platform's public support address — Impressum, privacy requests,
+ * /contact. It must be able to RECEIVE: martnepali.com needs MX records (or
+ * a forwarding service) pointing somewhere a person reads.
+ */
+export const SUPPORT_EMAIL = 'support@martnepali.com';
 
 /**
  * Short per-organizer reference, e.g. 'NEPCON-1A2B3C4D'.
