@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>MartNepali — Datenschutz ad (stage)</title>
+<!-- The Datenschutz checklist ad, 1080×1920. render(t) draws second t from
+     spec.js — deterministic, so the renderer can screenshot any frame.
+     Open with ?t=12 to see one moment, or ?play to watch it run. -->
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@500;600;700;800&display=block" rel="stylesheet">
+<script src="spec.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; background: #07070d; }
+  body { font-family: Inter, sans-serif; -webkit-font-smoothing: antialiased; color: #fff; }
+  #frame { position: absolute; inset: 0; overflow: hidden; }
+  .layer { position: absolute; inset: 0; }
+  #bg { background: radial-gradient(1200px 1400px at 50% 30%, #1b1030 0%, #0c0a18 55%, #06060b 100%); }
+  #aurora { filter: blur(90px); opacity: .85; }
+  .blob { position: absolute; border-radius: 50%; mix-blend-mode: screen; }
+  #floor { position: absolute; left: -540px; right: -540px; bottom: -260px; height: 900px; transform-origin: 50% 100%;
+    transform: perspective(700px) rotateX(64deg);
+    background-image: linear-gradient(rgba(168, 85, 247, .38) 2px, transparent 2px), linear-gradient(90deg, rgba(168, 85, 247, .38) 2px, transparent 2px);
+    background-size: 90px 90px; -webkit-mask: linear-gradient(to top, #000 10%, transparent 85%); opacity: .55; }
+  #parts { position: absolute; inset: 0; }
+  .pt { position: absolute; border-radius: 50%; background: #fff; }
+  #grain { position: absolute; inset: -200px; opacity: .06; pointer-events: none; z-index: 90; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/></filter><rect width='300' height='300' filter='url(%23n)'/></svg>"); }
+  #vignette { position: absolute; inset: 0; z-index: 80; pointer-events: none; background: radial-gradient(1300px 1700px at 50% 45%, transparent 55%, rgba(0,0,0,.55) 100%); }
+  .scene { position: absolute; inset: 0; display: none; }
+  .sora { font-family: Sora, Inter, sans-serif; }
+  .big { font-family: Sora, Inter, sans-serif; font-weight: 800; letter-spacing: -.035em; line-height: 1.04; }
+  .grad { background: linear-gradient(100deg, #ff7a93 0%, #ff4d79 35%, #d38cff 75%, #b388ff 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .en { font: 600 38px/1.35 Inter, sans-serif; color: rgba(255,255,255,.62); }
+  .wd { display: inline-block; will-change: transform, filter, opacity; }
+  .glass { background: linear-gradient(160deg, rgba(255,255,255,.11), rgba(255,255,255,.035)); border: 1.5px solid rgba(255,255,255,.14);
+    box-shadow: 0 40px 110px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.12); backdrop-filter: blur(18px); }
+  .pill { position: absolute; padding: 18px 30px; border-radius: 999px; font: 700 34px/1 Inter, sans-serif; white-space: nowrap; }
+  .icon { position: absolute; border-radius: 26%; overflow: hidden; box-shadow: 0 30px 90px rgba(225, 29, 72, .45), 0 0 0 2px rgba(255,255,255,.12); }
+  .icon img { width: 100%; height: 100%; display: block; }
+  .word-mark { position: absolute; left: 0; right: 0; text-align: center; font-family: Sora, sans-serif; font-weight: 800; letter-spacing: -.04em; }
+  #hud { position: absolute; left: 70px; right: 70px; top: 120px; display: none; }
+  #hud .lbl { font: 700 30px/1 Inter, sans-serif; letter-spacing: .22em; text-transform: uppercase; color: rgba(255,255,255,.7); }
+  #hud .cnt { position: absolute; right: 0; top: -6px; font: 800 44px/1 Sora, sans-serif; }
+  #hud .bar { margin-top: 26px; height: 14px; border-radius: 99px; background: rgba(255,255,255,.1); overflow: hidden; }
+  #hud .fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, #22c55e, #4ade80); box-shadow: 0 0 24px rgba(74, 222, 128, .8); }
+  .card { position: absolute; left: 70px; right: 70px; top: 300px; height: 1330px; border-radius: 64px; }
+  .num { position: absolute; right: 60px; top: 30px; font: 800 220px/1 Sora, sans-serif; color: rgba(255,255,255,.05); letter-spacing: -.06em; }
+  .ill { position: absolute; left: 50%; top: 70px; width: 720px; height: 720px; margin-left: -360px; }
+  .ill svg { width: 100%; height: 100%; overflow: visible; }
+  .txt { position: absolute; left: 60px; right: 60px; top: 790px; text-align: center; }
+  .box { position: absolute; left: 50%; bottom: -80px; width: 170px; height: 170px; margin-left: -85px; border-radius: 46px; }
+  .box svg { width: 100%; height: 100%; }
+  .row { display: flex; align-items: center; gap: 30px; padding: 22px 34px; border-radius: 34px; margin-bottom: 18px; }
+  .row .tk { flex: none; width: 76px; height: 76px; border-radius: 22px; }
+  .row .tk svg { width: 100%; height: 100%; }
+  .row .tx { font: 800 42px/1.15 Sora, sans-serif; letter-spacing: -.02em; }
+  .row .tx small { display: block; font: 600 27px/1.3 Inter, sans-serif; color: rgba(255,255,255,.55); letter-spacing: 0; margin-top: 6px; }
+  .url { position: absolute; left: 50%; padding: 30px 46px; border-radius: 999px; font: 800 44px/1 Sora, sans-serif; white-space: nowrap; letter-spacing: -.02em; }
+</style>
+</head>
+<body>
+<div id="frame">
+  <div id="bg" class="layer"></div>
+  <div id="aurora" class="layer"></div>
+  <div id="floor"></div>
+  <div id="parts"></div>
+  <div id="s-hook" class="scene"></div>
+  <div id="s-logo" class="scene"></div>
+  <div id="hud"><div class="lbl">DSGVO · Checkliste</div><div class="cnt" id="cnt"></div><div class="bar"><div class="fill" id="fill"></div></div></div>
+  <div id="s-item" class="scene"></div>
+  <div id="s-recap" class="scene"></div>
+  <div id="s-outro" class="scene"></div>
+  <div id="vignette"></div>
+  <div id="grain"></div>
+</div>
+<script>
+const { ITEMS, ITEM_LEN, T, TOTAL, TICK_AT } = window.SPEC;
+const $ = (s) => document.querySelector(s);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const eOut = (k) => 1 - Math.pow(1 - k, 3);
+const eOut5 = (k) => 1 - Math.pow(1 - k, 5);
+const eIO = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+const eBack = (k, s = 1.9) => 1 + (s + 1) * Math.pow(k - 1, 3) + s * Math.pow(k - 1, 2);
+const ICON = '../../public/icons/icon-512-v2.png';
+const GREEN = '#22c55e';
+
+// Seeded randoms, so every render of frame N is the same frame.
+function rng(seed) { return () => ((seed = (seed * 16807) % 2147483647) / 2147483647); }
+
+/* ---------- ambient: aurora, floor, particles ---------- */
+const auroraEl = $('#aurora');
+const BLOBS = [
+  { c: '#e11d48', r: 520, x: 250, y: 420, ax: 120, ay: 90, f: 0.11, p: 0 },
+  { c: '#7c3aed', r: 600, x: 820, y: 700, ax: 140, ay: 120, f: 0.08, p: 2 },
+  { c: '#2563eb', r: 420, x: 300, y: 1500, ax: 100, ay: 80, f: 0.09, p: 4 },
+  { c: '#db2777', r: 380, x: 850, y: 1350, ax: 90, ay: 110, f: 0.12, p: 1 },
+];
+auroraEl.innerHTML = BLOBS.map(() => '<div class="blob"></div>').join('');
+const R = rng(7);
+const PARTS = Array.from({ length: 46 }, () => ({ x: R() * 1080, y: R() * 1920, s: 2 + R() * 5, v: 20 + R() * 55, a: 0.15 + R() * 0.5, w: R() * 6 }));
+$('#parts').innerHTML = PARTS.map(() => '<div class="pt"></div>').join('');
+
+function ambient(t) {
+  [...auroraEl.children].forEach((el, i) => {
+    const b = BLOBS[i];
+    const x = b.x + Math.sin(t * b.f * 6.283 + b.p) * b.ax;
+    const y = b.y + Math.cos(t * b.f * 5.1 + b.p) * b.ay;
+    // A green bloom joins the aurora while the list is being ticked.
+    const glow = i === 2 ? prog(t, T.recap, T.recap + 3) * (1 - prog(t, T.outro, T.outro + 1)) : 0;
+    el.style.cssText = `width:${b.r * 2}px;height:${b.r * 2}px;left:${x - b.r}px;top:${y - b.r}px;background:${glow > 0 ? mix(b.c, '#16a34a', glow) : b.c};opacity:.55`;
+  });
+  $('#floor').style.backgroundPosition = `0 ${(t * 60) % 90}px`;
+  [...$('#parts').children].forEach((el, i) => {
+    const p = PARTS[i];
+    const y = (((p.y - t * p.v) % 1920) + 1920) % 1920;
+    const x = p.x + Math.sin(t * 0.7 + p.w) * 18;
+    el.style.cssText = `left:${x}px;top:${y}px;width:${p.s}px;height:${p.s}px;opacity:${p.a * (0.6 + 0.4 * Math.sin(t * 2 + p.w))};box-shadow:0 0 ${p.s * 3}px rgba(255,255,255,.7)`;
+  });
+}
+function mix(a, b, k) {
+  const pa = [1, 3, 5].map((o) => parseInt(a.slice(o, o + 2), 16)), pb = [1, 3, 5].map((o) => parseInt(b.slice(o, o + 2), 16));
+  return `rgb(${pa.map((v, i) => Math.round(lerp(v, pb[i], k))).join(',')})`;
+}
+
+/* ---------- words that blur in ---------- */
+function words(html, t, t0, { stagger = 0.08, dur = 0.5, rise = 40, cls = '' } = {}) {
+  return html.split(' ').map((w, i) => {
+    const k = eOut(prog(t, t0 + i * stagger, t0 + i * stagger + dur));
+    return `<span class="wd ${cls}" style=""opacity:${k};filter:blur(${(1 - k) * 18}px);transform:translateY(${(1 - k) * rise}px) scale(${lerp(0.94, 1, k)})">${w}</span>`;
+  }).join(' ');
+}
+const show = (id, on) => { $(id).style.display = on ? 'block' : 'none'; };
+
+/* ---------- the tick box ---------- */
+function tickSvg(k, uid) {
+  // k: 0 empty → 1 ticked. The path draws, the box fills green.
+  const fill = eOut(prog(k, 0, 0.35)), draw = eOut5(prog(k, 0.15, 1));
+  const L = 118;
+  return `<svg viewBox="0 0 100 100"><defs><linearGradient id="tg${uid}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4ade80"/><stop offset="1" stop-color="#16a34a"/></linearGradient></defs>
+    <rect x="4" y="4" width="92" height="92" rx="26" fill="rgba(255,255,255,.06)" stroke="rgba(255,255,255,.35)" stroke-width="4"/>
+    <rect x="4" y="4" width="92" height="92" rx="26" fill="url(#tg${uid})" opacity="${fill}" transform="translate(50 50) scale(${lerp(0.6, 1, fill)}) translate(-50 -50)"/>
+    <path d="M27 52 L44 68 L74 34" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="${L}" stroke-dashoffset="${L * (1 - draw)}"/></svg>`;
+}
+
+/* ---------- 1. hook ---------- */
+const CHIPS = [['Name', 150, 560, -8], ['E-Mail', 690, 470, 6], ['Ticket', 90, 1600, 5], ['Foto', 790, 1510, -6], ['Zahlung', 460, 1730, 3], ['Adresse', 380, 330, -3]];
+function hook(t) {
+  const out = eIO(prog(t, 3.55, 4.1));
+  const chips = CHIPS.map(([label, x, y, rot], i) => {
+    const k = eOut(prog(t, 0.2 + i * 0.12, 0.9 + i * 0.12));
+    const fx = x + Math.sin(t * 0.9 + i) * 14, fy = y + Math.cos(t * 0.8 + i * 2) * 16 - out * 300;
+    return `<div class="pill glass" style="left:${fx}px;top:${fy}px;opacity:${k * (1 - out) * 0.9};transform:rotate(${rot}deg) scale(${lerp(0.7, 1, k)});filter:blur(${(1 - k) * 10 + out * 20}px)">${label}</div>`;
+  }).join('');
+  const z = 1 + out * 0.6;
+  return `${chips}
+    <div style="position:absolute;left:60px;right:60px;top:760px;text-align:center;transform:scale(${z});opacity:${1 - out};filter:blur(${out * 24}px)">
+      <div class="big" style="font-size:168px">${words('Deine Daten.', t, 0.35, { stagger: 0.25 })}</div>
+      <div class="en" style="margin-top:18px;opacity:${eOut(prog(t, 0.9, 1.5))}">Your data.</div>
+      <div class="big" style="font-size:104px;margin-top:70px;padding-bottom:12px">${words('Wer passt darauf auf?', t, 2.2, { stagger: 0.14, cls: 'grad' })}</div>
+      <div class="en" style="margin-top:6px;opacity:${eOut(prog(t, 2.8, 3.3))}">Who looks after them?</div>
+    </div>`;
+}
+
+/* ---------- 2. logo + "DSGVO ✓" ---------- */
+function logo(t) {
+  const u = t - T.logo;
+  const ik = eBack(prog(u, 0, 0.7));
+  const wk = eOut(prog(u, 0.35, 0.95));
+  const q = eOut(prog(u, 1.2, 1.6)); // "DSGVO?"
+  const st = prog(u, 2.0, 2.45); // the stamp
+  const stamp = eBack(st, 2.6);
+  const out = eIO(prog(u, 3.5, 4.0));
+  const ring = prog(u, 2.0, 2.9);
+  const iconSize = 300;
+  return `<div style="position:absolute;inset:0;transform:translateY(${-out * 520}px) scale(${1 - out * 0.35});opacity:${1 - out}">
+    <div class="icon" style="left:${540 - iconSize / 2}px;top:${430}px;width:${iconSize}px;height:${iconSize}px;transform:scale(${ik}) rotate(${(1 - ik) * -12}deg);opacity:${clamp(ik * 1.4)}"><img src="${ICON}"></div>
+    <div class="word-mark" style="top:790px;font-size:120px;opacity:${wk};transform:translateY(${(1 - wk) * 50}px);filter:blur(${(1 - wk) * 14}px)">Mart<span style="color:#ff2e57">Nepali</span></div>
+    <div style="position:absolute;left:0;right:0;top:1030px;text-align:center;opacity:${q}">
+      <span class="big" style="font-size:190px;display:inline-block;transform:scale(${lerp(0.85, 1, q)})">DSGVO</span>
+      <span style="display:inline-block;width:190px;height:190px;vertical-align:-18px;margin-left:24px;position:relative">
+        <span class="big" style="position:absolute;inset:0;font-size:190px;line-height:190px;color:rgba(255,255,255,.55);opacity:${1 - prog(u, 1.85, 2.0)};transform:rotate(${prog(u, 1.85, 2.0) * 40}deg)">?</span>
+        <span style="position:absolute;inset:0;transform:scale(${lerp(2.4, 1, clamp(stamp))}) rotate(${(1 - clamp(stamp)) * -25}deg);opacity:${clamp(st * 3)}">${tickSvg(clamp(prog(u, 2.0, 2.5)), 'L')}</span>
+        <span style="position:absolute;left:50%;top:50%;width:${190 + ring * 420}px;height:${190 + ring * 420}px;margin:${-(95 + ring * 210)}px 0 0 ${-(95 + ring * 210)}px;border-radius:50%;border:${6 * (1 - ring)}px solid #4ade80;opacity:${st > 0 ? 1 - ring : 0}"></span>
+      </span>
+    </div>
+    <div class="en" style="position:absolute;left:0;right:0;top:1290px;text-align:center;font-size:44px;opacity:${eOut(prog(u, 2.4, 2.9))}">
+      <span style="color:#fff;font-weight:800">Unsere Checkliste.</span><br>GDPR — here is how we handle your data.</div>
+  </div>`;
+}
+
+/* ---------- 3. the eight items ---------- */
+const ILL = {
+  legal(u) {
+    const a = eOut(prog(u, 0.1, 0.7)), b = eOut(prog(u, 0.25, 0.85));
+    const line = (x, y, w, t0) => `<rect x="${x}" y="${y}" height="10" rx="5" width="${w * eOut(prog(u, t0, t0 + 0.35))}" fill="rgba(20,20,40,.18)"/>`;
+    const lines = (x0, y0, t0) => [0, 1, 2, 3, 4, 5].map((i) => line(x0, y0 + i * 26, [150, 170, 120, 165, 140, 100][i], t0 + i * 0.07)).join('');
+    const tab = (x, y, txt, t0, c) => { const k = eBack(prog(u, t0, t0 + 0.4)); return `<g transform="translate(${x} ${y}) scale(${k})"><rect x="-34" y="-22" width="68" height="44" rx="14" fill="${c}"/><text x="0" y="10" text-anchor="middle" font-family="Sora" font-weight="800" font-size="24" fill="#fff">${txt}</text></g>`; };
+    return `<g transform="translate(200 210)">
+      <g transform="translate(${lerp(0, 60, a)} ${lerp(40, -10, a)}) rotate(${lerp(0, 9, a)})" opacity="${a}">
+        <rect x="-110" y="-140" width="220" height="280" rx="18" fill="#e9e4f7"/><rect x="-110" y="-140" width="220" height="56" rx="18" fill="#7c3aed"/>
+        <text x="-86" y="-104" font-family="Sora" font-weight="800" font-size="22" fill="#fff">Privacy policy</text>${lines(-86, -60, 0.9)}</g>
+      <g transform="translate(${lerp(0, -50, b)} ${lerp(40, 10, b)}) rotate(${lerp(0, -6, b)})" opacity="${b}">
+        <rect x="-110" y="-140" width="220" height="280" rx="18" fill="#fff"/><rect x="-110" y="-140" width="220" height="56" rx="18" fill="#e11d48"/>
+        <text x="-86" y="-104" font-family="Sora" font-weight="800" font-size="22" fill="#fff">Datenschutz</text>${lines(-86, -60, 0.6)}</g>
+      ${tab(-120, -150, 'DE', 1.0, '#e11d48')}${tab(150, -130, 'EN', 1.2, '#7c3aed')}</g>`;
+  },
+  avv(u) {
+    const a = eOut(prog(u, 0.1, 0.6));
+    const sig = eIO(prog(u, 0.6, 1.4)), L = 420;
+    const seal = eBack(prog(u, 1.3, 1.75), 2.2);
+    const lines = [0, 1, 2, 3, 4].map((i) => `<rect x="-120" y="${-70 + i * 28}" height="10" rx="5" width="${[240, 210, 230, 180, 200][i] * eOut(prog(u, 0.3 + i * 0.06, 0.7 + i * 0.06))}" fill="rgba(20,20,40,.16)"/>`).join('');
+    return `<g transform="translate(200 205)" opacity="${a}"><g transform="translate(0 ${(1 - a) * 40})">
+      <rect x="-150" y="-175" width="300" height="360" rx="22" fill="#fff"/>
+      <text x="-120" y="-118" font-family="Sora" font-weight="800" font-size="30" fill="#141428">AVV</text>
+      <text x="-120" y="-90" font-family="Inter" font-weight="700" font-size="17" fill="#7c3aed">Art. 28 DSGVO</text>${lines}
+      <line x1="-120" y1="130" x2="60" y2="130" stroke="rgba(20,20,40,.25)" stroke-width="3"/>
+      <path d="M-115 118 c 14 -34 26 -34 22 -6 c -3 22 12 -20 24 -16 c 10 4 0 22 14 12 c 12 -10 18 -22 30 -8 c 8 10 16 -2 26 -6 c 10 -4 18 8 30 0" fill="none" stroke="#1d4ed8" stroke-width="5" stroke-linecap="round" stroke-dasharray="${L}" stroke-dashoffset="${L * (1 - sig)}"/>
+      <g transform="translate(105 115) scale(${seal}) rotate(${(1 - seal) * 60})"><circle r="46" fill="#e11d48"/><circle r="36" fill="none" stroke="rgba(255,255,255,.6)" stroke-width="3" stroke-dasharray="4 5"/>
+        <text y="16" text-anchor="middle" font-family="Sora" font-weight="800" font-size="44" fill="#fff">§</text></g></g></g>`;
+  },
+  eu(u) {
+    const a = eOut(prog(u, 0.05, 0.6));
+    const stars = Array.from({ length: 12 }, (_, i) => {
+      const ang = (i / 12) * Math.PI * 2 + u * 0.35, k = eBack(prog(u, 0.15 + i * 0.05, 0.5 + i * 0.05));
+      const x = Math.cos(ang) * 165, y = Math.sin(ang) * 165;
+      return `<g transform="translate(${x} ${y}) scale(${k * 1.3}) rotate(${u * 40})"><path d="M0 -12 L3.5 -3.8 L12 -3.8 L5 1.6 L7.6 10 L0 5 L-7.6 10 L-5 1.6 L-12 -3.8 L-3.5 -3.8Z" fill="#fcd34d"/></g>`;
+    }).join('');
+    const rack = [0, 1, 2].map((i) => {
+      const on = (Math.floor(u * 6 + i * 2) % 3) !== 0;
+      return `<g transform="translate(0 ${-58 + i * 58})"><rect x="-82" y="-22" width="164" height="46" rx="10" fill="#1e1b3a" stroke="rgba(255,255,255,.18)" stroke-width="2"/>
+        <circle cx="-58" cy="1" r="7" fill="${on ? '#4ade80' : '#14532d'}"/><circle cx="-36" cy="1" r="7" fill="${on ? '#14532d' : '#4ade80'}"/>
+        <rect x="-10" y="-4" width="74" height="10" rx="5" fill="rgba(255,255,255,.2)"/></g>`;
+    }).join('');
+    const pin = eBack(prog(u, 0.7, 1.15), 2.4);
+    return `<g transform="translate(200 200)"><circle r="200" fill="rgba(37,99,235,.18)" opacity="${a}"/>${stars}
+      <g opacity="${a}" transform="scale(${lerp(0.85, 1, a)})">${rack}</g>
+      <g transform="translate(0 ${-110 - (1 - pin) * 60}) scale(${pin})"><path d="M0 44 C -26 12 -34 0 -34 -14 A34 34 0 1 1 34 -14 C 34 0 26 12 0 44Z" fill="#e11d48"/><circle cy="-14" r="12" fill="#fff"/></g>
+      <g opacity="${eOut(prog(u, 1.0, 1.4))}"><rect x="-120" y="120" width="240" height="56" rx="28" fill="rgba(255,255,255,.95)"/>
+        <text y="158" text-anchor="middle" font-family="Sora" font-weight="800" font-size="30" fill="#141428">Frankfurt · EU</text></g></g>`;
+  },
+  consent(u) {
+    const a = eOut(prog(u, 0.05, 0.55));
+    const chips = [[-40, -30, 14], [30, 10, 11], [-10, 45, 12], [45, -45, 9], [-55, 25, 8]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#5b3312"/>`).join('');
+    const btn = (x, label, k, hi) => `<g transform="translate(${x} 150) scale(${k})"><rect x="-92" y="-34" width="184" height="68" rx="34" fill="${hi ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.95)'}"/>
+      <text y="11" text-anchor="middle" font-family="Inter" font-weight="800" font-size="28" fill="#141428">${label}</text></g>`;
+    const press = prog(u, 1.15, 1.35);
+    const ok = eBack(prog(u, 1.3, 1.7));
+    return `<g transform="translate(200 175)"><g opacity="${a}" transform="scale(${lerp(0.8, 1, a)}) rotate(${u * 6})">
+      <circle r="120" fill="#d4a15a"/><circle r="120" fill="none" stroke="#b8833f" stroke-width="10"/><path d="M60 -104 a36 36 0 0 0 44 44" fill="#07070d" stroke="none"/>${chips}</g>
+      ${btn(-102, 'Nein danke', eOut(prog(u, 0.45, 0.8)) * (1 - press * 0.08), false)}${btn(102, 'Ja', eOut(prog(u, 0.55, 0.9)), true)}
+      <g opacity="${ok}" transform="translate(0 -168) scale(${ok})"><rect x="-150" y="-30" width="300" height="60" rx="30" fill="#16a34a"/>
+        <text y="10" text-anchor="middle" font-family="Inter" font-weight="800" font-size="26" fill="#fff">Tracking: aus · off</text></g></g>`;
+  },
+  money(u) {
+    const a = eOut(prog(u, 0.05, 0.5));
+    const coins = [0, 1, 2, 3].map((i) => {
+      const k = prog(u, 0.55 + i * 0.22, 1.35 + i * 0.22);
+      if (k <= 0 || k >= 1) return '';
+      const e = eIO(k), x = lerp(-130, 130, e), y = 60 - Math.sin(e * Math.PI) * 230;
+      return `<g transform="translate(${x} ${y})"><circle r="24" fill="#fbbf24" stroke="#d97706" stroke-width="4"/><text y="9" text-anchor="middle" font-family="Sora" font-weight="800" font-size="24" fill="#92400e">€</text></g>`;
+    }).join('');
+    const nope = eBack(prog(u, 1.2, 1.6));
+    return `<g transform="translate(200 160)" opacity="${a}">
+      <path d="M-130 60 Q 0 -340 130 60" fill="none" stroke="rgba(251,191,36,.45)" stroke-width="4" stroke-dasharray="12 12"/>
+      <g transform="translate(-130 95)"><rect x="-46" y="-80" width="92" height="160" rx="18" fill="#1e1b3a" stroke="rgba(255,255,255,.4)" stroke-width="4"/><rect x="-34" y="-62" width="68" height="112" rx="8" fill="#2d2a55"/>
+        <text y="100" text-anchor="middle" font-family="Inter" font-weight="700" font-size="22" fill="rgba(255,255,255,.75)">Du · You</text></g>
+      <g transform="translate(140 95)"><path d="M-62 -30 L0 -72 L62 -30Z" fill="#fff"/><rect x="-58" y="-28" width="116" height="10" fill="#fff"/>
+        ${[-40, -13, 13, 40].map((x) => `<rect x="${x - 7}" y="-14" width="14" height="62" fill="#fff"/>`).join('')}<rect x="-64" y="48" width="128" height="14" rx="3" fill="#fff"/>
+        <text y="100" text-anchor="middle" font-family="Inter" font-weight="700" font-size="22" fill="rgba(255,255,255,.75)">Veranstalter</text></g>
+      <g transform="translate(0 150)"><rect x="-58" y="-40" width="116" height="80" rx="20" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.25)" stroke-width="2" stroke-dasharray="8 8"/>
+        <image href="${ICON}" x="-28" y="-28" width="56" height="56" opacity=".55"/>
+        <g opacity="${clamp(nope)}" transform="scale(${nope})"><circle r="50" fill="none" stroke="#f43f5e" stroke-width="8"/><line x1="-35" y1="35" x2="35" y2="-35" stroke="#f43f5e" stroke-width="8" stroke-linecap="round"/></g></g>
+      ${coins}</g>`;
+  },
+  erase(u) {
+    const a = eOut(prog(u, 0.05, 0.5));
+    const flip = eIO(prog(u, 0.35, 0.8));
+    const sweep = prog(u, 0.95, 1.55);
+    const row = (y, label, value) => {
+      const gone = clamp((sweep * 330 - 20) / 200);
+      return `<text x="-120" y="${y}" font-family="Inter" font-weight="700" font-size="20" fill="rgba(20,20,40,.45)">${label}</text>
+        <text x="-120" y="${y + 32}" font-family="Sora" font-weight="800" font-size="28" fill="#141428" opacity="${1 - gone}">${value}</text>
+        <rect x="-120" y="${y + 12}" width="${200 * gone}" height="26" rx="13" fill="rgba(20,20,40,.12)"/>`;
+    };
+    return `<g transform="translate(200 200)" opacity="${a}">
+      <g transform="translate(-95 -40)"><rect x="-80" y="-90" width="160" height="170" rx="22" fill="#fff"/><rect x="-80" y="-90" width="160" height="46" rx="22" fill="#e11d48"/><rect x="-80" y="-60" width="160" height="16" fill="#e11d48"/>
+        <text y="-56" text-anchor="middle" font-family="Inter" font-weight="800" font-size="20" fill="#fff">nach dem Event</text>
+        <text y="50" text-anchor="middle" font-family="Sora" font-weight="800" font-size="80" fill="#141428">${Math.max(1, Math.round(flip * 30))}</text>
+        <text y="70" text-anchor="middle" font-family="Inter" font-weight="700" font-size="18" fill="rgba(20,20,40,.55)">Tage · days</text></g>
+      <g transform="translate(95 40)"><rect x="-140" y="-110" width="280" height="220" rx="24" fill="#fff"/>${row(-66, 'Name', 'Sita G.')}${row(12, 'E-Mail', 'sita@…')}
+        <g transform="translate(${-150 + sweep * 330} 0)" opacity="${sweep > 0 && sweep < 1 ? 1 : 0}"><rect x="-10" y="-120" width="20" height="240" rx="10" fill="#4ade80"/><rect x="-60" y="-120" width="60" height="240" fill="rgba(74,222,128,.25)"/></g></g></g>`;
+  },
+  photo(u) {
+    const a = eOut(prog(u, 0.05, 0.5));
+    const burst = prog(u, 1.0, 1.5);
+    const pinK = u < 1.0 ? eBack(prog(u, 0.35, 0.7)) : 1 - eOut(burst);
+    const shake = u > 0.75 && u < 1.0 ? Math.sin(u * 90) * 6 : 0;
+    const bits = Array.from({ length: 10 }, (_, i) => {
+      const ang = (i / 10) * Math.PI * 2, d = eOut(burst) * 110;
+      return `<circle cx="${Math.cos(ang) * d}" cy="${Math.sin(ang) * d - 20}" r="${7 * (1 - burst)}" fill="#f43f5e" opacity="${burst > 0 ? 1 - burst : 0}"/>`;
+    }).join('');
+    const coordsGone = eOut(prog(u, 1.0, 1.4));
+    return `<g transform="translate(200 205)" opacity="${a}"><g transform="rotate(-4) translate(0 ${(1 - a) * 40})">
+      <rect x="-160" y="-170" width="320" height="330" rx="16" fill="#fff"/>
+      <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fda4af"/><stop offset="1" stop-color="#c4b5fd"/></linearGradient></defs>
+      <rect x="-140" y="-150" width="280" height="240" rx="6" fill="url(#sky)"/><circle cx="70" cy="-90" r="30" fill="#fff7ed"/>
+      <path d="M-140 90 L-60 -40 L-10 30 L40 -60 L140 90Z" fill="#6d28d9"/><path d="M-60 -40 L-40 -8 L-80 -8Z M40 -60 L62 -26 L18 -26Z" fill="#fff"/>
+      <text x="0" y="135" text-anchor="middle" font-family="Inter" font-weight="700" font-size="22" fill="rgba(20,20,40,.55)" opacity="${1 - coordsGone}">📍 49.87° N, 8.65° E</text>
+      <text x="0" y="135" text-anchor="middle" font-family="Inter" font-weight="800" font-size="22" fill="#16a34a" opacity="${coordsGone}">kein Standort · no location</text>
+      <g transform="translate(${shake} -40)"><g transform="scale(${Math.max(0, pinK)})"><path d="M0 40 C -24 10 -32 0 -32 -14 A32 32 0 1 1 32 -14 C 32 0 24 10 0 40Z" fill="#f43f5e"/><circle cy="-14" r="11" fill="#fff"/></g>${bits}</g></g></g>`;
+  },
+  rights(u) {
+    const a = eOut(prog(u, 0.05, 0.5));
+    const dl = eBack(prog(u, 0.45, 0.85)), del = eBack(prog(u, 0.6, 1.0));
+    const fly = prog(u, 1.0, 1.7), lid = Math.sin(prog(u, 1.4, 2.0) * Math.PI) * 26;
+    const file = fly > 0 && fly < 1 ? `<g transform="translate(${-80 + fly * -20} ${-10 - eOut(fly) * 170}) rotate(${fly * -14})" opacity="${1 - prog(fly, 0.7, 1)}"><rect x="-34" y="-42" width="68" height="84" rx="10" fill="#fff"/><text y="8" text-anchor="middle" font-family="Sora" font-weight="800" font-size="18" fill="#7c3aed">JSON</text></g>` : '';
+    return `<g transform="translate(200 200)" opacity="${a}">
+      <circle cy="-110" r="62" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.3)" stroke-width="3"/><circle cy="-126" r="22" fill="rgba(255,255,255,.7)"/><path d="M-36 -72 a36 30 0 0 1 72 0" fill="rgba(255,255,255,.7)"/>
+      <g transform="translate(-80 60) scale(${dl})"><rect x="-70" y="-70" width="140" height="140" rx="36" fill="#7c3aed"/>
+        <g transform="translate(0 ${Math.sin(u * 7) * 5})"><path d="M0 -34 V 18 M-22 -4 L0 18 L22 -4" stroke="#fff" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g><rect x="-30" y="30" width="60" height="9" rx="4" fill="#fff"/></g>
+      <g transform="translate(80 60) scale(${del})"><rect x="-70" y="-70" width="140" height="140" rx="36" fill="#e11d48"/>
+        <g transform="translate(0 6)"><rect x="-26" y="-18" width="52" height="54" rx="8" fill="none" stroke="#fff" stroke-width="8"/><g transform="translate(-30 -26) rotate(${-lid} 0 0)"><rect x="0" y="-4" width="60" height="9" rx="4" fill="#fff"/><rect x="22" y="-14" width="16" height="9" rx="3" fill="#fff"/></g></g></g>
+      ${file}
+      <text x="-80" y="170" text-anchor="middle" font-family="Inter" font-weight="700" font-size="22" fill="rgba(255,255,255,.8)">Herunterladen</text>
+      <text x="80" y="170" text-anchor="middle" font-family="Inter" font-weight="700" font-size="22" fill="rgba(255,255,255,.8)">Löschen</text></g>`;
+  },
+};
+
+function hud(t) {
+  const on = t >= T.items - 0.4 && t < T.recap + 0.6;
+  $('#hud').style.display = on ? 'block' : 'none';
+  if (!on) return;
+  const k = eOut(prog(t, T.items - 0.4, T.items)) * (1 - eOut(prog(t, T.recap, T.recap + 0.6)));
+  let done = 0;
+  ITEMS.forEach((_, i) => { done += eOut(prog(t, T.items + i * ITEM_LEN + TICK_AT, T.items + i * ITEM_LEN + TICK_AT + 0.4)); });
+  $('#hud').style.cssText = `display:block;opacity:${k};transform:translateY(${(1 - k) * -40}px)`;
+  $('#fill').style.width = `${(done / ITEMS.length) * 100}%`;
+  $('#cnt').textContent = `${Math.round(done)} / ${ITEMS.length}`;
+}
+
+/** Headline size by length: two lines at most on a phone-width card. */
+const fit = (html) => { const n = html.replace(/&shy;/g, '').length; return n > 34 ? 68 : n > 24 ? 76 : 88; };
+
+function item(t) {
+  const i = Math.floor((t - T.items) / ITEM_LEN);
+  if (i < 0 || i >= ITEMS.length) return '';
+  const it = ITEMS[i], u = t - (T.items + i * ITEM_LEN);
+  const inK = eOut5(prog(u, 0, 0.5)), outK = eIO(prog(u, ITEM_LEN - 0.38, ITEM_LEN));
+  const y = (1 - inK) * 160 - outK * 180, s = lerp(0.92, 1, inK) * lerp(1, 0.94, outK), blur = (1 - inK) * 18 + outK * 22, op = inK * (1 - outK);
+  const tk = prog(u, TICK_AT, TICK_AT + 0.45);
+  const glow = tk > 0 ? Math.max(0, 1 - prog(u, TICK_AT, TICK_AT + 1.2)) : 0;
+  const tilt = Math.sin(u * 0.9) * 1.2;
+  return `<div class="card glass" style="transform:translateY(${y}px) scale(${s}) rotate(${tilt * 0.3}deg);filter:blur(${blur}px);opacity:${op}">
+    <div class="num">0${i + 1}</div>
+    <div class="ill"><svg viewBox="0 0 400 400">${ILL[it.id](u)}</svg></div>
+    <div class="txt"><div class="big" style="font-size:${fit(it.de)}px">${words(it.de, u, 0.15, { stagger: 0.07 })}</div>
+      <div class="en" style="margin-top:26px;opacity:${eOut(prog(u, 0.55, 1.0))}">${it.en}</div></div>
+    <div class="box" style="transform:scale(${tk > 0 ? eBack(clamp(tk * 1.6), 2.2) * 0.2 + 0.8 : 0.8 + eOut(prog(u, 0.6, 1.0)) * 0.2});box-shadow:0 0 ${glow * 120}px rgba(74,222,128,${glow * 0.9})">${tickSvg(tk, 'i' + i)}</div>
+  </div>`;
+}
+
+/* ---------- 4. recap ---------- */
+function recap(t) {
+  const u = t - T.recap;
+  const outK = eIO(prog(u, 4.55, 5.0));
+  const titleK = eOut(prog(u, 0.1, 0.6));
+  const rows = ITEMS.map((it, i) => {
+    const k = eOut(prog(u, 0.25 + i * 0.07, 0.75 + i * 0.07));
+    const tk = prog(u, 0.9 + i * 0.28, 1.25 + i * 0.28);
+    const short = it.de.replace('&shy;', '');
+    return `<div class="row glass" style="opacity:${k};transform:translateX(${(1 - k) * (i % 2 ? 80 : -80)}px)">
+      <div class="tk">${tickSvg(tk, 'r' + i)}</div><div class="tx">${short}<small>${it.en.split(' — ')[0]}</small></div></div>`;
+  }).join('');
+  const all = eBack(prog(u, 0.9 + ITEMS.length * 0.28, 0.9 + ITEMS.length * 0.28 + 0.5), 2);
+  return `<div style="position:absolute;inset:0;opacity:${1 - outK};filter:blur(${outK * 20}px);transform:scale(${1 + outK * 0.08})">
+    <div style="position:absolute;left:70px;right:70px;top:110px;opacity:${titleK};transform:translateY(${(1 - titleK) * 30}px)">
+      <div class="big" style="font-size:96px">Die Checkliste</div><div class="en" style="margin-top:8px">The checklist — all of it, live on martnepali.com</div></div>
+    <div style="position:absolute;left:70px;right:70px;top:380px">${rows}</div>
+    <div style="position:absolute;right:70px;top:120px;transform:scale(${clamp(all, 0, 1.2)});opacity:${clamp(all)};transform-origin:100% 50%">
+      <div class="big" style="font-size:100px;color:#4ade80;text-shadow:0 0 40px rgba(74,222,128,.7)">8/8</div></div>
+  </div>`;
+}
+
+/* ---------- 5. outro ---------- */
+function outro(t) {
+  const u = t - T.outro;
+  const k = eOut(prog(u, 0.1, 0.7));
+  const urls = ['martnepali.com/privacy', 'martnepali.com/impressum', 'martnepali.com/avv'].map((s, i) => {
+    const q = eBack(prog(u, 0.9 + i * 0.35, 1.35 + i * 0.35), 2);
+    return `<div class="url glass" style="top:${700 + i * 150}px;transform:translateX(-50%) scale(${clamp(q, 0, 1.2)});opacity:${clamp(q * 1.5)}">${s}</div>`;
+  }).join('');
+  const v = eOut(prog(u, 2.8, 3.4));
+  const end = eOut5(prog(u, 4.8, 5.6));
+  const iconS = 200;
+  return `<div style="position:absolute;left:70px;right:70px;top:300px;text-align:center;opacity:${k * (1 - end)};transform:translateY(${(1 - k) * 40 - end * 120}px)">
+      <div class="big" style="font-size:98px">Alles offen <span class="grad">nachlesbar.</span></div>
+      <div class="en" style="margin-top:14px">Read everything — in plain words, in German and English.</div></div>
+    <div style="opacity:${1 - end}">${urls}</div>
+    <div style="position:absolute;left:70px;right:70px;top:1230px;text-align:center;opacity:${v * (1 - end)};transform:translateY(${(1 - v) * 40}px)">
+      <div class="big" style="font-size:62px">Für Vereine: AVV direkt im Portal abschließen.</div>
+      <div class="en" style="margin-top:12px">Organizers: accept the data processing agreement in your portal.</div></div>
+    <div style="position:absolute;inset:0;opacity:${end}">
+      <div class="icon" style="left:${540 - iconS / 2}px;top:${660}px;width:${iconS}px;height:${iconS}px;transform:scale(${lerp(0.7, 1, end)})"><img src="${ICON}"></div>
+      <div class="word-mark" style="top:900px;font-size:118px">Mart<span style="color:#ff2e57">Nepali</span></div>
+      <div class="en" style="position:absolute;left:0;right:0;top:1060px;text-align:center;font-size:44px;color:rgba(255,255,255,.8)">Events · Tickets · Bazaar</div>
+      <div style="position:absolute;left:50%;top:1200px;transform:translateX(-50%);padding:26px 44px;border-radius:999px;background:#fff;color:#0b0b14;font:800 46px/1 Sora,sans-serif;white-space:nowrap">martnepali.com</div>
+      <div class="en" style="position:absolute;left:0;right:0;top:1360px;text-align:center;font-size:34px">Datenschutz, der sich nachlesen lässt.</div>
+    </div>`;
+}
+
+/* ---------- the frame ---------- */
+window.render = function (t) {
+  ambient(t);
+  const on = (id, a, b) => { const v = t >= a && t < b; show(id, v); return v; };
+  if (on('#s-hook', 0, T.logo + 0.2)) $('#s-hook').innerHTML = hook(t);
+  if (on('#s-logo', T.logo, T.items)) $('#s-logo').innerHTML = logo(t);
+  hud(t);
+  if (on('#s-item', T.items, T.recap)) $('#s-item').innerHTML = item(t);
+  if (on('#s-recap', T.recap, T.outro + 0.1)) $('#s-recap').innerHTML = recap(t);
+  if (on('#s-outro', T.outro, TOTAL + 1)) $('#s-outro').innerHTML = outro(t);
+};
+window.setup = () => document.fonts.ready;
+
+const qs = new URLSearchParams(location.search);
+if (!qs.has('render')) {
+  document.fonts.ready.then(() => {
+    if (qs.has('play')) { const s = performance.now(); const tick = () => { const t = (performance.now() - s) / 1000; render(t % TOTAL); requestAnimationFrame(tick); }; tick(); }
+    else render(Number(qs.get('t') ?? 10));
+  });
+}
+</script>
+</body>
+</html>
