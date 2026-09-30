@@ -14,12 +14,12 @@ import nodemailer from 'nodemailer';
 import { db, makeEventWithTier, makeOrder } from './helpers.ts';
 
 /** Every message the code under test tried to send. */
-const sent: { to?: string; subject?: string; html?: string; text?: string }[] = [];
+const sent: { to?: string; subject?: string; html?: string; text?: string; from?: unknown }[] = [];
 /** When set, the next sends fail the way SendGrid does for an unverified From. */
 let smtpError: string | null = null;
 
 (nodemailer as unknown as { createTransport: unknown }).createTransport = () => ({
-  sendMail: async (message: { to?: string; subject?: string; html?: string; text?: string }) => {
+  sendMail: async (message: { to?: string; subject?: string; html?: string; text?: string; from?: unknown }) => {
     if (smtpError) throw new Error(smtpError);
     sent.push(message);
     return { messageId: 'test' };
@@ -112,6 +112,7 @@ test('Remind buyer sends now, stamps the order, and refuses a second press the s
   assert.equal(first.sent, true);
   assert.ok(remindedTo(order.buyerEmail));
   assert.ok(getOrder(order.id)!.buyerReminderSentAt, 'stamped');
+  assert.deepEqual(sent.at(-1)!.from, { name: 'MartNepali Payments', address: 'hello@test.invalid' });
 
   const second = await remindBuyerNow(order.id);
   assert.equal(second.sent, false);

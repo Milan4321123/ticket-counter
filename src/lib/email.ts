@@ -38,6 +38,8 @@ import {
   platformWordmark,
   replyToBuyers,
   replyToOrganizers,
+  senderFor,
+  type MailDesk,
 } from './platform';
 import { confirmSubscriptionUrl, oneClickUnsubscribeUrl, unsubscribeUrl } from './marketing';
 import { WAITLIST_NOTIFIED_RETENTION_DAYS } from './retention';
@@ -118,6 +120,7 @@ export function isUndeliverableAddress(to: string): boolean {
 
 async function sendMailAs(
   audience: Audience,
+  desk: MailDesk,
   message: MailMessage
 ): Promise<{ sent: boolean; reason?: string }> {
   const recipients = String(message.to ?? '')
@@ -127,7 +130,9 @@ async function sendMailAs(
   const deliverable = recipients.filter((r) => !isUndeliverableAddress(r));
   if (deliverable.length === 0) return { sent: false, reason: 'demo-address' };
   if (deliverable.length !== recipients.length) message = { ...message, to: deliverable.join(', ') };
-  const from = (audience === 'buyers' ? emailFromBuyers() : emailFromOrganizers()).trim();
+  // The audience picks the ADDRESS (and so the verified sender); the desk
+  // picks the NAME the inbox shows (lib/platform senderFor).
+  const from = senderFor((audience === 'buyers' ? emailFromBuyers() : emailFromOrganizers()).trim(), desk);
   if (!from) {
     console.error(
       `[email] No From address for ${audience}: set EMAIL_FROM_${audience.toUpperCase()} (or EMAIL_FROM). Mail not sent.`
@@ -970,7 +975,7 @@ export async function sendTicketEmail(
       ],
     });
 
-    const mailed = await sendMailAs('buyers', {
+    const mailed = await sendMailAs('buyers', event.kind === 'shop' ? 'orders' : 'tickets', {
       replyTo: replyToBuyers(),
       to: order.buyerEmail,
       subject: `Your ${one ? v.code : `${tickets.length} ${v.codes}`} for ${event.name}${subjectPlace(event)}`,
@@ -1340,7 +1345,7 @@ export async function sendTransferInstructionsEmail(
       ],
     });
 
-    const mailed = await sendMailAs('buyers', {
+    const mailed = await sendMailAs('buyers', 'payments', {
       replyTo: replyToBuyers(),
       to: order.buyerEmail,
       subject: `Reserved: your ${v.units} for ${event.name}${subjectPlace(event)} — payment details inside`,
@@ -1458,7 +1463,7 @@ export async function sendTransferReminderEmail(
       footer: ['You can change or switch off these reminders in your portal settings.'],
     });
 
-    const mailed = await sendMailAs('organizers', {
+    const mailed = await sendMailAs('organizers', 'payments', {
       replyTo: replyToOrganizers(),
       to: organizer.email,
       subject: `${awaiting.length} payment${one ? '' : 's'} to check — ${totals} expected`,
@@ -1560,7 +1565,7 @@ export async function sendOrganizerCredentialsEmail(
       footer: [`${name} · organizer portal`],
     });
 
-    const mailed = await sendMailAs('organizers', {
+    const mailed = await sendMailAs('organizers', 'organizers', {
       to: organizer.email,
       // replyToOrganizers(), like every other organizer mail — NOT
       // platformContactEmail(). The two are usually the same address, but the
@@ -1769,7 +1774,7 @@ export async function sendBuyerPaymentReminderEmail(
       ],
     });
 
-    const mailed = await sendMailAs('buyers', {
+    const mailed = await sendMailAs('buyers', 'payments', {
       replyTo: replyToBuyers(),
       to: order.buyerEmail,
       subject: `Reminder: your ${v.units} for ${event.name}${subjectPlace(event)} are still reserved`,
@@ -1892,7 +1897,7 @@ export async function sendContactRequestToTeam(
       ],
     });
 
-    const mailed = await sendMailAs('organizers', {
+    const mailed = await sendMailAs('organizers', 'support', {
       to,
       replyTo: request.email,
       subject: `${subjectLead} — ${request.name}`,
@@ -1978,7 +1983,7 @@ export async function sendContactRequestAck(
       footer: [`${name} · ${getBaseUrl()}`],
     });
 
-    const mailed = await sendMailAs(wantsAccount ? 'organizers' : 'buyers', {
+    const mailed = await sendMailAs(wantsAccount ? 'organizers' : 'buyers', wantsAccount ? 'organizers' : 'support', {
       to: request.email,
       replyTo: contactEmail,
       subject: `Thanks — we've got your request (${name})`,
@@ -2078,7 +2083,7 @@ export async function sendQuestionAnsweredEmail(
       footer: [`${name} · ${getBaseUrl()}`],
     });
 
-    const mailed = await sendMailAs('buyers', {
+    const mailed = await sendMailAs('buyers', 'support', {
       replyTo: replyToBuyers(),
       to,
       subject: `Answered: your question about ${event.name}`,
@@ -2187,7 +2192,7 @@ export async function sendSignInAlertEmail(
           `<strong>If it was not</strong>, change your password now. Somebody else knows it.`
       );
 
-    const mailed = await sendMailAs('organizers', {
+    const mailed = await sendMailAs('organizers', 'security', {
       replyTo: replyToOrganizers(),
       to: organizer.email,
       subject: headline,
@@ -2401,7 +2406,7 @@ export async function sendPayoutChangedEmail(
       footer: [`${brand} · ${getBaseUrl()}`],
     });
 
-    const mailed = await sendMailAs('organizers', {
+    const mailed = await sendMailAs('organizers', 'security', {
       replyTo: replyToOrganizers(),
       to: organizer.email,
       subject: waiting
@@ -2440,7 +2445,7 @@ export async function sendPayoutChangedEmail(
           (waiting ? 'and cancel the change before it takes effect.' : 'and switch the account off if in doubt.')
         : '';
       try {
-        const ownerCopy = await sendMailAs('organizers', {
+        const ownerCopy = await sendMailAs('organizers', 'security', {
           replyTo: replyToOrganizers(),
           to: ownerInbox,
           subject: change.nameMismatch
@@ -2590,7 +2595,7 @@ export async function sendWaitlistSpotsOpenEmail(
       footer: [[event.name, whenLine, venue].filter(Boolean).join(' · '), wrapText(sellerFooter(event.organizerId).text)],
     });
 
-    const mailed = await sendMailAs('buyers', {
+    const mailed = await sendMailAs('buyers', event.kind === 'shop' ? 'orders' : 'tickets', {
       replyTo: replyToBuyers(),
       to,
       subject: headline,
@@ -2694,7 +2699,7 @@ export async function sendOrganizerAnnouncementEmail(
       footer: [[event.name, whenLine, venue].filter(Boolean).join(' · ')],
     });
 
-    const mailed = await sendMailAs('buyers', {
+    const mailed = await sendMailAs('buyers', 'updates', {
       replyTo: replyToBuyers(),
       to,
       subject: headline,
@@ -2790,7 +2795,7 @@ export async function sendMarketingConfirmationEmail(
       ],
     });
 
-    const mailed = await sendMailAs('buyers', {
+    const mailed = await sendMailAs('buyers', 'updates', {
       replyTo: replyToBuyers(),
       to,
       subject: headline,
@@ -2901,7 +2906,7 @@ export async function sendReferralRewardEmail(
       ],
     });
 
-    const mailed = await sendMailAs('buyers', {
+    const mailed = await sendMailAs('buyers', 'updates', {
       replyTo: replyToBuyers(),
       to,
       subject: headline,
@@ -3009,7 +3014,7 @@ export async function sendStallRequestEmail(
       footer: [`${platformName()} · organizer portal`],
     });
 
-    const mailed = await sendMailAs('organizers', {
+    const mailed = await sendMailAs('organizers', 'organizers', {
       replyTo: replyToOrganizers(),
       to: hostOrganizer.email,
       subject: `Stall request for ${hostEvent.name}: ${shop.name}`,
@@ -3108,7 +3113,7 @@ export async function sendStallDecisionEmail(
       footer: [`${platformName()} · organizer portal`],
     });
 
-    const mailed = await sendMailAs('organizers', {
+    const mailed = await sendMailAs('organizers', 'organizers', {
       replyTo: replyToOrganizers(),
       to: shopOrganizer.email,
       subject: approved
@@ -3206,7 +3211,7 @@ export async function sendStallRevokedEmail(
       footer: [`${platformName()} · organizer portal`],
     });
 
-    const mailed = await sendMailAs('organizers', {
+    const mailed = await sendMailAs('organizers', 'organizers', {
       replyTo: replyToOrganizers(),
       to: shopOrganizer.email,
       subject: `Removed: your stall at ${hostEvent.name}`,
@@ -3292,7 +3297,7 @@ export async function sendPaymentConnectionChangedEmail(
       footer: [`${brand} · ${getBaseUrl()}`],
     });
 
-    const mailed = await sendMailAs('organizers', {
+    const mailed = await sendMailAs('organizers', 'security', {
       replyTo: replyToOrganizers(),
       to: organizer.email,
       subject: change.action === 'connected' ? headline : `Action may be needed: ${headline.toLowerCase()}`,
@@ -3314,7 +3319,7 @@ export async function sendPaymentConnectionChangedEmail(
         change.accountLabel ? ` (${change.accountLabel})` : ''
       }${change.sandbox ? ' [TEST MODE]' : ''}.`;
       try {
-        await sendMailAs('organizers', {
+        await sendMailAs('organizers', 'security', {
           replyTo: replyToOrganizers(),
           to: ownerInbox,
           subject: `${providerName} connection ${change.action} — ${organizer.name}`,
@@ -3368,7 +3373,7 @@ export async function sendOrderReadyEmail(orderId: string): Promise<{ sent: bool
       pHtml(escapeHtml(line), 20) +
       (atTable ? '' : buttonHtml(orderUrl, 'Open my collection code')) +
       pHtml(`${escapeHtml(event.name)}${event.pickupInfo ? ` · ${escapeHtml(event.pickupInfo.split('\n')[0])}` : ''}`, 0);
-    return await sendMailAs('buyers', {
+    return await sendMailAs('buyers', 'orders', {
       replyTo: replyToBuyers(),
       to: order.buyerEmail,
       subject: headline,
@@ -3424,7 +3429,7 @@ export async function sendSubscriptionEmail(
           : `This time's repeat could not be placed because the items were sold out. Your subscription carries on; the next one is due ${sub.nextOn}.`;
     const bodyHtml =
       pHtml(`Hi ${escapeHtml(sub.buyerName)},`) + pHtml(escapeHtml(line), 20) + buttonHtml(manage, 'Manage my subscription');
-    return await sendMailAs('buyers', {
+    return await sendMailAs('buyers', 'orders', {
       replyTo: replyToBuyers(),
       to: sub.buyerEmail,
       subject: headline,
@@ -3454,7 +3459,7 @@ export async function sendCustomerLoginCodeEmail(email: string, code: string): P
     if (!isEmailConfigured()) return { sent: false, reason: 'email-not-configured' };
     const headline = `${code} is your sign-in code`;
     const line = `Enter it on ${platformName()} to open your orders. It works for 10 minutes. If you did not ask for it, ignore this email — nothing happens without the code.`;
-    return await sendMailAs('buyers', {
+    return await sendMailAs('buyers', 'sign-in', {
       replyTo: replyToBuyers(),
       to: email,
       subject: headline,

@@ -30,13 +30,13 @@ import nodemailer from 'nodemailer';
 import { makeEvent, makeOrganizer, makePaidOrder, makeOrder, db } from './helpers.ts';
 
 /** Every message the code under test tried to send, in order. */
-const sent: { to?: string; subject?: string; html?: string; text?: string }[] = [];
+const sent: { to?: string; subject?: string; html?: string; text?: string; from?: unknown }[] = [];
 
 // Replace the transport on the module object itself, before lib/email is
 // imported: it calls nodemailer.createTransport() at send time, so the two see
 // the same object and no send ever reaches a socket.
 (nodemailer as unknown as { createTransport: unknown }).createTransport = () => ({
-  sendMail: async (message: { to?: string; subject?: string; html?: string; text?: string }) => {
+  sendMail: async (message: { to?: string; subject?: string; html?: string; text?: string; from?: unknown }) => {
     sent.push(message);
     return { messageId: 'test' };
   },
@@ -348,3 +348,24 @@ test('every organizer mail links absolutely, exactly like a buyer’s', () => {
     }
   });
 });
+
+test('the inbox shows which desk wrote: Tickets, Orders, Payments, Support', async () => {
+  // Every mail used to arrive under the one name in EMAIL_FROM. The address
+  // must stay the configured (verified) one; only the name changes per mail.
+  const lastFrom = () => sent[sent.length - 1].from as { name: string; address: string };
+
+  const event = makeEvent({ organizerId: seller.id, name: 'Desk Night', tiers: [{ tierKey: 'entry', priceCents: 1500 }] });
+  const { order: eventOrder } = makePaidOrder({ eventId: event.id, items: [{ tierId: 'entry', quantity: 1 }] });
+  await bodyOf(() => sendTicketEmail(eventOrder.id));
+  assert.deepEqual(lastFrom(), { name: 'MartNepali Tickets', address: 'hello@test.invalid' });
+
+  const { order: shopOrder } = makeShopWithOrder();
+  await bodyOf(() => sendTicketEmail(shopOrder.id));
+  assert.equal(lastFrom().name, 'MartNepali Orders');
+
+  const reservation = makeOrder({ eventId: event.id, items: [{ tierId: 'entry', quantity: 1 }], paymentMode: 'transfer' });
+  await bodyOf(() => sendTransferInstructionsEmail(reservation.id));
+  assert.equal(lastFrom().name, 'MartNepali Payments');
+  assert.equal(lastFrom().address, 'hello@test.invalid');
+});
+

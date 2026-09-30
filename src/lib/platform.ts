@@ -75,6 +75,47 @@ export function replyToOrganizers(): string {
   return (process.env.EMAIL_REPLY_TO_ORGANIZERS || '').trim() || SUPPORT_EMAIL;
 }
 
+/**
+ * What a mail is about — which decides the sender NAME the inbox shows.
+ *
+ * Every mail used to go out under the one display name in EMAIL_FROM, so a
+ * ticket, a payment reminder, a sign-in code and a reply to a question all
+ * arrived from the same "Events Ticket Buy". The address stays the verified
+ * one (the mail provider checks only the address); the name now says which
+ * desk wrote: "MartNepali Tickets", "MartNepali Payments", "MartNepali Support".
+ */
+export type MailDesk =
+  | 'tickets' // tickets delivered, an event's waitlist spots
+  | 'orders' // a shop's order: collection code, ready for pickup, subscriptions
+  | 'payments' // pay-by-transfer details and reminders; the organizer's "check your bank" digest
+  | 'support' // contact form, answered questions
+  | 'organizers' // organizer accounts and stalls
+  | 'security' // sign-in alerts, payout or payment account changed
+  | 'sign-in' // one-time sign-in codes
+  | 'updates'; // organizer announcements, marketing opt-in, referral rewards
+
+const DESK_LABEL: Record<MailDesk, string> = {
+  tickets: 'Tickets',
+  orders: 'Orders',
+  payments: 'Payments',
+  support: 'Support',
+  organizers: 'for Organizers',
+  security: 'Security',
+  'sign-in': 'Sign-in',
+  updates: 'Updates',
+};
+
+/**
+ * The From header for one mail: the configured address, under the desk's name.
+ * The display name written in EMAIL_FROM* is deliberately ignored — only the
+ * address in it counts. Null when no address is configured.
+ */
+export function senderFor(configuredFrom: string, desk: MailDesk): { name: string; address: string } | null {
+  const address = bareAddress(configuredFrom);
+  if (!address) return null;
+  return { name: `${platformNameFromEnv()} ${DESK_LABEL[desk]}`, address };
+}
+
 /** Just the address part of a "Name <a@b.c>" header, for use as a Reply-To. */
 export function bareAddress(from: string): string {
   const m = from.match(/<([^>]+)>/);
