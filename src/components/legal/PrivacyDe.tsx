@@ -757,6 +757,8 @@ export default function PrivacyDe({ f }: { f: PrivacyFacts }) {
             Besuche zu unterscheiden. <strong>Nie</strong> gemessen werden – unabhängig von Ihrer Antwort – Ihre
             Bestellseite, Ihre Tickets, Ihre Kundenkarte, Ihr Abonnement, Ihr Kundenkonto, der Einlass-Scanner,
             der Veranstalter- und der Administrationsbereich. Nichts, was Sie eingeben, wird an Google gesendet.
+            „Google Signals“ (die Verknüpfung mit Google-Konten) und die Nutzung für personalisierte Werbung
+            sind abgeschaltet.
           </p>
           <p>
             Empfänger ist die <strong>Google Ireland Limited</strong>, Gordon House, Barrow Street, Dublin 4,

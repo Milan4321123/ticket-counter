@@ -41,7 +41,37 @@ import { usePathname } from 'next/navigation';
  * that asks permission it does not need teaches people to click through
  * permission requests, which is a small harm done to every site after it.
  */
-export default function ConsentBanner() {
+/**
+ * The question in the visitor's language. Consent only counts if the person
+ * understood what they agreed to, so a German visitor is asked in German —
+ * hand-written, and marked translate="no" so the page translator never
+ * rewrites what somebody is consenting to.
+ */
+const TEXT = {
+  de: {
+    label: 'Besuche zählen',
+    q: 'Dürfen wir diesen Besuch zählen?',
+    body:
+      'Wir nutzen Google Analytics, um zu sehen, welche Seiten gelesen werden — sonst nichts. Dabei wird ein Cookie auf deinem Gerät gespeichert, und die Seitenadresse, dein ungefährer Standort und dein Browser gehen an Google in den USA. Auf deiner Bestellung, deinen Tickets und deiner Kundenkarte läuft es nie. Sagst du Nein, wird gar nichts geladen — die Seite funktioniert genauso. Ändern kannst du deine Wahl jederzeit unter „Cookie-Einstellungen“ unten auf jeder Seite.',
+    more: 'Was wir erheben',
+    href: '/privacy?v=de#analytics',
+    no: 'Nein danke',
+    yes: 'Ja, gern',
+  },
+  en: {
+    label: 'Counting visits',
+    q: 'May we count this visit?',
+    body:
+      'We use Google Analytics to see which pages people actually read — nothing else. It stores a cookie on your device and sends the page address, your rough location and your browser to Google in the United States. It never runs on your order, your tickets or your customer card. Say no and nothing loads at all; the site works exactly the same either way. You can change your mind any time under “Cookie settings” at the bottom of every page.',
+    more: 'What we collect',
+    href: '/privacy?v=en#analytics',
+    no: 'No thanks',
+    yes: 'Yes, that’s fine',
+  },
+};
+
+export default function ConsentBanner({ lang = 'en' }: { lang?: string }) {
+  const tx = lang === 'de' ? TEXT.de : TEXT.en;
   const measurementId = process.env.NEXT_PUBLIC_GA_ID ?? '';
   const pathname = usePathname();
   // Never rendered on the server: the answer lives in the visitor's own
@@ -64,16 +94,12 @@ export default function ConsentBanner() {
        the top of the page is told it appeared. It deliberately does NOT trap
        focus or block the page: this is a question, and the site works whether
        or not it is answered. */
-    <div className="consent" role="dialog" aria-live="polite" aria-label="Counting visits">
+    <div className="consent" role="dialog" aria-live="polite" aria-label={tx.label} translate="no">
       <div className="consent-body">
         <p className="consent-text">
-          <strong>May we count this visit?</strong> We use Google Analytics to see which pages
-          people actually read — nothing else. It stores a cookie on your device and sends the page
-          address, your rough location and your browser to Google in the United States. It never
-          runs on your order, your tickets or your customer card. Say no and nothing loads at all;
-          the site works exactly the same either way.{' '}
-          <Link href="/privacy" className="consent-link">
-            What we collect
+          <strong>{tx.q}</strong> {tx.body}{' '}
+          <Link href={tx.href} className="consent-link">
+            {tx.more}
           </Link>
         </p>
         {/* Same size, same weight, same colour, refuse first. If one of these
@@ -81,10 +107,10 @@ export default function ConsentBanner() {
             given and the analytics data stops being lawfully collected. */}
         <div className="consent-actions">
           <button type="button" className="btn consent-btn" onClick={() => setConsent('denied')}>
-            No thanks
+            {tx.no}
           </button>
           <button type="button" className="btn consent-btn" onClick={() => setConsent('granted')}>
-            Yes, that&rsquo;s fine
+            {tx.yes}
           </button>
         </div>
       </div>

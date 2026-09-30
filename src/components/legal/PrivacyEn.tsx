@@ -707,7 +707,8 @@ export default function PrivacyEn({ f }: { f: PrivacyFacts }) {
             <span className="mono">_ga</span> and <span className="mono">_ga_…</span> (up to 2 years) to tell
             visits apart. <strong>Never</strong> measured, whatever you answered: your order page, your
             tickets, your customer card, your subscription, your account, the door scanner, the seller hub and
-            the admin area. Nothing you type is sent to Google.
+            the admin area. Nothing you type is sent to Google. “Google signals” (linking visits to Google
+            accounts) and use for personalised advertising are switched off.
           </p>
           <p>
             The recipient is <strong>Google Ireland Limited</strong>, Gordon House, Barrow Street, Dublin 4,

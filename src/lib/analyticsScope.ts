@@ -137,7 +137,21 @@ export function analyticsCommands(input: {
   if (!configured) {
     return [
       ['js', new Date()],
-      ['config', measurementId, { page_location, send_page_view: true }],
+      [
+        'config',
+        measurementId,
+        {
+          page_location,
+          send_page_view: true,
+          // Counting pages is all the consent covers. Google signals would
+          // join visits to signed-in Google accounts across devices, and ad
+          // personalization would hand the visit to Google's ad machinery —
+          // neither is what the banner asked about, so both are off here,
+          // whatever the property's own settings say.
+          allow_google_signals: false,
+          allow_ad_personalization_signals: false,
+        },
+      ],
     ];
   }
   return [['event', 'page_view', { page_path: pathname, page_location }]];

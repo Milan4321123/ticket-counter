@@ -248,6 +248,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <li>
                   <Link href="/privacy">Privacy · Datenschutz</Link>
                 </li>
+                {/* Withdrawing consent must be as easy as giving it (Art. 7(3)
+                    GDPR): one click from every page to the switch, wherever
+                    the banner was answered. Only when analytics exists. */}
+                {process.env.NEXT_PUBLIC_GA_ID ? (
+                  <li>
+                    <Link href={`/privacy?v=${lang === 'de' ? 'de' : 'en'}#analytics`}>
+                      Cookie-Einstellungen · Cookie settings
+                    </Link>
+                  </li>
+                ) : null}
                 <li>
                   <Link href="/terms">Nutzungsbedingungen · Seller terms</Link>
                 </li>
@@ -277,7 +287,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Analytics />
         {/* Asked before anything is loaded, and only where something would be.
             Analytics above stays inert until this is answered. */}
-        <ConsentBanner />
+        <ConsentBanner lang={lang} />
         {/* On phones: offers the app once (the real prompt on Android, the
             exact taps on iPhone). Waits for the question above. */}
         <InstallNudge appName={PLATFORM_NAME} />

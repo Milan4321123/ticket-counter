@@ -167,6 +167,9 @@ test('the FIRST render configures, and lets config send the opening page view', 
     true,
     'the opening view is config’s job — sending it by hand is what raced and lost'
   );
+  // The consent is for counting pages — not for Google signals or ads.
+  assert.equal(options.allow_google_signals, false);
+  assert.equal(options.allow_ad_personalization_signals, false);
 });
 
 test('no page_view is ever emitted before a config', () => {
