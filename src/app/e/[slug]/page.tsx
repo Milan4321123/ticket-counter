@@ -55,6 +55,7 @@ import { vocabFor } from '@/lib/vocab';
 import { loadFeedSnapshot } from '@/lib/feedSnapshot';
 import { getAvailability } from '@/lib/inventory';
 import { runWaitlistNotifySweep } from '@/lib/waitlist';
+import { runTransferReminderSweep } from '@/lib/reminders';
 import WaitlistForm from '@/components/WaitlistForm';
 import EventCountdown from '@/components/EventCountdown';
 import WishButton from '@/components/WishButton';
@@ -299,6 +300,10 @@ export default async function EventPage({ params, searchParams }: Params) {
   // when nothing is due — so the people waiting on a sold-out event get told
   // about freed spots by the very traffic still looking at it, with no cron.
   void runWaitlistNotifySweep();
+  // Payment reminders ride the same traffic. Before this they started only
+  // when an organizer opened the portal dashboard, so after every deploy (a
+  // fresh process) no buyer was reminded until some organizer signed in.
+  void runTransferReminderSweep();
 
   /**
    * How many tickets can ACTUALLY be bought right now.

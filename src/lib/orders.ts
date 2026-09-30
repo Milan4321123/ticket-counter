@@ -75,6 +75,12 @@ export interface OrderRow {
    */
   buyerErasedAt: string | null;
   /**
+   * When the buyer was last sent a "your payment is still open" reminder —
+   * automatically (lib/reminders.ts) or from the organizer's Remind button.
+   * Null when they never were.
+   */
+  buyerReminderSentAt: string | null;
+  /**
    * The payout account this order was TOLD to pay, frozen when it was created.
    *
    * A receipt, not a pointer: the order page and its emails read these, so an
@@ -414,6 +420,7 @@ const ORDER_COLS = `
   paid_at AS paidAt,
   capture_id AS captureId,
   buyer_erased_at AS buyerErasedAt,
+  buyer_reminder_sent_at AS buyerReminderSentAt,
   payout_holder AS payoutHolder,
   payout_iban AS payoutIban,
   payout_bic AS payoutBic,

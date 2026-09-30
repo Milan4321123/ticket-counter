@@ -1601,7 +1601,7 @@ export async function sendOrganizerCredentialsEmail(
 
 export async function sendBuyerPaymentReminderEmail(
   orderId: string
-): Promise<{ sent: boolean; reason?: string }> {
+): Promise<{ sent: boolean; reason?: string; detail?: string }> {
   try {
     if (!isEmailConfigured()) return { sent: false, reason: 'email-not-configured' };
 
@@ -1640,9 +1640,13 @@ export async function sendBuyerPaymentReminderEmail(
     // Tokenized like the instructions mail this one repeats — same recipient,
     // same proof, same link.
     const orderUrl = orderUrlForBuyerEmail(orderId);
-    const deadline = new Date(
-      Date.parse(order.createdAt.replace(' ', 'T') + 'Z') + event.payWithinDays * 86_400_000
-    );
+    // The organizer's Remind button can send this after the pay-within date has
+    // passed (the reservation is only released two days later). "Please send
+    // it by" a date that is already behind the buyer reads as "too late" —
+    // so past the deadline, the date given is the real release date instead.
+    const reservedAt = Date.parse(order.createdAt.replace(' ', 'T') + 'Z');
+    const payBy = reservedAt + event.payWithinDays * 86_400_000;
+    const deadline = new Date(payBy > Date.now() ? payBy : payBy + 2 * 86_400_000);
     const deadlineDisplay = deadline.toLocaleDateString('en-GB', {
       day: 'numeric',
       month: 'long',
@@ -1775,8 +1779,11 @@ export async function sendBuyerPaymentReminderEmail(
     if (!mailed.sent) return mailed;
     return { sent: true };
   } catch (err) {
-    console.error('[email] Failed to send buyer payment reminder:', err instanceof Error ? err.message : err);
-    return { sent: false, reason: 'send-failed' };
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error('[email] Failed to send buyer payment reminder:', detail);
+    // The mail server's own words, for the organizer's Remind button — as the
+    // ticket resend does. The automatic sweep only logs it.
+    return { sent: false, reason: 'send-failed', detail };
   }
 }
 

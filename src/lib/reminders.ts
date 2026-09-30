@@ -7,17 +7,66 @@
 // triggered (orders.reminder_stage), so a reservation never nags twice for
 // the same stage, and confirmed/expired orders naturally drop out.
 //
-// The sweep runs from a background interval (see src/instrumentation.ts) and
-// lazily whenever the portal dashboard loads.
+// The sweep is started by traffic: the portal dashboard and every public
+// event page call it (it throttles itself), and the first call arms a
+// 15-minute interval for the life of the server process. Buyers get one
+// reminder of their own (sweepBuyerReminders), and organizers can send one by
+// hand from the orders page (remindBuyerNow).
 import { getDb } from './db';
 import { sendBuyerPaymentReminderEmail, sendTransferReminderEmail, type ReminderOrderSummary } from './email';
 
 /**
- * Days after reserving before a buyer whose transfer hasn't been confirmed
- * gets ONE friendly reminder. Deliberately shorter than the shortest sensible
- * pay-within window so it lands while there is still time to act.
+ * Hours after reserving before a buyer whose transfer hasn't been confirmed
+ * gets ONE automatic reminder. It has to land BEFORE the pay-within deadline,
+ * so it follows that window: 4 days on the default 5-day window and anything
+ * longer, a day before the deadline on a shorter one, and never under 12 hours.
+ *
+ * It used to be a flat 4 days. An event on a 1-, 2- or 3-day window expires
+ * reservations at pay_within_days + 2 (lib/orders expireOverdueTransfer...),
+ * so on a 1-day window the reservation was gone before its reminder was due,
+ * and on 2 or 3 days the reminder came after the deadline it was announcing.
  */
-const BUYER_REMINDER_DAYS = 4;
+export function buyerReminderDelayHours(payWithinDays: number): number {
+  const days = Number.isFinite(payWithinDays) ? payWithinDays : 5;
+  return days >= 5 ? 96 : Math.max(12, (days - 1) * 24);
+}
+
+/** The same rule as buyerReminderDelayHours, for a query over orders + events. */
+const BUYER_REMINDER_DELAY_SQL = `CASE WHEN e.pay_within_days >= 5 THEN 96
+       ELSE MAX(12, (e.pay_within_days - 1) * 24) END`;
+
+/**
+ * An event this close gets its reminder early — six hours after reserving —
+ * whatever the pay-within window says. Someone who reserves on Thursday for
+ * Saturday cannot wait until Monday to hear their seats are still unpaid.
+ */
+const EVENT_SOON_DAYS = 2;
+const EVENT_SOON_DELAY_HOURS = 6;
+
+/**
+ * When the automatic buyer reminder for an order becomes due (epoch ms), for
+ * the organizer's orders page — or null when it never will (the event is
+ * over). Mirrors the sweep's query below: the pay-within timer, or six hours
+ * after reserving once the event is EVENT_SOON_DAYS away, whichever is first.
+ * The sweep runs every 15 minutes, so the mail follows within about that.
+ */
+export function automaticReminderAt(
+  createdAt: string,
+  payWithinDays: number,
+  eventDate: string | null
+): number | null {
+  const reserved = Date.parse(createdAt.replace(' ', 'T') + 'Z');
+  const byTimer = reserved + buyerReminderDelayHours(payWithinDays) * 3_600_000;
+  if (!eventDate) return byTimer;
+  const eventDay = Date.parse(`${eventDate}T00:00:00Z`);
+  if (!Number.isFinite(eventDay)) return byTimer;
+  if (eventDay + 86_400_000 <= Date.now()) return null;
+  const bySoon = Math.max(reserved + EVENT_SOON_DELAY_HOURS * 3_600_000, eventDay - EVENT_SOON_DAYS * 86_400_000);
+  return Math.min(byTimer, bySoon);
+}
+
+/** A buyer may be reminded by hand at most once in this window. */
+export const MANUAL_REMINDER_COOLDOWN_HOURS = 24;
 
 /** Parse '2,4,6' -> [2,4,6]; ascending, deduped, 1..30 days, max 3 timers. */
 export function parseReminderDays(raw: string | null | undefined): number[] {
@@ -177,7 +226,7 @@ export async function runTransferReminderSweep(force = false): Promise<{ emailed
 
 /**
  * One friendly nudge per buyer whose bank transfer still isn't confirmed after
- * BUYER_REMINDER_DAYS. The email reassures anyone who has already paid that
+ * buyerReminderDelayHours() — sooner when the event is days away. The email reassures anyone who has already paid that
  * nothing is wrong, and repeats the amount, IBAN and reference for anyone who
  * hasn't. Stamped in buyer_reminder_sent_at so it can never send twice, and it
  * naturally stops once the organizer confirms the payment or the reservation
@@ -202,11 +251,18 @@ async function sweepBuyerReminders(): Promise<number> {
          AND COALESCE(org.is_demo, 0) = 0
          AND o.buyer_reminder_sent_at IS NULL
          AND o.buyer_erased_at IS NULL
-         AND o.created_at < datetime('now', ?)
+         -- Nothing to chase once the event is over.
+         AND (NULLIF(e.event_date, '') IS NULL OR e.event_date >= date('now'))
+         AND (
+           o.created_at < datetime('now', '-' || (${BUYER_REMINDER_DELAY_SQL}) || ' hours')
+           OR (NULLIF(e.event_date, '') IS NOT NULL
+               AND e.event_date <= date('now', '+${EVENT_SOON_DAYS} days')
+               AND o.created_at < datetime('now', '-${EVENT_SOON_DELAY_HOURS} hours'))
+         )
        ORDER BY o.created_at ASC
        LIMIT 100`
     )
-    .all(`-${BUYER_REMINDER_DAYS} days`) as { orderId: string }[];
+    .all() as { orderId: string }[];
 
   let sent = 0;
   const stamp = db.prepare(`UPDATE orders SET buyer_reminder_sent_at = datetime('now') WHERE id = ?`);
@@ -232,4 +288,43 @@ async function sweepBuyerReminders(): Promise<number> {
     }
   }
   return sent;
+}
+
+/**
+ * The organizer's "Remind buyer" button: send the payment reminder NOW, for one
+ * order, whatever the automatic timer says. The caller has already checked the
+ * organizer owns the order.
+ *
+ * Stamps buyer_reminder_sent_at like the automatic sweep does, so a buyer
+ * reminded by hand is not reminded again by the sweep, and a second press
+ * within MANUAL_REMINDER_COOLDOWN_HOURS is refused. The buyer gets the same
+ * email either way, with the same bank details and reference.
+ */
+export async function remindBuyerNow(
+  orderId: string
+): Promise<{ sent: boolean; reason?: string; detail?: string; lastSentAt?: string }> {
+  const db = getDb();
+  const row = db
+    .prepare(
+      `SELECT o.status, o.payment_mode AS paymentMode, o.buyer_erased_at AS erasedAt,
+              o.buyer_reminder_sent_at AS lastSentAt,
+              (o.buyer_reminder_sent_at IS NOT NULL
+                 AND o.buyer_reminder_sent_at > datetime('now', ?)) AS recent
+       FROM orders o WHERE o.id = ?`
+    )
+    .get(`-${MANUAL_REMINDER_COOLDOWN_HOURS} hours`, orderId) as
+    | { status: string; paymentMode: string; erasedAt: string | null; lastSentAt: string | null; recent: number }
+    | undefined;
+  if (!row) return { sent: false, reason: 'order-not-found' };
+  if (row.status !== 'claimed' || row.paymentMode !== 'transfer') {
+    return { sent: false, reason: 'order-not-awaiting-transfer' };
+  }
+  if (row.erasedAt) return { sent: false, reason: 'buyer-erased' };
+  if (row.recent) return { sent: false, reason: 'reminded-recently', lastSentAt: row.lastSentAt ?? undefined };
+
+  const result = await sendBuyerPaymentReminderEmail(orderId);
+  if (result.sent) {
+    db.prepare(`UPDATE orders SET buyer_reminder_sent_at = datetime('now') WHERE id = ?`).run(orderId);
+  }
+  return result;
 }

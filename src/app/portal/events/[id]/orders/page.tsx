@@ -17,6 +17,8 @@ import { organizerPlanActive } from '@/lib/organizers';
 import { listStallLinksForShop } from '@/lib/stalls';
 import TransferActions from '@/app/admin/TransferActions';
 import ResendButton from '@/app/admin/orders/ResendButton';
+import { automaticReminderAt, buyerReminderDelayHours } from '@/lib/reminders';
+import RemindButton from './RemindButton';
 import PlanExpired from '../../../PlanExpired';
 import PortalNav from '../../../PortalNav';
 import { requirePortalOrganizer } from '../../../guard';
@@ -80,6 +82,15 @@ export default async function PortalOrdersPage({
   // cannot know which one a given buyer chose — only that this event offered
   // both. That makes "bank transfer" the wrong word here whenever PayPal is on.
   const takesPaypal = effectivePayout(event).paypal.trim() !== '';
+  const reminderDelay = buyerReminderDelayHours(event.payWithinDays);
+  const remindButton = (o: { id: string; createdAt: string; buyerReminderSentAt: string | null }) => (
+    <RemindButton
+      orderId={o.id}
+      lastSentAt={o.buyerReminderSentAt}
+      autoAt={automaticReminderAt(o.createdAt, event.payWithinDays, event.eventDate)}
+      demo={organizer.isDemo}
+    />
+  );
   const allOrders = listOrders({ eventId: event.id, query });
   const isTodo = (o: (typeof allOrders)[number]) => o.paymentMode === 'transfer' && o.status === 'claimed';
   const isGone = (o: (typeof allOrders)[number]) => o.status === 'cancelled' || o.status === 'failed';
@@ -175,6 +186,14 @@ export default async function PortalOrdersPage({
               PayPal payments have no reference — match them by the sender&rsquo;s <strong>name</strong>.
             </p>
           )}
+          <p className="muted small" style={{ marginTop: 0 }}>
+            Not paid yet? Each buyer gets one automatic reminder{' '}
+            {reminderDelay % 24 === 0
+              ? `${reminderDelay / 24} day${reminderDelay === 24 ? '' : 's'}`
+              : `${reminderDelay} hours`}{' '}
+            after reserving (sooner when the event is close), with the payment details and reference again.{' '}
+            <strong>Remind buyer</strong> sends it now.
+          </p>
           {/* The stall counter-confirmation hint (stalls plan §7): a buyer
               standing at the stall whose transfer has not landed yet is not
               stuck — the owner confirms right here and scans a moment later. */}
@@ -220,6 +239,7 @@ export default async function PortalOrdersPage({
                     amountDisplay={formatMoney(o.totalCents, o.currency)}
                     reference={reference}
                   />
+                  {!o.buyerErasedAt && remindButton(o)}
                 </div>
               );
             })}
@@ -443,13 +463,16 @@ export default async function PortalOrdersPage({
                         // no address left (lib/email refuses it too).
                         erased ? null : <ResendButton orderId={o.id} demo={organizer.isDemo} />
                       ) : awaitingPay ? (
-                        <TransferActions
-                          orderId={o.id}
-                          buyerName={o.buyerName}
-                          payerName={o.payerName}
-                          amountDisplay={formatMoney(o.totalCents, o.currency)}
-                          reference={o.paymentReference}
-                        />
+                        <>
+                          <TransferActions
+                            orderId={o.id}
+                            buyerName={o.buyerName}
+                            payerName={o.payerName}
+                            amountDisplay={formatMoney(o.totalCents, o.currency)}
+                            reference={o.paymentReference}
+                          />
+                          {!erased && remindButton(o)}
+                        </>
                       ) : o.paymentMode === 'transfer' && gone && !erased ? (
                         <TransferActions
                           variant="late"
