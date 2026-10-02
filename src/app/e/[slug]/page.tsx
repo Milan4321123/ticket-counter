@@ -350,6 +350,9 @@ export default async function EventPage({ params, searchParams }: Params) {
   // other. The video carries its own first frame, so there is nothing a stand-in
   // photo can add here except that flicker.
   const stillId = coverIsVideo ? null : coverId;
+  // The 3D ticket in the hero shows a picture WHOLE, uncropped (the cover is a
+  // wide strip cut from it): the poster when there is one, else that photo.
+  const ticketArtId = isPhotoId(event.posterMediaId) ? event.posterMediaId : stillId;
   // The framing stamp only applies to the photo the organizer actually framed as
   // the cover — a stand-in still under a video cover was never positioned here,
   // so it keeps the automatic crop (and no stamp). See cropTag for why the URL
@@ -777,6 +780,7 @@ export default async function EventPage({ params, searchParams }: Params) {
           <HoloStage
             layout={layout}
             cover={stillUrl}
+            poster={ticketArtId ? mediaUrl(ticketArtId, 'gallery', null) : null}
             title={event.name}
             kicker={event.artist || (preview ? 'Preview' : 'Live event')}
             place={[event.venueName, heroCity].filter(Boolean).join(' · ')}

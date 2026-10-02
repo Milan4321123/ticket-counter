@@ -20,6 +20,8 @@ export type HoloLayout = 'classic' | 'poster' | 'festival' | 'editorial' | 'neon
 export interface HoloOptions {
   layout: HoloLayout;
   cover: string | null;
+  /** The same picture uncropped — the ticket shows the WHOLE poster. */
+  poster: string | null;
   title: string;
   kicker: string;
   place: string;
@@ -36,8 +38,8 @@ const clamp = (v: number, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
 
 /** A ticket outline: rounded corners, a notch top and bottom at the tear line. */
 function ticketShape(w: number, h: number, tear: number, portrait: boolean) {
-  const r = Math.min(w, h) * 0.07;
-  const n = Math.min(w, h) * 0.085;
+  const r = Math.min(w, h) * 0.06;
+  const n = Math.min(w, h) * 0.07;
   const s = new THREE.Shape();
   const x0 = -w / 2;
   const y0 = -h / 2;
@@ -59,8 +61,9 @@ function ticketShape(w: number, h: number, tear: number, portrait: boolean) {
     s.lineTo(x0, y0 + r);
     s.quadraticCurveTo(x0, y0, x0 + r, y0);
   } else {
-    // Portrait (poster layout): the stub is at the bottom, notches on the sides.
-    const py = y1 - h * tear;
+    // Portrait (poster layout): the stub is at the bottom, notches on the sides
+    // exactly where it tears off. `tear` is the stub's share, from the bottom.
+    const py = y0 + h * tear;
     s.moveTo(x0 + r, y0);
     s.lineTo(x1 - r, y0);
     s.quadraticCurveTo(x1, y0, x1, y0 + r);
@@ -99,72 +102,144 @@ function fitText(ctx: CanvasRenderingContext2D, text: string, maxW: number, size
   return s;
 }
 
-/** Paints the ticket's face: the cover on the art side, the stub beside it. */
-function paintFace(canvas: HTMLCanvasElement, o: HoloOptions, img: HTMLImageElement | null, portrait: boolean, tear: number) {
+/**
+ * Where everything sits on the face, in face units. The picture window takes
+ * the picture's OWN proportions, so the poster is shown whole — never cropped
+ * to fit a fixed ticket. Under it a caption band carries the name (printing
+ * the title over the poster hid the poster's own lettering), and the stub
+ * holds the date: beside it on a landscape ticket, below on a portrait one.
+ */
+interface FacePlan {
+  portrait: boolean;
+  w: number;
+  h: number;
+  /** The stub's share of the width (landscape) or height from the bottom (portrait). */
+  tear: number;
+  pic: { x: number; y: number; w: number; h: number };
+  cap: { x: number; y: number; w: number; h: number };
+  stub: { x: number; y: number; w: number; h: number };
+}
+
+function planFace(portrait: boolean, aspect: number): FacePlan {
+  if (portrait) {
+    const a = clamp(aspect, 0.55, 2.2);
+    const picH = 1 / a;
+    const capH = 0.2;
+    const stubH = 0.3;
+    const h = picH + capH + stubH;
+    return {
+      portrait,
+      w: 1,
+      h,
+      tear: stubH / h,
+      pic: { x: 0, y: 0, w: 1, h: picH },
+      cap: { x: 0, y: picH, w: 1, h: capH },
+      stub: { x: 0, y: picH + capH, w: 1, h: stubH },
+    };
+  }
+  const a = clamp(aspect, 0.6, 2.6);
+  const capH = 0.24;
+  const h = 1 + capH;
+  const stubW = 0.46 * h;
+  const w = a + stubW;
+  return {
+    portrait,
+    w,
+    h,
+    tear: a / w,
+    pic: { x: 0, y: 0, w: a, h: 1 },
+    cap: { x: 0, y: 1, w: a, h: capH },
+    stub: { x: a, y: 0, w: stubW, h },
+  };
+}
+
+type Rect = { x: number; y: number; w: number; h: number };
+
+/** Paints the face: the whole picture, the caption band, the stub. */
+function paintFace(canvas: HTMLCanvasElement, o: HoloOptions, img: HTMLImageElement | null, plan: FacePlan) {
   const ctx = canvas.getContext('2d')!;
   const W = canvas.width;
   const H = canvas.height;
+  const k = W / plan.w;
+  const px = (r: Rect): Rect => ({ x: r.x * k, y: r.y * k, w: r.w * k, h: r.h * k });
+  const pic = px(plan.pic);
+  const cap = px(plan.cap);
+  const stub = px(plan.stub);
   ctx.clearRect(0, 0, W, H);
-  const art = portrait ? { x: 0, y: 0, w: W, h: H * (1 - tear) } : { x: 0, y: 0, w: W * tear, h: H };
-  const stub = portrait ? { x: 0, y: art.h, w: W, h: H - art.h } : { x: art.w, y: 0, w: W - art.w, h: H };
 
-  // Art side — the cover, cover-fitted; or a gradient when there is none.
-  const bg = ctx.createLinearGradient(0, 0, art.w, art.h);
+  // The picture — or, without one, the page's colours with a few soft rings.
+  const bg = ctx.createLinearGradient(pic.x, pic.y, pic.x + pic.w, pic.y + pic.h);
   bg.addColorStop(0, '#0b0714');
   bg.addColorStop(0.55, o.accent);
   bg.addColorStop(1, o.pink);
   ctx.fillStyle = bg;
-  ctx.fillRect(art.x, art.y, art.w, art.h);
+  ctx.fillRect(pic.x, pic.y, pic.w, pic.h);
   if (img && img.naturalWidth) {
-    const k = Math.max(art.w / img.naturalWidth, art.h / img.naturalHeight);
-    const dw = img.naturalWidth * k;
-    const dh = img.naturalHeight * k;
-    ctx.drawImage(img, art.x + (art.w - dw) / 2, art.y + (art.h - dh) / 2, dw, dh);
+    const iw = img.naturalWidth;
+    const ih = img.naturalHeight;
+    const fill = Math.max(pic.w / iw, pic.h / ih);
+    const fit = Math.min(pic.w / iw, pic.h / ih);
+    // The window already has the picture's shape, so this only differs for an
+    // extreme strip: then the gaps are a blurred copy, never a crop.
+    if (fill / fit > 1.02) {
+      ctx.save();
+      ctx.filter = 'blur(24px) brightness(0.55)';
+      ctx.drawImage(img, pic.x + (pic.w - iw * fill) / 2, pic.y + (pic.h - ih * fill) / 2, iw * fill, ih * fill);
+      ctx.restore();
+    }
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(pic.x, pic.y, pic.w, pic.h);
+    ctx.clip();
+    ctx.drawImage(img, pic.x + (pic.w - iw * fit) / 2, pic.y + (pic.h - ih * fit) / 2, iw * fit, ih * fit);
+    ctx.restore();
   } else {
-    // A few soft rings so the gradient is not a flat card.
     ctx.globalAlpha = 0.18;
     ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
     for (let i = 1; i < 9; i++) {
-      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(art.w * 0.8, art.h * 0.1, i * art.w * 0.09, 0, Math.PI * 2);
+      ctx.arc(pic.x + pic.w * 0.8, pic.y + pic.h * 0.1, i * pic.w * 0.09, 0, Math.PI * 2);
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
   }
-  // Darken the bottom so the printed title reads on any photo.
-  const shade = ctx.createLinearGradient(0, art.y + art.h * 0.35, 0, art.y + art.h);
-  shade.addColorStop(0, 'rgba(6,4,12,0)');
-  shade.addColorStop(1, 'rgba(6,4,12,0.88)');
-  ctx.fillStyle = shade;
-  ctx.fillRect(art.x, art.y, art.w, art.h);
-  // …and a lighter band along the top, for the small label.
-  const topShade = ctx.createLinearGradient(0, art.y, 0, art.y + art.h * 0.25);
-  topShade.addColorStop(0, 'rgba(6,4,12,0.55)');
-  topShade.addColorStop(1, 'rgba(6,4,12,0)');
-  ctx.fillStyle = topShade;
-  ctx.fillRect(art.x, art.y, art.w, art.h * 0.25);
 
-  const pad = Math.round(Math.min(art.w, art.h) * 0.07);
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.font = `800 ${Math.round(art.h * 0.045)}px ${o.font}`;
+  // The caption band: dark, a thin line of the page's colour along its top.
+  const cg = ctx.createLinearGradient(cap.x, cap.y, cap.x + cap.w, cap.y + cap.h);
+  cg.addColorStop(0, '#0d0918');
+  cg.addColorStop(1, '#1a1030');
+  ctx.fillStyle = cg;
+  ctx.fillRect(cap.x, cap.y, cap.w, cap.h);
+  const line = ctx.createLinearGradient(cap.x, 0, cap.x + cap.w, 0);
+  line.addColorStop(0, o.accent);
+  line.addColorStop(1, o.pink);
+  ctx.fillStyle = line;
+  ctx.fillRect(cap.x, cap.y, cap.w, Math.max(3, cap.h * 0.025));
+
+  const pad = cap.h * 0.2;
+  const textW = cap.w - pad * 2;
   ctx.textBaseline = 'alphabetic';
-  if ('letterSpacing' in ctx) (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '6px';
-  ctx.fillText(o.kicker.toUpperCase(), art.x + pad, art.y + pad + art.h * 0.045);
-  if ('letterSpacing' in ctx) (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '0px';
-  const ts = fitText(ctx, o.title, art.w - pad * 2, Math.round(art.h * (portrait ? 0.1 : 0.15)), '900', o.font);
+  const letter = (v: string) => {
+    if ('letterSpacing' in ctx) (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = v;
+  };
+  if (o.kicker) {
+    letter(`${Math.round(cap.h * 0.02)}px`);
+    fitText(ctx, o.kicker.toUpperCase(), textW, Math.round(cap.h * 0.13), '800', o.font);
+    ctx.fillStyle = o.accent;
+    ctx.fillText(o.kicker.toUpperCase(), cap.x + pad, cap.y + cap.h * 0.3);
+    letter('0px');
+  }
+  const ts = fitText(ctx, o.title, textW, Math.round(cap.h * 0.32), '900', o.font);
   ctx.fillStyle = '#fff';
-  ctx.shadowColor = 'rgba(0,0,0,0.5)';
-  ctx.shadowBlur = 18;
-  ctx.fillText(o.title, art.x + pad, art.y + art.h - pad - (o.place ? ts * 0.62 : 0));
-  ctx.shadowBlur = 0;
+  ctx.fillText(o.title, cap.x + pad, cap.y + cap.h * 0.3 + ts * 0.95);
   if (o.place) {
-    ctx.fillStyle = 'rgba(255,255,255,0.78)';
-    ctx.font = `600 ${Math.round(ts * 0.42)}px ${o.font}`;
-    ctx.fillText(o.place, art.x + pad, art.y + art.h - pad);
+    fitText(ctx, o.place, textW, Math.round(cap.h * 0.13), '600', o.font);
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.fillText(o.place, cap.x + pad, cap.y + cap.h * 0.86);
   }
 
-  // Stub — the page's two colours, the date large, a barcode.
+  // The stub — the page's two colours, the date large, a barcode.
   const sg = ctx.createLinearGradient(stub.x, stub.y, stub.x + stub.w, stub.y + stub.h);
   sg.addColorStop(0, o.accent);
   sg.addColorStop(1, o.pink);
@@ -184,45 +259,54 @@ function paintFace(canvas: HTMLCanvasElement, o: HoloOptions, img: HTMLImageElem
     ctx.fill();
   }
   ctx.restore();
-  ctx.fillStyle = '#fff';
-  ctx.textAlign = 'center';
-  const cx = stub.x + stub.w / 2;
-  if (portrait) {
-    const cy = stub.y + stub.h / 2;
-    ctx.font = `900 ${Math.round(stub.h * 0.42)}px ${o.font}`;
-    ctx.fillText(o.day || '★', stub.x + stub.w * 0.22, cy + stub.h * 0.15);
-    ctx.font = `800 ${Math.round(stub.h * 0.14)}px ${o.font}`;
-    ctx.fillText(`${o.weekday} ${o.month}`.trim().toUpperCase() || 'ADMIT ONE', stub.x + stub.w * 0.22, cy + stub.h * 0.34);
-    ctx.textAlign = 'left';
-    ctx.font = `900 ${Math.round(stub.h * 0.16)}px ${o.font}`;
-    ctx.fillText('ADMIT ONE', stub.x + stub.w * 0.44, cy - stub.h * 0.08);
-    ctx.font = `700 ${Math.round(stub.h * 0.13)}px ${o.font}`;
-    ctx.fillText(o.price, stub.x + stub.w * 0.44, cy + stub.h * 0.16);
-  } else {
-    ctx.font = `800 ${Math.round(stub.w * 0.12)}px ${o.font}`;
-    ctx.fillText((o.weekday || 'ADMIT').toUpperCase(), cx, stub.y + stub.h * 0.2);
-    ctx.font = `900 ${Math.round(stub.w * 0.44)}px ${o.font}`;
-    ctx.fillText(o.day || '1', cx, stub.y + stub.h * 0.47);
-    ctx.font = `800 ${Math.round(stub.w * 0.13)}px ${o.font}`;
-    ctx.fillText((o.month || 'ONE').toUpperCase(), cx, stub.y + stub.h * 0.58);
-    if (o.price) {
-      ctx.font = `700 ${Math.round(stub.w * 0.09)}px ${o.font}`;
-      ctx.fillText(o.price, cx, stub.y + stub.h * 0.69);
-    }
-  }
-  ctx.textAlign = 'left';
-  // Barcode.
+
   const rnd = seeded(o.title + o.day);
-  ctx.fillStyle = 'rgba(255,255,255,0.92)';
-  if (portrait) {
-    let x = stub.x + stub.w * 0.44;
-    const end = stub.x + stub.w * 0.92;
-    while (x < end) {
+  const bars = (x0: number, x1: number, y: number, h: number) => {
+    let x = x0;
+    while (x < x1) {
       const bw = 2 + Math.floor(rnd() * 7);
-      if (rnd() > 0.35) ctx.fillRect(x, stub.y + stub.h * 0.62, bw, stub.h * 0.2);
+      if (rnd() > 0.35) ctx.fillRect(x, y, Math.min(bw, x1 - x), h);
       x += bw + 3;
     }
+  };
+  ctx.fillStyle = '#fff';
+  if (plan.portrait) {
+    // Date on the left; ADMIT ONE, the price and the barcode stacked on the
+    // right, each on its own row.
+    const lx = stub.x + stub.w * 0.2;
+    ctx.textAlign = 'center';
+    ctx.font = `900 ${Math.round(stub.h * 0.46)}px ${o.font}`;
+    ctx.fillText(o.day || '★', lx, stub.y + stub.h * 0.6);
+    ctx.font = `800 ${Math.round(stub.h * 0.14)}px ${o.font}`;
+    ctx.fillText(`${o.weekday} ${o.month}`.trim().toUpperCase(), lx, stub.y + stub.h * 0.82);
+    ctx.textAlign = 'left';
+    const rx = stub.x + stub.w * 0.42;
+    const rw = stub.w * 0.5;
+    fitText(ctx, 'ADMIT ONE', rw, Math.round(stub.h * 0.17), '900', o.font);
+    ctx.fillText('ADMIT ONE', rx, stub.y + stub.h * 0.32);
+    if (o.price) {
+      fitText(ctx, o.price, rw, Math.round(stub.h * 0.12), '700', o.font);
+      ctx.fillStyle = 'rgba(255,255,255,0.88)';
+      ctx.fillText(o.price, rx, stub.y + stub.h * 0.52);
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    bars(rx, rx + rw, stub.y + stub.h * 0.62, stub.h * 0.22);
   } else {
+    const cx = stub.x + stub.w / 2;
+    const u = Math.min(stub.w, stub.h * 0.5);
+    ctx.textAlign = 'center';
+    ctx.font = `800 ${Math.round(u * 0.12)}px ${o.font}`;
+    ctx.fillText((o.weekday || 'ADMIT').toUpperCase(), cx, stub.y + stub.h * 0.2);
+    ctx.font = `900 ${Math.round(u * 0.44)}px ${o.font}`;
+    ctx.fillText(o.day || '1', cx, stub.y + stub.h * 0.46);
+    ctx.font = `800 ${Math.round(u * 0.13)}px ${o.font}`;
+    ctx.fillText((o.month || 'ONE').toUpperCase(), cx, stub.y + stub.h * 0.57);
+    if (o.price) {
+      fitText(ctx, o.price, stub.w * 0.8, Math.round(u * 0.09), '700', o.font);
+      ctx.fillText(o.price, cx, stub.y + stub.h * 0.68);
+    }
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
     let y = stub.y + stub.h * 0.76;
     const end = stub.y + stub.h * 0.92;
     while (y < end) {
@@ -231,12 +315,14 @@ function paintFace(canvas: HTMLCanvasElement, o: HoloOptions, img: HTMLImageElem
       y += bh + 3;
     }
   }
+  ctx.textAlign = 'left';
+
   // The tear line.
   ctx.strokeStyle = 'rgba(255,255,255,0.7)';
   ctx.lineWidth = 4;
   ctx.setLineDash([14, 12]);
   ctx.beginPath();
-  if (portrait) {
+  if (plan.portrait) {
     ctx.moveTo(0, stub.y);
     ctx.lineTo(W, stub.y);
   } else {
@@ -288,38 +374,16 @@ export function startHolo(host: HTMLElement, hero: HTMLElement, o: HoloOptions):
   const edgeColour = o.layout === 'neon' ? new THREE.Color('#22d3ee') : o.layout === 'editorial' ? new THREE.Color('#e9d3a4') : accent;
 
   // ---------------- The ticket ----------------
+  //
+  // Built once the poster has loaded (or given up on), because its shape IS
+  // the poster's shape. Until then the field of light plays on its own.
   const portrait = o.layout === 'poster';
-  const TW = portrait ? 2.6 : 4.6;
-  const TH = portrait ? 3.7 : 4.6 / 2.35;
-  const tear = portrait ? 0.24 : 0.74;
-  const shape = ticketShape(TW, TH, tear, portrait);
   const depth = 0.05;
-  const geo = new THREE.ExtrudeGeometry(shape, {
-    depth,
-    bevelEnabled: true,
-    bevelThickness: 0.025,
-    bevelSize: 0.025,
-    bevelSegments: 4,
-    curveSegments: 28,
-  });
-  geo.translate(0, 0, -depth / 2);
-  // Face UVs from position, so the printed face maps edge to edge; the back is
-  // mirrored so it reads the right way round when the ticket spins.
-  {
-    const pos = geo.attributes.position;
-    const uv = geo.attributes.uv;
-    for (let i = 0; i < pos.count; i++) {
-      const u = (pos.getX(i) + TW / 2) / TW;
-      const v = (pos.getY(i) + TH / 2) / TH;
-      uv.setXY(i, pos.getZ(i) < 0 ? 1 - u : u, v);
-    }
-    uv.needsUpdate = true;
-  }
-
+  let TW = portrait ? 2.6 : 4.6;
+  let TH = portrait ? 3.7 : 2;
+  let tear = 0.3;
+  let ticketReady = false;
   const faceCanvas = document.createElement('canvas');
-  faceCanvas.width = portrait ? 1024 : 2048;
-  faceCanvas.height = Math.round((faceCanvas.width * TH) / TW);
-  paintFace(faceCanvas, o, null, portrait, tear);
   const faceTex = new THREE.CanvasTexture(faceCanvas);
   faceTex.colorSpace = THREE.SRGBColorSpace;
   faceTex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
@@ -359,17 +423,18 @@ export function startHolo(host: HTMLElement, hero: HTMLElement, o: HoloOptions):
         vec4 base = texture2D(map, vUv);
         float facing = abs(dot(normalize(vN), normalize(vV)));
         float fres = pow(1.0 - facing, 2.2);
-        // Rainbow foil that shifts with the viewing angle.
+        // Rainbow foil that shifts with the viewing angle — strong on the
+        // stub, only a breath over the picture so the poster stays true.
         vec3 irid = 0.5 + 0.5 * cos(6.2831 * (vec3(0.0, 0.33, 0.67) + fres * 1.8 + vUv.x * 0.9 + vUv.y * 0.5 + time * 0.04));
-        float onStub = portrait > 0.5 ? step(1.0 - tearAt, 1.0 - vUv.y) : step(tearAt, vUv.x);
-        float foil = mix(0.06, 0.22, onStub) + fres * 0.55;
+        float onStub = portrait > 0.5 ? step(vUv.y, tearAt) : step(tearAt, vUv.x);
+        float foil = mix(0.03, 0.22, onStub) + fres * 0.45;
         // A blade of light that crosses the ticket every few seconds.
         float band = vUv.x * 0.8 + vUv.y * 0.45 - mod(time * 0.32, 3.2) + 0.6;
-        float blade = smoothstep(0.06, 0.0, abs(band)) * 0.28;
+        float blade = smoothstep(0.05, 0.0, abs(band)) * mix(0.14, 0.26, onStub);
         // Fine holographic lines.
         float lines = (0.5 + 0.5 * sin((vUv.y * 420.0) + time * 2.0)) * 0.035 * onStub;
         vec3 col = base.rgb + irid * foil * 0.55 + vec3(blade) + lines;
-        col += mix(accent, pink, vUv.x) * fres * 0.35;
+        col += mix(accent, pink, vUv.x) * fres * 0.3;
         gl_FragColor = vec4(col, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -382,13 +447,12 @@ export function startHolo(host: HTMLElement, hero: HTMLElement, o: HoloOptions):
     emissive: edgeColour,
     emissiveIntensity: 0.35,
   });
-  const ticket = new THREE.Mesh(geo, [faceMat, edgeMat]);
-
-  // A glowing outline just in front of the face, and a halo behind.
-  const outline = new THREE.LineLoop(
-    new THREE.BufferGeometry().setFromPoints(shape.getPoints(48).map((p) => new THREE.Vector3(p.x, p.y, depth / 2 + 0.032))),
-    new THREE.LineBasicMaterial({ color: edgeColour, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending })
-  );
+  const outlineMat = new THREE.LineBasicMaterial({
+    color: edgeColour,
+    transparent: true,
+    opacity: 0.9,
+    blending: THREE.AdditiveBlending,
+  });
   const glowCanvas = document.createElement('canvas');
   glowCanvas.width = glowCanvas.height = 128;
   {
@@ -401,17 +465,70 @@ export function startHolo(host: HTMLElement, hero: HTMLElement, o: HoloOptions):
     g.fillRect(0, 0, 128, 128);
   }
   const glowTex = new THREE.CanvasTexture(glowCanvas);
-  const halo = new THREE.Mesh(
-    new THREE.PlaneGeometry(TW * 2.1, TH * 2.3),
-    new THREE.MeshBasicMaterial({ map: glowTex, color: edgeColour, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })
-  );
-  halo.position.z = -0.6;
+  const haloMat = new THREE.MeshBasicMaterial({
+    map: glowTex,
+    color: edgeColour,
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
 
   const rig = new THREE.Group(); // scroll + entrance
   const spinner = new THREE.Group(); // mouse, drag, idle
-  spinner.add(ticket, outline);
-  rig.add(halo, spinner);
+  rig.add(spinner);
   scene.add(rig);
+  const built: THREE.BufferGeometry[] = [];
+
+  const buildTicket = (img: HTMLImageElement | null) => {
+    const aspect = img && img.naturalWidth ? img.naturalWidth / img.naturalHeight : portrait ? 0.72 : 2.16;
+    const plan = planFace(portrait, aspect);
+    // World size: a landscape ticket about 4.6 wide, a portrait one 3.7 tall.
+    const k = 1 / Math.max(plan.w / 4.6, plan.h / (portrait ? 3.7 : 2.4));
+    TW = plan.w * k;
+    TH = plan.h * k;
+    tear = plan.tear;
+    holoUniforms.tearAt.value = tear;
+
+    const shape = ticketShape(TW, TH, tear, portrait);
+    const geo = new THREE.ExtrudeGeometry(shape, {
+      depth,
+      bevelEnabled: true,
+      bevelThickness: 0.025,
+      bevelSize: 0.025,
+      bevelSegments: 4,
+      curveSegments: 28,
+    });
+    geo.translate(0, 0, -depth / 2);
+    // Face UVs from position, so the printed face maps edge to edge; the back
+    // is mirrored so it reads the right way round when the ticket spins.
+    const pos = geo.attributes.position;
+    const uv = geo.attributes.uv;
+    for (let i = 0; i < pos.count; i++) {
+      const u = (pos.getX(i) + TW / 2) / TW;
+      const v = (pos.getY(i) + TH / 2) / TH;
+      uv.setXY(i, pos.getZ(i) < 0 ? 1 - u : u, v);
+    }
+    uv.needsUpdate = true;
+
+    const long = 2048;
+    faceCanvas.width = plan.w >= plan.h ? long : Math.round((long * plan.w) / plan.h);
+    faceCanvas.height = Math.round((faceCanvas.width * plan.h) / plan.w);
+    paintFace(faceCanvas, o, img, plan);
+    faceTex.needsUpdate = true;
+
+    const outlineGeo = new THREE.BufferGeometry().setFromPoints(
+      shape.getPoints(48).map((p) => new THREE.Vector3(p.x, p.y, depth / 2 + 0.032))
+    );
+    const haloGeo = new THREE.PlaneGeometry(TW * 2.1, TH * 2.3);
+    built.push(geo, outlineGeo, haloGeo);
+    const halo = new THREE.Mesh(haloGeo, haloMat);
+    halo.position.z = -0.6;
+    spinner.add(new THREE.Mesh(geo, [faceMat, edgeMat]), new THREE.LineLoop(outlineGeo, outlineMat));
+    rig.add(halo);
+    ticketReady = true;
+    layoutStage();
+  };
 
   const key = new THREE.DirectionalLight(0xffffff, 1.4);
   key.position.set(3, 4, 6);
@@ -512,18 +629,27 @@ export function startHolo(host: HTMLElement, hero: HTMLElement, o: HoloOptions):
     scene.add(floor);
   }
 
-  // Load the cover onto the face once it arrives.
+  // Wait for the picture (the whole poster), then build; give up after a few
+  // seconds and print the ticket without it rather than show nothing.
   let disposed = false;
-  if (o.cover) {
+  const src = o.poster || o.cover;
+  if (src) {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.decoding = 'async';
+    const giveUp = window.setTimeout(() => {
+      if (!disposed && !ticketReady) buildTicket(null);
+    }, 6000);
     img.onload = () => {
+      window.clearTimeout(giveUp);
       if (disposed) return;
-      paintFace(faceCanvas, o, img, portrait, tear);
-      faceTex.needsUpdate = true;
+      if (!ticketReady) buildTicket(img);
     };
-    img.src = o.cover;
+    img.onerror = () => {
+      window.clearTimeout(giveUp);
+      if (!disposed && !ticketReady) buildTicket(null);
+    };
+    img.src = src;
   }
 
   // ---------------- Layout of the stage ----------------
@@ -558,6 +684,7 @@ export function startHolo(host: HTMLElement, hero: HTMLElement, o: HoloOptions):
     fieldMat.uniforms.scale.value = renderer.getPixelRatio() * (wide ? 1 : 0.8);
   };
   layoutStage();
+  if (!src) buildTicket(null);
   const ro = new ResizeObserver(layoutStage);
   ro.observe(host);
 
@@ -635,7 +762,7 @@ export function startHolo(host: HTMLElement, hero: HTMLElement, o: HoloOptions):
     const dt = Math.min((now - lastNow) / 1000, 1 / 20);
     lastNow = now;
     t += dt;
-    born = Math.min(1, born + dt / 2.2);
+    if (ticketReady) born = Math.min(1, born + dt / 2.2);
     const e = 1 - Math.pow(1 - born, 4);
 
     const r = hero.getBoundingClientRect();
@@ -661,8 +788,8 @@ export function startHolo(host: HTMLElement, hero: HTMLElement, o: HoloOptions):
       Math.sin(t * 0.33) * 0.03 + (1 - e) * 0.4
     );
     spinner.position.y = Math.sin(t * 0.9) * 0.08;
-    (halo.material as THREE.MeshBasicMaterial).opacity = e * (0.32 + 0.1 * Math.sin(t * 1.4)) * (1 - hp);
-    (outline.material as THREE.LineBasicMaterial).opacity = 0.55 + 0.35 * Math.sin(t * 2.1);
+    haloMat.opacity = e * (0.32 + 0.1 * Math.sin(t * 1.4)) * (1 - hp);
+    outlineMat.opacity = 0.55 + 0.35 * Math.sin(t * 2.1);
 
     holoUniforms.time.value = t;
     fieldMat.uniforms.time.value = t;
@@ -691,15 +818,13 @@ export function startHolo(host: HTMLElement, hero: HTMLElement, o: HoloOptions):
     offs.forEach((off) => off());
     io.disconnect();
     ro.disconnect();
-    geo.dispose();
+    built.forEach((g) => g.dispose());
     faceMat.dispose();
     edgeMat.dispose();
+    outlineMat.dispose();
+    haloMat.dispose();
     faceTex.dispose();
     glowTex.dispose();
-    outline.geometry.dispose();
-    (outline.material as THREE.Material).dispose();
-    halo.geometry.dispose();
-    (halo.material as THREE.Material).dispose();
     fieldGeo.dispose();
     fieldMat.dispose();
     if (floor) {
