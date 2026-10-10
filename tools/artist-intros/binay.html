@@ -1,0 +1,340 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Binay Karki — walk-on intro</title>
+<!-- binay.html?t=18 shows one moment, ?play plays it (with out/binay/audio.wav if made). -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@500;600;700;800;900&family=Fraunces:ital,opsz,wght@1,9..144,600;1,9..144,800&display=block">
+<style>
+  :root { --f1: #fff7ed; --f2: #fdba74; --f3: #f97316; --f4: #dc2626; }
+  html, body { margin: 0; background: #000; overflow: hidden; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #070302; font-family: Inter, sans-serif; color: #fff; }
+  canvas { position: absolute; inset: 0; }
+  .scene { position: absolute; inset: 0; display: none; transform-origin: 50% 50%; }
+  .abs { position: absolute; }
+  .center { left: 0; right: 0; text-align: center; }
+  .acc { background: linear-gradient(100deg, var(--f2), var(--f3) 50%, var(--f4)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  em { font-family: Fraunces, serif; font-style: italic; font-weight: 800; background: linear-gradient(100deg, var(--f2), var(--f3) 55%, var(--f4)); -webkit-background-clip: text; background-clip: text; color: transparent; padding-right: 0.06em; }
+  .big { font-weight: 800; font-size: 150px; letter-spacing: -0.035em; line-height: 1; }
+  .sub { font-family: Fraunces, serif; font-style: italic; font-weight: 600; font-size: 52px; color: rgba(255, 255, 255, 0.7); }
+  .cut { position: absolute; transform-origin: 50% 100%; }
+  .tease { position: absolute; left: 140px; top: 250px; font-weight: 800; font-size: 116px; letter-spacing: -0.035em; line-height: 1.0; }
+  .tsub { position: absolute; left: 146px; top: 520px; }
+  .fire { display: inline-block; font-family: Anton, Impact, sans-serif; background: linear-gradient(180deg, var(--f1) 10%, var(--f2) 40%, var(--f3) 70%, var(--f4) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  #giant { position: absolute; left: 0; right: 0; top: 96px; text-align: center; font-size: 310px; line-height: 0.95; letter-spacing: 0.02em; white-space: nowrap; transform-origin: 50% 50%; }
+  #giant span { display: inline-block; }
+  .kick { font: 700 28px/1 Inter; letter-spacing: 0.32em; text-transform: uppercase; }
+  .live { display: inline-block; width: 16px; height: 16px; border-radius: 50%; background: #ff2d55; margin-right: 18px; vertical-align: 2px; box-shadow: 0 0 18px #ff2d55; }
+  .pill { display: inline-block; padding: 16px 34px; border-radius: 999px; background: rgba(255,255,255,.1); border: 1.5px solid rgba(255,255,255,.25); backdrop-filter: blur(12px); font: 700 32px/1 Inter; letter-spacing: .04em; }
+  .hey { position: absolute; font: 400 120px/1 Anton, Impact, sans-serif; transform-origin: 50% 50%; white-space: nowrap; }
+  #vig { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.65) 100%); }
+  #grain { mix-blend-mode: overlay; opacity: 0.1; }
+  #flash { position: absolute; inset: 0; background: #fff3e0; opacity: 0; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="bg" width="1920" height="1080"></canvas>
+  <div id="world" style="position:absolute;inset:0">
+
+    <!-- 1 · The amp hums on. Heidelberg, turn it up! -->
+    <div class="scene" id="s-dark">
+      <div class="abs center big" id="dk-0" style="top:300px"></div>
+      <div class="abs center big" id="dk-1" style="top:450px"></div>
+      <div class="abs center sub" id="dk-2" style="top:620px"></div>
+    </div>
+
+    <!-- 2 · Shout HEY! — his story over his silhouette. -->
+    <div class="scene" id="s-hey">
+      <div class="abs center big" id="hy-call" style="top:330px;font-size:160px"></div>
+      <div class="abs center sub" id="hy-callsub" style="top:530px"></div>
+      <div id="hy-sils"></div>
+      <div id="hy-lines"></div>
+      <div id="hy-pops"></div>
+      <div class="abs center" id="hy-prompt" style="top:48px"></div>
+    </div>
+
+    <!-- 3 · AIR GUITAR! over the fretboard. -->
+    <div class="scene" id="s-air">
+      <div class="abs center" id="ar-head" style="top:40px"><span class="fire" style="font-size:230px;line-height:1;transform:skewX(-8deg);filter:drop-shadow(6px 6px 0 #7f1d1d) drop-shadow(0 0 50px rgba(249,115,22,.55))"></span></div>
+      <div class="abs center sub" id="ar-sub" style="top:290px"></div>
+    </div>
+
+    <!-- 4 · 3 · 2 · 1 -->
+    <div class="scene" id="s-count">
+      <div id="ct-nums"></div>
+    </div>
+
+    <!-- 5 · Lights on: Binay Karki. -->
+    <div class="scene" id="s-reveal">
+      <img id="rv-bg" src="assets/binay/badge@2x.jpg" class="abs" style="left:-10%;top:-30%;width:120%;filter:blur(30px) brightness(.32) saturate(1.4)">
+      <div class="abs" style="inset:0;background:radial-gradient(ellipse at 50% 30%, rgba(249,115,22,.34), transparent 58%), radial-gradient(ellipse at 50% 100%, rgba(220,38,38,.35), transparent 60%)"></div>
+      <canvas id="rv-beams" width="1920" height="1080"></canvas>
+      <div id="giant"></div>
+      <img class="cut" id="rv-cut" src="assets/binay/guitar-hd-cut.png" style="height:900px;left:510px;top:180px">
+      <div class="abs" style="inset:0;background:linear-gradient(0deg, rgba(7,3,2,.97) 0, rgba(7,3,2,.7) 16%, transparent 38%)"></div>
+      <div class="abs center kick" id="rv-tag" style="top:892px;color:rgba(255,255,255,.85)"></div>
+      <div class="abs center" id="rv-wel" style="top:938px"></div>
+    </div>
+  </div>
+  <canvas id="fx" width="1920" height="1080"></canvas>
+  <canvas id="grain" width="480" height="270" style="width:1920px;height:1080px"></canvas>
+  <div id="vig"></div>
+  <div id="flash"></div>
+</div>
+
+<script src="fx.js"></script>
+<script src="binay.js"></script>
+<script>
+const A = window.ARTISTS.binay, S = A.scenes, B = A.B;
+const { clamp, prog, lerp, E, rng, reveal, sceneCam, shake, makeDust, dust, beams, makeSparks, sparks, rays, makeGrain, spotlight, makeConfetti, confetti, makeCrowd, crowd } = window.FX;
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, html, parent) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; if (parent) parent.appendChild(e); return e; };
+const bg = $('bg').getContext('2d'), fx = $('fx').getContext('2d'), gr = $('grain').getContext('2d');
+const EMBERS = makeSparks(110, 9), SPARKS = makeSparks(160, 12), GRAIN = makeGrain(), CROWD = makeCrowd(44, 26);
+const CONF = [makeConfetti(160, 7), makeConfetti(160, 8), makeConfetti(120, 9)].map((c) => c.map((p, i) => ({ ...p, c: ['#f97316', '#fdba74', '#dc2626', '#fff7ed', '#facc15', '#7f1d1d'][i % 6] })));
+const OR = '249,115,22', RD = '220,38,38';
+
+// Smoke: big soft blobs drifting across the floor.
+const SMOKE = (() => { const r = rng(5); return Array.from({ length: 9 }, () => ({ x: r() * 1920, y: 620 + r() * 380, rr: 260 + r() * 260, v: 10 + r() * 25, ph: r() * 6.28 })); })();
+function smoke(ctx, t, a = 1, tint = '90,40,30') {
+  ctx.save();
+  for (const s of SMOKE) {
+    const x = ((s.x + t * s.v) % 2400) - 240, y = s.y + Math.sin(t * 0.5 + s.ph) * 30;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, s.rr);
+    g.addColorStop(0, `rgba(${tint},${0.32 * a})`); g.addColorStop(1, `rgba(${tint},0)`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, s.rr, 0, 6.283); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// ---- build the DOM once ----
+A.dark.forEach((w, i) => { $('dk-' + i).innerHTML = w.text; });
+$('hy-call').innerHTML = A.hey.call.text; $('hy-callsub').textContent = A.hey.call.sub;
+$('hy-prompt').innerHTML = `<span class="pill">${A.hey.prompt}</span>`;
+const SIL = { badge: { src: 'badge-cut@2x.png', h: 880, left: 1020, top: 200 }, guitar: { src: 'guitar-hd-cut.png', h: 900, left: 1000, top: 180 } };
+const teasers = A.hey.lines.map((l) => {
+  const im = el('img', 'cut', null, $('hy-sils')); const g = SIL[l.img];
+  im.src = 'assets/binay/' + g.src; im.style.height = g.h + 'px'; im.style.left = g.left + 'px'; im.style.top = g.top + 'px';
+  const tx = el('div', 'tease', l.text, $('hy-lines')), sb = el('div', 'tsub sub', l.sub, $('hy-lines'));
+  return { ...l, im, tx, sb };
+});
+// every HEY! sends three words flying up out of the crowd
+const POPS = A.heys.flatMap((t, i) => { const r = rng(100 + i); return [0, 1, 2].map((k) => { const p = el('div', 'hey fire', 'HEY!', $('hy-pops')); return { t, el: p, x: 200 + ((k * 560 + r() * 380 + i * 170) % 1500), rot: (r() - 0.5) * 24, sc: 0.7 + r() * 0.6 }; }); });
+$('ar-head').firstElementChild.textContent = A.air.text; $('ar-sub').textContent = A.air.sub;
+const nums = A.count.map((c) => {
+  const wrap = el('div', 'abs center', null, $('ct-nums')); wrap.style.top = '60px';
+  wrap.innerHTML = `<div class="fire" style="font-size:600px;line-height:.92;transform:skewX(-8deg);filter:drop-shadow(8px 8px 0 #7f1d1d) drop-shadow(0 0 70px rgba(249,115,22,.6))">${c.n}</div><div class="sub" style="font-size:96px;margin-top:-24px;color:#fdba74">${c.ne}</div>`;
+  return { ...c, el: wrap };
+});
+const giant = [...`${A.reveal.first} ${A.reveal.last}`].map((ch) => el('span', 'fire', ch === ' ' ? '&nbsp;' : ch, $('giant')));
+$('rv-tag').innerHTML = `<span class="live"></span>${A.reveal.tag.text}`;
+$('rv-wel').innerHTML = `<span class="kick" style="color:rgba(255,255,255,.75)">${A.reveal.welcome.small}</span><span class="acc" style="font:italic 800 70px Fraunces,serif;margin-left:30px;vertical-align:-12px">${A.reveal.welcome.big}</span>`;
+
+const R = A.reveal.t;
+const pulse = (t, list, d = 0.22) => { let v = 0; for (const x of list) { const k = t - x; if (k >= 0 && k < d) v = Math.max(v, 1 - k / d); } return v; };
+
+// The fretboard in perspective, notes coming down on the beat.
+const VP = [960, 330], BOT = 1080, TOPW = 140, BOTW = 1700, HIT_U = 0.78;
+const NOTE_STR = A.notes.map((_, i) => [2, 4, 1, 3, 5, 0, 2, 4][i % 8]);
+function board(ctx, t, strum) {
+  const P = (u) => { const y = VP[1] + (BOT - VP[1]) * u * u, hw = TOPW / 2 + (BOTW - TOPW) / 2 * u * u; return [y, hw]; };
+  ctx.save();
+  // the neck
+  const [y1, w1] = P(1);
+  ctx.beginPath(); ctx.moveTo(VP[0] - TOPW / 2, VP[1]); ctx.lineTo(VP[0] + TOPW / 2, VP[1]); ctx.lineTo(VP[0] + w1, y1); ctx.lineTo(VP[0] - w1, y1); ctx.closePath();
+  const g = ctx.createLinearGradient(0, VP[1], 0, BOT); g.addColorStop(0, 'rgba(40,18,10,.2)'); g.addColorStop(1, 'rgba(70,30,14,.92)');
+  ctx.fillStyle = g; ctx.fill();
+  // frets rushing at the camera
+  for (let k = 0; k < 10; k++) {
+    const u = ((k / 10 + t * 0.55) % 1), [y, hw] = P(u);
+    ctx.strokeStyle = `rgba(255,210,170,${0.12 + 0.5 * u})`; ctx.lineWidth = 1 + 5 * u * u;
+    ctx.beginPath(); ctx.moveTo(VP[0] - hw, y); ctx.lineTo(VP[0] + hw, y); ctx.stroke();
+  }
+  // the strike line
+  const [hy, hhw] = P(HIT_U);
+  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = `rgba(${OR},${0.5 + 0.5 * strum})`; ctx.lineWidth = 6; ctx.filter = 'blur(2px)';
+  ctx.beginPath(); ctx.moveTo(VP[0] - hhw, hy); ctx.lineTo(VP[0] + hhw, hy); ctx.stroke(); ctx.restore();
+  // six strings, shaking when strummed
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (let s = 0; s < 6; s++) {
+    const f = (s + 0.5) / 6 - 0.5;
+    ctx.strokeStyle = `rgba(255,${200 - s * 12},${150 - s * 15},${0.55 + 0.4 * strum})`; ctx.lineWidth = 2 + (5 - s) * 0.5;
+    ctx.beginPath();
+    for (let i = 0; i <= 40; i++) {
+      const u = i / 40, [y, hw] = P(u), wob = Math.sin(u * 30 + t * 90 + s) * 10 * strum * u;
+      const x = VP[0] + f * 2 * hw + wob;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.stroke();
+  }
+  // notes: each arrives at the strike line on its beat
+  A.notes.forEach((nt, i) => {
+    const travel = 1.2, k = (t - (nt - travel)) / travel;
+    const s = NOTE_STR[i], f = (s + 0.5) / 6 - 0.5;
+    if (k >= 0 && k <= 1) {
+      const u = HIT_U * Math.sqrt(k), [y, hw] = P(u), x = VP[0] + f * 2 * hw, r = 6 + 34 * u * u;
+      const gg = ctx.createRadialGradient(x, y, 0, x, y, r * 2.2); gg.addColorStop(0, 'rgba(255,245,220,1)'); gg.addColorStop(0.35, `rgba(${OR},.85)`); gg.addColorStop(1, `rgba(${RD},0)`);
+      ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(x, y, r * 2.2, 0, 6.283); ctx.fill();
+    } else if (k > 1 && k < 1.5) {                                  // burst on the hit
+      const d = (k - 1) / 0.5, [y, hw] = P(HIT_U), x = VP[0] + f * 2 * hw;
+      ctx.strokeStyle = `rgba(255,200,120,${1 - d})`; ctx.lineWidth = 6 * (1 - d) + 1; ctx.beginPath(); ctx.arc(x, y, 30 + d * 160, 0, 6.283); ctx.stroke();
+    }
+  });
+  ctx.restore();
+  ctx.restore();
+}
+
+function render(t) {
+  const countT = A.count.map((c) => c.t);
+  const [sx, sy] = shake(t, [R, ...countT, A.strum], 18), [cx, cy] = shake(t, A.heys, 6);
+  $('world').style.transform = `translate(${(sx + cx).toFixed(1)}px,${(sy + cy).toFixed(1)}px)`;
+  bg.clearRect(0, 0, 1920, 1080); fx.clearRect(0, 0, 1920, 1080);
+  const hey = pulse(t, A.heys, 0.3);
+
+  // ---------- 1 · the amp hums on ----------
+  if (sceneCam($('s-dark'), t, S.dark[0], S.dark[1], { punch: 0, drift: 0.012 })) {
+    bg.fillStyle = '#060201'; bg.fillRect(0, 0, 1920, 1080);
+    const st = pulse(t, [A.strum], 1.2);
+    const g = bg.createRadialGradient(960, 560, 0, 960, 560, 900); g.addColorStop(0, `rgba(140,40,10,${0.16 + 0.35 * st})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+    bg.fillStyle = g; bg.fillRect(0, 0, 1920, 1080);
+    smoke(bg, t, 0.8);
+    spotlight(bg, 960 + Math.sin(t * 0.9 + 4) * 560, 930, { topX: 960, w: 220, alpha: clamp(t * 1.2) * 0.85, color: '255,220,190' });
+    sparks(fx, t, EMBERS, { since: 0, alpha: 0.35 + 0.5 * st });
+    A.dark.forEach((w, i) => reveal($('dk-' + i), t, w.t, { blur: 26, dy: 30 }));
+    crowd(fx, t, CROWD, { handsUp: 0.3, phones: clamp((t - 0.4) * 1.5), rimA: 0.35, rim: '255,170,120' });
+  }
+
+  // ---------- 2 · shout HEY! + the story ----------
+  if (sceneCam($('s-hey'), t, S.hey[0], S.hey[1], { drift: 0.006 })) {
+    bg.fillStyle = '#080302'; bg.fillRect(0, 0, 1920, 1080);
+    const g = bg.createRadialGradient(1320, 420, 0, 1320, 420, 1100); g.addColorStop(0, `rgba(160,50,10,${0.3 + 0.3 * hey})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+    bg.fillStyle = g; bg.fillRect(0, 0, 1920, 1080);
+    smoke(bg, t, 0.9);
+    beams(bg, t, [
+      { x: 520, y: -60, a: -0.35, s: 1.5, ph: 0, sw: 0.45, w: 220, c: OR },
+      { x: 1420, y: -60, a: 0.3, s: 1.7, ph: 2, sw: 0.45, w: 240, c: RD },
+    ], { alpha: 0.55 + 0.45 * hey });
+    sparks(fx, t, EMBERS, { since: 0, alpha: 0.5 });
+    const callOut = A.hey.lines[0].t - 0.1;
+    reveal($('hy-call'), t, A.hey.call.t, { blur: 26, dy: 30, out: callOut, osc: 0.2 });
+    reveal($('hy-callsub'), t, A.hey.call.t + 0.25, { blur: 14, dy: 16, out: callOut });
+    $('hy-call').style.transform += ` scale(${1 + 0.07 * hey})`;
+    teasers.forEach((l, i) => {
+      const next = teasers[i + 1] ? teasers[i + 1].t - 0.08 : S.hey[1];
+      reveal(l.tx, t, l.t, { dx: -60, dy: 0, blur: 22, out: next, od: 0.1, oblur: 20, ody: 0, d: 0.4 });
+      reveal(l.sb, t, l.t + 0.2, { blur: 12, dy: 14, out: next, od: 0.1, ody: 0, d: 0.4 });
+      const sameAsPrev = i > 0 && teasers[i - 1].img === l.img, sameAsNext = teasers[i + 1] && teasers[i + 1].img === l.img;
+      const t0 = sameAsPrev ? teasers[i - 1].t : l.t;
+      const shown = !sameAsNext && t >= t0 && t < next + 0.1;
+      l.im.style.display = shown ? 'block' : 'none';
+      if (!shown) return;
+      const p = E.out5(prog(t, t0, 0.4));
+      l.im.style.opacity = p;
+      l.im.style.transform = `translateX(${((1 - p) * 120).toFixed(1)}px) scale(${(1 + 0.03 * (t - t0)).toFixed(4)})`;
+      l.im.style.filter = `brightness(${(0.05 * hey).toFixed(3)}) drop-shadow(0 0 2px rgba(255,210,170,1)) drop-shadow(0 0 ${(24 + 30 * hey).toFixed(0)}px rgba(${OR},${(0.75 + 0.25 * hey).toFixed(2)}))`;
+    });
+    POPS.forEach((p) => {
+      const d = t - p.t, on = d >= 0 && d < 0.55;
+      p.el.style.display = on ? 'block' : 'none'; if (!on) return;
+      const k = d / 0.55;
+      p.el.style.left = p.x + 'px'; p.el.style.top = (790 - 150 * E.out3(k)) + 'px';
+      p.el.style.opacity = (1 - k * k).toFixed(3);
+      p.el.style.transform = `rotate(${p.rot}deg) scale(${(p.sc * E.back(Math.min(1, k * 3))).toFixed(3)})`;
+    });
+    reveal($('hy-prompt'), t, A.hey.lines[0].t, { blur: 10, dy: -14 });
+    $('hy-prompt').style.transform += ` scale(${1 + 0.08 * hey})`;
+    crowd(fx, t, CROWD, { handsUp: lerp(0.5, 0.9, prog(t, S.hey[0], 8)), jump: 0.25 + 0.6 * hey, rimA: 0.45 + 0.4 * hey, rim: '255,160,110' });
+  }
+
+  // ---------- 3 · air guitar ----------
+  if (sceneCam($('s-air'), t, S.air[0], S.air[1], { punch: 0.08, drift: 0.01 })) {
+    bg.fillStyle = '#070201'; bg.fillRect(0, 0, 1920, 1080);
+    const strum = pulse(t, A.notes, 0.25);
+    rays(bg, t, VP[0], VP[1], { alpha: 0.2 + 0.4 * strum, spin: 0.25, color: OR, len: 1300 });
+    smoke(bg, t, 0.7);
+    board(bg, t, strum);
+    reveal($('ar-head'), t, A.air.t, { blur: 30, dy: 0, sc: 0.5, d: 0.3 });
+    $('ar-head').style.transform += ` scale(${1 + 0.05 * strum})`;
+    reveal($('ar-sub'), t, A.air.t + 0.25, { blur: 14, dy: 16 });
+    sparks(fx, t, EMBERS, { since: 0, alpha: 0.6 });
+    crowd(fx, t, CROWD, { handsUp: 0.95, jump: 0.4 + 0.6 * strum, rimA: 0.7, rim: '255,150,90' });
+  }
+
+  // ---------- 4 · 3 · 2 · 1 ----------
+  if (sceneCam($('s-count'), t, S.count[0], S.count[1], { punch: 0, drift: 0, outD: 0.001 })) {
+    bg.fillStyle = '#060201'; bg.fillRect(0, 0, 1920, 1080);
+    const hit = pulse(t, countT, 0.45);
+    rays(bg, t, 960, 420, { alpha: 0.25 + 0.75 * hit, spin: 0.35, len: 1500, color: OR });
+    smoke(bg, t, 0.6);
+    countT.forEach((c, i) => { const d = t - c; if (d >= 0 && d < 0.7) { bg.strokeStyle = `rgba(${i % 2 ? RD : OR},${(1 - d / 0.7) * 0.85})`; bg.lineWidth = 10 * (1 - d / 0.7) + 2; bg.beginPath(); bg.arc(960, 420, 120 + d * 1600, 0, 6.283); bg.stroke(); } });
+    nums.forEach((n) => {
+      const end = n.t + 2 * B, on = t >= n.t && t < end;
+      n.el.style.display = on ? 'block' : 'none'; if (!on) return;
+      const a = E.out5(prog(t, n.t, 0.22)), z = E.in3(prog(t, end - 0.12, 0.12));
+      n.el.style.opacity = (clamp(a * 3) * (1 - z)).toFixed(3);
+      n.el.style.transform = `scale(${((2.4 - 1.4 * a) * (1 + 0.05 * (t - n.t)) * (1 + 3 * z)).toFixed(4)})`;
+      n.el.style.filter = `blur(${(26 * (1 - a) + 30 * z).toFixed(1)}px)`;
+    });
+    sparks(fx, t, EMBERS, { since: 0, alpha: 0.6 + 0.4 * hit });
+    crowd(fx, t, CROWD, { handsUp: 1, jump: 0.3 + 0.7 * hit, rimA: 0.5 + 0.5 * hit, rim: '255,150,90' });
+  }
+
+  // ---------- 5 · lights on ----------
+  if (sceneCam($('s-reveal'), t, S.reveal[0], S.reveal[1] + 1, { punch: 0.1, drift: 0.008, inD: 0.5, outD: 0.001 })) {
+    bg.fillStyle = '#070302'; bg.fillRect(0, 0, 1920, 1080);
+    const td = t - R, calm = prog(t, A.reveal.bandOut, 2);
+    const db = $('rv-beams').getContext('2d'); db.clearRect(0, 0, 1920, 1080);
+    smoke(db, t, 0.7, '120,50,25');
+    beams(db, t, [
+      { x: 330, y: -60, a: -0.25, s: 1.6, ph: 0, sw: 0.5, w: 300, c: OR },
+      { x: 1590, y: -60, a: 0.25, s: 1.4, ph: 1.5, sw: 0.5, w: 300, c: RD },
+      { x: 960, y: -80, a: 0, s: 0.9, ph: 3, sw: 0.3, w: 240, c: '255,230,200' },
+    ], { alpha: clamp(td * 3) * (1 - 0.4 * calm) });
+    giant.forEach((g, i) => {
+      const k = prog(t, R + i * 0.035, 0.4), e = E.out5(k);
+      g.style.opacity = clamp(k * 3);
+      g.style.transform = `translateY(${((1 - e) * -120).toFixed(1)}px) scale(${(1 + 0.6 * (1 - e)).toFixed(3)})`;
+      g.style.filter = `blur(${(24 * (1 - e)).toFixed(1)}px) drop-shadow(6px 6px 0 #7f1d1d) drop-shadow(0 0 40px rgba(249,115,22,.4))`;
+    });
+    $('giant').style.transform = `skewX(-8deg) scale(${1 + 0.01 * Math.max(0, td)})`;
+    const on = E.out3(prog(t, R + 0.05, 0.45)), cp = E.out5(prog(t, R, 0.6));
+    $('rv-cut').style.transform = `translateY(${((1 - cp) * 160).toFixed(1)}px) scale(${(1.03 + 0.012 * Math.max(0, td) - 0.03 * cp).toFixed(4)})`;
+    $('rv-cut').style.filter = `brightness(${(0.05 + 0.95 * on).toFixed(3)}) drop-shadow(0 0 ${(40 - 12 * on).toFixed(0)}px rgba(249,115,22,${(0.9 - 0.45 * on).toFixed(2)})) drop-shadow(0 30px 60px rgba(0,0,0,.6))`;
+    reveal($('rv-tag'), t, A.reveal.tag.t, { blur: 12, dy: 16 });
+    reveal($('rv-wel'), t, A.reveal.welcome.t, { blur: 18, dy: 20 });
+    sparks(fx, t, SPARKS, { since: R, burst: R, alpha: 0.9 });
+    confetti(fx, t, CONF[0], R, 180, 1120); confetti(fx, t, CONF[1], R, 1740, 1120); confetti(fx, t, CONF[2], R + 0.15, 960, 1150);
+    crowd(fx, t, CROWD, { baseY: 1410, handsUp: 1, jump: 0.9 - 0.5 * calm, rimA: 0.8, rim: '255,170,110' });
+  }
+
+  let fl = 0;
+  const flashAt = (t0, a, d) => { const x = t - t0; if (x >= 0 && x < d) fl = Math.max(fl, a * (1 - x / d)); };
+  flashAt(R, 0.95, 0.45); flashAt(A.strum, 0.3, 0.3); countT.forEach((c) => flashAt(c, 0.28, 0.2)); A.heys.forEach((c) => flashAt(c, 0.07, 0.1));
+  $('flash').style.opacity = fl.toFixed(3);
+  gr.clearRect(0, 0, 480, 270); gr.drawImage(GRAIN[Math.floor(t * 30) % GRAIN.length], 0, 0);
+}
+
+async function setup() {
+  // load every face up front: with display=block, text in a face that hasn't loaded yet is invisible,
+  // and a face only loads when first used, so its first frame would come out without that text
+  await Promise.all(['400 100px Anton', '500 100px Inter', '600 100px Inter', '700 100px Inter', '800 100px Inter', '900 100px Inter',
+    'italic 600 100px Fraunces', 'italic 800 100px Fraunces'].map((f) => document.fonts.load(f)));
+  await document.fonts.ready;
+  await Promise.all([...document.images].map((im) => im.complete ? 0 : new Promise((r) => { im.onload = im.onerror = r; })));
+  return true;
+}
+window.render = render; window.setup = setup;
+
+const q = new URLSearchParams(location.search);
+if (!q.has('render')) setup().then(() => {
+  if (q.has('play')) {
+    const au = new Audio('out/binay/audio.wav'); au.play().catch(() => {});
+    const t0 = performance.now();
+    const loop = () => { const t = (performance.now() - t0) / 1000; render(t % A.TOTAL); requestAnimationFrame(loop); };
+    loop();
+  } else render(parseFloat(q.get('t') || '18'));
+});
+</script>
+</body>
+</html>

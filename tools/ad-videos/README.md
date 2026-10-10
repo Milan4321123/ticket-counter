@@ -50,6 +50,37 @@ node synth-styles.mjs              # → out/dashain/styles/<id>/audio.wav
 node render-styles.mjs             # → out/dashain/styles/<id>/frames (ONLY=3.5 for samples)
 ```
 
+## MartNepali brand ads (brand/)
+
+Five 20-second ads for the platform itself — customer, shop seller, restaurant,
+event organizer, general — in the style of a modern product promo (soft
+morphing colour blobs on white, words sharpening out of a blur, a giant word the
+camera flies through, a dark dot-matrix logo reveal, glass UI cards with a
+cursor, a search-bar outro). Roman Nepali up front, English underneath.
+The scripts and timings are `brand/ads.js`; `brand/stage.html?ad=seller&t=9`
+shows a moment; `brand/art.js` holds the drawn illustrations (no photos).
+
+```bash
+node synth-brand.mjs               # → out/brand/<ad>/audio.wav (120 bpm, each ad in its own key)
+node render-brand.mjs              # → out/brand/<ad>/frames (ONLY=9 for samples)
+```
+
+## Studio: 30 ads for daily posting (studio/)
+
+Thirty 12–18 s ads — six each for buying, selling, events, restaurants and the
+platform — each in its own tone and one of seven looks (skins), each look with
+its own genre of music: blob (tech-house), kinetic (trap), paper (Nepali folk
+6/8), swiss (house), neon (synthwave), pov (lo-fi), cinema (piano & strings).
+Scripts, copy, timings and sound cues: `studio/scripts.js`. One stage draws
+them all: `studio/stage.html?id=sell-2-kinetic-myth&t=4`.
+
+```bash
+node synth-studio.mjs              # → out/studio/<id>/audio.wav
+JOBS=3 node render-studio.mjs      # → out/studio/<id>/frames (ONLY=4 for samples; ids to pick)
+node make-plan.mjs                 # → out/studio/posting-plan.md (30-day order, captions, covers)
+./encode-studio.sh                 # → out/studio/mp4/day-NN-<id>.mp4 + copies to ~/Desktop/martnepali-30-days
+```
+
 ## Notes
 
 - `timeline.js` is the edit: scene times, the buy scene's taps, the beat grid

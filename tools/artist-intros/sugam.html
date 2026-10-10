@@ -1,0 +1,500 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Sugam Pokhrel — main guest walk-on</title>
+<!-- sugam.html?t=26 shows one moment, ?play plays it (with out/sugam/audio.wav if made). -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Cinzel:wght@700;900&family=Inter:wght@500;600;700;800;900&family=Fraunces:ital,opsz,wght@1,9..144,600;1,9..144,800&display=block">
+<style>
+  :root { --g1: #fff7e0; --g2: #fde68a; --g3: #f59e0b; --g4: #d97706; --cr: #dc143c; }
+  html, body { margin: 0; background: #000; overflow: hidden; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #03030a; font-family: Inter, sans-serif; color: #fff; }
+  canvas { position: absolute; inset: 0; }
+  .scene { position: absolute; inset: 0; display: none; transform-origin: 50% 50%; }
+  .abs { position: absolute; }
+  .center { left: 0; right: 0; text-align: center; }
+  .acc { background: linear-gradient(100deg, var(--g2), var(--g3) 55%, #f97316); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  em { font-family: Fraunces, serif; font-style: italic; font-weight: 800; background: linear-gradient(100deg, var(--g2), var(--g3) 60%, #f97316); -webkit-background-clip: text; background-clip: text; color: transparent; padding-right: 0.06em; }
+  .big { font-weight: 800; font-size: 150px; letter-spacing: -0.035em; line-height: 1; }
+  .sub { font-family: Fraunces, serif; font-style: italic; font-weight: 600; font-size: 52px; color: rgba(255, 255, 255, 0.72); }
+  .w { display: inline-block; }
+  .anton { font-family: Anton, Impact, sans-serif; }
+  .cinzel { font-family: Cinzel, serif; font-weight: 900; }
+  .gold { display: inline-block; background: linear-gradient(180deg, var(--g1) 8%, var(--g2) 45%, var(--g3) 78%, var(--g4) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .cut { position: absolute; transform-origin: 50% 100%; }
+  #tunnel { position: absolute; inset: 0; perspective: 1000px; perspective-origin: 50% 50%; overflow: hidden; }
+  #tunnel-in { position: absolute; left: 50%; top: 50%; transform-style: preserve-3d; }
+  .card { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 18px; padding: 22px 38px 22px 24px; border-radius: 22px; white-space: nowrap;
+          background: linear-gradient(135deg, rgba(60,40,10,.85), rgba(20,14,6,.85)); border: 2px solid rgba(253,230,138,.55); box-shadow: 0 0 40px rgba(245,158,11,.35), inset 0 1px 0 rgba(255,255,255,.2);
+          font: 800 54px/1 Inter; letter-spacing: -0.01em; color: #fff7e0; }
+  .card i { width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 28px; background: linear-gradient(135deg, var(--g2), var(--g4)); color: #3b2206; }
+  .chip { position: absolute; transform: translate(-50%, -50%); padding: 18px 34px; border-radius: 999px; white-space: nowrap; font: 800 36px/1 Inter;
+          background: rgba(40,28,8,.6); border: 2px solid rgba(253,230,138,.7); box-shadow: 0 0 40px rgba(245,158,11,.35); color: #fff7e0; }
+  .emo { position: absolute; font-size: 170px; line-height: 1; transform-origin: 50% 50%; }
+  #kara { display: flex; justify-content: center; gap: 70px; }
+  #kara span { display: inline-block; font: 400 170px/1 Anton, Impact, sans-serif; letter-spacing: .02em; color: rgba(255,255,255,.35); transform-origin: 50% 80%; }
+  #ball { position: absolute; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff, #fde68a 40%, #f59e0b 75%); box-shadow: 0 0 40px 10px rgba(245,158,11,.6); }
+  .shout { position: absolute; left: 0; right: 0; top: 250px; text-align: center; font: 400 330px/1 Anton, Impact, sans-serif; letter-spacing: .02em; }
+  .n3d { position: absolute; left: 0; right: 0; text-align: center; perspective: 1600px; font-family: Anton, Impact, sans-serif; line-height: .9; white-space: nowrap; }
+  .n3d .in { position: relative; display: inline-block; transform-style: preserve-3d; }
+  .n3d .ly { position: absolute; left: 0; top: 0; }
+  .n3d .front { position: relative; display: inline-block; background: linear-gradient(180deg, #fff 6%, var(--g2) 46%, var(--g3) 82%, var(--g4) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .kick { font: 700 28px/1 Inter; letter-spacing: 0.32em; text-transform: uppercase; }
+  .live { display: inline-block; width: 16px; height: 16px; border-radius: 50%; background: #ff2d55; margin-right: 18px; vertical-align: 2px; box-shadow: 0 0 18px #ff2d55; }
+  #vig { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.6) 100%); }
+  #grain { mix-blend-mode: overlay; opacity: 0.08; }
+  #flash { position: absolute; inset: 0; background: #fff8e8; opacity: 0; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="bg" width="1920" height="1080"></canvas>
+  <div id="world" style="position:absolute;inset:0">
+
+    <!-- 1 · Warp through his hits → Tonight's MAIN GUEST -->
+    <div class="scene" id="s-open">
+      <div id="tunnel"><div id="tunnel-in"></div></div>
+      <div class="abs center big" id="op-line" style="top:390px"></div>
+      <div class="abs center sub" id="op-sub" style="top:570px"></div>
+      <div class="abs center cinzel" id="op-kick" style="top:330px;font-size:46px;letter-spacing:.55em;color:#fde68a"></div>
+      <div class="abs center" id="op-main" style="top:395px"><span class="cinzel gold" style="font-size:200px;line-height:1;filter:drop-shadow(0 0 40px rgba(245,158,11,.55))"></span></div>
+      <div class="abs center sub" id="op-msub" style="top:640px"></div>
+    </div>
+
+    <!-- 2 · Phone lights up — the gold portrait assembles -->
+    <div class="scene" id="s-lights">
+      <div class="abs center big" id="lt-head" style="top:18px;font-size:112px"></div>
+      <div class="abs center sub" id="lt-sub" style="top:142px;font-size:44px"></div>
+      <div id="lt-chips"></div>
+    </div>
+
+    <!-- 3 · Clap with us — faster — FASTER -->
+    <div class="scene" id="s-clap">
+      <div id="cl-texts"></div>
+      <div class="emo" id="cl-e0" style="left:150px;top:440px">👏</div>
+      <div class="emo" id="cl-e1" style="right:150px;top:440px">👏</div>
+    </div>
+
+    <!-- 4 · HANDS UP — the chant -->
+    <div class="scene" id="s-drop">
+      <div class="abs center" id="dr-head" style="top:24px"><span class="anton gold" style="font-size:220px;line-height:1;filter:drop-shadow(7px 7px 0 #7c2d12) drop-shadow(0 0 50px rgba(245,158,11,.55))"></span></div>
+      <div class="abs center sub" id="dr-sub" style="top:262px;font-size:44px"></div>
+      <div class="abs center" id="kara" style="top:500px"></div>
+      <div id="ball"></div>
+    </div>
+
+    <!-- 5 · When I say SUGAM, you say POKHREL -->
+    <div class="scene" id="s-call">
+      <div class="abs center big" id="ca-0" style="top:330px"></div>
+      <div class="abs center big" id="ca-1" style="top:485px"></div>
+      <div class="abs center sub" id="ca-sub" style="top:660px;font-size:44px"></div>
+      <div id="ca-shouts"></div>
+    </div>
+
+    <!-- 6 · 3 · 2 · 1 (the numbers are particles) -->
+    <div class="scene" id="s-count">
+      <div id="ct-subs"></div>
+    </div>
+
+    <!-- 7 · Lights on -->
+    <div class="scene" id="s-reveal">
+      <img id="rv-bg" src="assets/sugam/sing@2x.jpg" class="abs" style="left:-10%;top:-10%;width:120%;filter:blur(24px) brightness(.28) saturate(1.4)">
+      <div class="abs" style="inset:0;background:radial-gradient(ellipse at 50% 28%, rgba(245,158,11,.30), transparent 60%), radial-gradient(ellipse at 50% 100%, rgba(220,20,60,.32), transparent 60%)"></div>
+      <canvas id="rv-sky" width="1920" height="1080"></canvas>
+      <div class="abs center cinzel" id="rv-kick" style="top:24px;font-size:34px;letter-spacing:.32em;color:#fde68a;text-shadow:0 0 24px rgba(245,158,11,.6)"></div>
+      <div class="n3d" id="nm1" style="top:78px;font-size:470px"></div>
+      <img class="cut" id="rv-cut" src="assets/sugam/sing-cut@2x.png" style="height:900px;left:510px;top:140px;-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 14%)">
+      <div class="abs" style="inset:0;background:linear-gradient(0deg, rgba(4,2,8,.96) 0, rgba(4,2,8,.7) 18%, transparent 42%)"></div>
+      <div class="n3d" id="nm2" style="top:690px;font-size:150px;letter-spacing:.24em;padding-left:.24em"></div>
+      <div class="abs center kick" id="rv-tag" style="top:858px;color:rgba(255,255,255,.85)"></div>
+      <div class="abs center" id="rv-wel" style="top:900px"></div>
+    </div>
+  </div>
+  <canvas id="pt" width="1920" height="1080"></canvas>
+  <canvas id="fx" width="1920" height="1080"></canvas>
+  <canvas id="grain" width="480" height="270" style="width:1920px;height:1080px"></canvas>
+  <div id="vig"></div>
+  <div id="flash"></div>
+</div>
+
+<script src="fx.js"></script>
+<script src="sugam.js"></script>
+<script src="assets/sugam/points.js"></script>
+<script>
+const A = window.ARTISTS.sugam, S = A.scenes, B = A.B, at = A.at;
+const { glowSprite, makeShells, fireworks, flare, clamp, prog, lerp, E, rng, reveal, sceneCam, shake, makeDust, dust, beams, makeSparks, sparks, rays, wavePlane, makeGrain, spotlight, makeConfetti, confetti, makeCrowd, crowd } = window.FX;
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, html, parent) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; if (parent) parent.appendChild(e); return e; };
+const bg = $('bg').getContext('2d'), pc = $('pt').getContext('2d'), fx = $('fx').getContext('2d'), gr = $('grain').getContext('2d');
+const GOLD = '255,196,92', DUST = makeDust(150, 11), SPARKS = makeSparks(170, 5), GRAIN = makeGrain(), CROWD = makeCrowd(21, 26);
+const CONF = [makeConfetti(170, 1), makeConfetti(170, 2), makeConfetti(130, 3)];
+const SHELLS = makeShells(A.reveal.shells.map(([b, x, y, rgb, rocket]) => ({ t: at(b), x, y, rgb, rocket })));
+const pulse = (t, list, d = 0.22) => { let v = 0; for (const x of list) { const k = t - x; if (k >= 0 && k < d) v = Math.max(v, 1 - k / d); } return v; };
+
+// ---------------- 1 · tunnel ----------------
+const cards = A.open.titles.map((title, i) => {
+  const album = title.includes('·');
+  const c = el('div', 'card', `<i>${album ? '◉' : '♪'}</i>${title}`, $('tunnel-in'));
+  const r = rng(i * 7 + 3), ang = (i % 2 ? -1 : 1) * (Math.PI / 2 + (r() - 0.5) * 1.6), R = 500 + r() * 60;
+  return { el: c, i, x: Math.cos(ang) * R * 1.6, y: Math.sin(ang) * R * 0.86 };
+});
+$('op-line').innerHTML = A.open.lines.map((l) => `<span class="w">${l.text}</span>`).join(' ');
+const opWords = [...$('op-line').children];
+$('op-sub').textContent = A.open.sub.text; $('op-kick').textContent = A.open.kicker.text;
+$('op-main').firstElementChild.textContent = A.open.main.text; $('op-msub').textContent = A.open.mainSub.text;
+// warp stars
+const STARS = (() => { const r = rng(4); return Array.from({ length: 280 }, () => ({ x: (r() - 0.5) * 3600, y: (r() - 0.5) * 2200, z: 200 + r() * 5000 })); })();
+function warp(ctx, t, alpha = 1) {
+  const fly = A.fly(t) * 1.25, vel = (A.open.v + 2 * A.open.a * t) * 1.25;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+  for (const s of STARS) {
+    const z = ((s.z - fly) % 5000 + 5000) % 5000 + 60, zt = z + Math.min(1400, vel * 0.06);
+    const x1 = 960 + (s.x * 700) / z, y1 = 540 + (s.y * 700) / z, x0 = 960 + (s.x * 700) / zt, y0 = 540 + (s.y * 700) / zt;
+    const a = Math.min(1, (5000 - z) / 1500) * alpha;
+    ctx.strokeStyle = `rgba(255,${210 + (s.z % 40)},${150 + (s.z % 90)},${a.toFixed(3)})`; ctx.lineWidth = 1 + 2.5 * (1 - z / 5000);
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ---------------- 2 · lights ----------------
+$('lt-head').innerHTML = A.lights.head.text; $('lt-sub').textContent = A.lights.sub.text;
+const chips = A.lights.chips.map((c) => { const d = el('div', 'chip', c.text, $('lt-chips')); d.style.left = c.x + 'px'; d.style.top = c.y + 'px'; return { ...c, el: d }; });
+const SEA = (() => { const r = rng(9); return Array.from({ length: 340 }, () => { const depth = r(); return { x: r() * 1920, y: 640 + depth * 300, s: 0.5 + depth * 1.6, on: at(13) + (1 - depth) * 1.6 + r() * 0.7, ph: r() * 6.28 }; }); })();
+function phoneSea(ctx, t, alpha = 1) {
+  const sp = glowSprite('210,230,255');
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const p of SEA) {
+    const k = clamp((t - p.on) / 0.3); if (k <= 0) continue;
+    const a = k * (0.55 + 0.45 * Math.sin(t * 3 + p.ph)) * alpha, sz = 10 + 18 * p.s;
+    ctx.globalAlpha = a; ctx.drawImage(sp, p.x + Math.sin(t * 1.4 + p.ph) * 6 - sz / 2, p.y - sz / 2, sz, sz);
+  }
+  ctx.restore();
+}
+
+// ---------------- 3 · clap ----------------
+const clTexts = A.clap.texts.map((c) => {
+  const big = el('div', 'abs center big', c.text, $('cl-texts')); big.style.top = c.text.includes('!!') ? '4px' : '18px'; big.style.fontSize = '112px';
+  const sub = el('div', 'abs center sub', c.sub, $('cl-texts')); sub.style.top = c.text.includes('!!') ? '160px' : '142px'; sub.style.fontSize = '44px';
+  return { ...c, big, sub };
+});
+if (clTexts[2]) clTexts[2].big.innerHTML = `<span class="anton gold" style="font-size:150px;line-height:1;letter-spacing:.02em">${A.clap.texts[2].text}</span>`;
+const clapWin = A.claps.map((c, i) => Math.min(0.16, ((A.claps[i + 1] ?? c + 1) - c) * 0.45));
+const clapPose = (t) => { let v = 0; A.claps.forEach((c, i) => { const k = t - c, w = clapWin[i]; if (k > -w && k < w * 0.9) v = Math.max(v, 1 - Math.abs(k) / w); }); return E.out3(v); };
+
+// ---------------- 4 · drop / chant ----------------
+$('dr-head').firstElementChild.textContent = A.drop.head.text; $('dr-sub').textContent = A.drop.sub.text;
+const SYL = A.chant.slice(0, 4).map((c) => el('span', null, c[3], $('kara')));
+let SYLX = [];                                     // measured in setup()
+const chantT = (base) => A.chant.map(([b]) => base + b * B);
+
+// ---------------- 5 · call ----------------
+A.call.lines.forEach((l, i) => { $('ca-' + i).innerHTML = l.text; });
+$('ca-sub').textContent = A.call.sub.text;
+const shouts = A.call.shouts.map((s) => { const d = el('div', 'shout', `<span class="${s.who === 'crowd' ? 'gold' : ''}" style="${s.who === 'crowd' ? 'filter:drop-shadow(8px 8px 0 #7c2d12) drop-shadow(0 0 60px rgba(245,158,11,.6))' : 'filter:drop-shadow(0 0 40px rgba(255,255,255,.35))'}">${s.word}</span>`, $('ca-shouts')); return { ...s, el: d }; });
+const crowdShouts = A.call.shouts.filter((s) => s.who === 'crowd').map((s) => s.t);
+
+// ---------------- 6 · count ----------------
+const ctSubs = A.count.map((c) => { const d = el('div', 'abs center sub', c.ne, $('ct-subs')); d.style.top = '860px'; d.style.fontSize = '96px'; d.style.color = '#fde68a'; return { ...c, el: d }; });
+const countT = A.count.map((c) => c.t);
+
+// ---------------- 7 · reveal ----------------
+function build3d(box, text, layers = 13, step = 3.2) {
+  const shade = (k) => { const u = k / (layers - 1); return `rgb(${Math.round(70 + 120 * u)},${Math.round(36 + 72 * u)},${Math.round(6 + 14 * u)})`; };
+  box.innerHTML = `<div class="in">${Array.from({ length: layers }, (_, k) => `<span class="ly" style="transform:translateZ(${(-(layers - k) * step).toFixed(1)}px);color:${shade(k)}">${text}</span>`).join('')}<span class="front">${text}</span></div>`;
+  return box.firstElementChild;
+}
+const nm1 = build3d($('nm1'), A.reveal.first), nm2 = build3d($('nm2'), A.reveal.last, 10, 2.4);
+$('rv-kick').textContent = A.reveal.kicker;
+$('rv-tag').innerHTML = `<span class="live"></span>${A.reveal.tag.text}`;
+$('rv-wel').innerHTML = `<span class="kick" style="color:rgba(255,255,255,.78)">${A.reveal.welcome.small}</span><span class="acc" style="font:italic 800 70px Fraunces,serif;margin-left:30px;vertical-align:-12px">${A.reveal.welcome.big}</span>`;
+const R = A.reveal.t;
+
+// ---------------- the gold particles ----------------
+// One set of ~4200 particles moves between shapes: a burst of light → his
+// portrait (stippled from the cut-out photo) → scattered → a turning galaxy →
+// the numbers 3, 2, 1 → a single point → a burst at the reveal.
+const PTS = window.POINTS, N = PTS.length, PR = rng(77);
+const P = PTS.map(([px, py, L]) => ({ px, py, L, d: PR(), sw: (PR() - 0.5) * 2, dir: PR() * 6.283, r: PR(), r2: PR(), v: 500 + PR() * 1500, th: PR() * 6.283 }));
+const GT = {};                                    // glyph targets, built in setup() once Anton is loaded
+function glyph(ch) {
+  const W = 900, H = 760, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d'); x.fillStyle = '#fff'; x.font = '680px Anton'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(ch, W / 2, H / 2 + 20);
+  const d = x.getImageData(0, 0, W, H).data, on = [];
+  for (let y = 0; y < H; y += 2) for (let xx = 0; xx < W; xx += 2) if (d[(y * W + xx) * 4 + 3] > 128) on.push(xx, y);
+  const r = rng(ch.charCodeAt(0) * 13), n = on.length / 2;
+  return P.map(() => { const k = (r() * n) | 0; return [960 - W / 2 + on[2 * k] + r() * 2, 470 - H / 2 + on[2 * k + 1] + r() * 2]; });
+}
+const KF = [
+  { t: at(12), set: 'flash', dur: 0.01 },
+  { t: at(12) + 0.06, set: 'portrait', dur: 1.5, stag: 0.9, swirl: 260 },
+  { t: at(32), set: 'scatter', dur: 0.42, stag: 0.06, swirl: 0 },
+  { t: at(33.2), set: 'galaxy', dur: 1.3, stag: 0.5, swirl: 160 },
+  { t: at(48), set: 'n3', dur: 0.34, stag: 0.16, swirl: 110 },
+  { t: at(50), set: 'n2', dur: 0.34, stag: 0.16, swirl: 110 },
+  { t: at(52), set: 'n1', dur: 0.34, stag: 0.16, swirl: 110 },
+  { t: A.implode, set: 'point', dur: 0.28, stag: 0.05, swirl: 70 },
+  { t: R, set: 'burst', dur: 0.01 },
+];
+function pos(set, p, i, t) {
+  switch (set) {
+    case 'flash': return [960 + Math.cos(p.dir) * 26 * p.r, 560 + Math.sin(p.dir) * 26 * p.r, 3, 1];
+    case 'portrait': {
+      const k = pulse(t, A.claps, 0.16), x = 510 + p.px * 900, y = 140 + p.py * 900;
+      return [x + (x - 960) * 0.075 * k + Math.sin(t * 2.3 + p.th) * 1.4, y + (y - 560) * 0.075 * k + Math.cos(t * 2.1 + p.th) * 1.4, 1.7 + 2.8 * p.L + 1.2 * k, 0.32 + 0.68 * p.L];
+    }
+    case 'scatter': return [960 + Math.cos(p.dir) * (700 + 900 * p.r), 560 + Math.sin(p.dir) * (700 + 900 * p.r) * 0.7, 3, 0.9];
+    case 'galaxy': {
+      const rad = 140 + Math.pow(p.r, 0.7) * 980, ang = p.th + t * 0.35 * (1.25 - rad / 1300), z = Math.sin(ang);
+      return [960 + Math.cos(ang) * rad, 520 + z * rad * 0.32 + (p.r2 - 0.5) * 50, 1.3 + 1.9 * (z + 1) / 2, 0.22 + 0.5 * (z + 1) / 2];
+    }
+    case 'n3': case 'n2': case 'n1': { const g = GT[set][i]; return [g[0] + Math.sin(t * 3 + p.th) * 1.5, g[1] + Math.cos(t * 3 + p.th) * 1.5, 2.6, 0.95]; }
+    case 'point': { const b = 1 + 0.25 * Math.sin(t * 22); return [960 + Math.cos(p.dir) * 16 * p.r * b, 470 + Math.sin(p.dir) * 16 * p.r * b, 2.6, 1]; }
+    case 'burst': {
+      const d = Math.max(0, t - R), k = (1 - Math.exp(-2.3 * d)) / 2.3;
+      return [960 + Math.cos(p.dir) * p.v * k, 470 + Math.sin(p.dir) * p.v * k + 120 * d * d, 3.4 * Math.max(0.2, 1 - d / 2), Math.pow(Math.max(0, 1 - d / 1.9), 1.5)];
+    }
+  }
+}
+function particles(t) {
+  pc.clearRect(0, 0, 1920, 1080);
+  if (t < KF[0].t || t > R + 2.2) return;
+  let k = KF.length - 1; while (k > 0 && KF[k].t > t) k--;
+  const cur = KF[k], prev = KF[Math.max(0, k - 1)];
+  // overall brightness: dimmed behind the call and response
+  const g = t >= S.call[0] && t < S.call[1] ? 0.5 : t >= A.blackout && t < R ? 1.4 : 1;
+  const sp = glowSprite(GOLD);
+  pc.save(); pc.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < N; i++) {
+    const p = P[i], local = clamp((t - cur.t - p.d * (cur.stag || 0)) / cur.dur), e = E.inOut(local);
+    const a = pos(prev.set, p, i, t), b = pos(cur.set, p, i, t);
+    let x = a[0] + (b[0] - a[0]) * e, y = a[1] + (b[1] - a[1]) * e;
+    if (cur.swirl && e > 0 && e < 1) { const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1, s = Math.sin(Math.PI * e) * cur.swirl * p.sw; x += (-dy / L) * s; y += (dx / L) * s; }
+    const size = a[2] + (b[2] - a[2]) * e, al = (a[3] + (b[3] - a[3]) * e) * g;
+    if (al <= 0.01) continue;
+    pc.globalAlpha = Math.min(1, al); pc.drawImage(sp, x - size * 2.2, y - size * 2.2, size * 4.4, size * 4.4);
+  }
+  pc.restore();
+}
+
+function render(t) {
+  const shakes = [at(12), at(32), ...crowdShouts, ...countT, R, ...SHELLS.map((s) => s.t)];
+  const [sx, sy] = shake(t, shakes, 14), [cx, cy] = shake(t, A.claps, 4);
+  $('world').style.transform = `translate(${(sx + cx).toFixed(1)}px,${(sy + cy).toFixed(1)}px)`;
+  bg.clearRect(0, 0, 1920, 1080); fx.clearRect(0, 0, 1920, 1080);
+  const clp = pulse(t, A.claps, 0.2);
+
+  // ---------- 1 · warp through the hits ----------
+  if (sceneCam($('s-open'), t, S.open[0], S.open[1], { punch: 0, drift: 0.01, outD: 0.001 })) {
+    bg.fillStyle = '#020208'; bg.fillRect(0, 0, 1920, 1080);
+    const glow = 0.18 + 0.5 * prog(t, at(8), at(12) - at(8));
+    const g = bg.createRadialGradient(960, 540, 0, 960, 540, 1000); g.addColorStop(0, `rgba(245,158,11,${glow.toFixed(3)})`); g.addColorStop(0.5, 'rgba(60,30,90,.18)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    bg.fillStyle = g; bg.fillRect(0, 0, 1920, 1080);
+    warp(bg, t, clamp(t * 1.5));
+    const fly = A.fly(t);
+    cards.forEach((c) => {
+      const z = A.open.z0 - A.open.gap * c.i + fly, on = z < 650;
+      c.el.style.display = on ? 'flex' : 'none'; if (!on) return;
+      c.el.style.opacity = (clamp((z + 1700) / 500) * clamp((650 - z) / 380) * (1 - prog(t, at(6.8), 0.35))).toFixed(3);
+      c.el.style.transform = `translate3d(${c.x.toFixed(1)}px,${c.y.toFixed(1)}px,${z.toFixed(1)}px) translate(-50%,-50%)`;
+    });
+    opWords.forEach((w, i) => reveal(w, t, A.open.lines[i].t, { blur: 26, dy: 30, out: A.open.out, osc: 0.3 }));
+    reveal($('op-sub'), t, A.open.sub.t, { blur: 14, dy: 16, out: A.open.out });
+    reveal($('op-kick'), t, A.open.kicker.t, { blur: 16, dy: -20, out: at(11.6) });
+    reveal($('op-main'), t, A.open.main.t, { blur: 34, dy: 0, sc: 0.35, d: 0.55, out: at(11.6), osc: 0.4 });
+    reveal($('op-msub'), t, A.open.mainSub.t, { blur: 14, dy: 16, out: at(11.6) });
+    flare(fx, 960, 540, pulse(t, [at(8)], 0.6) * 0.8);
+  }
+
+  // ---------- 2 · phone lights up ----------
+  if (sceneCam($('s-lights'), t, S.lights[0], S.lights[1], { punch: 0, drift: 0.008 })) {
+    bg.fillStyle = '#04040d'; bg.fillRect(0, 0, 1920, 1080);
+    const g = bg.createRadialGradient(960, 560, 0, 960, 560, 800); g.addColorStop(0, 'rgba(245,158,11,.22)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    bg.fillStyle = g; bg.fillRect(0, 0, 1920, 1080);
+    phoneSea(bg, t);
+    reveal($('lt-head'), t, A.lights.head.t, { blur: 24, dy: -24 });
+    reveal($('lt-sub'), t, A.lights.sub.t, { blur: 14, dy: -14 });
+    chips.forEach((c, i) => reveal(c.el, t, c.t, { blur: 16, dx: i === 1 ? 60 : -60, dy: 0, sc: 0.3 }));
+    chips.forEach((c) => { c.el.style.transform = 'translate(-50%,-50%) ' + c.el.style.transform; });
+    crowd(fx, t, CROWD, { handsUp: lerp(0.35, 0.9, prog(t, at(13), 1.6)), phones: clamp((t - at(13)) * 1.2), rimA: 0.35, rim: '255,210,150' });
+    flare(fx, 960, 560, pulse(t, [at(12)], 0.7));
+  }
+
+  // ---------- 3 · clap faster ----------
+  if (sceneCam($('s-clap'), t, S.clap[0], S.clap[1], { drift: 0.006, outD: 0.001 })) {
+    const k = prog(t, S.clap[0], S.clap[1] - S.clap[0]);
+    bg.fillStyle = '#05030c'; bg.fillRect(0, 0, 1920, 1080);
+    const g = bg.createRadialGradient(960, 560, 0, 960, 560, 950); g.addColorStop(0, `rgba(245,158,11,${(0.16 + 0.2 * clp + 0.2 * k).toFixed(3)})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+    bg.fillStyle = g; bg.fillRect(0, 0, 1920, 1080);
+    beams(bg, t * (1 + 2 * k), [
+      { x: 420, y: -60, a: -0.35, s: 1.1, ph: 0, sw: 0.45, w: 220, c: '245,158,11' },
+      { x: 1500, y: -60, a: 0.3, s: 1.3, ph: 2, sw: 0.45, w: 240, c: '170,80,255' },
+    ], { alpha: 0.35 + 0.45 * clp + 0.3 * k });
+    // the clap ring: a segment lights up for every clap
+    const n = A.claps.length, lit = A.claps.filter((c) => t >= c).length, rot = -Math.PI / 2 + t * 0.15;
+    bg.save(); bg.lineCap = 'round';
+    for (let i = 0; i < n; i++) {
+      const a0 = rot + (i / n) * 6.283 + 0.03, a1 = rot + ((i + 1) / n) * 6.283 - 0.03, on = i < lit, now = i === lit - 1;
+      bg.strokeStyle = on ? `rgba(253,224,138,${now ? 1 : 0.75})` : 'rgba(255,255,255,.1)'; bg.lineWidth = now ? 16 + 10 * clp : 12;
+      if (on) { bg.shadowColor = 'rgba(245,158,11,.9)'; bg.shadowBlur = now ? 30 : 12; } else bg.shadowBlur = 0;
+      bg.beginPath(); bg.arc(960, 560, 410, a0, a1); bg.stroke();
+    }
+    bg.restore();
+    A.claps.forEach((c) => { const d = t - c; if (d >= 0 && d < 0.5) { bg.strokeStyle = `rgba(253,224,138,${(1 - d / 0.5) * 0.7})`; bg.lineWidth = 6 * (1 - d / 0.5) + 1; bg.beginPath(); bg.arc(960, 560, 410 + d * 700, 0, 6.283); bg.stroke(); } });
+    clTexts.forEach((c, i) => {
+      const next = clTexts[i + 1] ? clTexts[i + 1].t - 0.05 : S.clap[1];
+      reveal(c.big, t, c.t, { blur: 24, dy: -20, out: next, od: 0.1, sc: i === 2 ? 0.5 : 0.15, d: 0.3 });
+      reveal(c.sub, t, c.t + 0.1, { blur: 12, dy: -12, out: next, od: 0.1, d: 0.3 });
+      c.big.style.transform += ` scale(${1 + 0.07 * clp})`;
+    });
+    [$('cl-e0'), $('cl-e1')].forEach((e, i) => {
+      e.style.transform = `scale(${(0.7 + 0.6 * clp).toFixed(3)}) rotate(${(i ? 1 : -1) * (12 - 18 * clp)}deg)`;
+      e.style.opacity = (clamp((t - S.clap[0]) * 4) * (0.5 + 0.5 * clp)).toFixed(3);
+    });
+    crowd(fx, t, CROWD, { handsUp: lerp(0.6, 0.95, k), clap: clapPose(t), rimA: 0.45 + 0.4 * clp, rim: '255,200,140' });
+    // the breath before the drop: everything pulls in
+    const suck = E.in3(prog(t, at(31.6), at(32) - at(31.6)));
+    if (suck > 0) $('s-clap').style.transform += ` scale(${(1 - 0.06 * suck).toFixed(4)})`;
+  }
+
+  // ---------- 4 · HANDS UP — the chant ----------
+  if (sceneCam($('s-drop'), t, S.drop[0], S.drop[1], { punch: 0.1, drift: 0.008, inD: 0.4 })) {
+    const beat = pulse(t, Array.from({ length: 8 }, (_, i) => S.drop[0] + i * B), 0.25);
+    bg.fillStyle = '#060309'; bg.fillRect(0, 0, 1920, 1080);
+    rays(bg, t, 960, 380, { alpha: 0.25 + 0.3 * beat, spin: 0.25, color: GOLD, len: 1500 });
+    wavePlane(bg, t, { horizon: 600, camY: -140, alpha: 0.5 + 0.4 * beat, amp: 34, color: (q) => `rgba(255,196,92,${q})` });
+    beams(bg, t * 1.5, [
+      { x: 300, y: -60, a: -0.25, s: 1.6, ph: 0, sw: 0.55, w: 260, c: '245,158,11' },
+      { x: 960, y: -80, a: 0, s: 1.1, ph: 1, sw: 0.5, w: 220, c: '255,230,180' },
+      { x: 1620, y: -60, a: 0.25, s: 1.8, ph: 2, sw: 0.55, w: 260, c: '220,40,80' },
+    ], { alpha: 0.6 + 0.4 * beat });
+    reveal($('dr-head'), t, A.drop.head.t, { blur: 30, dy: 0, sc: 0.6, d: 0.35 });
+    $('dr-head').style.transform += ` scale(${1 + 0.05 * beat})`;
+    reveal($('dr-sub'), t, A.drop.sub.t, { blur: 14, dy: 16 });
+    // bouncing-ball lyrics: the ball lands on each syllable as it's sung
+    const T = chantT(S.drop[0]), idx = T.filter((x) => t >= x).length - 1, row = idx < 4 ? 0 : 1;
+    SYL.forEach((s, j) => {
+      const sj = row * 4 + j, sung = idx >= sj, now = idx === sj, hit = now ? pulse(t, [T[sj]], 0.3) : 0;
+      s.style.color = sung ? '#fde68a' : 'rgba(255,255,255,.32)';
+      s.style.textShadow = now ? '0 0 50px rgba(245,158,11,.9)' : 'none';
+      s.style.transform = `scale(${(now ? 1.12 + 0.12 * hit : 1).toFixed(3)})`;
+      if (row === 1 && j === 3) s.textContent = 'OH!'; else if (j === 3) s.textContent = 'OH';
+    });
+    reveal($('kara'), t, S.drop[0] + 0.1, { blur: 20, dy: 30, d: 0.35 });
+    const ball = $('ball');
+    if (SYLX.length && idx >= 0) {
+      const j = idx % 4, t0 = T[idx], t1 = T[idx + 1] ?? (t0 + B), k = clamp((t - t0) / (t1 - t0));
+      const x0 = SYLX[j], x1 = j < 3 ? SYLX[j + 1] : SYLX[0];
+      const x = j < 3 ? lerp(x0, x1, k) : lerp(x0, x1, E.inOut(k)), y = 486 - Math.sin(Math.PI * k) * (j < 3 ? 110 : 160);
+      ball.style.display = 'block'; ball.style.left = x + 'px'; ball.style.top = y + 'px';
+    } else ball.style.display = 'none';
+    crowd(fx, t, CROWD, { handsUp: 1, sway: 1, swayT: 4 * B, jump: 0.25 * beat, rimA: 0.75, rim: '255,200,130' });
+    sparks(fx, t, SPARKS, { since: S.drop[0], burst: S.drop[0], alpha: 0.6 });
+  }
+
+  // ---------- 5 · call and response ----------
+  if (sceneCam($('s-call'), t, S.call[0], S.call[1], { punch: 0.04, drift: 0.01, outD: 0.001 })) {
+    const cs = pulse(t, crowdShouts, 0.4);
+    bg.fillStyle = cs > 0.5 ? '#170a04' : '#040208'; bg.fillRect(0, 0, 1920, 1080);
+    spotlight(bg, 640 + Math.sin(t * 1.3) * 200, 960, { topX: 760, w: 240, alpha: 0.6, color: '255,220,170' });
+    spotlight(bg, 1280 - Math.sin(t * 1.1) * 200, 960, { topX: 1160, w: 240, alpha: 0.6, color: '255,200,150' });
+    const linesOut = at(43.85);
+    A.call.lines.forEach((l, i) => reveal($('ca-' + i), t, l.t, { blur: 24, dy: 26, out: linesOut, od: 0.12 }));
+    reveal($('ca-sub'), t, A.call.sub.t, { blur: 14, dy: 16, out: linesOut, od: 0.12 });
+    shouts.forEach((s) => {
+      const end = s.t + B * 0.95, on = t >= s.t && t < end;
+      s.el.style.display = on ? 'block' : 'none'; if (!on) return;
+      const a = E.out5(prog(t, s.t, 0.16)), z = E.in3(prog(t, end - 0.1, 0.1));
+      s.el.style.opacity = (clamp(a * 3) * (1 - z)).toFixed(3);
+      s.el.style.transform = `scale(${((1.8 - 0.8 * a) * (1 + 0.04 * (t - s.t)) * (1 + 0.6 * z)).toFixed(4)}) rotate(${(s.who === 'crowd' ? -3 : 2) * (1 - a)}deg)`;
+      s.el.style.filter = `blur(${(18 * (1 - a) + 14 * z).toFixed(1)}px)`;
+    });
+    crowd(fx, t, CROWD, { handsUp: 0.9, jump: cs, rimA: 0.5 + 0.4 * cs, rim: '255,190,120' });
+  }
+
+  // ---------- 6 · 3 · 2 · 1 ----------
+  if (sceneCam($('s-count'), t, S.count[0], S.count[1], { punch: 0, drift: 0, outD: 0.001 })) {
+    const dark = t >= A.blackout;
+    bg.fillStyle = '#020104'; bg.fillRect(0, 0, 1920, 1080);
+    if (!dark) {
+      const hit = pulse(t, countT, 0.5);
+      rays(bg, t, 960, 470, { alpha: 0.18 + 0.6 * hit, spin: 0.3, len: 1500, color: GOLD });
+      countT.forEach((c) => { const d = t - c; if (d >= 0 && d < 0.8) { bg.strokeStyle = `rgba(253,224,138,${(1 - d / 0.8) * 0.85})`; bg.lineWidth = 10 * (1 - d / 0.8) + 2; bg.beginPath(); bg.arc(960, 470, 150 + d * 1500, 0, 6.283); bg.stroke(); } });
+      ctSubs.forEach((c, i) => { const end = (countT[i + 1] ?? A.implode) - 0.05; reveal(c.el, t, c.t + 0.08, { blur: 16, dy: 20, out: end, od: 0.1, d: 0.25 }); });
+      crowd(fx, t, CROWD, { handsUp: 1, jump: 0.3 + 0.7 * hit, rimA: 0.5 + 0.5 * hit });
+    } else {
+      ctSubs.forEach((c) => { c.el.style.opacity = 0; });
+      const h = 0.5 + 0.5 * prog(t, A.blackout, R - A.blackout), g = bg.createRadialGradient(960, 470, 0, 960, 470, 260 * h);
+      g.addColorStop(0, `rgba(255,236,190,${0.55 * h})`); g.addColorStop(1, 'rgba(245,158,11,0)'); bg.fillStyle = g; bg.fillRect(0, 0, 1920, 1080);
+    }
+  }
+
+  // ---------- 7 · lights on ----------
+  if (sceneCam($('s-reveal'), t, S.reveal[0], S.reveal[1] + 1, { punch: 0.12, drift: 0.007, inD: 0.5, outD: 0.001 })) {
+    bg.fillStyle = '#05020a'; bg.fillRect(0, 0, 1920, 1080);
+    const td = t - R, calm = prog(t, A.reveal.bandOut, 2);
+    const sky = $('rv-sky').getContext('2d'); sky.clearRect(0, 0, 1920, 1080);
+    beams(sky, t, [
+      { x: 360, y: -60, a: -0.25, s: 1.4, ph: 0, sw: 0.45, w: 300, c: '255,150,40' },
+      { x: 1560, y: -60, a: 0.25, s: 1.2, ph: 1.5, sw: 0.45, w: 300, c: '255,40,80' },
+      { x: 960, y: -80, a: 0, s: 0.8, ph: 3, sw: 0.3, w: 240, c: '255,220,160' },
+    ], { alpha: clamp(td * 3) * (1 - 0.35 * calm) });
+    reveal($('rv-kick'), t, R + 0.3, { blur: 14, dy: -16 });
+    // SUGAM in 3D gold: swings in, then turns gently
+    const a1 = E.out5(prog(t, R, 0.55));
+    nm1.style.transform = `rotateX(${(6 * (1 - a1) + 3).toFixed(2)}deg) rotateY(${(28 * (1 - a1) + Math.sin(td * 0.9) * 6 * a1).toFixed(2)}deg) scale(${(1.5 - 0.5 * a1).toFixed(4)})`;
+    $('nm1').style.opacity = clamp(a1 * 3).toFixed(3); $('nm1').style.filter = a1 < 1 ? `blur(${(26 * (1 - a1)).toFixed(1)}px)` : 'none';
+    const a2 = E.out5(prog(t, R + 0.4, 0.55));
+    nm2.style.transform = `rotateY(${(-24 * (1 - a2) - Math.sin(td * 0.9) * 5 * a2).toFixed(2)}deg) scale(${(1.4 - 0.4 * a2).toFixed(4)})`;
+    $('nm2').style.opacity = clamp(a2 * 3).toFixed(3); $('nm2').style.filter = a2 < 1 ? `blur(${(20 * (1 - a2)).toFixed(1)}px)` : 'none';
+    // the photo: lights on
+    const on = E.out3(prog(t, R + 0.02, 0.4)), cp = E.out5(prog(t, R, 0.6));
+    $('rv-cut').style.transform = `translateY(${((1 - cp) * 120).toFixed(1)}px) scale(${(1.03 + 0.013 * Math.max(0, td) - 0.03 * cp).toFixed(4)})`;
+    $('rv-cut').style.filter = `brightness(${(0.08 + 0.92 * on).toFixed(3)}) drop-shadow(0 0 ${(44 - 14 * on).toFixed(0)}px rgba(245,158,11,${(0.95 - 0.5 * on).toFixed(2)})) drop-shadow(0 30px 60px rgba(0,0,0,.6))`;
+    reveal($('rv-tag'), t, A.reveal.tag.t, { blur: 12, dy: 16 });
+    reveal($('rv-wel'), t, A.reveal.welcome.t, { blur: 18, dy: 20 });
+    fireworks(fx, t, SHELLS);
+    sparks(fx, t, SPARKS, { since: R, burst: R, alpha: 0.9 });
+    confetti(fx, t, CONF[0], R, 160, 1120); confetti(fx, t, CONF[1], R, 1760, 1120); confetti(fx, t, CONF[2], R + 0.15, 960, 1150);
+    crowd(fx, t, CROWD, { baseY: 1310, handsUp: 1, sway: calm, swayT: 4 * B, jump: 0.9 - 0.6 * calm, rimA: 0.85, rim: '255,190,110' });
+    flare(fx, 960, 470, pulse(t, [R], 0.8));
+  }
+
+  particles(t);
+
+  let fl = 0;
+  const flashAt = (t0, a, d) => { const x = t - t0; if (x >= 0 && x < d) fl = Math.max(fl, a * (1 - x / d)); };
+  flashAt(at(12), 0.95, 0.55); flashAt(at(32), 0.75, 0.35); flashAt(R, 1, 0.5);
+  countT.forEach((c) => flashAt(c, 0.25, 0.2)); crowdShouts.forEach((c) => flashAt(c, 0.18, 0.18)); A.claps.forEach((c) => flashAt(c, 0.05, 0.1));
+  $('flash').style.opacity = fl.toFixed(3);
+  gr.clearRect(0, 0, 480, 270); gr.drawImage(GRAIN[Math.floor(t * 30) % GRAIN.length], 0, 0);
+}
+
+async function setup() {
+  // load every face up front: with display=block, text in a face that hasn't loaded yet is invisible,
+  // and a face only loads when first used, so its first frame would come out without that text
+  await Promise.all(['400 100px Anton', '700 100px Cinzel', '900 100px Cinzel', '500 100px Inter', '600 100px Inter', '700 100px Inter', '800 100px Inter', '900 100px Inter',
+    'italic 600 100px Fraunces', 'italic 800 100px Fraunces'].map((f) => document.fonts.load(f)));
+  await document.fonts.ready;
+  await Promise.all([...document.images].map((im) => im.complete ? 0 : new Promise((r) => { im.onload = im.onerror = r; })));
+  for (const [set, ch] of [['n3', '3'], ['n2', '2'], ['n1', '1']]) GT[set] = glyph(ch);
+  // where each lyric syllable sits, for the bouncing ball
+  const sc = $('s-drop'); const prev = sc.style.display; sc.style.display = 'block';
+  SYLX = SYL.map((s) => { const r = s.getBoundingClientRect(); return r.left + r.width / 2; });
+  sc.style.display = prev;
+  return true;
+}
+window.render = render; window.setup = setup;
+
+const q = new URLSearchParams(location.search);
+if (!q.has('render')) setup().then(() => {
+  if (q.has('play')) {
+    const au = new Audio('out/sugam/audio.wav'); au.play().catch(() => {});
+    const t0 = performance.now();
+    const loop = () => { const t = (performance.now() - t0) / 1000; render(t % A.TOTAL); requestAnimationFrame(loop); };
+    loop();
+  } else render(parseFloat(q.get('t') || '26'));
+});
+</script>
+</body>
+</html>

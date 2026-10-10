@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MartNepali brand ads — stage</title>
+<!-- The five MartNepali brand ads (?ad=customer|seller|restaurant|organizer|general),
+     drawn from brand/ads.js: render(t) sets everything for second t.
+     ?ad=seller&t=9 shows one moment, ?ad=seller&play plays it. -->
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@500;600;700;800&family=Mukta:wght@700;800&display=block" rel="stylesheet">
+<script src="ads.js"></script>
+<script src="art.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; background: #f3f3ef; }
+  body { font-family: Inter, sans-serif; -webkit-font-smoothing: antialiased; }
+  #frame { position: absolute; inset: 0; overflow: hidden; }
+  .layer { position: absolute; inset: 0; }
+  .jk { font-family: 'Plus Jakarta Sans', Inter, sans-serif; }
+  #bg { position: absolute; inset: 0; }
+  #blobs { position: absolute; inset: 0; }
+  #dots { position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(255,255,255,.16) 2px, transparent 2.6px); background-size: 26px 26px;
+    -webkit-mask: radial-gradient(900px 1100px at 50% 45%, #000 30%, transparent 80%); }
+  #grain { position: absolute; inset: -200px; opacity: .05; pointer-events: none; z-index: 90; mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/></filter><rect width='300' height='300' filter='url(%23n)'/></svg>"); }
+  .shot { position: absolute; inset: 0; display: none; will-change: transform, filter, opacity; }
+  .wblock { position: absolute; left: 60px; right: 60px; text-align: center; }
+  .wline { white-space: nowrap; line-height: 1.08; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; letter-spacing: -.03em; }
+  .wd { display: inline-block; margin: 0 .12em; will-change: transform, filter, opacity; }
+  .wsub { margin-top: 26px; font: 600 40px/1.3 Inter, sans-serif; }
+  .card { position: absolute; border-radius: 48px; }
+  .dark-card { background: linear-gradient(160deg, rgba(255,255,255,.10), rgba(255,255,255,.04)); border: 1.5px solid rgba(255,255,255,.14); box-shadow: 0 40px 100px rgba(0,0,0,.45); color: #fff; }
+  .light-card { background: rgba(255,255,255,.92); box-shadow: 0 30px 80px rgba(20,20,20,.12), 0 2px 0 rgba(255,255,255,.9) inset; color: #111; }
+  .chip { display: inline-flex; align-items: center; gap: 10px; padding: 18px 28px; border-radius: 999px; font: 700 36px/1 Inter, sans-serif; border: 2px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); color: #fff; margin: 0 10px 14px 0; }
+  .cursor { position: absolute; width: 58px; height: 70px; z-index: 50; pointer-events: none; filter: drop-shadow(0 6px 10px rgba(0,0,0,.4)); }
+  .ripple { position: absolute; width: 90px; height: 90px; margin: -45px 0 0 -45px; border-radius: 50%; border: 5px solid #fff; z-index: 49; opacity: 0; }
+  .shimmer { background: linear-gradient(90deg, rgba(255,255,255,.05) 0%, rgba(255,255,255,.22) 50%, rgba(255,255,255,.05) 100%); background-size: 300% 100%; }
+  .art { position: absolute; }
+  .mn { display: inline-block; }
+  .mn svg { width: 100%; height: 100%; }
+  .qr svg { width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<div id="frame">
+  <div id="bg"></div>
+  <svg id="blobs" width="1080" height="1920"><defs><filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="34"/></filter></defs><g id="bl" filter="url(#soft)"></g></svg>
+  <div id="dots"></div>
+  <div id="lit" class="layer"></div>
+  <div id="shots"></div>
+  <div id="grain"></div>
+</div>
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const eOut = (k) => 1 - Math.pow(1 - k, 3);
+const eOut5 = (k) => 1 - Math.pow(1 - k, 5);
+const eIO = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+const eBack = (k) => { const c = 1.7; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); };
+const css = (el, o) => { for (const k in o) el.style[k] = o[k]; return el; };
+const h = (tag, style = '', html = '') => { const e = document.createElement(tag); if (style) e.style.cssText = style; if (html) e.innerHTML = html; return e; };
+const q = new URLSearchParams(location.search);
+const AD = BRAND.AD[q.get('ad') || 'customer'];
+const T = BRAND.TIMES;
+const A = AD.accent, A2 = AD.accent2;
+let LOGO = '', QR = '';
+const DARK = new Set(['logo', 'ask', 'build', 'menu', 'kitchen', 'tiers', 'scan', 'outro']);
+const themeOf = (s) => (DARK.has(s.type) ? 'dark' : s.type === 'split' ? 'split' : 'light');
+const rect = (el) => el.getBoundingClientRect();
+let MARKN = 0;
+const mark = (size) => { const n = ++MARKN; return `<span class="mn" style="width:${size * 0.875}px;height:${size}px">${LOGO.replace(/id="([^"]+)"/g, `id="$1_m${n}"`).replace(/url\(#([^)]+)\)/g, `url(#$1_m${n})`)}</span>`; };
+// Each drawing gets its own gradient ids, so a copy inside a hidden shot never
+// hides the colours of a visible one.
+let ARTN = 0;
+const art = (k) => { const n = ++ARTN; return ART[k].replace(/id="([^"]+)"/g, `id="$1_${n}"`).replace(/url\(#([^)]+)\)/g, `url(#$1_${n})`); };
+const ink = (s) => (s || '').replace(/\*([^*]+)\*/g, `<span style="color:${A}">$1</span>`);
+
+// ---------- words ----------
+function wordBlock(text, sub, { size = 116, top = 760, theme = 'light', subColor } = {}) {
+  const el = h('div', `top:${top}px`); el.className = 'wblock';
+  const ws = BRAND.words(text);
+  const lines = [];
+  ws.forEach((w) => { (lines[w.line] = lines[w.line] || []).push(w); });
+  el.innerHTML = lines.map((ln) => `<div class="wline" style="font-size:${size}px;color:${theme === 'dark' ? '#fff' : '#111'}">${ln.map((w) => `<span class="wd" style="${w.accent ? `color:${A}` : ''}">${w.w}</span>`).join('')}</div>`).join('')
+    + (sub ? `<div class="wsub" style="color:${subColor || (theme === 'dark' ? 'rgba(255,255,255,.7)' : '#6b7280')}">${sub}</div>` : '');
+  el._ws = $$('.wd', el); el._acc = ws.map((w) => w.accent); el._text = text;
+  return el;
+}
+function fitWords(el) {
+  for (const ln of $$('.wline', el)) { const w = ln.scrollWidth; if (w > 960) ln.style.fontSize = parseFloat(ln.style.fontSize) * 960 / w + 'px'; }
+}
+function drawWords(el, lt, start = BRAND.W0) {
+  el._ws.forEach((w, i) => {
+    const k = prog(lt, start + i * BRAND.WS - 0.12, start + i * BRAND.WS + 0.3);
+    const e = eOut5(k);
+    w.style.opacity = clamp(k * 1.6);
+    w.style.filter = k < 1 ? `blur(${(1 - e) * 16}px)` : '';
+    w.style.transform = `translateX(${(1 - e) * -46}px) scale(${el._acc[i] ? lerp(1.25, 1, eBack(k)) : 1})`;
+  });
+  const sub = $('.wsub', el);
+  if (sub) { const k = prog(lt, BRAND.subTime(el._text, start) - 0.1, BRAND.subTime(el._text, start) + 0.3); sub.style.opacity = eOut(k); sub.style.filter = `blur(${(1 - eOut(k)) * 10}px)`; sub.style.transform = `translateY(${(1 - eOut(k)) * 16}px)`; }
+}
+
+// ---------- cursor ----------
+const CURSOR = `<svg viewBox="0 0 24 30" width="58" height="70"><path d="M2 2 L2 24 L8 18.5 L12 28 L16 26.3 L12 17 L20 17 Z" fill="#fff" stroke="#111" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
+function cursorOn(parent) { const c = h('div', '', CURSOR); c.className = 'cursor'; const r = h('div'); r.className = 'ripple'; parent.append(c, r); return { c, r }; }
+// path: [[t, el|[x,y], click?]] — moves between targets, clicks where asked.
+function drawCursor(cur, lt, path) {
+  const pts = path.map(([t, target, click]) => { let x, y; if (Array.isArray(target)) [x, y] = target; else { const r = rect(target); x = r.left + r.width / 2; y = r.top + r.height / 2; } return [t, x, y, click]; });
+  let x = pts[0][1], y = pts[0][2];
+  for (let i = 1; i < pts.length; i++) { const [t0, x0, y0] = pts[i - 1], [t1, x1, y1] = pts[i]; if (lt >= t0) { const k = eIO(prog(lt, t0 + 0.02, t1 - 0.08)); x = lerp(x0, x1, k); y = lerp(y0, y1, k); } }
+  let press = 1, rip = null;
+  for (const [t, px, py, click] of pts) if (click && lt >= t - 0.06 && lt < t + 0.45) { if (lt < t + 0.1) press = 0.82; rip = [px, py, prog(lt, t, t + 0.45)]; }
+  css(cur.c, { left: x - 6 + 'px', top: y - 4 + 'px', transform: `scale(${press})`, opacity: String(clamp(lt / 0.15)) });
+  if (rip) css(cur.r, { left: rip[0] + 'px', top: rip[1] + 'px', opacity: String(1 - rip[2]), transform: `scale(${0.5 + rip[2] * 1.6})` }); else cur.r.style.opacity = 0;
+}
+const typed = (text, lt, a, b) => text.slice(0, Math.round(text.length * prog(lt, a, b)));
+const caret = (lt, on) => `<span style="display:inline-block;width:4px;height:1em;vertical-align:-.12em;margin-left:4px;background:${A};opacity:${on && Math.floor(lt * 3) % 2 === 0 ? 1 : on ? 0.3 : 0}"></span>`;
+
+// ---------- shots ----------
+const B = {};
+
+B.words = (s) => { const el = h('div'); const wb = wordBlock(s.text, s.sub, { size: 124 }); el.append(wb); return { el, fit: () => { fitWords(wb); wb.style.top = 960 - wb.offsetHeight / 2 - 40 + 'px'; }, draw(lt) { drawWords(wb, lt); wb.style.transform = `scale(${1 + 0.05 * lt / s.d})`; } }; };
+
+B.giant = (s) => {
+  const el = h('div');
+  const w = h('div', `position:absolute;left:0;right:0;top:50%;text-align:center;white-space:nowrap;font:800 360px/1 'Plus Jakarta Sans',sans-serif;letter-spacing:-.05em;color:${A}`, s.text);
+  el.append(w);
+  return { el, fit: () => { const sw = w.scrollWidth; if (sw > 1500) w.style.fontSize = 360 * 1500 / sw + 'px'; w.style.marginTop = -w.offsetHeight / 2 + 'px'; }, draw(lt) {
+    const k = eOut5(prog(lt, 0, s.d * 0.5)), z = prog(lt, s.d * 0.55, s.d);
+    w.style.transform = `translateX(${(1 - k) * 1400}px) scale(${1 + Math.pow(z, 2.2) * 9})`;
+    w.style.filter = `blur(${(1 - k) * 22 + z * z * 30}px)`;
+    w.style.opacity = 1 - prog(lt, s.d * 0.8, s.d);
+  } };
+};
+
+const SPOTS = [[200, 480, 340, -12], [870, 450, 310, 10], [170, 1350, 320, 8], [890, 1370, 340, -9], [540, 300, 250, 4], [560, 1600, 270, -4], [110, 930, 200, 6], [975, 930, 200, -6]];
+B.collage = (s) => {
+  const el = h('div');
+  const items = s.items.map((k, i) => { const [x, y, sz] = SPOTS[i]; const a = h('div', `left:${x - sz / 2}px;top:${y - sz / 2}px;width:${sz}px;height:${sz}px;filter:drop-shadow(0 26px 30px rgba(0,0,0,.18))`, art(k)); a.className = 'art'; el.append(a); return a; });
+  const wb = wordBlock(s.text, s.sub, { size: 104 }); el.append(wb);
+  return { el, fit: () => { fitWords(wb); wb.style.top = 930 - wb.offsetHeight / 2 + 'px'; }, draw(lt) {
+    items.forEach((a, i) => {
+      const [x, y, sz, rot] = SPOTS[i];
+      const k = prog(lt, T.collage.items + i * T.collage.step, T.collage.items + i * T.collage.step + 0.5), e = eOut5(k);
+      const dx = (540 - x) * (1 - e), dy = (960 - y) * (1 - e);
+      a.style.opacity = clamp(k * 3);
+      a.style.transform = `translate(${dx}px, ${dy + Math.sin(lt * 2 + i) * 8}px) scale(${lerp(0.2, 1, e)}) rotate(${rot * e + Math.sin(lt * 1.6 + i) * 3}deg)`;
+      a.style.filter = `drop-shadow(0 26px 30px rgba(0,0,0,.18)) blur(${(1 - e) * 10 + (i >= 6 ? 3 : 0)}px)`;
+    });
+    drawWords(wb, lt, 0.45);
+  } };
+};
+
+B.logo = (s) => {
+  const el = h('div');
+  const ring = h('div', 'position:absolute;left:540px;top:880px');
+  for (let i = 0; i < 56; i++) { const a = (i / 56) * Math.PI * 2; ring.append(h('span', `position:absolute;left:${Math.cos(a) * 250 - 6}px;top:${Math.sin(a) * 250 - 6}px;width:12px;height:12px;border-radius:3px;background:${A};box-shadow:0 0 14px ${A}`)); }
+  const disc = h('div', `position:absolute;left:375px;top:715px;width:330px;height:330px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 0 80px ${A}88`, mark(200));
+  const word = h('div', `position:absolute;left:390px;top:822px;font:800 104px/1 'Plus Jakarta Sans',sans-serif;letter-spacing:-.03em;color:#fff;white-space:nowrap`, [...'MartNepali'].map((c, i) => `<span style="display:inline-block;${i >= 4 ? `color:${A}` : ''}">${c}</span>`).join(''));
+  const sub = s.sub ? h('div', `position:absolute;left:0;right:0;top:1060px;text-align:center`, `<span style="display:inline-block;padding:16px 34px;border-radius:999px;background:${A};color:#fff;font:800 44px/1 'Plus Jakarta Sans',sans-serif">${s.sub}</span>`) : null;
+  el.append(ring, disc, word); if (sub) el.append(sub);
+  return { el, draw(lt) {
+    $$('span', ring).forEach((d, i) => { const k = prog(lt, T.logo.ring[0] + i * 0.01, T.logo.ring[0] + i * 0.01 + 0.2); d.style.opacity = k * (1 - prog(lt, T.logo.slide, T.logo.slide + 0.3)); });
+    ring.style.transform = `rotate(${lt * 40}deg) scale(${lerp(0.7, 1, eOut5(prog(lt, 0, 0.5)))})`;
+    const mk = prog(lt, T.logo.mark, T.logo.mark + 0.35), sl = eIO(prog(lt, T.logo.slide, T.logo.slide + 0.4));
+    disc.style.opacity = clamp(mk * 3);
+    disc.style.transform = `translateX(${sl * -335}px) scale(${lerp(0.3, 1, eBack(mk)) * lerp(1, 0.6, sl)})`;
+    const ls = $$('span', word);
+    ls.forEach((c, i) => { const k = prog(lt, T.logo.letters[0] + i * 0.04, T.logo.letters[0] + i * 0.04 + 0.25); c.style.opacity = eOut(k); c.style.transform = `translateY(${(1 - eOut5(k)) * 60}px)`; c.style.filter = `blur(${(1 - eOut(k)) * 10}px)`; });
+    word.style.transform = `translateX(${-40 * sl}px)`;
+    if (sub) { const k = prog(lt, T.logo.sub, T.logo.sub + 0.35); sub.style.opacity = k; sub.style.transform = `translateY(${(1 - eOut5(k)) * 30}px)`; }
+  } };
+};
+
+B.ask = (s) => {
+  const el = h('div');
+  const card = h('div', 'left:60px;right:60px;top:470px;padding:40px'); card.className = 'card dark-card';
+  card.innerHTML = `<div style="display:flex;align-items:center;gap:18px;font:700 40px/1 'Plus Jakarta Sans',sans-serif">${mark(50)}Ask MartNepali<span style="margin-left:auto;font:600 26px/1 Inter;color:rgba(255,255,255,.55)">EN · DE · नेपाली</span></div>
+    <div class="in" style="margin-top:30px;height:140px;border-radius:44px;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.14);display:flex;align-items:center;padding:0 16px 0 38px;gap:14px">
+      <div class="tx" style="flex:1;font:600 42px/1.2 Inter;color:#fff;white-space:nowrap;overflow:hidden"></div>
+      <div class="go" style="width:104px;height:104px;border-radius:50%;background:${A};display:flex;align-items:center;justify-content:center;font:800 54px/1 Inter;color:#fff">↑</div></div>
+    <div class="think shimmer" style="margin-top:26px;height:120px;border-radius:32px;display:flex;align-items:center;justify-content:center;font:700 40px/1 'Plus Jakarta Sans';color:#fff">Khojdai…</div>
+    <div class="res"></div>`;
+  const res = $('.res', card);
+  s.results.forEach(([ak, t1, t2]) => res.append(h('div', 'display:flex;align-items:center;gap:26px;margin-top:22px;padding:18px;border-radius:32px;background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.1)',
+    `<div style="width:120px;height:120px;border-radius:26px;background:#f7f5f0;padding:10px;flex:none">${art(ak)}</div><div><div style="font:700 42px/1.15 'Plus Jakarta Sans'">${t1}</div><div style="margin-top:8px;font:600 30px/1.2 Inter;color:rgba(255,255,255,.6)">${t2}</div></div><div style="margin-left:auto;font:700 44px/1 Inter;color:${A}">›</div>`)));
+  const sub = h('div', 'position:absolute;left:70px;right:70px;top:1560px;text-align:center;font:700 44px/1.3 Inter;color:rgba(255,255,255,.85)', ink(s.sub));
+  el.append(card, sub);
+  const cur = cursorOn(el);
+  const X = T.ask;
+  return { el, draw(lt) {
+    const inp = $('.in', card), tx = $('.tx', card), go = $('.go', card), th = $('.think', card);
+    const text = typed(s.q, lt, X.typeA, X.typeB);
+    tx.innerHTML = (lt < X.typeA ? `<span style="color:rgba(255,255,255,.4)">Ke khojnu hunchha?</span>` : text) + caret(lt, lt > X.click && lt < X.send);
+    inp.style.borderColor = lt > X.click ? A : 'rgba(255,255,255,.14)';
+    inp.style.boxShadow = lt > X.click ? `0 0 40px ${A}55` : 'none';
+    go.style.transform = `scale(${lt > X.send - 0.05 && lt < X.send + 0.1 ? 0.85 : 1})`;
+    go.style.boxShadow = lt > X.typeB ? `0 0 ${30 + 20 * Math.sin(lt * 10)}px ${A}` : 'none';
+    const tk = prog(lt, X.think, X.think + 0.2), tout = prog(lt, X.results[0] - 0.1, X.results[0] + 0.15);
+    th.style.display = tk > 0 && tout < 1 ? 'flex' : 'none';
+    th.style.opacity = tk * (1 - tout); th.style.filter = `blur(${2 + 2 * Math.sin(lt * 8)}px)`; th.style.backgroundPosition = `${(lt * 180) % 300}% 0`;
+    $$('.res > div', card).forEach((r, i) => { const k = prog(lt, X.results[i], X.results[i] + 0.35); r.style.display = k > 0 ? 'flex' : 'none'; r.style.opacity = eOut(k); r.style.transform = `translateY(${(1 - eOut5(k)) * 60}px) scale(${lerp(0.9, 1, eOut5(k))})`; r.style.filter = `blur(${(1 - eOut(k)) * 8}px)`; });
+    card.style.transform = `perspective(1800px) rotateX(${(1 - eOut5(prog(lt, 0, 0.5))) * 18 + Math.sin(lt * 0.8) * 1.5}deg) rotateY(${Math.sin(lt * 0.6) * 2}deg)`;
+    const sk = prog(lt, X.results[2], X.results[2] + 0.4); sub.style.opacity = sk; sub.style.transform = `translateY(${(1 - eOut5(sk)) * 30}px)`;
+    drawCursor(cur, lt, [[0, [880, 1700]], [X.click, inp, true], [X.send - 0.3, go], [X.send, go, true], [X.send + 1.2, [900, 1650]]]);
+  } };
+};
+
+B.build = (s) => {
+  const el = h('div');
+  const card = h('div', 'left:60px;right:60px;top:430px;padding:40px;min-height:900px'); card.className = 'card dark-card';
+  card.innerHTML = `<div style="display:flex;align-items:center;gap:18px;font:700 40px/1 'Plus Jakarta Sans'">${mark(50)}Setup assistant</div>
+    <div class="chat">
+      <div style="margin-top:34px;max-width:720px;padding:26px 32px;border-radius:34px 34px 34px 10px;background:rgba(255,255,255,.09);font:600 38px/1.3 Inter">Namaste! Ke bechnu hunchha? 🙏</div>
+      <div class="me" style="margin:26px 0 0 auto;max-width:760px;padding:26px 32px;border-radius:34px 34px 10px 34px;background:${A};color:#111;font:700 38px/1.3 Inter"></div>
+      <div class="think shimmer" style="margin-top:30px;height:120px;border-radius:32px;display:flex;align-items:center;justify-content:center;font:700 40px/1 'Plus Jakarta Sans'">Page banaudai…</div>
+    </div>
+    <div class="page" style="position:absolute;inset:0;border-radius:48px;overflow:hidden;background:#fff;color:#111;display:none">
+      <div style="height:300px;position:relative;background:linear-gradient(135deg,${A},${A2})">
+        <div style="position:absolute;right:40px;top:30px;width:250px;height:250px">${art('achar')}</div>
+        <div style="position:absolute;left:36px;top:30px;padding:10px 18px;border-radius:999px;background:rgba(255,255,255,.85);font:700 24px/1 Inter;color:#555">Example page</div>
+      </div>
+      <div style="padding:30px 40px">
+        <div style="font:800 64px/1.05 'Plus Jakarta Sans'">${s.shop}</div>
+        <div style="margin-top:10px;font:600 32px/1.2 Inter;color:#6b7280">${s.place}</div>
+        <div class="rows"></div>
+        <div style="margin-top:30px;height:110px;border-radius:32px;background:${A};display:flex;align-items:center;justify-content:center;font:800 40px/1 'Plus Jakarta Sans';color:#111">Order garnus</div>
+      </div>
+    </div>`;
+  s.rows.forEach(([ak, name, price]) => $('.rows', card).append(h('div', 'display:flex;align-items:center;gap:22px;margin-top:20px;padding-bottom:18px;border-bottom:2px solid #f0f0f0',
+    `<div style="width:96px;height:96px;border-radius:22px;background:#f7f5f0;padding:8px;flex:none">${art(ak)}</div><div style="font:700 38px/1.2 'Plus Jakarta Sans'">${name}</div><div style="margin-left:auto;font:800 38px/1 Inter">${price}</div>`)));
+  const sub = h('div', 'position:absolute;left:70px;right:70px;top:1600px;text-align:center;font:700 46px/1.3 Inter;color:rgba(255,255,255,.88)', ink(s.sub));
+  el.append(card, sub);
+  const X = T.build;
+  return { el, draw(lt) {
+    const me = $('.me', card), th = $('.think', card), page = $('.page', card), chat = $('.chat', card);
+    me.style.display = lt >= X.typeA - 0.1 ? 'block' : 'none';
+    me.innerHTML = typed(s.q, lt, X.typeA, X.typeB) + (lt < X.send ? caret(lt, true) : '');
+    const tk = prog(lt, X.think, X.think + 0.2);
+    th.style.display = tk > 0 ? 'flex' : 'none'; th.style.opacity = tk; th.style.filter = `blur(${2 + 2 * Math.sin(lt * 8)}px)`; th.style.backgroundPosition = `${(lt * 180) % 300}% 0`;
+    const pk = prog(lt, X.page, X.page + 0.45);
+    page.style.display = pk > 0 ? 'block' : 'none';
+    page.style.opacity = eOut(pk); page.style.transform = `scale(${lerp(0.85, 1, eOut5(pk))})`; page.style.filter = `blur(${(1 - eOut(pk)) * 14}px)`;
+    chat.style.opacity = 1 - pk;
+    $$('.rows > div', card).forEach((r, i) => { const k = prog(lt, X.rows[i], X.rows[i] + 0.3); r.style.opacity = eOut(k); r.style.transform = `translateX(${(1 - eOut5(k)) * 80}px)`; });
+    card.style.transform = `perspective(1800px) rotateX(${(1 - eOut5(prog(lt, 0, 0.5))) * 18}deg) rotateY(${Math.sin(lt * 0.7) * 2.5}deg)`;
+    const sk = prog(lt, X.rows[2], X.rows[2] + 0.4); sub.style.opacity = sk; sub.style.transform = `translateY(${(1 - eOut5(sk)) * 30}px)`;
+  } };
+};
+
+B.notify = (s) => {
+  const el = h('div');
+  const cards = s.cards.map(([t1, t2], i) => { const c = h('div', 'left:70px;right:70px;top:0;padding:30px 34px;display:flex;gap:24px;align-items:center;border-radius:40px',
+    `<div style="width:96px;height:96px;border-radius:24px;background:#fff;border:2px solid #eee;display:flex;align-items:center;justify-content:center;flex:none">${mark(62)}</div>
+     <div style="flex:1"><div style="display:flex;font:700 26px/1 Inter;color:#9ca3af;letter-spacing:.06em">MARTNEPALI<span style="margin-left:auto;letter-spacing:0">now</span></div>
+     <div style="margin-top:10px;font:800 42px/1.1 'Plus Jakarta Sans';color:${i === 2 ? '#15803d' : '#111'}">${t1}</div><div style="margin-top:6px;font:600 34px/1.25 Inter;color:#374151">${t2}</div></div>`); c.className = 'card light-card'; el.append(c); return c; });
+  const wb = wordBlock(s.text, s.sub, { size: 120 }); el.append(wb);
+  return { el, fit: () => { fitWords(wb); wb.style.top = '1190px'; }, draw(lt) {
+    const n = T.notify.cards;
+    cards.forEach((c, i) => {
+      const k = prog(lt, n[i], n[i] + 0.4);
+      const above = n.filter((x, j) => j > i && lt >= x).length;       // newer cards push it down
+      const push = n.slice(i + 1).reduce((acc, x) => acc + eOut5(prog(lt, x, x + 0.4)) * 210, 0);
+      c.style.opacity = clamp(k * 3) * (1 - above * 0.12);
+      c.style.transform = `translateY(${360 + (1 - eOut5(k)) * -300 + push}px) scale(${1 - above * 0.04})`;
+      c.style.zIndex = 10 + i;
+    });
+    drawWords(wb, lt, 1.5);
+  } };
+};
+
+B.list = (s) => {
+  const el = h('div');
+  const card = h('div', 'left:80px;right:80px;top:470px;padding:56px 56px 40px'); card.className = 'card light-card';
+  card.innerHTML = `<div class="ttl" style="font:800 84px/1.05 'Plus Jakarta Sans';letter-spacing:-.03em">${s.title.split('/').map((l) => `<div>${ink(l.trim())}</div>`).join('')}</div>`
+    + s.items.map((it) => `<div class="row" style="display:flex;align-items:center;gap:26px;margin-top:40px"><div class="ck" style="width:76px;height:76px;border-radius:50%;background:${A};color:#fff;display:flex;align-items:center;justify-content:center;font:800 42px/1 Inter;flex:none">✓</div><div style="font:700 44px/1.2 Inter;color:#1f2937">${it}</div></div>`).join('');
+  const sub = h('div', 'position:absolute;left:70px;right:70px;text-align:center;font:600 40px/1.3 Inter;color:#6b7280', s.sub);
+  el.append(card, sub);
+  return { el, fit: () => { sub.style.top = card.offsetTop + card.offsetHeight + 60 + 'px'; }, draw(lt) {
+    const tk = prog(lt, 0.05, 0.45);
+    const ttl = $('.ttl', card); ttl.style.opacity = eOut(tk); ttl.style.filter = `blur(${(1 - eOut(tk)) * 14}px)`; ttl.style.transform = `translateX(${(1 - eOut5(tk)) * -50}px)`;
+    $$('.row', card).forEach((r, i) => { const k = prog(lt, T.list.rows[i], T.list.rows[i] + 0.35); r.style.opacity = eOut(k); r.style.transform = `translateX(${(1 - eOut5(k)) * 90}px)`; $('.ck', r).style.transform = `scale(${lerp(0, 1, eBack(prog(lt, T.list.rows[i] + 0.05, T.list.rows[i] + 0.4)))})`; });
+    card.style.transform = `perspective(1800px) rotateX(${(1 - eOut5(prog(lt, 0, 0.45))) * 14}deg) rotateY(${Math.sin(lt * 0.7) * -2}deg)`;
+    const sk = prog(lt, T.list.rows[2] + 0.3, T.list.rows[2] + 0.7); sub.style.opacity = sk;
+  } };
+};
+
+B.menu = (s) => {
+  const el = h('div');
+  const card = h('div', 'left:70px;right:70px;top:380px;padding:44px'); card.className = 'card dark-card';
+  const chipRow = (cls, items) => `<div class="${cls}" style="margin-top:18px">${items.map((x) => `<span class="chip">${x}</span>`).join('')}</div>`;
+  card.innerHTML = `<div style="display:flex;align-items:center;gap:30px"><div style="width:250px;height:250px;border-radius:40px;background:#f7f5f0;padding:18px;flex:none">${art('jhol')}</div>
+      <div><div style="font:800 70px/1 'Plus Jakarta Sans'">${s.dish}</div><div style="margin-top:18px;display:inline-block;padding:12px 24px;border-radius:999px;background:${A};color:#111;font:800 40px/1 Inter">${s.price}</div>
+      <div style="margin-top:14px;font:600 26px/1 Inter;color:rgba(255,255,255,.5)">Example menu</div></div></div>
+    <div style="margin-top:40px;font:700 36px/1 Inter;color:rgba(255,255,255,.7)">Piro kati?</div>${chipRow('spice', ['Kam', 'Madhyam 🌶', 'Dherai 🌶🌶'])}
+    <div style="margin-top:26px;font:700 36px/1 Inter;color:rgba(255,255,255,.7)">Kati baje lina?</div>${chipRow('slot', ['18:30', '18:45', '19:00'])}
+    <div class="btn" style="margin-top:30px;height:130px;border-radius:36px;background:${A};display:flex;align-items:center;justify-content:center;font:800 46px/1 'Plus Jakarta Sans';color:#111">Order garnus</div>`;
+  const sub = h('div', 'position:absolute;left:70px;right:70px;top:1560px;text-align:center;font:700 44px/1.3 Inter;color:rgba(255,255,255,.88)', ink(s.sub));
+  el.append(card, sub);
+  const cur = cursorOn(el);
+  const X = T.menu;
+  return { el, draw(lt) {
+    const sp = $$('.spice .chip', card)[1], sl = $$('.slot .chip', card)[1], btn = $('.btn', card);
+    for (const [c, at] of [[sp, X.taps[0]], [sl, X.taps[1]]]) { const on = lt >= at; css(c, { background: on ? A : 'rgba(255,255,255,.06)', color: on ? '#111' : '#fff', borderColor: on ? A : 'rgba(255,255,255,.18)', transform: `scale(${lt >= at - 0.05 && lt < at + 0.12 ? 0.92 : 1})` }); }
+    const done = lt >= X.done;
+    btn.innerHTML = done ? '✓ Order bhayo — QR email ma' : 'Order garnus';
+    css(btn, { background: done ? '#16a34a' : A, color: done ? '#fff' : '#111', transform: `scale(${lt >= X.taps[2] - 0.05 && lt < X.taps[2] + 0.12 ? 0.95 : 1})`, fontSize: done ? '40px' : '46px' });
+    card.style.transform = `perspective(1800px) rotateX(${(1 - eOut5(prog(lt, 0, 0.5))) * 16}deg) rotateY(${Math.sin(lt * 0.7) * 2}deg)`;
+    const sk = prog(lt, X.done + 0.1, X.done + 0.5); sub.style.opacity = sk; sub.style.transform = `translateY(${(1 - eOut5(sk)) * 30}px)`;
+    drawCursor(cur, lt, [[0, [900, 1750]], [X.taps[0], sp, true], [X.taps[1], sl, true], [X.taps[2], btn, true], [X.taps[2] + 1, [900, 1700]]]);
+  } };
+};
+
+B.kitchen = (s) => {
+  const el = h('div');
+  const COLS = [['Naya', '#60a5fa'], ['Pakaudai', '#f59e0b'], ['Tayar ✓', '#22c55e']];
+  const board = h('div', 'left:40px;right:40px;top:400px;height:1080px;padding:34px'); board.className = 'card dark-card';
+  board.innerHTML = `<div style="display:flex;align-items:center;gap:16px;font:800 50px/1 'Plus Jakarta Sans'">Kitchen board<span style="margin-left:auto;display:flex;align-items:center;gap:10px;font:700 28px/1 Inter;color:#4ade80"><i style="width:14px;height:14px;border-radius:50%;background:#22c55e;box-shadow:0 0 12px #22c55e"></i>LIVE</span></div>`
+    + COLS.map(([n, c], i) => `<div style="position:absolute;left:${34 + i * 332}px;top:130px;width:312px;height:910px;border-radius:30px;background:rgba(255,255,255,.04)"><div style="margin:20px;display:inline-block;padding:12px 20px;border-radius:999px;background:${c}22;color:${c};font:800 30px/1 Inter">${n}</div></div>`).join('');
+  const ORD = [['#20', 'Momo ×2', '18:30', 'momo'], ['#21', 'Jhol momo ×2', '18:45', 'jhol'], ['#22', 'Thali', '19:00', 'thali']];
+  const cards = ORD.map(([n, it, tm, ak]) => { const c = h('div', 'position:absolute;width:284px;padding:20px;border-radius:26px;background:#fff;color:#111;box-shadow:0 14px 30px rgba(0,0,0,.35)',
+    `<div style="display:flex;align-items:center;gap:12px"><div style="width:70px;height:70px">${art(ak)}</div><div style="font:800 34px/1 Inter">${n}</div></div><div style="margin-top:10px;font:700 30px/1.2 Inter">${it}</div><div style="margin-top:6px;font:600 26px/1 Inter;color:#6b7280">⏱ ${tm}</div>`); board.append(c); return c; });
+  const toast = h('div', 'left:120px;right:120px;top:1520px;padding:26px 30px;border-radius:30px;background:#16a34a;color:#fff;font:700 38px/1.25 Inter;text-align:center', '🔔 #20 tayar — customer lai email gayo ✓'); toast.className = 'card';
+  const sub = h('div', 'position:absolute;left:70px;right:70px;top:1680px;text-align:center;font:700 42px/1.3 Inter;color:rgba(255,255,255,.85)', ink(s.sub));
+  el.append(board, toast, sub);
+  const X = T.kitchen;
+  const pos = (col, row) => [48 + col * 332, 230 + row * 250];
+  return { el, draw(lt) {
+    // #20: cooking → ready; #21: arrives → cooking; #22: arrives in new.
+    const at = (from, to, t0) => { const k = eIO(prog(lt, t0, t0 + 0.4)); return [lerp(from[0], to[0], k), lerp(from[1], to[1], k) - Math.sin(k * Math.PI) * 60]; };
+    const p0 = at(pos(1, 0), pos(2, 0), X.moves[1]);
+    const p1 = at(pos(0, 0), pos(1, 1), X.moves[0]);
+    const p2 = pos(0, 0);
+    [[cards[0], p0, -1], [cards[1], p1, X.arrive[0]], [cards[2], p2, X.arrive[1]]].forEach(([c, p, arr]) => {
+      const k = arr < 0 ? 1 : prog(lt, arr, arr + 0.35);
+      c.style.left = p[0] + 'px'; c.style.top = p[1] + 'px';
+      c.style.opacity = eOut(k); c.style.transform = `translateY(${(1 - eOut5(k)) * -120}px) scale(${lerp(0.8, 1, eOut5(k))})`;
+    });
+    cards[0].style.outline = lt >= X.ready ? '6px solid #22c55e' : 'none';
+    board.style.transform = `perspective(1800px) rotateX(${(1 - eOut5(prog(lt, 0, 0.5))) * 16}deg)`;
+    const tk = prog(lt, X.ready, X.ready + 0.35); toast.style.opacity = tk; toast.style.transform = `translateY(${(1 - eOut5(tk)) * 60}px) scale(${lerp(0.8, 1, eBack(tk))})`;
+    const sk = prog(lt, 0.4, 0.8); sub.style.opacity = sk;
+  } };
+};
+
+B.table = (s) => {
+  const el = h('div');
+  const tent = h('div', 'left:300px;top:380px;width:480px;padding:40px;text-align:center'); tent.className = 'card light-card';
+  tent.innerHTML = `<div style="font:800 64px/1 'Plus Jakarta Sans'">Table 4</div><div class="qr" style="margin:30px auto 0;width:300px;height:300px">${QR}</div><div style="margin-top:22px;font:700 30px/1 Inter;color:#6b7280">Scan → menu → order</div>`;
+  const pill = h('div', `left:330px;top:960px;padding:22px 34px;border-radius:999px;background:${A};color:#111;font:800 40px/1 Inter`, '✓ Menu khulyo'); pill.className = 'card';
+  const wb = wordBlock(s.text, s.sub, { size: 116 }); el.append(tent, pill, wb);
+  return { el, fit: () => { fitWords(wb); wb.style.top = '1150px'; }, draw(lt) {
+    const k = prog(lt, T.table.qr, T.table.qr + 0.45);
+    tent.style.opacity = eOut(k); tent.style.transform = `perspective(1400px) rotateX(${(1 - eOut5(k)) * 60 + 8}deg) rotateZ(${Math.sin(lt) * 1.5}deg)`;
+    const pk = prog(lt, T.table.scan, T.table.scan + 0.35); pill.style.opacity = pk; pill.style.transform = `scale(${lerp(0.5, 1, eBack(pk))})`;
+    drawWords(wb, lt, 0.5);
+  } };
+};
+
+B.tiers = (s) => {
+  const el = h('div');
+  const tk = h('div', 'left:70px;right:70px;top:360px;padding:40px'); tk.className = 'card dark-card';
+  tk.innerHTML = `<div style="font:800 52px/1 'Plus Jakarta Sans'">Tickets</div>
+    <div style="position:relative;display:flex;align-items:center;margin-top:30px;padding:26px 30px;border-radius:30px;background:rgba(255,255,255,.06)"><div><div style="font:700 40px/1 Inter">Early bird</div><div style="margin-top:8px;font:600 30px/1 Inter;color:rgba(255,255,255,.6)">€39.99</div></div>
+      <div class="stamp" style="position:absolute;right:30px;top:24px;padding:10px 20px;border:5px solid #ef4444;border-radius:14px;color:#ef4444;font:800 38px/1 'Plus Jakarta Sans';transform:rotate(-8deg)">SOLD OUT</div></div>
+    <div style="display:flex;align-items:center;margin-top:18px;padding:26px 30px;border-radius:30px;background:rgba(255,255,255,.06)"><div><div style="font:700 40px/1 Inter">Standard – Phase 2</div><div style="margin-top:8px;font:600 30px/1 Inter;color:rgba(255,255,255,.6)">€50.00</div></div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:10px;font:700 30px/1 Inter;color:#4ade80"><i style="width:14px;height:14px;border-radius:50%;background:#22c55e"></i>Selling</div></div>`;
+  const sm = h('div', 'left:70px;right:70px;top:930px;padding:36px'); sm.className = 'card dark-card';
+  let seats = '';
+  const order = [];
+  for (let r = 0; r < 6; r++) for (let c = 0; c < 11; c++) { seats += `<i data-i="${r * 11 + c}" style="position:absolute;left:${36 + c * 78 + (c >= 5 ? 20 : 0)}px;top:${150 + r * 66}px;width:54px;height:48px;border-radius:12px 12px 6px 6px;background:rgba(255,255,255,.12)"></i>`; order.push(r * 11 + c); }
+  let sd = 7; order.sort(() => ((sd = (sd * 16807) % 2147483647) / 2147483647) - 0.5);
+  sm.innerHTML = `<div style="display:flex;align-items:center"><div style="font:800 46px/1 'Plus Jakarta Sans'">Seat map</div><div style="margin-left:auto;padding:10px 60px;border-radius:12px;background:rgba(255,255,255,.14);font:800 24px/1 Inter;letter-spacing:.2em">STAGE</div></div><div style="position:relative;height:560px">${seats}</div>`;
+  const sub = h('div', 'position:absolute;left:70px;right:70px;top:1620px;text-align:center;font:700 44px/1.3 Inter;color:rgba(255,255,255,.88)', ink(s.sub));
+  el.append(tk, sm, sub);
+  const X = T.tiers;
+  return { el, draw(lt) {
+    const st = $('.stamp', tk), k = prog(lt, X.stamp, X.stamp + 0.2);
+    st.style.opacity = k > 0 ? 1 : 0; st.style.transform = `rotate(-8deg) scale(${lerp(2.2, 1, eOut5(k))})`;
+    const n = Math.floor(order.length * 0.78 * eIO(prog(lt, X.seats0, X.seats1)));
+    const taken = new Set(order.slice(0, n));
+    $$('i[data-i]', sm).forEach((e) => { e.style.background = taken.has(+e.dataset.i) ? A : 'rgba(255,255,255,.12)'; e.style.boxShadow = taken.has(+e.dataset.i) ? `0 0 14px ${A}88` : 'none'; });
+    tk.style.transform = `perspective(1800px) rotateX(${(1 - eOut5(prog(lt, 0, 0.5))) * 16}deg)`;
+    const mk = prog(lt, 0.3, 0.8); sm.style.opacity = eOut(mk); sm.style.transform = `translateY(${(1 - eOut5(mk)) * 120}px)`;
+    const sk = prog(lt, 1.2, 1.6); sub.style.opacity = sk;
+  } };
+};
+
+B.scan = (s) => {
+  const el = h('div');
+  const cnt = h('div', 'position:absolute;left:0;right:0;top:300px;text-align:center;font:800 90px/1 "Plus Jakarta Sans";color:#fff');
+  const phone = h('div', 'position:absolute;left:250px;top:470px;width:580px;height:1080px;border-radius:80px;background:#111;border:10px solid #2a2a2e;overflow:hidden;box-shadow:0 50px 120px rgba(0,0,0,.6)');
+  phone.innerHTML = `<div style="position:absolute;left:0;right:0;top:40px;text-align:center;font:700 34px/1 Inter;color:#fff">Door scan</div>
+    <div class="cam" style="position:absolute;left:40px;right:40px;top:120px;bottom:180px;border-radius:40px;background:radial-gradient(circle at 50% 40%,#2b2f36,#0d0f12);overflow:hidden">
+      <div class="tk" style="position:absolute;left:90px;top:170px;width:320px;padding:22px;border-radius:26px;background:#fff"><div class="qr" style="width:276px;height:276px">${QR}</div></div>
+      ${[[70, 150, 'border-right:0;border-bottom:0'], [370, 150, 'border-left:0;border-bottom:0'], [70, 470, 'border-right:0;border-top:0'], [370, 470, 'border-left:0;border-top:0']].map(([x, y, b]) => `<div style="position:absolute;left:${x}px;top:${y}px;width:60px;height:60px;border:7px solid #fff;border-radius:14px;${b}"></div>`).join('')}
+      <div class="ok" style="position:absolute;inset:0;background:rgba(22,163,74,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font:800 70px/1.1 'Plus Jakarta Sans';opacity:0">✓ Valid<div style="font:700 36px/1.2 Inter;margin-top:12px">2 tickets</div></div>
+    </div>
+    <div style="position:absolute;left:0;right:0;bottom:70px;text-align:center;font:700 30px/1 Inter;color:rgba(255,255,255,.6)">Point at the ticket QR</div>`;
+  const sub = h('div', 'position:absolute;left:70px;right:70px;top:1620px;text-align:center;font:700 44px/1.3 Inter;color:rgba(255,255,255,.88)', ink(s.sub));
+  el.append(cnt, phone, sub);
+  const X = T.scan;
+  return { el, draw(lt) {
+    const done = X.scans.filter((x) => lt >= x + 0.12).length;
+    cnt.innerHTML = `${212 + done * 2}<span style="font-size:50px;color:rgba(255,255,255,.55)"> / 500 bhitra</span>`;
+    cnt.style.transform = `scale(${1 + 0.08 * X.scans.reduce((a, x) => Math.max(a, 1 - prog(lt, x + 0.12, x + 0.4)) * (lt >= x + 0.12 ? 1 : 0), 0)})`;
+    let slide = 1, ok = 0;
+    for (const x of X.scans) { if (lt >= x - 0.45 && lt < x + 0.45) { slide = lt < x ? 1 - eOut5(prog(lt, x - 0.45, x - 0.1)) : eIO(prog(lt, x + 0.25, x + 0.45)) * -1; ok = lt >= x + 0.1 ? 1 - prog(lt, x + 0.3, x + 0.45) : 0; } }
+    $('.tk', phone).style.transform = `translateX(${slide * 520}px) rotate(${slide * 12}deg)`;
+    $('.ok', phone).style.opacity = ok;
+    phone.style.transform = `perspective(1800px) rotateY(${Math.sin(lt * 0.8) * 5}deg) translateY(${(1 - eOut5(prog(lt, 0, 0.5))) * 400}px)`;
+    const sk = prog(lt, 0.6, 1.0); sub.style.opacity = sk;
+  } };
+};
+
+B.poster = (s) => {
+  const el = h('div');
+  const p = h('div', 'position:absolute;left:290px;top:640px;width:500px;height:708px;border-radius:30px;overflow:hidden;box-shadow:0 40px 90px rgba(0,0,0,.28)', '<img src="../out/dashain/media/poster-main.jpg" style="width:100%;height:100%;object-fit:cover">');
+  const tix = [[110, 780, -16], [800, 900, 14], [130, 1250, 10]].map(([x, y, r]) => { const a = h('div', `left:${x}px;top:${y}px;width:230px;height:230px;filter:drop-shadow(0 20px 26px rgba(0,0,0,.2))`, art('ticket')); a.className = 'art'; a._r = r; return a; });
+  const wb = wordBlock(s.text, s.sub, { size: 88 });
+  el.append(p, ...tix, wb);
+  return { el, fit: () => { fitWords(wb); wb.style.top = '250px'; }, draw(lt) {
+    const k = prog(lt, T.poster.poster, T.poster.poster + 0.6);
+    p.style.opacity = eOut(k); p.style.transform = `perspective(1400px) rotateY(${(1 - eOut5(k)) * -50 + Math.sin(lt) * 3}deg) scale(${lerp(0.8, 1, eOut5(k))})`;
+    tix.forEach((a, i) => { const kk = prog(lt, T.poster.tickets[i], T.poster.tickets[i] + 0.4); a.style.opacity = eOut(kk); a.style.transform = `scale(${lerp(0.3, 1, eBack(kk))}) rotate(${a._r + Math.sin(lt * 1.5 + i) * 4}deg) translateY(${Math.sin(lt * 2 + i) * 8}px)`; });
+    drawWords(wb, lt, 0.45);
+  } };
+};
+
+B.pillars = (s) => {
+  const el = h('div');
+  const cards = s.cards.map(([ak, t1, t2], i) => { const c = h('div', `left:70px;right:70px;top:${430 + i * 330}px;height:290px;padding:30px 40px;display:flex;align-items:center;gap:34px`,
+    `<div style="width:220px;height:220px;flex:none">${art(ak)}</div><div><div style="font:800 60px/1.05 'Plus Jakarta Sans';letter-spacing:-.02em">${t1}</div><div style="margin-top:12px;font:700 38px/1.2 Inter;color:${i === 1 ? AD.accent2 : A}">${t2}</div></div>`); c.className = 'card light-card'; el.append(c); return c; });
+  return { el, draw(lt) {
+    cards.forEach((c, i) => { const k = prog(lt, T.pillars.cards[i], T.pillars.cards[i] + 0.45); c.style.opacity = eOut(k); c.style.filter = `blur(${(1 - eOut(k)) * 12}px)`; c.style.transform = `translateX(${(1 - eOut5(k)) * (i % 2 ? 700 : -700)}px) rotate(${(i % 2 ? 1 : -1) * Math.sin(lt * 0.9 + i) * 0.8}deg)`; });
+  } };
+};
+
+B.split = (s) => {
+  const el = h('div');
+  const side = (arr, right) => h('div', `position:absolute;top:0;bottom:0;${right ? 'right:0' : 'left:0'};width:540px;background:${right ? AD.accent2 : A};color:#fff;padding:420px 50px 0`,
+    `<div style="font:800 110px/1 'Plus Jakarta Sans';letter-spacing:-.03em">${arr[0]}</div><div style="margin-top:14px;font:700 34px/1 Inter;opacity:.8">${right ? 'Seller' : 'Customer'}</div>`
+    + arr.slice(1).map((x) => `<div class="ln" style="margin-top:44px;font:700 42px/1.2 Inter;display:flex;gap:14px"><span>✓</span><span>${x}</span></div>`).join(''));
+  const L = side(s.left, false), R = side(s.right, true);
+  const mid = h('div', 'position:absolute;left:534px;top:0;width:12px;height:1920px;background:#fff');
+  el.append(L, R, mid);
+  return { el, draw(lt) {
+    L.style.transform = `translateY(${(1 - eOut5(prog(lt, T.split.left - 0.2, T.split.left + 0.3))) * -1920}px)`;
+    R.style.transform = `translateY(${(1 - eOut5(prog(lt, T.split.right - 0.2, T.split.right + 0.3))) * 1920}px)`;
+    mid.style.transform = `scaleY(${eOut5(prog(lt, 0.6, 1.0))})`;
+    [L, R].forEach((side) => $$('.ln', side).forEach((l, i) => { const k = prog(lt, T.split.lines[i], T.split.lines[i] + 0.3); l.style.opacity = eOut(k); l.style.transform = `translateX(${(1 - eOut5(k)) * 60}px)`; }));
+  } };
+};
+
+const CHIPS = [[120, 520, -6], [560, 440, 5], [170, 1280, 4], [560, 1360, -5]];
+B.langs = (s) => {
+  const el = h('div');
+  const chips = s.chips.map((c, i) => { const [x, y] = CHIPS[i]; const e = h('div', `left:${x}px;top:${y}px;padding:28px 44px;border-radius:999px;font:800 60px/1 ${c === 'नेपाली' ? 'Mukta' : "'Plus Jakarta Sans'"},sans-serif;color:${i % 2 ? AD.accent2 : A}`, c); e.className = 'card light-card'; el.append(e); return e; });
+  const wb = wordBlock(s.text, s.sub, { size: 124 }); el.append(wb);
+  return { el, fit: () => { fitWords(wb); wb.style.top = 960 - wb.offsetHeight / 2 + 'px'; }, draw(lt) {
+    chips.forEach((c, i) => { const k = prog(lt, T.langs.chips[i], T.langs.chips[i] + 0.35); c.style.opacity = eOut(k); c.style.transform = `scale(${lerp(0.3, 1, eBack(k))}) rotate(${CHIPS[i][2]}deg) translateY(${Math.sin(lt * 2 + i) * 10}px)`; });
+    drawWords(wb, lt, 0.5);
+  } };
+};
+
+B.outro = (s) => {
+  const el = h('div');
+  const lock = h('div', 'position:absolute;left:0;right:0;top:600px;display:flex;align-items:center;justify-content:center;gap:28px',
+    `<div style="width:170px;height:170px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 0 60px ${A}66">${mark(104)}</div><div style="font:800 110px/1 'Plus Jakarta Sans';letter-spacing:-.03em;color:#fff">Mart<span style="color:${A}">Nepali</span></div>`);
+  const bar = h('div', `position:absolute;left:130px;right:130px;top:900px;height:136px;border-radius:999px;background:#fff;display:flex;align-items:center;gap:22px;padding:0 44px;box-shadow:-9px 0 0 ${A},9px 0 0 ${AD.accent2}`,
+    `<svg viewBox="0 0 24 24" width="50" height="50"><circle cx="10" cy="10" r="7" stroke="#111" stroke-width="3" fill="none"/><line x1="15.5" y1="15.5" x2="22" y2="22" stroke="#111" stroke-width="3" stroke-linecap="round"/></svg><div class="tx" style="font:700 56px/1 Inter;color:#111"></div>`);
+  const tag = h('div', 'position:absolute;left:60px;right:60px;top:1110px;text-align:center;font:800 64px/1.2 "Plus Jakarta Sans";letter-spacing:-.02em;color:#fff', ink(s.tag));
+  el.append(lock, bar, tag);
+  const X = T.outro;
+  return { el, draw(lt) {
+    const k = prog(lt, X.lockup, X.lockup + 0.45);
+    lock.style.opacity = eOut(k); lock.style.transform = `scale(${lerp(0.7, 1, eOut5(k))})`; lock.style.filter = `blur(${(1 - eOut(k)) * 16}px)`;
+    const bk = prog(lt, X.typeA - 0.3, X.typeA); bar.style.opacity = eOut(bk); bar.style.transform = `scaleX(${lerp(0.3, 1, eOut5(bk))})`;
+    $('.tx', bar).innerHTML = typed('martnepali.com', lt, X.typeA, X.typeB) + caret(lt, lt > X.typeA - 0.2);
+    const tk = prog(lt, X.tag, X.tag + 0.45); tag.style.opacity = eOut(tk); tag.style.transform = `translateY(${(1 - eOut5(tk)) * 30}px)`; tag.style.filter = `blur(${(1 - eOut(tk)) * 10}px)`;
+  } };
+};
+
+// ---------- world: background, blobs, dots ----------
+const SHOTS = [];
+const LAYOUTS = [
+  [[180, 300, 420], [950, 1600, 520], [900, 520, 240]],
+  [[900, 360, 460], [120, 1500, 480], [600, 1000, 200]],
+  [[540, 1650, 560], [100, 380, 360], [1000, 900, 260]],
+  [[150, 900, 480], [980, 300, 420], [700, 1700, 300]],
+];
+const blobs = [0, 1, 2].map((i) => { const p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); $('#bl').append(p); return p; });
+function blobPath(cx, cy, r, t, seed) {
+  const N = 8, pts = [];
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2;
+    const rr = r * (1 + 0.17 * Math.sin(t * 1.1 + i * 1.7 + seed) + 0.09 * Math.sin(t * 2.0 + i * 2.9 + seed * 2));
+    pts.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr]);
+  }
+  let d = `M${pts[0][0]} ${pts[0][1]}`;
+  for (let i = 0; i < N; i++) {
+    const p0 = pts[(i - 1 + N) % N], p1 = pts[i], p2 = pts[(i + 1) % N], p3 = pts[(i + 2) % N];
+    d += ` C${p1[0] + (p2[0] - p0[0]) / 6} ${p1[1] + (p2[1] - p0[1]) / 6} ${p2[0] - (p3[0] - p1[0]) / 6} ${p2[1] - (p3[1] - p1[1]) / 6} ${p2[0]} ${p2[1]}`;
+  }
+  return d + 'Z';
+}
+const LIT = [];
+function world(t) {
+  let i = 0; AD.shots.forEach((s, j) => { if (t >= s.t) i = j; });
+  const s = AD.shots[i], prev = AD.shots[Math.max(0, i - 1)];
+  const blend = i === 0 ? 1 : eIO(prog(t, s.t, s.t + 0.7));
+  const L0 = LAYOUTS[Math.max(0, i - 1) % 4], L1 = LAYOUTS[i % 4];
+  const th = themeOf(s), thp = themeOf(prev);
+  const dk = (x) => (x === 'light' ? 0 : 1);
+  const dark = lerp(dk(thp), dk(th), i === 0 ? 1 : prog(t, s.t, s.t + 0.3));
+  $('#bg').style.background = `rgb(${lerp(243, 8, dark)},${lerp(243, 9, dark)},${lerp(239, 11, dark)})`;
+  blobs.forEach((p, k) => {
+    const [x0, y0, r0] = L0[k], [x1, y1, r1] = L1[k];
+    p.setAttribute('d', blobPath(lerp(x0, x1, blend) + Math.sin(t * 0.4 + k) * 30, lerp(y0, y1, blend) + Math.cos(t * 0.35 + k) * 30, lerp(r0, r1, blend), t, k * 2.3));
+    p.setAttribute('fill', k === 1 ? A2 : A);
+    p.setAttribute('opacity', String(lerp(k === 2 ? 0.45 : 0.7, 0.32, dark)));
+  });
+  $('#dots').style.opacity = dark * 0.9;
+  $('#lit').style.opacity = dark;
+  LIT.forEach((l) => { l.el.style.opacity = 0.2 + 0.8 * Math.max(0, Math.sin(t * l.sp + l.ph)); });
+  $('#grain').style.transform = `translate(${(Math.floor(t * 24) * 37) % 200 - 100}px, ${(Math.floor(t * 24) * 53) % 200 - 100}px)`;
+  $('#grain').style.mixBlendMode = dark > 0.5 ? 'screen' : 'multiply';
+}
+
+window.setup = async function (qr) {
+  QR = qr || '';
+  try { LOGO = await (await fetch('../out/dashain/martnepali-logo.svg')).text(); LOGO = LOGO.replace(/width="\d+"/, '').replace(/height="\d+"/, ''); } catch {}
+  let sd = 3; const r = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 18; i++) { const e = h('div', `position:absolute;left:${Math.floor(r() * 41) * 26 + 3}px;top:${Math.floor(r() * 73) * 26 + 3}px;width:22px;height:22px;border-radius:5px;background:${A};box-shadow:0 0 18px ${A}`); $('#lit').append(e); LIT.push({ el: e, sp: 1 + r() * 3, ph: r() * 6 }); }
+  for (const s of AD.shots) {
+    const shot = B[s.type](s);
+    shot.el.className = 'shot'; shot.s = s;
+    $('#shots').append(shot.el);
+    SHOTS.push(shot);
+  }
+  await document.fonts.ready;
+  await Promise.all($$('img').map((i) => i.decode().catch(() => {})));
+  for (const sh of SHOTS) { sh.el.style.display = 'block'; sh.fit && sh.fit(); sh.el.style.display = 'none'; }
+};
+
+window.render = function (t) {
+  world(t);
+  for (const sh of SHOTS) {
+    const s = sh.s, lt = t - s.t;
+    const last = s === AD.shots[AD.shots.length - 1];
+    const on = lt >= 0 && (lt < s.d || last);
+    sh.el.style.display = on ? 'block' : 'none';
+    if (!on) continue;
+    // In: sharpen out of a blur; out: blur away (giant and split do their own).
+    const own = s.type === 'giant' || s.type === 'split';
+    const ki = own ? 1 : eOut(prog(lt, 0, 0.32)), ko = own || last ? 0 : eIO(prog(lt, s.d - 0.24, s.d));
+    sh.el.style.opacity = ki * (1 - ko);
+    sh.el.style.filter = ki < 1 || ko > 0 ? `blur(${(1 - ki) * 18 + ko * 20}px)` : '';
+    sh.el.style.transform = `scale(${lerp(1.08, 1, ki) * lerp(1, 0.94, ko)})`;
+    sh.draw(lt);
+  }
+};
+
+if (!q.has('render')) addEventListener('load', async () => {
+  await window.setup('');
+  if (q.has('play')) { const t0 = performance.now(); const loop = () => { window.render(((performance.now() - t0) / 1000) % AD.TOTAL); requestAnimationFrame(loop); }; loop(); }
+  else window.render(parseFloat(q.get('t') || '0'));
+});
+</script>
+</body>
+</html>

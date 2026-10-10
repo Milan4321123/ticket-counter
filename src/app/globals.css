@@ -11186,6 +11186,7 @@ html.tx-wait body {
   font-family: var(--font-display, var(--font));
   font-weight: 700;
   font-size: 1.02rem;
+  line-height: 1.3;
   color: var(--text);
 }
 
@@ -11223,17 +11224,18 @@ html.tx-wait body {
 
 .ai-steps li {
   counter-increment: ai;
-  display: flex;
-  gap: 10px;
-  align-items: baseline;
+  position: relative;
+  padding-left: 32px;
   font-size: 0.9rem;
-  line-height: 1.5;
+  line-height: 1.75;
   color: var(--text);
 }
 
 .ai-steps li::before {
   content: counter(ai);
-  flex: none;
+  position: absolute;
+  left: 0;
+  top: 2px;
   width: 22px;
   height: 22px;
   border-radius: 50%;
@@ -11243,14 +11245,15 @@ html.tx-wait body {
   font-weight: 700;
   color: #fff;
   background: linear-gradient(135deg, var(--accent-strong), var(--pink));
-  transform: translateY(-1px);
 }
 
 .ai-key {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 1px 7px;
+  padding: 0 7px;
+  line-height: 1.5;
+  vertical-align: middle;
   border: 1px solid var(--border);
   border-radius: 7px;
   background: var(--bg-card);
