@@ -47,6 +47,16 @@ export interface EventRow {
   /** False hides the "only N left" countdown from buyers entirely. */
   showRemaining: boolean;
   salesOpen: boolean;
+  /** 'HH:MM' on Germany's wall clock when the show starts, or '' (lib/onlineSales). */
+  showTime: string;
+  /** Online sales close this many minutes before the start; null = never. */
+  onlineCloseMin: number | null;
+  /** The organizer pressed "Stop online sales now". */
+  onlineStopped: boolean;
+  /** Tickets are also sold at the counter at the venue — what a closed page tells buyers. */
+  counterSales: boolean;
+  /** One line about the counter: "Opens 17:30 · cash only". '' when none. */
+  counterNote: string;
   /**
    * The organizer's WhatsApp number, digits only, or ''. Never rendered raw —
    * every use goes through lib/whatsapp.ts.
@@ -269,6 +279,11 @@ const EVENT_COLS = `
   total_capacity AS totalCapacity,
   show_remaining AS showRemaining,
   sales_open AS salesOpen,
+  show_time AS showTime,
+  online_close_min AS onlineCloseMin,
+  online_stopped AS onlineStopped,
+  counter_sales AS counterSales,
+  counter_note AS counterNote,
   whatsapp,
   whatsapp_name AS whatsappName,
   whatsapp_photo AS whatsappPhoto,
@@ -323,6 +338,11 @@ function rowToEvent(row: Record<string, unknown> | undefined): EventRow | null {
   return {
     ...(row as unknown as EventRow),
     salesOpen: Boolean(row.salesOpen),
+    showTime: (row.showTime as string | null) ?? '',
+    onlineCloseMin: row.onlineCloseMin === null || row.onlineCloseMin === undefined ? null : Number(row.onlineCloseMin),
+    onlineStopped: Boolean(row.onlineStopped),
+    counterSales: row.counterSales === null || row.counterSales === undefined ? true : Boolean(row.counterSales),
+    counterNote: (row.counterNote as string | null) ?? '',
     // Added by migration and free text, so old rows read NULL. Both fall back
     // to what those rows have always meant: an event, with nothing to collect.
     kind: asEventKind(row.kind),

@@ -95,9 +95,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       // reservation may have expired. The kindest answer is "go and buy one".
       return NextResponse.json({ ok: true, onSale: true });
     }
-    if (state.kind !== 'sold-out') {
-      // Paused, announced-only, or past. A waitlist here would promise an
-      // email on a condition that has nothing to do with spots freeing up.
+    if (state.kind !== 'sold-out' || state.online.closed) {
+      // Paused, announced-only, or past — or sold out on show night, when
+      // online sales have closed and a freed spot can never be bought online
+      // again. A waitlist here would promise an email on a condition that has
+      // nothing to do with spots freeing up.
       return apiError(
         409,
         `The waitlist is only for a sold-out ${v.listing} — right now ${v.units} are simply not on sale here.`

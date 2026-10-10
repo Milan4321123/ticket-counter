@@ -2,6 +2,7 @@ import LoopCarousel from '@/components/LoopCarousel';
 import { currentLang } from '@/lib/i18nServer';
 import { localizeListing } from '@/lib/listingI18n';
 import CityCheck from '@/components/CityCheck';
+import CounterSheet from '@/components/CounterSheet';
 import Stars from '@/components/Stars';
 import { ratingForShop, ratingsForItems } from '@/lib/reviews';
 import { MixedScript } from '@/components/Np';
@@ -62,6 +63,7 @@ import WishButton from '@/components/WishButton';
 import { readListingName } from '@/lib/exampleShop';
 import { canWish, wishCountsFor } from '@/lib/wishes';
 import { cityLabel, otherShowsByAct, shortDateLabel } from '@/lib/sameAct';
+import { minutesUntil, wallClockLabel } from '@/lib/onlineSales';
 import {
   ticketState,
   fromPriceCents,
@@ -325,6 +327,24 @@ export default async function EventPage({ params, searchParams }: Params) {
   const soldOut = !state.buyable;
   const buyableRemaining = state.remaining;
   const minPrice = fromPriceCents(tiers, availability);
+  /**
+   * Show night (lib/onlineSales): online buying has closed and the counter at
+   * the venue sells what is left. Every buy control then stays pressable and
+   * opens the "buy at the counter" sheet — a buyer on their way to the hall
+   * should be told where to buy, not shown a grey button.
+   */
+  const counterClosed = state.kind === 'online-closed' && !preview;
+  /** "today at 18:00" while the online cutoff is within a day and a half — said beside the button. */
+  const cutoffSoon =
+    state.buyable && state.online.closesAt && minutesUntil(state.online.closesAt) <= 36 * 60
+      ? wallClockLabel(state.online.closesAt)
+      : null;
+  /**
+   * What a button with nothing behind it says. ticketState's cta for a show
+   * that is over is "See page" — right on a feed tile, which links here, and
+   * wrong on this page, which IS the page. The badge says it plainly.
+   */
+  const inertCta = state.kind === 'past' ? state.badge : state.cta;
 
   // ---------------- Media ----------------
 
@@ -929,6 +949,10 @@ export default async function EventPage({ params, searchParams }: Params) {
                 <Link href={checkoutHref} className="btn btn-primary btn-lg">
                   {v.cta}
                 </Link>
+              ) : counterClosed ? (
+                <button type="button" className="btn btn-primary btn-lg" data-counter-sheet>
+                  {state.online.counter ? v.cta : state.cta}
+                </button>
               ) : (
                 /* Says why there is no button rather than leaving a gap. A
                    visitor who arrives at an event with nothing on sale should
@@ -939,7 +963,7 @@ export default async function EventPage({ params, searchParams }: Params) {
                   aria-disabled="true"
                   style={{ opacity: 0.6, pointerEvents: 'none' }}
                 >
-                  {state.cta}
+                  {inertCta}
                 </span>
               )}
               {/* Only when it adds something. When nothing is buyable the
@@ -951,6 +975,8 @@ export default async function EventPage({ params, searchParams }: Params) {
                 <span className={`badge ${state.badge.startsWith('Only') ? 'badge-amber' : 'badge-green'}`}>
                   {state.badge}
                 </span>
+              ) : state.kind === 'online-closed' ? (
+                <span className="badge badge-amber">{state.badge}</span>
               ) : state.kind === 'sold-out' && state.soldOutNames.length === 1 ? (
                 /* Names the type that has gone, which the button cannot: on an
                    event with an early bird and a standard, "Sold out" alone left
@@ -968,11 +994,23 @@ export default async function EventPage({ params, searchParams }: Params) {
               ) : null}
               {/* One line of context under the buttons for the states that need
                   explaining. "Sold out" speaks for itself; the other two do not. */}
-              {state.kind === 'closed' || state.kind === 'coming-soon' ? (
+              {state.kind === 'closed' || state.kind === 'coming-soon' || state.kind === 'online-closed' ? (
                 <p className="muted small" style={{ width: '100%', margin: '8px 0 0' }}>
                   {state.kind === 'closed'
                     ? `${v.Sales} are paused right now — check back soon.`
-                    : `${v.Units} are not on sale yet. This page is where they will appear.`}
+                    : state.kind === 'online-closed'
+                      ? state.online.counter
+                        ? 'Online sales have closed — tickets are still available at the counter at the venue.'
+                        : 'Online sales have closed for this show.'
+                      : `${v.Units} are not on sale yet. This page is where they will appear.`}
+                </p>
+              ) : null}
+              {/* Before it happens, too: a buyer planning to "get one this
+                  afternoon" needs to know the website stops selling first. */}
+              {cutoffSoon ? (
+                <p className="muted small" style={{ width: '100%', margin: '8px 0 0' }}>
+                  Online sales close {cutoffSoon}
+                  {state.online.counter ? ' — after that, tickets at the counter.' : '.'}
                 </p>
               ) : null}
             </div>
@@ -1223,7 +1261,13 @@ export default async function EventPage({ params, searchParams }: Params) {
                       {card}
                     </Link>
                   ) : (
-                    <div className="tier-card glow-card" key={tier.tierKey}>
+                    // On show night the card a buyer taps is where they learn
+                    // to buy at the counter — see counterClosed.
+                    <div
+                      className="tier-card glow-card"
+                      key={tier.tierKey}
+                      {...(counterClosed && tier.status === 'on-sale' && remaining > 0 ? { 'data-counter-sheet': '' } : {})}
+                    >
                       {card}
                     </div>
                   );
@@ -1281,6 +1325,13 @@ export default async function EventPage({ params, searchParams }: Params) {
                   </Link>
                 </p>
               )}
+              {counterClosed && (
+                <p style={{ marginTop: 16 }}>
+                  <button type="button" className="btn btn-primary btn-lg" data-counter-sheet>
+                    {state.online.counter ? 'Get your tickets' : state.cta}
+                  </button>
+                </p>
+              )}
               {/* Sold out is the one state where this page can still DO
                   something for the visitor, so it is the only state that gets
                   the waitlist — a paused or coming-soon event is not "full",
@@ -1288,7 +1339,7 @@ export default async function EventPage({ params, searchParams }: Params) {
                   email on the wrong condition. Not in preview: the API would
                   refuse an unpublished event anyway, and the organizer does
                   not need a form that signs them up to their own list. */}
-              {state.kind === 'sold-out' && !preview && (
+              {state.kind === 'sold-out' && !preview && !state.online.closed && (
                 <div style={{ marginTop: 16, maxWidth: 480 }}>
                   <WaitlistForm eventId={event.id} kind={event.kind} checkoutHref={checkoutHref} />
                 </div>
@@ -1588,9 +1639,13 @@ export default async function EventPage({ params, searchParams }: Params) {
               <Link href={checkoutHref} className="btn btn-primary btn-lg">
                 {isShop ? `Order from ${event.name}` : `Get tickets for ${event.name}`}
               </Link>
+            ) : counterClosed ? (
+              <button type="button" className="btn btn-primary btn-lg" data-counter-sheet>
+                {state.online.counter ? `Get tickets for ${event.name}` : state.cta}
+              </button>
             ) : (
               <span className="btn btn-lg" aria-disabled="true" style={{ opacity: 0.6, pointerEvents: 'none' }}>
-                {state.cta}
+                {inertCta}
               </span>
             )}
             <Link href="/" className="btn">
@@ -1705,7 +1760,8 @@ export default async function EventPage({ params, searchParams }: Params) {
           name={event.name}
           place={[heroCity, heroWhen].filter(Boolean).join(' · ')}
           buyable={state.buyable}
-          cta={state.cta}
+          counterSheet={counterClosed}
+          cta={counterClosed && state.online.counter ? v.cta : inertCta}
           priceLabel={
             state.buyable && minPrice !== null
               ? minPrice === 0
@@ -1713,6 +1769,22 @@ export default async function EventPage({ params, searchParams }: Params) {
                 : `from ${formatMoney(minPrice, event.currency)}`
               : state.badge
           }
+        />
+      )}
+
+      {/* The "buy at the counter" sheet behind every data-counter-sheet control. */}
+      {counterClosed && (
+        <CounterSheet
+          lang={await currentLang()}
+          slug={event.slug}
+          name={event.name}
+          counter={state.online.counter}
+          note={state.online.counterNote}
+          venue={event.venueName}
+          address={event.address}
+          city={event.city}
+          mapsHref={maps}
+          start={state.online.start ? { time: state.online.start.time, doors: state.online.start.source === 'doors' } : null}
         />
       )}
 

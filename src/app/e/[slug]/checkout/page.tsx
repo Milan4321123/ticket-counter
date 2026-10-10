@@ -2,11 +2,12 @@ import type { Metadata } from 'next';
 import { listingOpenTo } from '@/lib/demo';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getEventBySlug, getEventMedia, getEventTiers, mediaUrl } from '@/lib/events';
+import { getEventBySlug, getEventMedia, getEventTiers, mapsUrl, mediaUrl } from '@/lib/events';
 import { getAvailability } from '@/lib/inventory';
 import { ticketState, tiersInSaleOrder } from '@/lib/ticketState';
 import { cityLabel, otherShowsByAct, shortDateLabel } from '@/lib/sameAct';
 import CityCheck from '@/components/CityCheck';
+import CounterSheet from '@/components/CounterSheet';
 import { vocabFor } from '@/lib/vocab';
 import { expireOverdueTransferReservations } from '@/lib/orders';
 import { getOrganizer } from '@/lib/organizers';
@@ -60,6 +61,28 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
   // closed" in the one voice, which on an event the organizer has marked as not
   // yet open said the opposite of what every other page said.
   const state = ticketState(event, getEventTiers(event.id), availability);
+  // Show night, online sales over (lib/onlineSales). Reached by a link, a
+  // bookmark or a page left open since the afternoon — this is the moment the
+  // buyer clicked to buy, so the counter is what they are told about.
+  if (state.kind === 'online-closed') {
+    return (
+      <div className="container container-narrow">
+        <CounterSheet
+          mode="page"
+          lang={await currentLang()}
+          slug={event.slug}
+          name={event.name}
+          counter={state.online.counter}
+          note={state.online.counterNote}
+          venue={event.venueName}
+          address={event.address}
+          city={event.city}
+          mapsHref={mapsUrl(event)}
+          start={state.online.start ? { time: state.online.start.time, doors: state.online.start.source === 'doors' } : null}
+        />
+      </div>
+    );
+  }
   if (!state.buyable) {
     return (
       <div className="container container-narrow">
@@ -67,6 +90,8 @@ export default async function EventCheckoutPage({ params, searchParams }: Params
         <div className={`notice anim-fade-up anim-d1 ${state.kind === 'sold-out' ? 'notice-error' : 'notice-warn'}`}>
           {state.kind === 'coming-soon'
             ? `${vocabFor(event.kind).Units} are not on sale yet — nothing can be booked just now.`
+            : state.kind === 'past'
+              ? `This ${vocabFor(event.kind).listing} has already taken place.`
             : state.kind === 'sold-out'
               ? `This ${vocabFor(event.kind).listing} is completely sold out — thank you for the incredible interest!`
               : 'Sales are currently closed, so nothing can be booked right now. Check back soon!'}

@@ -39,6 +39,7 @@ import {
   getEventBySlug,
   getEventMedia,
   getEventTiers,
+  mapsUrl,
   mediaUrl,
   parsePageDesign,
   tierPhoto,
@@ -74,6 +75,7 @@ import { tierBadge, ticketState, visibleTiers } from '@/lib/ticketState';
 import { cityLabel, otherShowsByAct, shortDateLabel } from '@/lib/sameAct';
 import OtherCityNotice from '@/components/OtherCityNotice';
 import CityCheck from '@/components/CityCheck';
+import CounterSheet from '@/components/CounterSheet';
 import WishButton from '@/components/WishButton';
 import { canWish, wishCount } from '@/lib/wishes';
 import { vocabFor } from '@/lib/vocab';
@@ -256,6 +258,9 @@ export default async function ItemPage({ params, searchParams }: Params) {
   // drift: the listing's own state, this row's status, this row's stock.
   const buyable = state.buyable && tier.status === 'on-sale' && remaining > 0;
   const badge = tierBadge(state, tier, remaining, availability.showRemaining);
+  // Show night, online sales over (lib/onlineSales): the buy button stays and
+  // opens the "buy at the counter" sheet, as on the listing page.
+  const counterClosed = state.kind === 'online-closed' && tier.status === 'on-sale' && remaining > 0;
 
   const photos = getEventMedia(event.id);
   const photo = tierPhoto(tier, photos);
@@ -659,6 +664,10 @@ export default async function ItemPage({ params, searchParams }: Params) {
                   {v.cta}
                 </Link>
               </>
+            ) : counterClosed ? (
+              <button type="button" className="btn btn-primary btn-lg" data-counter-sheet>
+                {state.online.counter ? v.cta : state.cta}
+              </button>
             ) : (
               /* Not a disabled button: there is nothing to press, and a greyed
                  control invites people to keep trying it. The badge above
@@ -749,10 +758,24 @@ export default async function ItemPage({ params, searchParams }: Params) {
               freed stock, so offering it because this one row is out would
               promise an email on a condition nobody is measuring. There is no
               preview of an item page, hence no !preview here. */}
-          {state.kind === 'sold-out' && (
+          {state.kind === 'sold-out' && !state.online.closed && (
             <div style={{ marginTop: 16, maxWidth: 480 }}>
               <WaitlistForm eventId={event.id} kind={event.kind} checkoutHref={buyHref} />
             </div>
+          )}
+          {counterClosed && (
+            <CounterSheet
+              lang={await currentLang()}
+              slug={event.slug}
+              name={event.name}
+              counter={state.online.counter}
+              note={state.online.counterNote}
+              venue={event.venueName}
+              address={event.address}
+              city={event.city}
+              mapsHref={mapsUrl(event)}
+              start={state.online.start ? { time: state.online.start.time, doors: state.online.start.source === 'doors' } : null}
+            />
           )}
 
           {/* Who you are buying from, said on the page where the buying starts

@@ -14,6 +14,11 @@ interface Props {
   /** What the button says — "Get tickets", "Coming soon", "Sold out". */
   cta?: string;
   /**
+   * Show night, online sales over: the button stays pressable and opens the
+   * "buy at the counter" sheet (components/CounterSheet) instead of a checkout.
+   */
+  counterSheet?: boolean;
+  /**
    * "Heidelberg · Sat 10 Oct". The bar is the only thing on screen for most of
    * a phone visit, and an act playing two countries in one month makes the
    * city part of the identity of the page, not a detail on it.
@@ -35,6 +40,7 @@ export default function StickyCtaBar({
   priceLabel,
   buyable = true,
   cta = 'Get tickets',
+  counterSheet = false,
   place = '',
 }: Props) {
   const [armed, setArmed] = useState(false);
@@ -70,6 +76,10 @@ export default function StickyCtaBar({
         <Link href={href} className="btn btn-primary">
           {cta}
         </Link>
+      ) : counterSheet ? (
+        <button type="button" className="btn btn-primary" data-counter-sheet>
+          {cta}
+        </button>
       ) : (
         <span className="btn" aria-disabled="true" style={{ opacity: 0.65, pointerEvents: 'none' }}>
           {cta}

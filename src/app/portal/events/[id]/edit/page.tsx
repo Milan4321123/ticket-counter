@@ -56,6 +56,7 @@ import SetupAssistant from './SetupAssistant';
 import { listEventsForOrganizer } from '@/lib/events';
 import { currentLang } from '@/lib/i18nServer';
 import DetailsForm from './DetailsForm';
+import { onlineSales, onlineSwitchState } from '@/lib/onlineSales';
 import { FAQ_SUGGESTIONS_EVENT } from './faqBridge';
 import MediaPanel from './MediaPanel';
 import HostStallsPanel from './HostStallsPanel';
@@ -409,6 +410,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
             eventId={event.id}
             isDraft={event.status === 'draft'}
             kind={event.kind}
+            online={onlineSwitchState(event)}
             initial={{
               name: event.name,
               artist: event.artist,
@@ -426,6 +428,10 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
               maxPerOrder: event.maxPerOrder,
               payWithinDays: event.payWithinDays,
               salesOpen: event.salesOpen,
+              showTime: event.showTime,
+              onlineCloseMin: event.onlineCloseMin,
+              counterSales: event.counterSales,
+              counterNote: event.counterNote,
               whatsapp: event.whatsapp,
               whatsappName: event.whatsappName,
               whatsappPhotoUrl: event.whatsappPhoto,
@@ -757,6 +763,9 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
               from every tab, in the words the page itself is using. */}
           {!event.salesOpen && event.status === 'published' && (
             <span className="badge badge-amber">Sales closed</span>
+          )}
+          {event.salesOpen && event.status === 'published' && onlineSales(event).closed && (
+            <span className="badge badge-amber">Online sales closed</span>
           )}
           <span className="badge badge-accent">{stepsDone} of 4 steps done</span>
           <span style={{ flex: 1 }} />

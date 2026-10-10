@@ -22,6 +22,7 @@
 // again. Adding a new surface means calling this rather than rewriting it.
 import type { EventRow, EventTierRow } from './events';
 import type { Availability } from './inventory';
+import { onlineSales, type OnlineSales } from './onlineSales';
 import { vocabFor } from './vocab';
 
 export type TicketStateKind =
@@ -33,6 +34,12 @@ export type TicketStateKind =
   | 'sold-out'
   /** The organizer paused sales without unpublishing. */
   | 'closed'
+  /**
+   * Online buying has ended for this show — the cutoff before the start passed,
+   * or the organizer pressed "Stop online sales now". Tickets may still be sold
+   * at the counter; `online.counter` says whether.
+   */
+  | 'online-closed'
   /** The event has been and gone. */
   | 'past';
 
@@ -70,6 +77,13 @@ export interface TicketState {
   upcomingNames: string[];
   /** On-sale types with nothing left, by name — same reason. */
   soldOutNames: string[];
+  /**
+   * The show-night handover from the website to the counter (lib/onlineSales):
+   * whether online buying is closed, why, when it closes, and what to tell a
+   * buyer about the counter. Carried on every state so a surface that says
+   * "Online sales close at 18:00" reads the same minute the refusal will.
+   */
+  online: OnlineSales;
 }
 
 /**
@@ -156,9 +170,10 @@ export function ticketState(
   event: EventRow,
   tiers: EventTierRow[],
   availability: Availability,
-  opts: { past?: boolean } = {}
+  opts: { past?: boolean; now?: Date } = {}
 ): TicketState {
   const showCount = availability.showRemaining;
+  const online = onlineSales(event, opts.now);
 
   // Only tiers that are actually for sale count as stock. A tier that is merely
   // announced is not inventory, and counting it would make an event whose whole
@@ -196,8 +211,11 @@ export function ticketState(
     }, 0)
   );
 
-  if (opts.past) {
-    return { kind: 'past', buyable: false, remaining: 0, badge: 'Finished', cta: 'See page', showCount, upcoming, upcomingNames, soldOutNames };
+  // A show that has been and gone is finished however its date reads in the
+  // feed — "buy at the counter" the morning after would send somebody to a
+  // locked hall.
+  if (opts.past || online.over) {
+    return { kind: 'past', buyable: false, remaining: 0, badge: 'Finished', cta: 'See page', showCount, upcoming, upcomingNames, soldOutNames, online };
   }
   // Announced-but-not-yet-selling is checked before BOTH the pause and sold out.
   //
@@ -208,10 +226,28 @@ export function ticketState(
   // The count is dropped: what is sitting unsold is not "left", it was never
   // offered.
   if (nothingOnSaleYet) {
-    return { kind: 'coming-soon', buyable: false, remaining: 0, badge: 'Coming soon', cta: 'Coming soon', showCount, upcoming, upcomingNames, soldOutNames };
+    return { kind: 'coming-soon', buyable: false, remaining: 0, badge: 'Coming soon', cta: 'Coming soon', showCount, upcoming, upcomingNames, soldOutNames, online };
   }
   if (!event.salesOpen) {
-    return { kind: 'closed', buyable: false, remaining, badge: 'Sales closed', cta: 'Sales closed', showCount, upcoming, upcomingNames, soldOutNames };
+    return { kind: 'closed', buyable: false, remaining, badge: 'Sales closed', cta: 'Sales closed', showCount, upcoming, upcomingNames, soldOutNames, online };
+  }
+  // Online buying has ended for tonight. After the pause (the organizer's
+  // general switch still wins) and BEFORE sold out only while something is
+  // left: a sold-out show must say sold out, not send people to a counter with
+  // nothing to sell.
+  if (online.closed && remaining > 0) {
+    return {
+      kind: 'online-closed',
+      buyable: false,
+      remaining,
+      badge: 'Online sales closed',
+      cta: online.counter ? 'Buy at the counter' : 'Online sales closed',
+      showCount,
+      upcoming,
+      upcomingNames,
+      soldOutNames,
+      online,
+    };
   }
   if (remaining === 0) {
     // Named only when there was exactly ONE type to sell. With two both gone,
@@ -228,6 +264,7 @@ export function ticketState(
       upcoming,
       upcomingNames,
       soldOutNames,
+      online,
     };
   }
   // The only two labels a shop says differently — the rest ("Sold out",
@@ -243,6 +280,7 @@ export function ticketState(
     upcoming,
     upcomingNames,
     soldOutNames,
+    online,
   };
 }
 
@@ -286,6 +324,9 @@ export function tierBadge(
   // On sale, but the listing as a whole is paused — so the honest word for THIS
   // row is the listing's, in the amber the hero uses for it.
   if (state.kind === 'closed') return { label: state.badge, className: 'badge badge-amber' };
+  if (state.kind === 'online-closed') {
+    return { label: state.online.counter ? 'At the counter' : 'Online sales closed', className: 'badge badge-amber' };
+  }
   if (showRemaining && remaining <= 25) {
     return { label: `Only ${remaining} left`, className: 'badge badge-amber' };
   }

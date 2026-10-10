@@ -65,6 +65,7 @@ export const BADGE_TONE: Record<string, string> = {
   'on-sale': 'badge-green',
   'coming-soon': 'badge-green',
   closed: 'badge-amber',
+  'online-closed': 'badge-amber',
   'sold-out': 'badge-red',
   past: 'badge',
 };

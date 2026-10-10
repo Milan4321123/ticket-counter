@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { demoAddress, listingOpenTo } from '@/lib/demo';
 import { getBaseUrl } from '@/lib/config';
 import { getEventById, getEventTier, getEventTiers, type EventRow } from '@/lib/events';
+import { onlineRefusal } from '@/lib/onlineSales';
 import { readsAsComingSoon } from '@/lib/ticketState';
 import { getAvailability, SoldOutError } from '@/lib/inventory';
 import {
@@ -172,6 +173,11 @@ export async function POST(req: Request) {
           : 'Ticket sales are currently closed for this event.'
       );
     }
+    // Show night: the online till shuts before the start and the counter takes
+    // over (lib/onlineSales). Checked here as well as on the page, because a
+    // page opened at 17:55 can still be pressed at 18:05.
+    const onlineClosed = onlineRefusal(event);
+    if (onlineClosed) return apiError(403, 'SALES_CLOSED', onlineClosed);
 
     const validated = validateBody(raw, event);
     if (typeof validated === 'string') {

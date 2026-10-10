@@ -279,6 +279,7 @@ function createDb(): Database.Database {
   migrateDemo(db);
   migrateKitchen(db);
   migrateSeats(db);
+  migrateOnlineSales(db);
   migrateSubscriptions(db);
   migrateCustomers(db);
   migratePrivacy(db);
@@ -1494,4 +1495,21 @@ function migrateSeats(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_seat_holds_order ON seat_holds(order_id);
   `);
+}
+
+/**
+ * Online sales stop before the show and the counter takes over (lib/onlineSales).
+ *
+ * online_close_min defaults to 60 on every event, old ones included: the rule
+ * only bites once a start time is known (the new show_time, or a time written
+ * in the date line), and an hour before the show is when an organizer selling
+ * at the door wants the online till shut. NULL = never close online.
+ */
+function migrateOnlineSales(db: Database.Database): void {
+  const eventCols = (db.pragma(`table_info(events)`) as { name: string }[]).map((c) => c.name);
+  if (!eventCols.includes('show_time')) db.exec(`ALTER TABLE events ADD COLUMN show_time TEXT NOT NULL DEFAULT ''`);
+  if (!eventCols.includes('online_close_min')) db.exec(`ALTER TABLE events ADD COLUMN online_close_min INTEGER DEFAULT 60`);
+  if (!eventCols.includes('online_stopped')) db.exec(`ALTER TABLE events ADD COLUMN online_stopped INTEGER NOT NULL DEFAULT 0`);
+  if (!eventCols.includes('counter_sales')) db.exec(`ALTER TABLE events ADD COLUMN counter_sales INTEGER NOT NULL DEFAULT 1`);
+  if (!eventCols.includes('counter_note')) db.exec(`ALTER TABLE events ADD COLUMN counter_note TEXT NOT NULL DEFAULT ''`);
 }

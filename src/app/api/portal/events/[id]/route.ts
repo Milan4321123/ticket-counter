@@ -20,6 +20,7 @@ import {
   FOCUS_RE,
 } from '@/lib/events';
 import { isShopCategory } from '@/lib/categories';
+import { isHhmm, isOnlineCloseChoice } from '@/lib/onlineSales';
 import { getConnection } from '@/lib/paymentConnections';
 import { readJsonLimited, BodyTooLargeError } from '@/lib/http';
 import { organizerTotpEnabled } from '@/lib/organizerTotp';
@@ -403,6 +404,35 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       need(typeof body.salesOpen === 'boolean', 'Sales open must be on or off.');
       set('sales_open', body.salesOpen ? 1 : 0);
       merged.salesOpen = body.salesOpen;
+    }
+    // ---- Show night: online sales stop, the counter takes over -------------
+    // (lib/onlineSales). Each field stands alone, so the one-tap "Stop online
+    // sales now" button can send onlineStopped and nothing else.
+    if ('showTime' in body) {
+      need(body.showTime === '' || isHhmm(body.showTime), 'The show start must be a time like 19:00.');
+      set('show_time', body.showTime as string);
+      merged.showTime = body.showTime as string;
+    }
+    if ('onlineCloseMin' in body) {
+      need(isOnlineCloseChoice(body.onlineCloseMin), 'Please pick from the list when online sales should close.');
+      set('online_close_min', body.onlineCloseMin);
+      merged.onlineCloseMin = body.onlineCloseMin;
+    }
+    if ('onlineStopped' in body) {
+      need(typeof body.onlineStopped === 'boolean', 'Stopping online sales must be on or off.');
+      set('online_stopped', body.onlineStopped ? 1 : 0);
+      merged.onlineStopped = body.onlineStopped;
+    }
+    if ('counterSales' in body) {
+      need(typeof body.counterSales === 'boolean', 'Selling at the counter must be on or off.');
+      set('counter_sales', body.counterSales ? 1 : 0);
+      merged.counterSales = body.counterSales;
+    }
+    if ('counterNote' in body) {
+      // One line: it is shown in the buyer's "buy at the counter" sheet.
+      const v = strField(body.counterNote, 'The counter note', 160).replace(/\s+/g, ' ').trim();
+      set('counter_note', v);
+      merged.counterNote = v;
     }
     if ('whatsappFocus' in body) {
       need(typeof body.whatsappFocus === 'string', 'That focus point does not look right.');

@@ -7,6 +7,8 @@ import ContactPhotoFramer from '@/components/ContactPhotoFramer';
 import SpeechInput from '@/components/SpeechInput';
 import { saveEvent } from './save';
 import { SHOP_CATEGORIES } from '@/lib/categories';
+import { ONLINE_CLOSE_CHOICES, onlineSales, wallClockLabel } from '@/lib/onlineSales';
+import OnlineSalesSwitch from '../../../OnlineSalesSwitch';
 import { vocabFor } from '@/lib/vocab';
 import type { EventKind } from '@/lib/types';
 
@@ -14,6 +16,12 @@ interface Props {
   eventId: string;
   isDraft: boolean;
   kind: EventKind;
+  /**
+   * Online sales right now, as the server sees them (lib/onlineSales). Read
+   * from props, not copied into state, so "Stop online sales now" shows its
+   * new answer the moment the page refreshes.
+   */
+  online: { closed: boolean; reason: 'stopped' | 'clock' | null; clockPassed: boolean; closesLabel: string | null; counter: boolean };
   initial: {
     name: string;
     artist: string;
@@ -32,6 +40,12 @@ interface Props {
     maxPerOrder: number;
     payWithinDays: number;
     salesOpen: boolean;
+    /** 'HH:MM' the show starts, or ''. Events only. */
+    showTime: string;
+    /** Minutes before the start that online sales close; null = never. */
+    onlineCloseMin: number | null;
+    counterSales: boolean;
+    counterNote: string;
     whatsapp: string;
     whatsappName: string;
     /** The bubble's OWN photo, or '' — chosen right here, separate from below. */
@@ -61,7 +75,7 @@ function writtenDate(date: string, doors: string): string {
 /** The same date written with or without commas is not "written by hand". */
 const sameWritten = (a: string, b: string) => a.replace(/,/g, '').replace(/\s+/g, ' ').trim() === b.replace(/,/g, '').replace(/\s+/g, ' ').trim();
 
-export default function DetailsForm({ eventId, isDraft, kind, initial }: Props) {
+export default function DetailsForm({ eventId, isDraft, kind, online, initial }: Props) {
   const router = useRouter();
   // A shop and an event fill in different halves of this form: a shop has no
   // date and no line-up, and answers "when do I come and get it?" instead.
@@ -92,6 +106,10 @@ export default function DetailsForm({ eventId, isDraft, kind, initial }: Props) 
   const [maxPerOrder, setMaxPerOrder] = useState(String(initial.maxPerOrder));
   const [payWithinDays, setPayWithinDays] = useState(String(initial.payWithinDays));
   const [salesOpen, setSalesOpen] = useState(initial.salesOpen);
+  const [showTime, setShowTime] = useState(initial.showTime);
+  const [onlineCloseMin, setOnlineCloseMin] = useState<number | null>(initial.onlineCloseMin);
+  const [counterSales, setCounterSales] = useState(initial.counterSales);
+  const [counterNote, setCounterNote] = useState(initial.counterNote);
   const [whatsapp, setWhatsapp] = useState(initial.whatsapp ? `+${initial.whatsapp}` : '');
   const [whatsappName, setWhatsappName] = useState(initial.whatsappName);
   /**
@@ -201,6 +219,8 @@ export default function DetailsForm({ eventId, isDraft, kind, initial }: Props) 
       maxPerOrder: perOrder,
       payWithinDays: payDays,
       salesOpen,
+      // The show-night handover is an event's: a shop has no start to count back from.
+      ...(isShop ? {} : { showTime, onlineCloseMin, counterSales, counterNote }),
       whatsapp,
       whatsappName,
       whatsappFocus: `${fx}% ${fy}%`,
@@ -226,6 +246,21 @@ export default function DetailsForm({ eventId, isDraft, kind, initial }: Props) 
     other: '🛍️',
   };
   const builtDate = writtenDate(eventDate, doors);
+  /**
+   * When online sales would close with what is on screen now — worked out by
+   * the same lib the buyer's page uses, so the sentence under the picker is the
+   * minute the page will actually close.
+   */
+  const plannedOnline = onlineSales({
+    kind,
+    eventDate: eventDate || null,
+    dateDisplay: customDate ? dateDisplay : builtDate,
+    showTime,
+    onlineCloseMin,
+    onlineStopped: false,
+    counterSales,
+    counterNote,
+  });
 
   // Step numbers follow what is shown, so a shop and an event both count 1, 2, 3.
   return (
@@ -393,6 +428,72 @@ export default function DetailsForm({ eventId, isDraft, kind, initial }: Props) 
               <label htmlFor="ev-doors">Doors open (optional)</label>
               <input id="ev-doors" className="input" type="time" value={doors} onChange={(e) => setDoors(e.target.value)} />
             </div>
+            <div className="field" style={{ margin: 0 }}>
+              <label htmlFor="ev-show-time">Show starts</label>
+              <input id="ev-show-time" className="input" type="time" value={showTime} onChange={(e) => setShowTime(e.target.value)} />
+            </div>
+          </div>
+          {/* On the night: the website stops selling before the start and the
+              counter at the venue takes over (lib/onlineSales). */}
+          <div className="os-box">
+            <div className="bf-label">On the night — online sales &amp; the counter</div>
+            <div className="field" style={{ margin: 0 }}>
+              <label htmlFor="ev-online-close">Stop selling online</label>
+              <select
+                id="ev-online-close"
+                className="input"
+                value={onlineCloseMin === null ? 'never' : String(onlineCloseMin)}
+                onChange={(e) => setOnlineCloseMin(e.target.value === 'never' ? null : Number(e.target.value))}
+              >
+                {ONLINE_CLOSE_CHOICES.map((c) => (
+                  <option key={c.min ?? 'never'} value={c.min === null ? 'never' : String(c.min)}>
+                    {c.min === null || c.min === 0 ? c.label : `${c.label} the show`}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="muted small os-preview">
+              {onlineCloseMin === null
+                ? 'Online sales stay open until you stop them yourself.'
+                : !plannedOnline.start
+                  ? 'Add the show start (or the doors time) so online sales can close automatically.'
+                  : plannedOnline.closesAt
+                    ? `Online sales will close ${wallClockLabel(plannedOnline.closesAt)}${
+                        plannedOnline.start.source === 'doors' ? ' — counted from the doors time, since no show start is set' : ''
+                      }.`
+                    : null}
+            </p>
+            <label className="bf-switch" htmlFor="ev-counter-sales">
+              <input id="ev-counter-sales" type="checkbox" checked={counterSales} onChange={(e) => setCounterSales(e.target.checked)} />
+              <span>
+                <strong>Tickets also sold at the counter</strong>
+                <span className="muted small">
+                  After online sales close, anyone who taps Get tickets is told to buy at the counter at the venue.
+                </span>
+              </span>
+            </label>
+            {counterSales && (
+              <input
+                id="ev-counter-note"
+                className="input"
+                value={counterNote}
+                onChange={(e) => setCounterNote(e.target.value)}
+                maxLength={160}
+                placeholder="Optional: e.g. Counter opens 17:30 · cash and card · €30 at the door"
+                aria-label="A line about the counter"
+              />
+            )}
+            <OnlineSalesSwitch
+              eventId={eventId}
+              closed={online.closed}
+              reason={online.reason}
+              clockPassed={online.clockPassed}
+              closesLabel={online.closesLabel}
+              counter={online.counter}
+              onReopened={(autoCloseCleared) => {
+                if (autoCloseCleared) setOnlineCloseMin(null);
+              }}
+            />
           </div>
           {customDate ? (
             <div className="field" style={{ margin: 0 }}>

@@ -25,6 +25,7 @@ import { anyPaymentRoute, paymentOptionsFor } from './paymentConnections';
 import { paypalPayee } from './events';
 import type { EventRow, EventTierRow } from './events';
 import { effectivePayout } from './payout';
+import { onlineSales } from './onlineSales';
 import { readsAsComingSoon } from './ticketState';
 
 export const SITE_NAME = platformNameFromEnv();
@@ -170,6 +171,12 @@ function offerAvailability(
   }
   if (!event.salesOpen || totalRemaining === 0 || remaining === 0) {
     return 'https://schema.org/SoldOut';
+  }
+  // Show night, online sales over (lib/onlineSales): what is left is sold at
+  // the counter — schema.org's own word for that is InStoreOnly.
+  const online = onlineSales(event);
+  if (online.closed) {
+    return online.counter ? 'https://schema.org/InStoreOnly' : 'https://schema.org/SoldOut';
   }
   return 'https://schema.org/InStock';
 }

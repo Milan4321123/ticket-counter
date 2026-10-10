@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { listingOpenTo } from '@/lib/demo';
 import { getEventById } from '@/lib/events';
+import { onlineRefusal } from '@/lib/onlineSales';
 import { BodyTooLargeError, readJsonLimited } from '@/lib/http';
 import { getPaidOrderByReferralCode } from '@/lib/orders';
 import { getOrganizer } from '@/lib/organizers';
@@ -75,6 +76,8 @@ export async function POST(req: Request) {
       const v = vocabFor(event.kind);
       return apiError(403, 'SALES_CLOSED', `${v.Sales} are currently closed for this ${v.listing}.`);
     }
+    const onlineClosed = onlineRefusal(event);
+    if (onlineClosed) return apiError(403, 'SALES_CLOSED', onlineClosed);
 
     // Shape first — this branch says nothing about any code that exists.
     if (!/^[A-Z0-9]{8}$/.test(code)) {

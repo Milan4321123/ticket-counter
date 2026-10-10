@@ -8,6 +8,7 @@ import crypto from 'crypto';
 import { getDb } from './db';
 import type { EventRow, EventTierRow } from './events';
 import { parseChoices, parseSlotConfig } from './kitchen';
+import { onlineSales } from './onlineSales';
 import { paymentOptionsFor } from './paymentConnections';
 import { parseSeatMap } from './seats';
 import { readListingName } from './exampleShop';
@@ -39,6 +40,8 @@ export function basketLineFor(
   const example = readListingName(event.name).isExample;
   if (event.isDemo || event.status !== 'published') return null;
   if (!example && !event.salesOpen) return null;
+  // Show night: once online sales have closed, the counter sells, not the basket.
+  if (!example && onlineSales(event).closed) return null;
   if (tier.priceCents <= 0 || tier.seatsPerUnit > 1) return null;
   if (!example && tier.status !== 'on-sale') return null;
   // The site's example shops take no money at all; they may sit in a basket
