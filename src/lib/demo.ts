@@ -25,11 +25,11 @@
 // Uploads and cross-account actions (vendor stalls) are refused for demo
 // accounts too, and the whole account deletes itself after DEMO_TTL_MS.
 import crypto from 'crypto';
-import sharp from 'sharp';
 import { getDb } from './db';
 import { getEventById, makeUniqueSlug, newId, type EventRow } from './events';
 import { purgeOrganizer } from './erasure';
 import { SoldOutError } from './inventory';
+import { picture, type Palette } from './demoArt';
 import { mediaFilePath, saveEventPhoto } from './media';
 import { getEventBySlug, getEventMedia } from './events';
 import { setWish } from './wishes';
@@ -252,39 +252,6 @@ const BUYERS = [
   'Jenny Müller', 'Tobias Weber', 'Priya Sharma', 'Aarav Khadka', 'Sita Neupane', 'Hari Oli',
 ];
 
-interface Palette {
-  a: string;
-  b: string;
-  ink: string;
-  accent: string;
-}
-
-/** A simple generated picture: a gradient, a big word, a small line. No external files. */
-async function picture(title: string, sub: string, p: Palette, w = 960, h = 720): Promise<Buffer> {
-  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const size = Math.max(48, Math.min(120, Math.floor((w * 1.4) / Math.max(title.length, 6))));
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="${p.a}"/><stop offset="1" stop-color="${p.b}"/>
-    </linearGradient>
-    <radialGradient id="r" cx="0.25" cy="0.2" r="0.8">
-      <stop offset="0" stop-color="${p.accent}" stop-opacity="0.45"/><stop offset="1" stop-color="${p.accent}" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <rect width="100%" height="100%" fill="url(#g)"/>
-  <rect width="100%" height="100%" fill="url(#r)"/>
-  <circle cx="${w * 0.82}" cy="${h * 0.25}" r="${h * 0.32}" fill="${p.accent}" opacity="0.12"/>
-  <text x="50%" y="52%" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-weight="800"
-        font-size="${size}" fill="${p.ink}">${esc(title)}</text>
-  <text x="50%" y="${52 + 11}%" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-weight="600"
-        font-size="${Math.round(size * 0.32)}" fill="${p.ink}" opacity="0.8" letter-spacing="4">${esc(sub.toUpperCase())}</text>
-  <text x="${w - 28}" y="${h - 26}" text-anchor="end" font-family="Helvetica Neue, Arial, sans-serif" font-weight="700"
-        font-size="22" fill="${p.ink}" opacity="0.55" letter-spacing="3">DEMO</text>
-</svg>`;
-  return sharp(Buffer.from(svg)).png().toBuffer();
-}
-
 function isoDaysFromNow(days: number): string {
   const d = new Date(Date.now() + days * 86_400_000);
   return d.toISOString().slice(0, 10);
@@ -311,8 +278,9 @@ export interface DemoSandbox {
 }
 
 /**
- * Build one visitor's demo account and everything in it. Takes a second or so
- * (the pictures are rendered with sharp). The caller signs the visitor in.
+ * Build one visitor's demo account and everything in it. The pictures are
+ * pre-drawn files (lib/demoArt), so nothing is rendered here. The caller signs
+ * the visitor in.
  */
 export async function createDemoSandbox(): Promise<DemoSandbox> {
   const db = getDb();

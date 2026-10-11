@@ -218,12 +218,47 @@ export interface VariantResult {
  * unsupported codec, a full disk. Callers fall back to serving the original,
  * so a failure here degrades to today's behaviour instead of a broken image.
  */
+/**
+ * One render at a time, process-wide. A feed full of fresh photos asks for
+ * dozens of variants at once, and each render decodes a full-size original
+ * (a 12-megapixel phone photo is ~36 MB of pixels). In parallel that is what
+ * ran the 512 MB instance out of memory; queued, the later requests just wait
+ * a moment — and usually find the file already rendered when their turn comes.
+ */
+let renderQueue: Promise<unknown> = Promise.resolve();
+
+function oneAtATime<T>(job: () => Promise<T>): Promise<T> {
+  const run = renderQueue.then(job, job);
+  renderQueue = run.catch(() => undefined);
+  return run;
+}
+
 export async function getVariant(
   media: EventMediaRow,
   variant: VariantName,
   crop: CropRect | null = null
 ): Promise<VariantResult | null> {
   if (!canMakeVariant(media.mime)) return null;
+  const spec = VARIANTS[variant];
+  const source = mediaFilePath(media);
+  try {
+    const target = path.join(
+      derivedDir(media.eventId),
+      derivedName(media.id, variant, sourceStamp(fs.statSync(source)), spec, crop)
+    );
+    // Already rendered: no need to wait in line.
+    if (fs.existsSync(target)) return { filePath: target, mime: 'image/jpeg' };
+  } catch {
+    return null;
+  }
+  return oneAtATime(() => renderVariant(media, variant, crop));
+}
+
+async function renderVariant(
+  media: EventMediaRow,
+  variant: VariantName,
+  crop: CropRect | null
+): Promise<VariantResult | null> {
 
   const spec = VARIANTS[variant];
   const source = mediaFilePath(media);

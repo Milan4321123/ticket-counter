@@ -5,7 +5,6 @@
 //   3. an organizer can only ever touch their OWN events/media (404 otherwise —
 //      indistinguishable from a resource that does not exist).
 import { NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
 import { describeDevice, sendSignInAlertEmail } from '@/lib/email';
 import { getEventById, type EventRow } from '@/lib/events';
 import { currentOrganizer, organizerPlanActive, type OrganizerRow } from '@/lib/organizers';
@@ -80,41 +79,6 @@ export function demoGate(organizer: OrganizerRow, what: string): NextResponse | 
     } satisfies ApiErrorResponse,
     { status: 403 }
   );
-}
-
-/** Photos one try-it-yourself demo account may upload in its 24 hours. */
-export const DEMO_PHOTO_LIMIT = 15;
-
-/**
- * Photo uploads in a demo account: allowed — a visitor should see their own
- * pictures on their own page — but bounded. At most DEMO_PHOTO_LIMIT across
- * the whole demo, and a per-visitor pace. Demo pages are only ever shown to
- * their owner (lib/demo listingOpenTo), and the photos are deleted with the
- * demo after 24 hours (sweepExpiredDemos → deleteEventCompletely removes the
- * files). Real accounts are unaffected: null means go ahead.
- */
-export function demoPhotoGate(organizer: OrganizerRow, ip: string): NextResponse | null {
-  if (!organizer.isDemo) return null;
-  const used = (
-    getDb()
-      // The visitor's own uploads only — not the pictures the demo came with
-      // (written while it was being built, in its first few minutes).
-      .prepare(
-        `SELECT COUNT(*) AS n FROM event_media m JOIN events e ON e.id = m.event_id
-           JOIN organizers o ON o.id = e.organizer_id
-          WHERE e.organizer_id = ? AND m.created_at > datetime(o.created_at, '+3 minutes')`
-      )
-      .get(organizer.id) as { n: number }
-  ).n;
-  if (used >= DEMO_PHOTO_LIMIT || !rateLimit(`demo:photos:${ip}`, 40, 60 * 60_000)) {
-    return NextResponse.json(
-      {
-        error: `A demo account can hold up to ${DEMO_PHOTO_LIMIT} photos — remove one to add another. (They are deleted with the demo after 24 hours.)`,
-      } satisfies ApiErrorResponse,
-      { status: 429 }
-    );
-  }
-  return null;
 }
 
 /**
