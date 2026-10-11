@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { getDb } from './db';
 import { deleteVariants } from './imageVariants';
-import { paypalLinkFor } from './paypalLink';
+import { isPaypalMeLink, paypalLinkFor } from './paypalLink';
 import { chunkIds } from './sqlIn';
 import { asEventKind, type EventKind } from './types';
 
@@ -1250,7 +1250,8 @@ export function paypalPayee(event: Pick<EventRow, 'paypalAccount'>): PaypalPayee
 }
 
 /**
- * A PayPal.Me link with the amount already in it, or null.
+ * A PayPal.Me link with the amount already in it, the PayPal app QR link as
+ * given (no amount possible), or null.
  *
  * PayPal.Me accepts a trailing amount — /25.00EUR — so the buyer lands on a page
  * that already knows what to charge. Worth having, and worth being honest about
@@ -1273,6 +1274,9 @@ export function paypalMeUrl(
   currency: string,
 ): string | null {
   if (!payee?.link) return null;
+  // A PayPal app QR link opens the organizer's PayPal as it is: it has no
+  // place for an amount, so the buyer types it (the page says so).
+  if (!isPaypalMeLink(payee.link)) return payee.link;
 
   const cents = Math.round(amountCents);
   if (!Number.isFinite(cents) || cents < 1) return null;

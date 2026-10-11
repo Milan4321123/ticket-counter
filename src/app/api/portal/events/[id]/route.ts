@@ -508,10 +508,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       payoutTouched = true;
     }
     if ('paypalAccount' in body) {
-      const v = strField(body.paypalAccount, 'The PayPal address', 120);
+      const v = strField(body.paypalAccount, 'The PayPal address', 400);
       need(
         isValidPaypalAccount(v),
-        'That does not look like a PayPal address — use the email address on your PayPal account, or your PayPal.Me link.'
+        'That does not look like a PayPal address — use the email address on your PayPal account, your PayPal.Me link, or a screenshot of your PayPal QR code.'
       );
       payoutTarget.paypal = v;
       payoutTouched = true;

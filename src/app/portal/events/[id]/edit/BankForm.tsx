@@ -3,7 +3,8 @@
 import { useRef, useState } from 'react';
 import type { EventKind } from '@/lib/types';
 import { vocabFor } from '@/lib/vocab';
-import { paypalLinkFor } from '@/lib/paypalLink';
+import { isPaypalMeLink, paypalLinkFor } from '@/lib/paypalLink';
+import PaypalQrUpload from './PaypalQrUpload';
 import { useRouter } from 'next/navigation';
 import { saveEvent, type StepUpRequest } from './save';
 
@@ -50,6 +51,7 @@ export default function BankForm({ eventId, kind, initial, queued, routes, conne
   const [bic, setBic] = useState(initial.bankBic);
   const [bankName, setBankName] = useState(initial.bankName);
   const [paypal, setPaypal] = useState(initial.paypalAccount);
+  const paypalLink = paypal.trim() ? paypalLinkFor(paypal) : null;
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -428,23 +430,26 @@ export default function BankForm({ eventId, kind, initial, queued, routes, conne
         </details>
 
         <div className="field" style={{ margin: 0, maxWidth: 460 }}>
-          <label htmlFor="bank-paypal">PayPal.Me (optional)</label>
+          <label htmlFor="bank-paypal">PayPal (optional)</label>
           <input
             id="bank-paypal"
             className="input"
             value={paypal}
             onChange={(e) => setPaypal(e.target.value)}
-            maxLength={120}
+            maxLength={400}
             spellCheck={false}
             autoCapitalize="none"
-            placeholder="paypal.me/yourname"
+            placeholder="paypal.me/yourname or you@email.com"
           />
-          <p className={`small${paypal.trim() && paypalLinkFor(paypal) ? '' : ' muted'}`} style={{ margin: '6px 0 0', ...(paypal.trim() && paypalLinkFor(paypal) ? { color: 'var(--green)', fontWeight: 600 } : {}) }}>
+          <PaypalQrUpload onFound={setPaypal} />
+          <p className={`small${paypalLink ? '' : ' muted'}`} style={{ margin: '6px 0 0', ...(paypalLink ? { color: 'var(--green)', fontWeight: 600 } : {}) }}>
             {!paypal.trim()
-              ? 'Offered next to your IBAN. PayPal payments arrive under the sender’s name — match it on the orders page.'
-              : paypalLinkFor(paypal)
-                ? '✓ Buyers get a Pay button with the amount already filled in.'
-                : 'Works, but buyers must type the amount. A paypal.me/yourname link gives them a ready button.'}
+              ? 'A PayPal.Me link, the email on your PayPal, or a screenshot of the QR code in your PayPal app. Offered next to your IBAN; payments arrive under the sender’s name — match it on the orders page.'
+              : paypalLink && isPaypalMeLink(paypalLink)
+                ? '✓ Buyers get a QR code and a Pay button with the amount already filled in.'
+                : paypalLink
+                  ? '✓ Buyers get your PayPal QR code and a Pay button. They type the amount themselves.'
+                  : 'Works, but buyers must type the amount. A paypal.me/yourname link or your PayPal QR code gives them a ready button.'}
           </p>
         </div>
       </section>

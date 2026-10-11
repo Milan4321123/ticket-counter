@@ -22,6 +22,7 @@ import { getSellerIdentity } from '@/lib/sellerIdentity';
 import SellerBlock from '@/components/legal/SellerBlock';
 import { platformName } from '@/lib/platform';
 import { girocodePayload } from '@/lib/girocode';
+import { isPaypalMeLink } from '@/lib/paypalLink';
 import { formatMoney } from '@/lib/money';
 import { getBaseUrl } from '@/lib/config';
 import { getOrder, getOrderItems, getTicketsForOrder, paymentReference, referralCode } from '@/lib/orders';
@@ -376,6 +377,9 @@ export default async function OrderPage({
     // laptop with a phone in hand; most people open this page ON the phone, and
     // cannot scan their own screen — they need something to TAP.
     const paypalPayUrl = paypalMeUrl(paypal, order.totalCents, order.currency);
+    // False for a PayPal app QR link: it opens the organizer's PayPal but
+    // cannot carry the amount, so the buyer is told to type it.
+    const paypalHasAmount = Boolean(paypal?.link && isPaypalMeLink(paypal.link));
     const paypalQr = await paymentQrDataUrl(paypalPayUrl);
 
     return (
@@ -485,7 +489,7 @@ export default async function OrderPage({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={paypalQr}
-                  alt={`PayPal.Me link for ${amountDisplay}`}
+                  alt={paypalHasAmount ? `PayPal.Me link for ${amountDisplay}` : 'The organizer’s PayPal QR code'}
                   width={160}
                   height={160}
                   style={{
@@ -499,7 +503,9 @@ export default async function OrderPage({
                 />
                 <div style={{ flex: '1 1 200px', minWidth: 0 }}>
                   <strong style={{ display: 'block', marginBottom: 4 }}>
-                    Open PayPal with the amount filled in
+                    {paypalHasAmount
+                      ? 'Open PayPal with the amount filled in'
+                      : `Open the organizer’s PayPal and send ${amountDisplay}`}
                   </strong>
                   {/* The tap and the scan are the same link. Which one is
                       useful depends only on which device this page is open on,
