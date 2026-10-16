@@ -119,9 +119,13 @@ function soldOut(input: EventAskInput): boolean {
   return input.tiers.length > 0 && input.tiers.every((t) => t.soldOut);
 }
 
+/** Placeholder account names that must never be read out as a seller. */
+const NO_NAME = /^(unknown|n\/?a|none|test|-+|\?+)$/i;
+
 function seller(input: EventAskInput): string {
-  const legal = input.sellerLegalName.trim();
-  const name = input.organizerName.trim() || 'the organizer';
+  const clean = (s: string) => (NO_NAME.test(s.trim()) ? '' : s.trim());
+  const legal = clean(input.sellerLegalName);
+  const name = clean(input.organizerName) || legal || 'the organizer';
   return legal && legal.toLowerCase() !== name.toLowerCase() ? `${name} (${legal})` : name;
 }
 

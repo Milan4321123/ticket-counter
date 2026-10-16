@@ -68,6 +68,13 @@ describe('event instant answers', () => {
   });
 });
 
+describe('placeholder names', () => {
+  it('never says "organized by Unknown"', () => {
+    const a = instantEventAnswer({ ...event, organizerName: 'Unknown', sellerLegalName: '' }, 'who organizes this?')!;
+    assert.match(a.answer, /organized by the organizer/);
+  });
+});
+
 describe('homepage Ask', () => {
   it('points custom work to the team', () => {
     assert.match(quickAnswer('can you make a website for my restaurant?')!, /\(\/contact\)/);

@@ -196,7 +196,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       address: event.kind === 'shop' ? event.pickupInfo : event.address,
       city: event.city,
       payWithinDays: event.payWithinDays,
-      organizerName: organizer?.name ?? '',
+      // The name buyers know them by: what the page's WhatsApp bubble says,
+      // else the account name (lib/eventAsk drops placeholders like "Unknown").
+      organizerName: event.whatsappName.trim() || organizer?.name || '',
       sellerLegalName: identity?.legalName ?? '',
       tiers: shownTiers.map((t) => ({
         name: t.name,
