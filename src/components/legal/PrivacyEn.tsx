@@ -18,7 +18,7 @@ export const PRIVACY_TOC_EN: { id: string; title: string }[] = [
   { id: 'cookies', title: '4. Cookies and storage on your device' },
   { id: 'bestellung', title: '5. Tickets and orders' },
   { id: 'zahlung', title: '6. Payment' },
-  { id: 'kundenkonto', title: '7. Customer account' },
+  { id: 'kundenkonto', title: '7. Customer account and community' },
   { id: 'mitteilungen', title: '8. “Keep me posted” – a seller’s announcements' },
   { id: 'kundenkarte', title: '9. Customer card' },
   { id: 'abonnements', title: '10. Subscribe & save (standing orders)' },
@@ -305,6 +305,11 @@ export default function PrivacyEn({ f }: { f: PrivacyFacts }) {
                 <td className="small">until you remove them</td>
               </tr>
               <tr>
+                <td className="mono small">mn-bhetghat-v1</td>
+                <td className="small">Bhetghat: events you saved to My plans or skipped, and your town filter – never sent to us</td>
+                <td className="small">until you remove them; skips after 30 days</td>
+              </tr>
+              <tr>
                 <td className="mono small">martnepali.device.v1, martnepali.wished.v1</td>
                 <td className="small">
                   Wish button: a random device code and your wishes, so one wish counts once per device. The
@@ -449,7 +454,7 @@ export default function PrivacyEn({ f }: { f: PrivacyFacts }) {
         </p>
       </Sec>
 
-      <Sec id="kundenkonto" title="7. Customer account">
+      <Sec id="kundenkonto" title="7. Customer account and community">
         <p>
           An account is optional; you can order without one. With one, you see every order that belongs to
           your confirmed email address, and your basket follows you between devices. We are the controller.
@@ -480,8 +485,34 @@ export default function PrivacyEn({ f }: { f: PrivacyFacts }) {
           signed in to for {d.customerInactive} days are deleted automatically, basket included. Your orders
           are not affected – they follow the periods in section 5.
         </p>
-        <p style={{ marginBottom: 0 }}>
+        <p>
           The legal basis is Art. 6(1)(b) GDPR (providing the account you asked for).
+        </p>
+        <Sub>The community (optional)</Sub>
+        <p>
+          If you join the community from your account, we also store the name you choose to show other
+          members, your town, a random public handle, when you joined, and that you confirmed you are 16 or
+          older and accepted the community rules. What you post there – meetups and who is going, group-chat
+          messages, help-board posts, private messages, reports and blocks – is visible only to signed-in
+          members (a private message only to its two people) and is never shown to search engines. A Kalakar
+          profile is the exception: it is public on purpose, with the name, photo, text and links you put in
+          it – never your email address or member name. Profile photos are re-encoded in your browser and
+          stripped of camera data before upload; a profile&rsquo;s video loads from YouTube or Vimeo only when
+          someone presses play.
+        </p>
+        <p>
+          <strong>Storage:</strong> a meetup with its participants and chat is deleted {d.meetup} days after
+          the day it took place; a help post with its conversations {d.helpPost} days after it left the board;
+          any conversation {d.conversation} days after its last message; a handled report {d.report} days after
+          the decision. Leaving the community (on <Link href="/community" style={linkStyle}>/community</Link>)
+          or deleting your account deletes all of it at once. We read reports to enforce the rules; three
+          reports from different members hide a post until it has been checked.
+        </p>
+        <p style={{ marginBottom: 0 }}>
+          Legal basis: Art. 6(1)(b) GDPR (the community service you joined); for moderation and safety Art.
+          6(1)(f) GDPR (our and other members&rsquo; legitimate interest in a safe community). The festival card
+          maker (<Link href="/card" style={linkStyle}>/card</Link>) runs entirely in your browser: the photo
+          you add is never uploaded.
         </p>
       </Sec>
 
@@ -887,6 +918,26 @@ export default function PrivacyEn({ f }: { f: PrivacyFacts }) {
               <tr>
                 <td className="small">Customer account</td>
                 <td className="small">until you delete it; automatically after {d.customerInactive} days without sign-in</td>
+              </tr>
+              <tr>
+                <td className="small">Community: meetups and their chat</td>
+                <td className="small">{d.meetup} days after the meetup</td>
+              </tr>
+              <tr>
+                <td className="small">Community: help posts and their conversations</td>
+                <td className="small">{d.helpPost} days after the post left the board</td>
+              </tr>
+              <tr>
+                <td className="small">Community: private conversations</td>
+                <td className="small">{d.conversation} days after the last message</td>
+              </tr>
+              <tr>
+                <td className="small">Community: membership, Kalakar profile, blocks</td>
+                <td className="small">until you leave the community or delete your account</td>
+              </tr>
+              <tr>
+                <td className="small">Community: handled reports</td>
+                <td className="small">{d.report} days after the decision</td>
               </tr>
               <tr>
                 <td className="small">Contact requests</td>

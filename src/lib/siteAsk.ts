@@ -150,6 +150,11 @@ export const SITE_PAGES: { path: string; what: string }[] = [
   { path: '/patro', what: 'Nepali calendar (patro) with festival dates' },
   { path: '/festivals', what: 'Nepali festivals — Dashain, Tihar, Holi, Teej and more — with events for each' },
   { path: '/contact', what: 'talk to the team; ask for a custom-designed event page or a promo video' },
+  { path: '/studio', what: 'what we build: event pages, shops and promo videos — examples and how to get one free' },
+  { path: '/community', what: 'the Nepali community: meetups and invitations, the help board, artists to book' },
+  { path: '/bhetghat', what: 'swipe through events and members\' meetups (karaoke, futsal, laser tag) near you' },
+  { path: '/kalakar', what: 'Nepali singers, DJs, dancers, photographers, caterers and pandits to book' },
+  { path: '/card', what: 'make a free festival greeting card (Dashain, Tihar…) with your name and photo' },
   { path: '/privacy', what: 'privacy and how personal data is handled' },
 ];
 
@@ -172,7 +177,12 @@ const BUTTON: Record<string, { icon: string; label: string }> = {
   '/showcase': { icon: '✨', label: 'All features' },
   '/patro': { icon: '📅', label: 'Nepali calendar' },
   '/festivals': { icon: '🪔', label: 'Festivals' },
-  '/contact': { icon: '💬', label: 'Talk to the team' },
+  '/contact': { icon: '💬', label: 'Talk to us' },
+  '/studio': { icon: '🎬', label: 'What we build' },
+  '/community': { icon: '🤝', label: 'Community' },
+  '/bhetghat': { icon: '👋', label: 'Meetups' },
+  '/kalakar': { icon: '🎤', label: 'Artists' },
+  '/card': { icon: '🪔', label: 'Festival cards' },
   '/privacy': { icon: '🔒', label: 'Privacy' },
 };
 

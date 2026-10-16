@@ -73,6 +73,13 @@ export default function FestivalPage({ festival }: { festival: Festival }) {
                 </>
             )}
           </p>
+          {occurrence && (
+            <p className="anim-fade-up anim-d3" style={{ margin: '18px 0 0' }}>
+              <Link href={`/card?f=${festival.slug}`} className="btn btn-brand">
+                Make your {festival.name} card — free
+              </Link>
+            </p>
+          )}
         </div>
       </section>
 

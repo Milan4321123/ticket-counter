@@ -283,6 +283,7 @@ function createDb(): Database.Database {
   migrateSubscriptions(db);
   migrateCustomers(db);
   migratePrivacy(db);
+  migrateCommunity(db);
   return db;
 }
 
@@ -1512,4 +1513,177 @@ function migrateOnlineSales(db: Database.Database): void {
   if (!eventCols.includes('online_stopped')) db.exec(`ALTER TABLE events ADD COLUMN online_stopped INTEGER NOT NULL DEFAULT 0`);
   if (!eventCols.includes('counter_sales')) db.exec(`ALTER TABLE events ADD COLUMN counter_sales INTEGER NOT NULL DEFAULT 1`);
   if (!eventCols.includes('counter_note')) db.exec(`ALTER TABLE events ADD COLUMN counter_note TEXT NOT NULL DEFAULT ''`);
+}
+
+/**
+ * The community (lib/community.ts and its neighbours): members who opted in
+ * from their customer account, Bhetghat meetups and their group chats, the
+ * Sahayog help board, Kalakar profiles, one-to-one conversations about a help
+ * post or a profile, and the report / block machinery that keeps it civil.
+ *
+ * A member IS a customer account (a verified email) plus the community_*
+ * columns below: the name other members see (never the checkout name), a home
+ * town, a random public handle (so pages and APIs never carry the account id),
+ * and when they accepted the rules and confirmed they are 16 or over.
+ *
+ * Nothing here references money, orders or events by foreign key; every row
+ * hangs off a customer id, and lib/community eraseCommunityMember removes them
+ * all with the account.
+ */
+function migrateCommunity(db: Database.Database): void {
+  const cols = (db.pragma(`table_info(customers)`) as { name: string }[]).map((c) => c.name);
+  const add: [string, string][] = [
+    ['community_name', `TEXT NOT NULL DEFAULT ''`],
+    ['community_city', `TEXT NOT NULL DEFAULT ''`],
+    ['community_handle', 'TEXT'],
+    ['community_joined_at', 'TEXT'],
+    ['community_rules_version', 'INTEGER NOT NULL DEFAULT 0'],
+    ['community_banned_at', 'TEXT'],
+  ];
+  for (const [col, ddl] of add) {
+    if (!cols.includes(col)) db.exec(`ALTER TABLE customers ADD COLUMN ${col} ${ddl}`);
+  }
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_handle ON customers(community_handle) WHERE community_handle IS NOT NULL;
+
+    CREATE TABLE IF NOT EXISTS meetups (
+      id TEXT PRIMARY KEY,
+      host_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      about TEXT NOT NULL DEFAULT '',
+      category TEXT NOT NULL DEFAULT 'other',
+      city TEXT NOT NULL,
+      place TEXT NOT NULL,
+      starts_at TEXT NOT NULL,                 -- 'YYYY-MM-DDTHH:MM', wall-clock time in Germany
+      capacity INTEGER NOT NULL DEFAULT 0,     -- 0 = no limit
+      status TEXT NOT NULL DEFAULT 'open',     -- open | cancelled | removed
+      status_note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_meetups_starts ON meetups(status, starts_at);
+    CREATE INDEX IF NOT EXISTS idx_meetups_host ON meetups(host_id);
+
+    CREATE TABLE IF NOT EXISTS meetup_members (
+      meetup_id TEXT NOT NULL,
+      customer_id TEXT NOT NULL,
+      joined_at TEXT NOT NULL DEFAULT (datetime('now')),
+      removed_at TEXT,                         -- the host took them off; they cannot rejoin
+      last_read_id INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (meetup_id, customer_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_meetup_members_customer ON meetup_members(customer_id);
+
+    CREATE TABLE IF NOT EXISTS meetup_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      meetup_id TEXT NOT NULL,
+      customer_id TEXT NOT NULL,
+      body TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      removed_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_meetup_messages_meetup ON meetup_messages(meetup_id, id);
+    CREATE INDEX IF NOT EXISTS idx_meetup_messages_customer ON meetup_messages(customer_id);
+
+    CREATE TABLE IF NOT EXISTS help_posts (
+      id TEXT PRIMARY KEY,
+      author_id TEXT NOT NULL,
+      kind TEXT NOT NULL,                      -- ask | offer
+      category TEXT NOT NULL,
+      city TEXT NOT NULL DEFAULT '',
+      title TEXT NOT NULL,
+      body TEXT NOT NULL DEFAULT '',
+      when_date TEXT,                          -- 'YYYY-MM-DD': the day of a ride or a flight
+      expires_on TEXT NOT NULL,                -- 'YYYY-MM-DD': off the board after this day
+      status TEXT NOT NULL DEFAULT 'open',     -- open | closed | removed
+      status_note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_help_posts_open ON help_posts(status, expires_on);
+    CREATE INDEX IF NOT EXISTS idx_help_posts_author ON help_posts(author_id);
+
+    CREATE TABLE IF NOT EXISTS talent_profiles (
+      id TEXT PRIMARY KEY,
+      owner_id TEXT NOT NULL UNIQUE,           -- one profile per member
+      slug TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      city TEXT NOT NULL DEFAULT '',
+      areas TEXT NOT NULL DEFAULT '',
+      bio TEXT NOT NULL DEFAULT '',
+      links TEXT NOT NULL DEFAULT '[]',        -- JSON [{ "label", "url" }]
+      video_url TEXT NOT NULL DEFAULT '',
+      photo TEXT NOT NULL DEFAULT '',          -- file name under DATA_DIR/talent; '' = none
+      status TEXT NOT NULL DEFAULT 'live',     -- live | hidden | removed
+      status_note TEXT NOT NULL DEFAULT '',
+      verified_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_talent_status ON talent_profiles(status, kind);
+
+    CREATE TABLE IF NOT EXISTS conversations (
+      id TEXT PRIMARY KEY,
+      topic_type TEXT NOT NULL,                -- help | talent
+      topic_id TEXT NOT NULL,
+      owner_id TEXT NOT NULL,                  -- whose post or profile it is about
+      other_id TEXT NOT NULL,                  -- who wrote to them
+      owner_read_id INTEGER NOT NULL DEFAULT 0,
+      other_read_id INTEGER NOT NULL DEFAULT 0,
+      last_message_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (topic_type, topic_id, other_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_conversations_owner ON conversations(owner_id, last_message_at);
+    CREATE INDEX IF NOT EXISTS idx_conversations_other ON conversations(other_id, last_message_at);
+
+    CREATE TABLE IF NOT EXISTS conversation_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conversation_id TEXT NOT NULL,
+      sender_id TEXT NOT NULL,
+      body TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      removed_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_conversation_messages ON conversation_messages(conversation_id, id);
+
+    CREATE TABLE IF NOT EXISTS community_reports (
+      id TEXT PRIMARY KEY,
+      reporter_id TEXT NOT NULL,
+      target_type TEXT NOT NULL,               -- meetup | meetup_message | help_post | message | talent | member
+      target_id TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      note TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'open',     -- open | dismissed | actioned
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      handled_at TEXT,
+      UNIQUE (reporter_id, target_type, target_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_community_reports_status ON community_reports(status, created_at);
+    CREATE INDEX IF NOT EXISTS idx_community_reports_target ON community_reports(target_type, target_id);
+
+    CREATE TABLE IF NOT EXISTS community_blocks (
+      blocker_id TEXT NOT NULL,
+      blocked_id TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (blocker_id, blocked_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_community_blocks_blocked ON community_blocks(blocked_id);
+  `);
+
+  // Invitations (Oct 2026): how one gets in — 'open' (tap and you are in),
+  // 'ask' (the host says yes or no) or 'private' (only with the invite link) —
+  // the link's secret, a "happens if N join" minimum, and a cost line
+  // ("€12 each, pay at the venue"; the site never touches the money).
+  const meetupCols = (db.pragma(`table_info(meetups)`) as { name: string }[]).map((c) => c.name);
+  if (!meetupCols.includes('join_mode')) db.exec(`ALTER TABLE meetups ADD COLUMN join_mode TEXT NOT NULL DEFAULT 'open'`);
+  if (!meetupCols.includes('invite_code')) db.exec(`ALTER TABLE meetups ADD COLUMN invite_code TEXT`);
+  if (!meetupCols.includes('min_people')) db.exec(`ALTER TABLE meetups ADD COLUMN min_people INTEGER NOT NULL DEFAULT 0`);
+  if (!meetupCols.includes('cost_note')) db.exec(`ALTER TABLE meetups ADD COLUMN cost_note TEXT NOT NULL DEFAULT ''`);
+  db.exec(`UPDATE meetups SET invite_code = lower(hex(randomblob(9))) WHERE invite_code IS NULL`);
+  // going | requested — a request becomes 'going' when the host says yes;
+  // a "no" sets removed_at, like being taken off, so it cannot be re-sent.
+  const memberCols = (db.pragma(`table_info(meetup_members)`) as { name: string }[]).map((c) => c.name);
+  if (!memberCols.includes('status')) db.exec(`ALTER TABLE meetup_members ADD COLUMN status TEXT NOT NULL DEFAULT 'going'`);
 }

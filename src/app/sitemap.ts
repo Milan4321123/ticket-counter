@@ -9,6 +9,8 @@ import {
   tierPhoto,
 } from '@/lib/events';
 import { machineDate } from '@/lib/seo';
+import { liveTalentSlugs } from '@/lib/talent';
+import { cityHubs } from '@/lib/cityPages';
 import { visibleTiers } from '@/lib/ticketState';
 
 /**
@@ -58,6 +60,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/festivals`, changeFrequency: 'weekly', priority: 0.8 },
     { url: `${base}/patro`, changeFrequency: 'daily', priority: 0.8 },
     { url: `${base}/digest`, changeFrequency: 'weekly', priority: 0.5 },
+    // The community's public doors. Everything members post is behind a
+    // sign-in and listed nowhere; Kalakar profiles are public on purpose.
+    { url: `${base}/community`, changeFrequency: 'weekly', priority: 0.7 },
+    { url: `${base}/bhetghat`, changeFrequency: 'daily', priority: 0.7 },
+    { url: `${base}/sahayog`, changeFrequency: 'weekly', priority: 0.6 },
+    { url: `${base}/kalakar`, changeFrequency: 'weekly', priority: 0.7 },
+    { url: `${base}/card`, changeFrequency: 'weekly', priority: 0.7 },
+    { url: `${base}/nepali-in`, changeFrequency: 'weekly', priority: 0.6 },
+    { url: `${base}/studio`, changeFrequency: 'monthly', priority: 0.7 },
     { url: `${base}/contact`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/privacy`, changeFrequency: 'yearly', priority: 0.3 },
     // The other public legal pages. Low priority — nobody searches for them —
@@ -136,5 +147,20 @@ export default function sitemap(): MetadataRoute.Sitemap {
     })
   );
 
-  return [...staticPages, ...shelfPages, ...eventPages, ...itemPages];
+  // Kalakar profiles — public pages their owners published to be found.
+  const talentPages: MetadataRoute.Sitemap = liveTalentSlugs().map((t) => ({
+    url: `${base}/kalakar/${t.slug}`,
+    lastModified: new Date(`${t.updatedAt.replace(' ', 'T')}Z`),
+    changeFrequency: 'monthly',
+    priority: 0.6,
+  }));
+
+  // One page per town with something public on it (lib/cityPages).
+  const cityPages: MetadataRoute.Sitemap = cityHubs().map((h) => ({
+    url: `${base}/nepali-in/${h.slug}`,
+    changeFrequency: 'weekly',
+    priority: 0.6,
+  }));
+
+  return [...staticPages, ...shelfPages, ...eventPages, ...itemPages, ...talentPages, ...cityPages];
 }

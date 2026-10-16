@@ -30,7 +30,11 @@ import {
   BACKUP_RETENTION_DAYS,
   BUYER_RETENTION_DAYS,
   CONTACT_REQUEST_RETENTION_DAYS,
+  COMMUNITY_REPORT_RETENTION_DAYS,
+  CONVERSATION_RETENTION_DAYS,
   CUSTOMER_INACTIVE_DAYS,
+  HELP_POST_RETENTION_DAYS,
+  MEETUP_RETENTION_DAYS,
   REFERRAL_VOUCHER_RETENTION_DAYS,
   SHOP_UNCOLLECTED_LONG_STOP_DAYS,
   SUBSCRIPTION_ENDED_RETENTION_DAYS,
@@ -64,6 +68,10 @@ export type PrivacyFacts = {
     backup: number;
     termination: number;
     offlineTicket: number;
+    meetup: number;
+    helpPost: number;
+    conversation: number;
+    report: number;
   };
   sessions: {
     organizerDays: number;
@@ -104,6 +112,10 @@ export function privacyFacts(): PrivacyFacts {
       backup: BACKUP_RETENTION_DAYS,
       termination: TERMINATION_DELETION_DAYS,
       offlineTicket: OFFLINE_TICKET_CACHE_DAYS,
+      meetup: MEETUP_RETENTION_DAYS,
+      helpPost: HELP_POST_RETENTION_DAYS,
+      conversation: CONVERSATION_RETENTION_DAYS,
+      report: COMMUNITY_REPORT_RETENTION_DAYS,
     },
     sessions: {
       organizerDays: Math.round(ORGANIZER_SESSION_TTL_MS / DAY_MS),

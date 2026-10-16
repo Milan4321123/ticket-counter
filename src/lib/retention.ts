@@ -19,6 +19,7 @@
 // is safe to call as often as you like, is armed lazily from page loads, and
 // swallows its own errors so it can never break a render.
 import { getDb } from './db';
+import { runCommunityRetention } from './communityData';
 
 const DEFAULT_RETENTION_DAYS = 30;
 
@@ -228,6 +229,18 @@ export const REFERRAL_VOUCHER_RETENTION_DAYS = 30;
 /** Database backups older than this are deleted (scripts/backup.mjs mirrors it). */
 export const BACKUP_RETENTION_DAYS = 30;
 
+/** A Bhetghat meetup, who went and its group chat: deleted this long after the day. */
+export const MEETUP_RETENTION_DAYS = 30;
+
+/** A Sahayog help post and its conversations: deleted this long after it left the board. */
+export const HELP_POST_RETENTION_DAYS = 30;
+
+/** Any one-to-one conversation: deleted this long after its last message. */
+export const CONVERSATION_RETENTION_DAYS = 365;
+
+/** A handled community report: deleted this long after it was handled. */
+export const COMMUNITY_REPORT_RETENTION_DAYS = 180;
+
 /**
  * Orders due for erasure: the buyer has not been erased yet, and the thing
  * their details were needed for is genuinely over.
@@ -348,6 +361,8 @@ export interface RetentionSweepResult {
   contactRequestsDeleted: number;
   /** Spent referral vouchers whose referrer address was erased. */
   voucherEmailsErased: number;
+  /** Community rows deleted: orphans of deleted accounts, past meetups, old posts, quiet conversations, handled reports. */
+  communityDeleted: number;
   /** Names of the steps that threw this run (each is logged; the rest still ran). */
   failed: string[];
 }
@@ -366,6 +381,7 @@ function emptyResult(): RetentionSweepResult {
     loginCodesDeleted: 0,
     contactRequestsDeleted: 0,
     voucherEmailsErased: 0,
+    communityDeleted: 0,
     failed: [],
   };
 }
@@ -714,6 +730,18 @@ export function runBuyerDataRetentionSweep(force = false): RetentionSweepResult 
         .run().changes;
     });
 
+    // The community (lib/communityData): what members post lives on its own
+    // clocks, and the rows of accounts the step above just deleted go too.
+    step('community', () => {
+      const r = runCommunityRetention(db, {
+        meetupDays: MEETUP_RETENTION_DAYS,
+        helpPostDays: HELP_POST_RETENTION_DAYS,
+        conversationDays: CONVERSATION_RETENTION_DAYS,
+        reportDays: COMMUNITY_REPORT_RETENTION_DAYS,
+      });
+      result.communityDeleted = r.orphans + r.meetups + r.helpPosts + r.conversations + r.reports;
+    });
+
     const said: [number, string][] = [
       [result.erased, 'erased buyer details on %d order(s)'],
       [result.scrubbed, 'scrubbed payer name / note / phone from %d already-erased order(s)'],
@@ -727,6 +755,7 @@ export function runBuyerDataRetentionSweep(force = false): RetentionSweepResult 
       [result.loginCodesDeleted, 'deleted %d expired sign-in code(s)'],
       [result.contactRequestsDeleted, 'deleted %d old contact request(s)'],
       [result.voucherEmailsErased, "erased the referrer's address on %d spent voucher(s)"],
+      [result.communityDeleted, 'deleted %d community row(s) past their time'],
     ];
     for (const [n, text] of said) {
       if (n > 0) console.log(`Retention sweep: ${text.replace('%d', String(n))}.`);

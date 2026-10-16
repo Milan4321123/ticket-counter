@@ -27,6 +27,7 @@ import { fromPriceCents } from '@/lib/ticketState';
 import { formatMoney } from '@/lib/money';
 import type { FeedSnapshot } from '@/lib/feedSnapshot';
 import { listPlatformPosts } from '@/lib/platformPosts';
+import { cardFestivalInSeason } from '@/lib/greetingCards';
 import type { PlatformPostRow } from '@/lib/platformPosts';
 
 // The feed reflects live availability — always render fresh.
@@ -219,6 +220,7 @@ export default async function HomePage() {
   const upcoming = events.filter((e) => e.kind !== 'shop' && !isPast(e, todayIso()));
   const upcomingCount = upcoming.length;
   const upcomingCities = new Set(upcoming.map((e) => e.city.trim()).filter(Boolean));
+  const cardSeason = cardFestivalInSeason();
 
   return (
     <>
@@ -253,6 +255,26 @@ export default async function HomePage() {
       {/* Anchors the Ask chat links to ("/#events", "/#shops", "/#picks"). */}
       <span id="events" className="ab-anchor" aria-hidden="true" />
       <HomeBillboard slides={slides} startAt={slidesStart} />
+      {/* Festival season only: the greeting card people send to the family
+          group, carrying the site's address with it (see lib/greetingCards). */}
+      {cardSeason && (
+        <div className="container">
+          <Link href={`/card?f=${cardSeason.slug}`} className="gc-band">
+            <span className="gc-band-icon" aria-hidden="true">
+              {cardSeason.slug === 'tihar' ? '🪔' : cardSeason.slug === 'dashain' ? '🪁' : '✨'}
+            </span>
+            <span className="gc-band-text">
+              <strong>
+                <span lang="ne">{cardSeason.nameNe}</span> · Make your {cardSeason.name} card
+              </strong>
+              <span>Your name and family photo, ready for WhatsApp in a minute. Free.</span>
+            </span>
+            <span className="gc-band-go" aria-hidden="true">
+              Make it →
+            </span>
+          </Link>
+        </div>
+      )}
       <nav className="qt container" aria-label={tr('home.title')}>
         <Link href="/market" className="qt-tile qt-bazaar">
           <span className="qt-icon" aria-hidden="true">
@@ -288,6 +310,48 @@ export default async function HomePage() {
           }
         />
       </nav>
+
+      {/* The community: meetups, the help board, artists. Three doors, one
+          line each — the pages behind them explain themselves. */}
+      <section className="container ch-home" aria-labelledby="ch-home-title">
+        <div className="ch-home-head">
+          <p className="feed-kicker">
+            <span lang="ne">हाम्रो समाज</span> · Community
+          </p>
+          <h2 id="ch-home-title" className="ch-home-title">
+            Far from home, closer to each other
+          </h2>
+        </div>
+        <div className="ch-mini-row">
+          <Link href="/bhetghat" className="ch-door ch-door-bg ch-mini">
+            <span className="ch-door-emoji" aria-hidden="true">
+              👋
+            </span>
+            <span className="ch-door-text">
+              <strong>Meetups</strong>
+              <span>Swipe right, you&rsquo;re in</span>
+            </span>
+          </Link>
+          <Link href="/sahayog" className="ch-door ch-door-hb ch-mini">
+            <span className="ch-door-emoji" aria-hidden="true">
+              🤝
+            </span>
+            <span className="ch-door-text">
+              <strong>Help board</strong>
+              <span>Rooms, rides, luggage to Nepal</span>
+            </span>
+          </Link>
+          <Link href="/kalakar" className="ch-door ch-door-kl ch-mini">
+            <span className="ch-door-emoji" aria-hidden="true">
+              🎤
+            </span>
+            <span className="ch-door-text">
+              <strong>Artists</strong>
+              <span>Singers, DJs, pandits & more</span>
+            </span>
+          </Link>
+        </div>
+      </section>
 
       {/* The platform's own voice, AFTER the listing. Above the events it was
           the first thing between a visitor and the reason they came, and news

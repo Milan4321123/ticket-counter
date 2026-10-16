@@ -26,7 +26,7 @@ export const PRIVACY_TOC_DE: { id: string; title: string }[] = [
   { id: 'cookies', title: '4. Cookies und Speicherung auf Ihrem Gerät' },
   { id: 'bestellung', title: '5. Tickets und Bestellungen' },
   { id: 'zahlung', title: '6. Bezahlung' },
-  { id: 'kundenkonto', title: '7. Kundenkonto' },
+  { id: 'kundenkonto', title: '7. Kundenkonto und Community' },
   { id: 'mitteilungen', title: '8. „Keep me posted“ – Mitteilungen eines Anbieters' },
   { id: 'kundenkarte', title: '9. Kundenkarte' },
   { id: 'abonnements', title: '10. Subscribe & save (wiederkehrende Bestellungen)' },
@@ -321,6 +321,11 @@ export default function PrivacyDe({ f }: { f: PrivacyFacts }) {
                 <td className="small">bis Sie Einträge entfernen</td>
               </tr>
               <tr>
+                <td className="mono small">mn-bhetghat-v1</td>
+                <td className="small">Bhetghat: Veranstaltungen, die Sie in „Meine Pläne“ gelegt oder übersprungen haben, und Ihr Ortsfilter – wird nie an uns übertragen</td>
+                <td className="small">bis Sie sie entfernen; Übersprungenes nach 30 Tagen</td>
+              </tr>
+              <tr>
                 <td className="mono small">martnepali.device.v1, martnepali.wished.v1</td>
                 <td className="small">
                   Wunsch-Button: zufällige Gerätekennung und Ihre Wünsche, damit ein Wunsch je Gerät nur
@@ -475,7 +480,7 @@ export default function PrivacyDe({ f }: { f: PrivacyFacts }) {
         </p>
       </Sec>
 
-      <Sec id="kundenkonto" title="7. Kundenkonto">
+      <Sec id="kundenkonto" title="7. Kundenkonto und Community">
         <p>
           Ein Kundenkonto ist freiwillig; Bestellen geht auch ohne. Mit einem Konto sehen Sie alle
           Bestellungen, die zu Ihrer bestätigten E-Mail-Adresse gehören, und Ihr Warenkorb wird zwischen
@@ -508,8 +513,37 @@ export default function PrivacyDe({ f }: { f: PrivacyFacts }) {
           in die sich {d.customerInactive} Tage lang niemand angemeldet hat, löschen wir automatisch samt
           Warenkorb. Ihre Bestellungen sind davon nicht betroffen – für sie gelten die Fristen aus Abschnitt 5.
         </p>
-        <p style={{ marginBottom: 0 }}>
+        <p>
           Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Bereitstellung des von Ihnen gewünschten Kontos).
+        </p>
+        <Sub>Die Community (freiwillig)</Sub>
+        <p>
+          Wenn Sie aus Ihrem Kundenkonto der Community beitreten, speichern wir zusätzlich den Namen, den andere
+          Mitglieder sehen sollen, Ihren Wohnort, ein zufälliges öffentliches Kürzel, den Zeitpunkt des
+          Beitritts sowie Ihre Bestätigung, dass Sie mindestens 16 Jahre alt sind und die Community-Regeln
+          akzeptieren. Was Sie dort veröffentlichen – Treffen und wer teilnimmt, Nachrichten im Gruppen-Chat,
+          Beiträge im Hilfe-Board, private Nachrichten, Meldungen und Blockierungen – sehen nur angemeldete
+          Mitglieder (eine private Nachricht nur die beiden Beteiligten); Suchmaschinen sehen nichts davon.
+          Ausnahme ist ein Kalakar-Profil: Es ist bewusst öffentlich, mit dem Namen, Foto, Text und den Links, die
+          Sie eintragen – nie mit Ihrer E-Mail-Adresse oder Ihrem Mitgliedsnamen. Profilfotos werden in Ihrem
+          Browser neu kodiert und vor dem Hochladen von Kameradaten befreit; das Video eines Profils wird erst
+          von YouTube bzw. Vimeo geladen, wenn jemand auf „Abspielen“ drückt.
+        </p>
+        <p>
+          <strong>Speicherdauer:</strong> Ein Treffen mit Teilnehmenden und Chat wird {d.meetup} Tage nach dem
+          Termin gelöscht; ein Hilfe-Beitrag mit seinen Unterhaltungen {d.helpPost} Tage, nachdem er vom Board
+          verschwunden ist; jede Unterhaltung {d.conversation} Tage nach der letzten Nachricht; eine bearbeitete
+          Meldung {d.report} Tage nach der Entscheidung. Wenn Sie die Community verlassen (auf{' '}
+          <Link href="/community" style={linkStyle}>/community</Link>) oder Ihr Konto löschen, wird alles auf
+          einmal gelöscht. Meldungen lesen wir, um die Regeln durchzusetzen; drei Meldungen verschiedener
+          Mitglieder blenden einen Beitrag bis zur Prüfung aus.
+        </p>
+        <p style={{ marginBottom: 0 }}>
+          Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (der Community-Dienst, dem Sie beigetreten sind); für
+          Moderation und Sicherheit Art. 6 Abs. 1 lit. f DSGVO (unser berechtigtes Interesse und das der anderen
+          Mitglieder an einer sicheren Community). Der Grußkarten-Generator (
+          <Link href="/card" style={linkStyle}>/card</Link>) läuft vollständig in Ihrem Browser: Das Foto, das
+          Sie hinzufügen, wird nie hochgeladen.
         </p>
       </Sec>
 
@@ -946,6 +980,26 @@ export default function PrivacyDe({ f }: { f: PrivacyFacts }) {
               <tr>
                 <td className="small">Kundenkonto</td>
                 <td className="small">bis Sie es löschen; automatisch nach {d.customerInactive} Tagen ohne Anmeldung</td>
+              </tr>
+              <tr>
+                <td className="small">Community: Treffen und ihr Chat</td>
+                <td className="small">{d.meetup} Tage nach dem Treffen</td>
+              </tr>
+              <tr>
+                <td className="small">Community: Hilfe-Beiträge und ihre Unterhaltungen</td>
+                <td className="small">{d.helpPost} Tage, nachdem der Beitrag vom Board verschwunden ist</td>
+              </tr>
+              <tr>
+                <td className="small">Community: private Unterhaltungen</td>
+                <td className="small">{d.conversation} Tage nach der letzten Nachricht</td>
+              </tr>
+              <tr>
+                <td className="small">Community: Mitgliedschaft, Kalakar-Profil, Blockierungen</td>
+                <td className="small">bis Sie die Community verlassen oder Ihr Konto löschen</td>
+              </tr>
+              <tr>
+                <td className="small">Community: bearbeitete Meldungen</td>
+                <td className="small">{d.report} Tage nach der Entscheidung</td>
               </tr>
               <tr>
                 <td className="small">Kontaktanfragen</td>

@@ -31,6 +31,8 @@ export default function robots(): MetadataRoute.Robots {
           // part of an event listing. More specific than the /api/ rule below,
           // so it wins on a per-URL basis.
           '/api/media/',
+          // Kalakar profile photos: the og:image of a public profile page.
+          '/api/community/talent/photo/',
         ],
         disallow: [
           '/api/', // JSON endpoints — nothing here belongs in an index
@@ -41,6 +43,12 @@ export default function robots(): MetadataRoute.Robots {
           '/order/', // a real person's order and payment reference
           '/c/', // a real person's customer card with one seller
           '/checkout', // mid-purchase state, useless and personal
+          // The community's members-only rooms: a meetup, a help post, a
+          // conversation. Each answers a stranger with the join card anyway;
+          // this keeps the shared links themselves out of any index.
+          '/bhetghat/m/',
+          '/sahayog/p/',
+          '/inbox',
         ],
       },
     ],

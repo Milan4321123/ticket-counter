@@ -10218,7 +10218,10 @@ html.tx-wait body {
     position: static;
   }
   .cc-chat {
-    min-height: 70vh;
+    min-height: 58vh;
+  }
+  .cc-card-mobile {
+    margin-top: 14px;
   }
 }
 .cc-page {

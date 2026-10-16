@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 import { QUOTA_MESSAGE, takeAiQuota } from '@/lib/aiQuota';
 import { demoAddress, listingOpenTo } from '@/lib/demo';
 import { answerVisitorQuestion, type AssistantContext } from '@/lib/ai';
+import { fallbackEventAnswer, instantEventAnswer, linksForQuestion, type EventAskInput } from '@/lib/eventAsk';
+import { getOrganizer } from '@/lib/organizers';
+import { getSellerIdentity } from '@/lib/sellerIdentity';
+import { visibleTiers } from '@/lib/ticketState';
 import {
   createEventQuestion,
   getEventById,
@@ -174,6 +178,40 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       });
     }
 
+    // The questions nearly everybody asks first — what is this, who runs it,
+    // when, where, how much, how do I buy — straight from the listing, with no
+    // model and no quota (lib/eventAsk). Only the rest goes to the AI.
+    const availabilityNow = getAvailability(event.id);
+    const shownTiers = visibleTiers(getEventTiers(event.id));
+    const organizer = getOrganizer(event.organizerId);
+    const identity = getSellerIdentity(event.organizerId);
+    const askInput: EventAskInput = {
+      kind: event.kind === 'shop' ? 'shop' : 'event',
+      name: event.name,
+      artist: event.artist,
+      description: event.description,
+      dateDisplay: event.dateDisplay,
+      showTime: event.showTime,
+      venueName: event.kind === 'shop' ? '' : event.venueName,
+      address: event.kind === 'shop' ? event.pickupInfo : event.address,
+      city: event.city,
+      payWithinDays: event.payWithinDays,
+      organizerName: organizer?.name ?? '',
+      sellerLegalName: identity?.legalName ?? '',
+      tiers: shownTiers.map((t) => ({
+        name: t.name,
+        priceDisplay: formatMoney(t.priceCents, event.currency),
+        studentOnly: t.studentOnly,
+        soldOut: (availabilityNow.tiers[t.tierKey]?.remaining ?? 0) === 0,
+        free: t.priceCents === 0,
+      })),
+      faqs: getEventFaqs(event.id).map((f) => ({ question: f.question, answer: f.answer })),
+    };
+    const instant = instantEventAnswer(askInput, question);
+    if (instant) {
+      return NextResponse.json({ kind: 'answered', answer: instant.answer, links: instant.links });
+    }
+
     // Daily caps (lib/aiQuota): per visitor, per event page, and site-wide.
     if (
       !takeAiQuota([
@@ -217,11 +255,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         .map((q) => ({ question: q.question, answer: q.answer ?? '' })),
       // Written by the organizer in the portal; trimmed to size inside lib/ai.
       organizerNotes: event.assistantContext,
+      organizerName: [askInput.organizerName, askInput.sellerLegalName].filter(Boolean).join(' / '),
     };
 
     const result = await answerVisitorQuestion(ctx, question);
     if (result.kind === 'answered') {
-      return NextResponse.json({ kind: 'answered', answer: result.answer });
+      return NextResponse.json({ kind: 'answered', answer: result.answer, links: linksForQuestion(askInput, question) });
     }
 
     // Not a question at all. Saving it would put "sdfdsf" in the organizer's
@@ -242,7 +281,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // "send this to the organizer" link, which comes back here with escalate.
     return NextResponse.json({
       kind: 'unanswered',
-      message: 'I could not find that in the event details.',
+      // Never a bare dead end: what the page is about, and the offer below
+      // to pass the question to the organizer.
+      message: fallbackEventAnswer(askInput, question),
       canEscalate: true,
     });
   } catch (e) {

@@ -92,7 +92,6 @@ export default function CreatorChat({ owner = 'Milan', ai = false }: { owner?: s
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
-  const [openCard, setOpenCard] = useState(false);
   const log = useRef<HTMLDivElement>(null);
   const mobileCard = useRef<HTMLDivElement>(null);
   const speechBase = useRef('');
@@ -120,13 +119,14 @@ export default function CreatorChat({ owner = 'Milan', ai = false }: { owner?: s
   useEffect(() => {
     log.current?.scrollTo({ top: log.current.scrollHeight, behavior: 'smooth' });
   }, [turns, busy]);
-  // Phone: the opened request sits BELOW the chat, full height — bring its top
-  // into view so the visitor sees it arrive, with the send button under it.
-  useEffect(() => {
-    if (!openCard) return;
+  // Phone: the request is always shown, BELOW the chat at full height (people
+  // did not find it behind a tap-to-open strip). Once it is ready to send,
+  // bring it into view so the send button is right there.
+  function showCard() {
     const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     mobileCard.current?.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'start' });
-  }, [openCard]);
+  }
+
 
   async function talk(text: string) {
     const said = text.trim();
@@ -154,6 +154,7 @@ export default function CreatorChat({ owner = 'Milan', ai = false }: { owner?: s
         d = await ask();
       }
       if (d?.fields) setFields({ ...EMPTY, ...d.fields });
+      if (d?.ready && !ready && window.matchMedia('(max-width: 860px)').matches) setTimeout(showCard, 400);
       setReady(Boolean(d?.ready));
       setTurns((t) => [...t, { from: 'bot', text: d?.reply ?? d?.error ?? 'Sorry — that did not go through. Try again in a moment.' }]);
     } catch {
@@ -306,11 +307,12 @@ export default function CreatorChat({ owner = 'Milan', ai = false }: { owner?: s
             </div>
           )}
         </div>
-        {/* Phone: the request as a strip that opens. */}
-        <button type="button" className="cc-strip" onClick={() => setOpenCard((o) => !o)} aria-expanded={openCard}>
+        {/* Phone: how far the request is, and a jump to it — it is always
+            open just below the chat. */}
+        <button type="button" className="cc-strip" onClick={showCard}>
           <span className="cc-ring cc-ring-sm" style={{ ['--p' as string]: `${pct}%` }} aria-hidden="true" />
           Your request · {filled}/{rows.length}
-          {ready && !sent ? ' · ready to send' : ''} {openCard ? '▴' : '▾'}
+          {ready && !sent ? ' · ready to send' : ' · shown below'} ↓
         </button>
         {!sent && (
           <form
@@ -342,11 +344,9 @@ export default function CreatorChat({ owner = 'Milan', ai = false }: { owner?: s
       {/* Phone: the opened request, below the chat rather than squeezed inside
           it — the chat has a fixed height, and a card nested in it had to be
           scrolled in a sliver of screen to reach its send button. */}
-      {openCard && (
-        <div className="cc-card-mobile" ref={mobileCard}>
-          {card}
-        </div>
-      )}
+      <div className="cc-card-mobile" ref={mobileCard}>
+        {card}
+      </div>
       <div className="cc-card-desk">{card}</div>
     </div>
   );

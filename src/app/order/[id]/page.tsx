@@ -5,6 +5,8 @@ import OrganizerWhatsApp from '@/components/OrganizerWhatsApp';
 import CopyButton from '@/components/CopyButton';
 import PrintButton from '@/components/PrintButton';
 import ReviewForm from '@/components/ReviewForm';
+import StoryCardButton from '@/components/StoryCardButton';
+import { listingStillUrl } from '@/lib/listing';
 import { buyerAccountForOrder, issueCardForOrder } from '@/lib/buyerAccount';
 import {
   cropTag,
@@ -1001,7 +1003,20 @@ export default async function OrderPage({
               default. The PayPal links above are spelled the same way. */}
           <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="btn btn-green">
             {isFreeOrder ? "Tell your friends — I'm going →" : 'Tell your friends on WhatsApp →'}
-          </a>
+          </a>{' '}
+          {/* The same invitation as a picture for Instagram / WhatsApp status,
+              drawn in the browser from the event's own poster. */}
+          {event && event.kind !== 'shop' && shareEventUrl ? (
+            <StoryCardButton
+              title={event.name}
+              when={shortDateLabel(event) || event.dateDisplay}
+              where={[event.venueName, cityLabel(event.city)].filter(Boolean).join(' · ')}
+              image={listingStillUrl(event)}
+              url={shareEventUrl}
+              free={isFreeOrder}
+              slug={event.slug}
+            />
+          ) : null}
         </p>
       )}
 

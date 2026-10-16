@@ -53,6 +53,8 @@ export interface AssistantContext {
    * parking, food, age limits, doors. Everything the page has no field for.
    */
   organizerNotes: string;
+  /** Who runs it — the account name and, when given, the registered (legal) name. */
+  organizerName?: string;
 }
 
 export type AssistantResult =
@@ -90,6 +92,8 @@ export async function answerVisitorQuestion(ctx: AssistantContext, question: str
     const contextBlock =
       `EVENT CONTEXT (the only source of truth):\n` +
       `Name: ${ctx.eventName}\nArtist: ${ctx.artist || '-'}\nDate: ${ctx.dateDisplay || '-'}\n` +
+      `Organizer / seller (responsible for this listing): ${ctx.organizerName || '-'}\n` +
+      (ctx.description.trim() ? `Description (written by the organizer):\n${ctx.description.trim().slice(0, 1500)}\n` : '') +
       `Venue: ${ctx.venueName || '-'}, ${ctx.address || '-'}, ${ctx.city || '-'}\n` +
       `Payment: bank transfer within ${ctx.payWithinDays} days of reserving; tickets arrive by email after the organizer confirms the transfer.\n` +
       `Tickets:\n${ctx.tiers
@@ -122,11 +126,18 @@ export async function answerVisitorQuestion(ctx: AssistantContext, question: str
         'an account, who gets the money) use the HOW BUYING WORKS section. For short everyday or cultural questions ' +
         'that are clearly about this listing (e.g. "what is Dashain?" on a Dashain event, "what is jhol momo?" in a ' +
         'momo shop), you may give a brief common-knowledge answer and tie it back to the listing. ' +
-        'Stay within this page. Questions that have NOTHING to do with this listing or with buying here — the ' +
-        'weather, news, sports, homework, other cities, other events or shops, general trivia — are NOT for the ' +
-        'organizer: for those set confident=true and reply kindly in one sentence, in the visitor\'s language, ' +
-        'that you can only help with this listing here and that the homepage has everything else. Only questions ' +
-        'ABOUT this listing that the context cannot answer get confident=false (they go to the organizer). ' +
+        'General questions that are not about this listing (getting around in Germany, what to wear to a Nepali ' +
+        'concert, what a festival means, how bank transfers work, tips for a first visit) deserve a short, ' +
+        'genuinely helpful general answer: give it in 1-2 sentences, set confident=true, and where it fits bring ' +
+        'it back to this listing. Do not give medical, legal or financial advice beyond common sense, and never ' +
+        'present general advice as a fact about this listing. ' +
+        'Be warm and quietly persuasive, like a friendly host: when it fits, invite the visitor to get their ' +
+        'tickets (or order) on this page, mention that it may sell out only if the context says tickets are ' +
+        'limited or sold out, and never pressure or invent urgency. If someone asks about having their own event ' +
+        'page, a shop, a website or a promo video, say that MartNepali sets that up for free and that they can ' +
+        'reach the team through "Talk to us" (the contact page). ' +
+        'Only questions ABOUT this listing that the context cannot answer get confident=false (they go to the ' +
+        'organizer). ' +
         'Never invent facts about THIS listing — prices, times, dates, policies, what is included — that are not in ' +
         'the context. ' +
         'BUT do answer broad or vague questions ("what do you know?", "tell me about this", "what is this?", ' +

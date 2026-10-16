@@ -66,6 +66,8 @@ interface Msg {
    */
   escalateHref?: string;
   escalateLabel?: string;
+  /** Next steps offered under an answer — "Get tickets", "Talk to us". */
+  links?: { label: string; href: string }[];
 }
 
 function ChatIcon() {
@@ -221,11 +223,16 @@ export default function ChatWidget({ title, subtitle, placeholder, endpoint, ext
         canEscalate?: boolean;
         escalateHref?: string;
         escalateLabel?: string;
+        links?: { label: string; href: string }[];
       } | null;
       if (!res.ok) {
         pushAssistant(data?.error ?? 'Something went wrong — please try again.', 'error');
       } else if (data?.kind === 'answered' && typeof data.answer === 'string') {
-        pushAssistant(data.answer);
+        const answer = data.answer;
+        const links = Array.isArray(data.links)
+          ? data.links.filter((l) => l && typeof l.label === 'string' && typeof l.href === 'string' && (l.href.startsWith('/') || l.href.startsWith('#'))).slice(0, 3)
+          : [];
+        setMessages((m) => [...m, { role: 'assistant', text: answer, tone: 'normal', links }]);
       } else if (data?.kind === 'unclear') {
         // Not a question at all — nearly always a typo or a stray keypress.
         // Ask for another go, and do NOT offer to bother a human with it.
@@ -346,6 +353,22 @@ export default function ChatWidget({ title, subtitle, placeholder, endpoint, ext
             translate={m.role === 'user' ? 'no' : undefined}
           >
             {m.text}
+            {m.links && m.links.length > 0 && (
+              <span className="chat-links">
+                {m.links.map((l) => (
+                  <a
+                    key={l.href}
+                    href={l.href}
+                    className="chat-link-btn"
+                    // A jump within the page ("#tickets") closes the chat so
+                    // the visitor actually sees where it took them.
+                    onClick={() => l.href.startsWith('#') && setOpen(false)}
+                  >
+                    {l.label} →
+                  </a>
+                ))}
+              </span>
+            )}
             {/* Plain text link rather than a button: this is an offer inside a
                 sentence, not an action the visitor came here to take. */}
             {m.escalateHref && (

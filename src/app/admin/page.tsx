@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { isAdminRequest } from '@/lib/auth';
 import { countNewContactRequests } from '@/lib/contact';
+import { communityCounts } from '@/lib/community';
 import { getPrimaryEvent, listAllEvents } from '@/lib/events';
 import { formatMoney } from '@/lib/money';
 import { listOrganizers } from '@/lib/organizers';
@@ -66,6 +67,7 @@ export default async function AdminDashboardPage() {
   // Account applications and "design my page for me" enquiries from /contact
   // still waiting for an answer.
   const newContactRequests = countNewContactRequests();
+  const communityReports = communityCounts().openReports;
   const totalCapacity = events.reduce((sum, e) => sum + e.totalCapacity, 0);
   // Every event shares one currency until multi-currency exists — use the
   // platform's first event's (falls back to EUR before any event exists).
@@ -116,6 +118,15 @@ export default async function AdminDashboardPage() {
               sit with somebody who has no stake in the score. */}
           <Link href="/admin/reviews" className="btn btn-sm">
             Reviews
+          </Link>
+          {/* Reports on meetups, help posts, messages and Kalakar profiles. */}
+          <Link href="/admin/community" className="btn btn-sm">
+            Community
+            {communityReports > 0 ? (
+              <span className="badge badge-amber" style={{ marginLeft: 6 }}>
+                {communityReports} reported
+              </span>
+            ) : null}
           </Link>
           {/* What people wanted but could not buy (lib/wishes). */}
           <Link href="/admin/wishes" className="btn btn-sm">

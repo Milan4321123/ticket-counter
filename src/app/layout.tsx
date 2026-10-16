@@ -18,6 +18,8 @@ import './globals.css';
 // `btn bz-search-btn`), and the bazaar's denser version is meant to win those
 // ties. Its own header comment explains why it is a separate file at all.
 import './bazaar.css';
+// Cards, meetups, the help board, profiles, the inbox — see its header.
+import './community.css';
 import { INSTALL_PROMPT_CATCHER, InstallFooterLink, InstallNudge, ServiceWorkerRegistrar } from '@/components/AppInstall';
 import { Suspense } from 'react';
 import HeaderNav from '@/components/HeaderNav';
@@ -220,10 +222,33 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <Link href="/patro">Nepali patro</Link>
                 </li>
                 <li>
+                  <Link href="/community">
+                    <Np>हाम्रो समाज</Np> · Community
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/bhetghat">Bhetghat · meetups</Link>
+                </li>
+                <li>
+                  <Link href="/sahayog">Sahayog · help board</Link>
+                </li>
+                <li>
+                  <Link href="/kalakar">Kalakar · Nepali artists</Link>
+                </li>
+                <li>
+                  <Link href="/card">Festival greeting cards</Link>
+                </li>
+                <li>
+                  <Link href="/nepali-in">Nepalis by town</Link>
+                </li>
+                <li>
                   <Link href="/market">The bazaar</Link>
                 </li>
                 <li>
                   <Link href="/organizers">For organizers</Link>
+                </li>
+                <li>
+                  <Link href="/studio">What we build · Studio</Link>
                 </li>
                 <li>
                   <Link href="/showcase">Features</Link>

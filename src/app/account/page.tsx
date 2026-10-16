@@ -5,6 +5,8 @@ import { orderUrlForBuyerEmail } from '@/lib/orders';
 import { readListingName } from '@/lib/exampleShop';
 import { everyLabel } from '@/lib/subscriptions';
 import { BUYER_RETENTION_DAYS, CUSTOMER_INACTIVE_DAYS, UNDATED_ORDER_RETENTION_DAYS } from '@/lib/retention';
+import { getMember } from '@/lib/community';
+import { communityUnread } from '@/lib/inbox';
 import SignInForm from './SignInForm';
 
 export const dynamic = 'force-dynamic';
@@ -67,6 +69,8 @@ export default async function AccountPage({
   }
 
   const orders = ordersForCustomer(customer.email);
+  const member = getMember(customer.id);
+  const unread = member ? communityUnread(member) : 0;
   const subs = subscriptionsForCustomer(customer.email);
   const first = customer.name.split(/\s+/)[0] || '';
 
@@ -198,6 +202,22 @@ export default async function AccountPage({
       )}
 
       <section className="acc-section anim-fade-up anim-d2">
+        <h2>Community</h2>
+        {member ? (
+          <p className="muted small">
+            You are a member as <strong translate="no">{member.name}</strong> ({member.city}).{' '}
+            <Link href="/community">Your community page</Link> · <Link href="/inbox">Inbox{unread ? ` (${unread})` : ''}</Link> ·{' '}
+            <Link href="/bhetghat/plans">My plans</Link>
+          </p>
+        ) : (
+          <p className="muted small">
+            Meetups near you, a help board for rooms, rides and papers, and Nepali artists to book — free, members only.{' '}
+            <Link href="/community">Join the community →</Link>
+          </p>
+        )}
+      </section>
+
+      <section className="acc-section anim-fade-up anim-d2">
         <h2>Your name at checkout</h2>
         <form method="post" action="/api/account/name" className="acc-name">
           <input name="name" defaultValue={customer.name} placeholder="Your name" maxLength={120} aria-label="Your name" />
@@ -213,7 +233,7 @@ export default async function AccountPage({
         <p className="muted small">
           Download everything held under <span translate="no">{customer.email}</span> — your account, orders
           with their items and tickets, subscriptions, reviews, customer cards, keep-me-posted choices,
-          waitlists and messages — as one file (JSON), with how long each is kept.
+          waitlists, messages and your community posts — as one file (JSON), with how long each is kept.
         </p>
         <a href="/api/account/export" className="btn btn-sm" download>
           Download my data
@@ -224,7 +244,8 @@ export default async function AccountPage({
       <section className="acc-section anim-fade-up anim-d2" id="delete">
         <h2>Delete my account</h2>
         <p className="muted small">
-          This deletes your account, your saved basket and any sign-in code, and signs you out. Your{' '}
+          This deletes your account, your saved basket, any sign-in code and everything you did in the community
+          (meetups, posts, messages, your Kalakar profile), and signs you out. Your{' '}
           <strong>orders are not part of your account</strong>: each one is the seller&rsquo;s record of a sale
           and stays with them until it is erased automatically — {BUYER_RETENTION_DAYS} days after the event
           (for shops, after collection; for listings without a date, {UNDATED_ORDER_RETENTION_DAYS} days after

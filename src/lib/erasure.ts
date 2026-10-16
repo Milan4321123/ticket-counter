@@ -25,14 +25,19 @@
 // books.
 import { getDb } from './db';
 import { eraseCustomerCards } from './cards';
+import { communityExport } from './communityData';
 import { customerAccountRow, deleteCustomersByEmail, getCustomerBasket } from './customers';
 import { deleteEventCompletely, tablesWithColumn } from './events';
 import { eraseMarketingConsent } from './marketing';
 import { paymentReference } from './orders';
 import {
   BUYER_RETENTION_DAYS,
+  COMMUNITY_REPORT_RETENTION_DAYS,
   CONTACT_REQUEST_RETENTION_DAYS,
+  CONVERSATION_RETENTION_DAYS,
   CUSTOMER_INACTIVE_DAYS,
+  HELP_POST_RETENTION_DAYS,
+  MEETUP_RETENTION_DAYS,
   ERASED_BUYER_EMAIL,
   ERASED_BUYER_NAME,
   ERASE_ORDER_BUYER_SQL,
@@ -225,6 +230,7 @@ function retentionNotes(): Record<string, string> {
     contactRequests: `Contact-form messages are deleted ${CONTACT_REQUEST_RETENTION_DAYS} days after they arrived.`,
     referralVouchers: `Your address on a spent voucher is erased ${REFERRAL_VOUCHER_RETENTION_DAYS} days after it was spent (later only while you still have an order with that seller, because your referral count depends on it).`,
     marketing: 'A confirmed keep-me-posted consent lasts until you unsubscribe or ask for erasure; an unsubscribe is kept as a do-not-email record.',
+    community: `Community: a meetup with its participants and chat is deleted ${MEETUP_RETENTION_DAYS} days after it took place; a help post with its conversations ${HELP_POST_RETENTION_DAYS} days after it left the board; a conversation ${CONVERSATION_RETENTION_DAYS} days after its last message; a handled report ${COMMUNITY_REPORT_RETENTION_DAYS} days after the decision. Leaving the community or deleting your account deletes all of it at once.`,
   };
 }
 
@@ -367,12 +373,13 @@ export function collectPersonalData(rawEmail: string) {
   };
 }
 
-/** The signed-in customer's whole export: their account and basket, plus everything under their address. */
+/** The signed-in customer's whole export: their account and basket, everything under their address, and their community data. */
 export function customerDataExport(customer: { id: string; email: string }) {
   return {
     account: customerAccountRow(customer.id),
     basket: getCustomerBasket(customer.id),
     ...collectPersonalData(customer.email),
+    community: communityExport(getDb(), customer.id),
   };
 }
 

@@ -1,7 +1,10 @@
 import { MixedScript } from '@/components/Np';
 import Np from '@/components/Np';
 import CopyButton from '@/components/CopyButton';
-import { digestText } from '@/lib/digest';
+import DigestCardButton, { type DigestCardItem } from '@/components/DigestCardButton';
+import { cityName } from '@/lib/cities';
+import { digestSections, digestText } from '@/lib/digest';
+import { readListingName } from '@/lib/exampleShop';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +21,16 @@ export const metadata = {
 // visible in full, the copy button is at the top, and nothing else competes.
 export default function DigestPage() {
   const text = digestText();
+  // The same week as a picture (components/DigestCardButton).
+  const sections = digestSections();
+  const cardItems: DigestCardItem[] = [...sections.thisWeek, ...sections.comingUp].slice(0, 9).map((e) => ({
+    when: e.eventDate
+      ? new Date(`${e.eventDate.slice(0, 10)}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
+      : e.dateDisplay,
+    title: readListingName(e.name).name,
+    city: cityName(e.city),
+  }));
+  const festival = sections.festivalLine ? sections.festivalLine.replace(/\s*·\s*https?:\/\/\S+$/, '') : null;
 
   return (
     <div className="container container-narrow section">
@@ -37,7 +50,10 @@ export default function DigestPage() {
           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}
         >
           <span>The message</span>
-          <CopyButton value={text} label="Copy for WhatsApp" />
+          <span style={{ display: 'inline-flex', gap: 8, flexWrap: 'wrap' }}>
+            <CopyButton value={text} label="Copy for WhatsApp" />
+            <DigestCardButton items={cardItems} festival={festival} />
+          </span>
         </div>
         <pre
           style={{

@@ -122,7 +122,27 @@ const HELP: Answers = {
     'Kun chahincha bhannus — wa je pani sodhnus.',
 };
 
+const CUSTOM: Answers = {
+  en:
+    'Want your own event page, a shop, a website or a promo video for Reels and WhatsApp? MartNepali sets it up with you — free while we grow. ' +
+    'See [what we build](/studio), then [talk to us](/contact) — a person reads every message.',
+  de:
+    'Du möchtest eine eigene Event-Seite, einen Laden, eine Website oder ein Promo-Video für Reels und WhatsApp? MartNepali richtet es mit dir ein — kostenlos, solange wir wachsen. ' +
+    'Sieh dir an, [was wir bauen](/studio), und [schreib uns](/contact).',
+  ne:
+    'आफ्नै कार्यक्रम पेज, पसल, वेबसाइट वा Reels/WhatsApp का लागि प्रमो भिडियो चाहनुहुन्छ? MartNepali ले निःशुल्क बनाइदिन्छ। ' +
+    '[हामी के बनाउँछौं](/studio) हेर्नुहोस्, अनि [हामीलाई लेख्नुहोस्](/contact)।',
+  rn:
+    'Aafno event page, pasal, website wa Reels/WhatsApp ko lagi promo video chahiyo? MartNepali le sangai banaidincha — ahile free. ' +
+    '[Hami ke banauchau](/studio) hernus, ani [hamilai lekhnus](/contact).',
+};
+
 const TOPICS: { re: RegExp; answer: Answers }[] = [
+  {
+    // "Can you make me a website / a promo video?", "marketing for my event".
+    re: /\b(website|web ?site|webseite|promo ?video|video (for|of) (my|our)|(make|create|design|build) (me |us )?(a |an )?(video|website|page|poster|ad|advert)|advert\w*|marketing|werbung|custom (page|design|website)|video banau\w*|website banau\w*)\b/i,
+    answer: CUSTOM,
+  },
   {
     // "I am not sure what to do", "help", "keine Ahnung", "k garne thaha chaina".
     re: /^\s*(help|hi|hello|hey|hallo|namaste|namaskar|start|menu|\?+)\s*[!.?]*\s*$|\b(nots?\s?s?rue|not sure|dont know|don'?t know|no idea|what (can|should|do) i do|where (do|should) i start|what now|confused|lost|keine ahnung|was kann ich (hier )?(machen|tun)|k garne|ke garne|thaha chaina|thaha xaina|bujhina)\b|के गर्ने|थाहा छैन/i,

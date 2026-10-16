@@ -9,6 +9,7 @@
 import crypto from 'crypto';
 import { cookies } from 'next/headers';
 import { getSigningSecret } from './auth';
+import { eraseCommunityRows, unlinkTalentPhotos } from './communityData';
 import { getDb } from './db';
 
 export const CUSTOMER_COOKIE_NAME = 'customer_session';
@@ -117,8 +118,8 @@ export function setCustomerName(id: string, name: string): void {
 
 /**
  * Delete the account and everything that exists only because of it — the
- * saved basket and any sign-in code waiting for its address — in one
- * transaction. NOT the orders: those are the sellers' records (each seller is
+ * saved basket, any sign-in code waiting for its address, and everything the
+ * person did in the community (lib/communityData) — in one transaction. NOT the orders: those are the sellers' records (each seller is
  * the controller of its own sales) and are erased on their own clock by
  * lib/retention.ts, or earlier on request through the admin erase tool.
  *
@@ -128,30 +129,41 @@ export function setCustomerName(id: string, name: string): void {
  */
 export function deleteCustomer(id: string): boolean {
   const db = getDb();
-  return db.transaction(() => {
+  let photos: string[] = [];
+  const done = db.transaction(() => {
     const row = db.prepare(`SELECT email FROM customers WHERE id = ?`).get(id) as { email: string } | undefined;
     if (!row) return false;
     db.prepare(`DELETE FROM customer_baskets WHERE customer_id = ?`).run(id);
     db.prepare(`DELETE FROM customer_login_codes WHERE email = ?`).run(row.email);
+    // Meetups, help posts, a Kalakar profile, conversations, reports, blocks.
+    photos = eraseCommunityRows(db, id).photos;
     db.prepare(`DELETE FROM customers WHERE id = ?`).run(id);
     return true;
   })();
+  unlinkTalentPhotos(photos);
+  return done;
 }
 
 /** Delete every account for this address (there is at most one), with baskets and codes. */
 export function deleteCustomersByEmail(email: string): { customers: number; baskets: number; loginCodes: number } {
   const db = getDb();
   const address = (email || '').trim();
-  return db.transaction(() => {
+  const photos: string[] = [];
+  const report = db.transaction(() => {
     const ids = (db.prepare(`SELECT id FROM customers WHERE email = ?`).all(address) as { id: string }[]).map(
       (r) => r.id
     );
     let baskets = 0;
-    for (const id of ids) baskets += db.prepare(`DELETE FROM customer_baskets WHERE customer_id = ?`).run(id).changes;
+    for (const id of ids) {
+      baskets += db.prepare(`DELETE FROM customer_baskets WHERE customer_id = ?`).run(id).changes;
+      photos.push(...eraseCommunityRows(db, id).photos);
+    }
     const loginCodes = db.prepare(`DELETE FROM customer_login_codes WHERE email = ?`).run(address).changes;
     const customers = db.prepare(`DELETE FROM customers WHERE email = ?`).run(address).changes;
     return { customers, baskets, loginCodes };
   })();
+  unlinkTalentPhotos(photos);
+  return report;
 }
 
 /** The raw account row, for the customer's own data export. */

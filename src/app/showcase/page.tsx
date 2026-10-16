@@ -36,6 +36,9 @@ export default function ShowcasePage() {
             <Link href="/built" className="btn btn-green">
               How it&rsquo;s built
             </Link>
+            <Link href="/studio" className="btn">
+              Videos &amp; custom builds
+            </Link>
           </p>
         </div>
       </section>
