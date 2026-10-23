@@ -27,6 +27,7 @@ import assert from 'node:assert/strict';
 
 import {
   applyQueuedPayoutNow,
+  payoutDestinationMoves,
   cancelQueuedPayoutChange,
   effectivePayout,
   isValidIban,
@@ -291,4 +292,11 @@ test('owner can NOT apply early when the IBAN changes', () => {
   assert.equal(queuedChangeKeepsDestination(queued), false);
   assert.throws(() => applyQueuedPayoutNow(event.id, queued, event.organizerId));
   assert.equal(effectivePayout(getEventById(event.id)!).iban, OLD.iban);
+});
+
+test('only an IBAN or PayPal move counts as a destination move (decides the day of waiting)', () => {
+  assert.equal(payoutDestinationMoves(OLD, { ...OLD, holder: 'Dashain Nights GmbH', bic: 'X', bankName: 'Y' }), false);
+  assert.equal(payoutDestinationMoves(OLD, { ...OLD, iban: 'de02 1203 0000 0000 2020 51' }), false);
+  assert.equal(payoutDestinationMoves(OLD, NEW), true);
+  assert.equal(payoutDestinationMoves(OLD, { ...OLD, paypal: 'someone@example.test' }), true);
 });

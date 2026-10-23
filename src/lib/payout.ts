@@ -305,6 +305,36 @@ export function queuedChangeKeepsDestination(event: EventPayoutColumns): boolean
 }
 
 /**
+ * Does moving from `from` to `to` change where money lands? Only the IBAN and
+ * PayPal decide that; the holder, BIC and bank name only describe the account.
+ */
+export function payoutDestinationMoves(from: PayoutAccount, to: PayoutAccount): boolean {
+  return !sameIban(from.iban, to.iban) || from.paypal.trim() !== to.paypal.trim();
+}
+
+/**
+ * Put a corrected description (holder, BIC, bank name) on this event's unpaid
+ * orders that point at the same IBAN, so buyers who already have instructions
+ * pay a name their bank accepts. Paid and cancelled orders keep what they were
+ * told. Returns how many orders changed.
+ */
+export function correctUnpaidOrderDetails(eventId: string, account: PayoutAccount): number {
+  const db = getDb();
+  const orders = db
+    .prepare(`SELECT id, payout_iban AS iban FROM orders WHERE event_id = ? AND status IN ('pending', 'claimed')`)
+    .all(eventId) as { id: string; iban: string }[];
+  const fix = db.prepare(`UPDATE orders SET payout_holder = ?, payout_bic = ?, payout_bank_name = ? WHERE id = ?`);
+  let n = 0;
+  for (const o of orders) {
+    if (o.iban && sameIban(o.iban, account.iban)) {
+      fix.run(account.holder, account.bic, account.bankName, o.id);
+      n++;
+    }
+  }
+  return n;
+}
+
+/**
  * The owner applies a queued description-only change now instead of tomorrow.
  *
  * Also corrects the holder/BIC/bank name on this event's still-unpaid orders
@@ -323,18 +353,7 @@ export function applyQueuedPayoutNow(eventId: string, event: EventPayoutColumns,
   db.transaction(() => {
     db.prepare(`UPDATE events SET pending_payout_effective_at = ? WHERE id = ?`).run(now, eventId);
     settleDuePayout(eventId);
-    const orders = db
-      .prepare(`SELECT id, payout_iban AS iban FROM orders WHERE event_id = ? AND status IN ('pending', 'claimed')`)
-      .all(eventId) as { id: string; iban: string }[];
-    const fix = db.prepare(
-      `UPDATE orders SET payout_holder = ?, payout_bic = ?, payout_bank_name = ? WHERE id = ?`
-    );
-    for (const o of orders) {
-      if (o.iban && sameIban(o.iban, queued.iban)) {
-        fix.run(queued.holder, queued.bic, queued.bankName, o.id);
-        ordersUpdated++;
-      }
-    }
+    ordersUpdated = correctUnpaidOrderDetails(eventId, queued);
     recordPayoutChange({
       eventId,
       organizerId,

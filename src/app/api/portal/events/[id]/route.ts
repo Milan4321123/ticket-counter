@@ -27,11 +27,16 @@ import { organizerTotpEnabled } from '@/lib/organizerTotp';
 import { legalPublishBlocker } from '@/lib/organizers';
 import {
   PAYOUT_DELAY_MS,
+  cancelQueuedPayoutChange,
+  correctUnpaidOrderDetails,
   effectivePayout,
   isValidIban,
+  markPayoutChangesCancelled,
   payoutChangeIsDelayed,
+  payoutDestinationMoves,
   payoutNameMatchesOrganizer,
   queuePayoutChange,
+  queuedPayoutChange,
   recordPayoutChange,
 } from '@/lib/payout';
 import {
@@ -525,16 +530,27 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
      * Does this change have to wait before buyers are given it?
      *
      * Only once the event could ever have taken money (payout_locked), and only
-     * when a DESTINATION actually moves — correcting the bank's display name on
-     * a selling event is not worth a day's delay, and gating it would teach
-     * organizers that the waiting period is arbitrary.
+     * when a DESTINATION actually moves — the IBAN or PayPal. Correcting the
+     * holder's spelling, the BIC or the bank name sends money nowhere new, so it
+     * applies at once (still behind the step-up, still alarmed and recorded):
+     * with Verification of Payee a misspelled holder makes every buyer's bank
+     * warn "name does not match", and a day of that is the real harm.
      *
      * Note this deliberately does NOT spare a first-time set the way the step-up
      * does. On an event that has already sold, adding a bank account where there
      * was only PayPal is a brand-new place for money to go, and "there was
      * nothing here before" is exactly the shape the attack would take.
      */
-    const delayPayout = payoutTouched && payoutChange.changed.length > 0 && payoutChangeIsDelayed(event);
+    const delayPayout =
+      payoutTouched &&
+      payoutChange.changed.length > 0 &&
+      payoutChangeIsDelayed(event) &&
+      payoutDestinationMoves(payoutNow, payoutTarget);
+    // A queued change that this immediate one already covers (same IBAN and
+    // PayPal) would only land tomorrow as a no-op and keep the warning box up.
+    const queuedNow = queuedPayoutChange(event);
+    const supersedeQueued =
+      payoutTouched && !delayPayout && queuedNow !== null && !payoutDestinationMoves(queuedNow, payoutTarget);
 
     if (payoutTouched && !delayPayout) {
       set('bank_account_holder', payoutTarget.holder);
@@ -919,6 +935,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       // have.
       if (delayPayout) {
         queuePayoutChange(event.id, payoutTarget, payoutEffectiveAt!);
+      } else if (payoutTouched && payoutChangeIsDelayed(event)) {
+        if (supersedeQueued) {
+          markPayoutChangesCancelled(event.id);
+          cancelQueuedPayoutChange(event.id);
+        }
+        correctUnpaidOrderDetails(event.id, payoutTarget);
       }
       for (const field of payoutChange.changed) {
         recordPayoutChange({
