@@ -33,7 +33,8 @@ import PortalNav from '../../../PortalNav';
 import { requirePortalOrganizer } from '../../../guard';
 import AssistantPanel from './AssistantPanel';
 import { organizerTotpEnabled } from '@/lib/organizerTotp';
-import { effectivePayout, queuedPayoutChange } from '@/lib/payout';
+import { effectivePayout, queuedChangeKeepsDestination, queuedPayoutChange } from '@/lib/payout';
+import { isAdminRequest } from '@/lib/auth';
 import { anyPaymentRoute, listConnections, paymentOptionsFor } from '@/lib/paymentConnections';
 import BankForm from './BankForm';
 import KitchenSetupPanel from './KitchenSetupPanel';
@@ -269,6 +270,8 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
   // exists to make visible.
   const effective = effectivePayout(event);
   const queued = queuedPayoutChange(event);
+  // The owner's early-apply button for a name-only fix; see lib/payout.
+  const ownerCanApplyNow = Boolean(queued) && queuedChangeKeepsDestination(event) && (await isAdminRequest());
   // Done when a buyer could actually pay: a transfer route with an account
   // behind it, or an instant route with the seller's own connection behind it.
   const bankDone = anyPaymentRoute(paymentOptionsFor(event));
@@ -468,6 +471,7 @@ export default async function EventEditPage({ params }: { params: Promise<{ id: 
               paypal: connections.find((c) => c.provider === 'paypal')?.accountLabel ?? null,
               stripe: connections.find((c) => c.provider === 'stripe')?.accountLabel ?? null,
             }}
+            ownerCanApplyNow={ownerCanApplyNow}
             queued={
               queued && {
                 holder: queued.holder,

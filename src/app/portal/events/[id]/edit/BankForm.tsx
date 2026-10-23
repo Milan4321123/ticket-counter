@@ -29,6 +29,12 @@ interface Props {
   };
   /** A confirmed change still inside its waiting period, if any. */
   queued?: QueuedChange | null;
+  /**
+   * True only for the platform owner (signed in to admin in this browser) when
+   * the queued change keeps the same IBAN and PayPal — a name fix. Organizers
+   * never see the button.
+   */
+  ownerCanApplyNow?: boolean;
   /** Which ways to pay THIS listing offers — see lib/paymentConnections. */
   routes: { transfer: boolean; paypal: boolean; stripe: boolean };
   /** The seller's connected accounts (label), or null when not connected. */
@@ -38,7 +44,7 @@ interface Props {
 /** The exact patch that was refused, held so the confirmed save is the same one. */
 type PendingPatch = Record<string, unknown>;
 
-export default function BankForm({ eventId, kind, initial, queued, routes, connected }: Props) {
+export default function BankForm({ eventId, kind, initial, queued, ownerCanApplyNow, routes, connected }: Props) {
   const router = useRouter();
   const v = vocabFor(kind);
   const [payTransfer, setPayTransfer] = useState(routes.transfer);
@@ -242,6 +248,28 @@ export default function BankForm({ eventId, kind, initial, queued, routes, conne
     );
   }
 
+  async function applyNow() {
+    if (cancelling) return;
+    if (!window.confirm('Apply this name fix now instead of waiting the day? Only do this after confirming with the organizer.')) return;
+    setCancelling(true);
+    setCancelError(null);
+    try {
+      const res = await fetch(`/api/admin/events/${eventId}/payout/apply-now`, { method: 'POST' });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        setCancelError(data?.error ?? 'Could not apply the change. Please try again.');
+        setCancelling(false);
+        return;
+      }
+    } catch {
+      setCancelError('Could not reach the server — please check your connection and try again.');
+      setCancelling(false);
+      return;
+    }
+    setCancelling(false);
+    router.refresh();
+  }
+
   async function cancelQueued() {
     if (cancelling) return;
     setCancelling(true);
@@ -359,6 +387,17 @@ export default function BankForm({ eventId, kind, initial, queued, routes, conne
           >
             {cancelling ? 'Cancelling…' : 'Cancel this change'}
           </button>
+          {ownerCanApplyNow && (
+            <button
+              type="button"
+              className="btn btn-sm btn-primary"
+              style={{ marginTop: 10, marginLeft: 8 }}
+              onClick={applyNow}
+              disabled={cancelling}
+            >
+              Apply now (owner · same IBAN, name fix)
+            </button>
+          )}
         </div>
       )}
 
