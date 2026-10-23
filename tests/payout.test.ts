@@ -26,6 +26,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  applyQueuedPayoutNow,
   cancelQueuedPayoutChange,
   effectivePayout,
   isValidIban,
@@ -34,6 +35,7 @@ import {
   parkedPayout,
   payoutChangeIsDelayed,
   queuePayoutChange,
+  queuedChangeKeepsDestination,
   queuedPayoutChange,
   settleDuePayout,
   PAYOUT_DELAY_MS,
@@ -41,7 +43,7 @@ import {
 } from '../src/lib/payout.ts';
 import { getEventById } from '../src/lib/events.ts';
 import { getOrder } from '../src/lib/orders.ts';
-import { db, makeEventWithTier, makeOrder } from './helpers.ts';
+import { db, makeEventWithTier, makeOrder, makePaidOrder } from './helpers.ts';
 
 /** The organizer's real account, and the one an attacker would swap it for. */
 const OLD: PayoutAccount = {
@@ -258,4 +260,35 @@ test('an IBAN with a broken checksum is not a payout account', () => {
   assert.equal(isValidIban('DE0212030000000020205'), false); // one short for DE
   assert.equal(isValidIban('NL91ABNA0417164300'), true);
   assert.equal(isValidIban(''), true); // "not set yet" is a different question
+});
+
+// ---------------- The owner's early approval ----------------
+
+test('owner can apply a holder-name fix early; same IBAN, unpaid orders get the corrected name', () => {
+  const { event, tier } = eventWithOldAccount();
+  const unpaid = makeOrder({ eventId: event.id, items: [{ tierId: tier.tierKey, quantity: 1 }] });
+  const { order: paid } = makePaidOrder({ eventId: event.id, items: [{ tierId: tier.tierKey, quantity: 1 }] });
+
+  const fixed: PayoutAccount = { ...OLD, holder: 'Dashain Nights GmbH', iban: 'de02 1203 0000 0000 2020 51' };
+  queuePayoutChange(event.id, fixed, Date.now() + PAYOUT_DELAY_MS);
+  const queued = getEventById(event.id)!;
+  assert.equal(queuedChangeKeepsDestination(queued), true);
+
+  const updated = applyQueuedPayoutNow(event.id, queued, event.organizerId);
+  assert.equal(updated, 1);
+
+  const after = getEventById(event.id)!;
+  assert.equal(after.bankAccountHolder, 'Dashain Nights GmbH');
+  assert.equal(after.pendingPayoutEffectiveAt, null);
+  assert.equal(getOrder(unpaid.id)!.payoutHolder, 'Dashain Nights GmbH');
+  assert.equal(getOrder(paid.id)!.payoutHolder, OLD.holder, 'a paid order keeps what it was told');
+});
+
+test('owner can NOT apply early when the IBAN changes', () => {
+  const { event } = eventWithOldAccount();
+  queuePayoutChange(event.id, NEW, Date.now() + PAYOUT_DELAY_MS);
+  const queued = getEventById(event.id)!;
+  assert.equal(queuedChangeKeepsDestination(queued), false);
+  assert.throws(() => applyQueuedPayoutNow(event.id, queued, event.organizerId));
+  assert.equal(effectivePayout(getEventById(event.id)!).iban, OLD.iban);
 });

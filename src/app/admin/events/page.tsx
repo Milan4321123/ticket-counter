@@ -5,6 +5,8 @@ import { readCapacityLog } from '@/lib/capacity';
 import { getEventTiersBulk, listAllEvents } from '@/lib/events';
 import { getAvailabilityBulk } from '@/lib/inventory';
 import { listOrganizers } from '@/lib/organizers';
+import { livePayout, queuedChangeKeepsDestination, queuedPayoutChange } from '@/lib/payout';
+import ApplyPayoutNow from './ApplyPayoutNow';
 import CapacityForm from './CapacityForm';
 
 export const dynamic = 'force-dynamic';
@@ -91,6 +93,7 @@ export default async function AdminEventsPage() {
             }));
             const log = readCapacityLog(event.id);
             const soldOut = availability.totalRemaining === 0;
+            const queuedPayout = queuedPayoutChange(event);
 
             return (
               <div className="card" key={event.id}>
@@ -136,6 +139,16 @@ export default async function AdminEventsPage() {
                     tiers={tiers}
                   />
                 </div>
+
+                {queuedPayout && (
+                  <ApplyPayoutNow
+                    eventId={event.id}
+                    fromHolder={livePayout(event).holder}
+                    toHolder={queuedPayout.holder}
+                    effectiveAt={queuedPayout.effectiveAt}
+                    allowed={queuedChangeKeepsDestination(event)}
+                  />
+                )}
 
                 {log.length > 0 && (
                   <details style={{ marginTop: 12 }}>

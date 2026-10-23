@@ -281,6 +281,74 @@ export function settleDuePayout(eventId: string): void {
     .run(eventId, Date.now());
 }
 
+/** IBANs compared the way a bank would: spaces and case do not count. */
+function sameIban(a: string, b: string): boolean {
+  return (a || '').replace(/\s+/g, '').toUpperCase() === (b || '').replace(/\s+/g, '').toUpperCase();
+}
+
+/**
+ * True when a queued change leaves the money going exactly where it goes now —
+ * same IBAN, same PayPal — and only corrects how the account is described
+ * (holder spelling, BIC, bank name).
+ *
+ * That is the only kind of change the platform owner may approve early. The day
+ * of waiting exists to stop money being redirected; a typo fix in the holder
+ * name redirects nothing, and with Verification of Payee every buyer's bank now
+ * warns "name does not match" until it is fixed. Anything that touches where
+ * the money lands still waits the full day, owner or not.
+ */
+export function queuedChangeKeepsDestination(event: EventPayoutColumns): boolean {
+  const queued = queuedPayoutChange(event);
+  if (!queued) return false;
+  const live = livePayout(event);
+  return sameIban(queued.iban, live.iban) && queued.paypal.trim() === live.paypal.trim();
+}
+
+/**
+ * The owner applies a queued description-only change now instead of tomorrow.
+ *
+ * Also corrects the holder/BIC/bank name on this event's still-unpaid orders
+ * that point at the same IBAN, so buyers who already have instructions pay a
+ * name their bank will accept. Paid and cancelled orders keep what they were
+ * told. Recorded in payout_changes as the owner's act.
+ */
+export function applyQueuedPayoutNow(eventId: string, event: EventPayoutColumns, organizerId: string): number {
+  const queued = queuedPayoutChange(event);
+  if (!queued || !queuedChangeKeepsDestination(event)) {
+    throw new Error('Only a queued change that keeps the same IBAN and PayPal can be applied early.');
+  }
+  const db = getDb();
+  const now = Date.now();
+  let ordersUpdated = 0;
+  db.transaction(() => {
+    db.prepare(`UPDATE events SET pending_payout_effective_at = ? WHERE id = ?`).run(now, eventId);
+    settleDuePayout(eventId);
+    const orders = db
+      .prepare(`SELECT id, payout_iban AS iban FROM orders WHERE event_id = ? AND status IN ('pending', 'claimed')`)
+      .all(eventId) as { id: string; iban: string }[];
+    const fix = db.prepare(
+      `UPDATE orders SET payout_holder = ?, payout_bic = ?, payout_bank_name = ? WHERE id = ?`
+    );
+    for (const o of orders) {
+      if (o.iban && sameIban(o.iban, queued.iban)) {
+        fix.run(queued.holder, queued.bic, queued.bankName, o.id);
+        ordersUpdated++;
+      }
+    }
+    recordPayoutChange({
+      eventId,
+      organizerId,
+      field: 'appliedEarly',
+      oldValue: new Date(queued.effectiveAt).toISOString(),
+      newValue: new Date(now).toISOString(),
+      factor: 'none',
+      actor: 'owner',
+      effectiveAt: null,
+    });
+  })();
+  return ordersUpdated;
+}
+
 // ---------------- What an order was told ----------------
 
 /** The payout columns frozen onto an order at the moment it was created. */
