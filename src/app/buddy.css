@@ -1,0 +1,329 @@
+/* components/MessageBuddy — "Sathi", the message-us character.
+   Sits where the event chat bubble sits on pages that have none (the
+   component hides itself on those). Every motion stops for visitors who asked
+   for less of it. */
+
+.sathi-dock {
+  position: fixed;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 70;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+}
+.sathi-dock > * {
+  pointer-events: auto;
+}
+
+.sathi-fab {
+  position: relative;
+  width: 66px;
+  height: 66px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  background: radial-gradient(circle at 50% 38%, #2a3170 0%, #141838 70%);
+  box-shadow:
+    0 0 0 2px rgba(220, 20, 60, 0.55),
+    0 14px 30px -10px var(--brand-glow, rgba(220, 20, 60, 0.45)),
+    0 8px 20px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  animation: sathi-arrive 0.7s var(--ease-out) both, sathi-bob 3.2s ease-in-out 0.7s infinite;
+  transition: transform 0.2s var(--ease-out);
+}
+.sathi-fab:hover,
+.sathi-fab:focus-visible {
+  transform: translateY(-3px) scale(1.06);
+}
+.sathi-fab:active {
+  transform: scale(0.94);
+}
+/* A soft ring pulse, so the corner reads as "you can tap me". */
+.sathi-fab::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 0 rgba(220, 20, 60, 0.5);
+  animation: sathi-ring 3.2s ease-out 1.5s infinite;
+  pointer-events: none;
+}
+.sathi-fab .sathi {
+  width: 100%;
+  height: 100%;
+  transform: translateY(3%);
+}
+
+.sathi {
+  display: block;
+  overflow: visible;
+}
+.sathi-head {
+  transform-origin: 32px 42px;
+  animation: sathi-nod 6s ease-in-out infinite;
+}
+.sathi-topi {
+  transform-origin: 32px 20px;
+  animation: sathi-topi 6s ease-in-out infinite;
+}
+.sathi-eyes {
+  transform-origin: 32px 30px;
+  animation: sathi-blink 4.6s infinite;
+}
+.sathi-arm {
+  transform-origin: 46px 52px;
+  animation: sathi-wave-idle 7s ease-in-out infinite;
+}
+.sathi.is-waving .sathi-arm {
+  animation: sathi-wave 0.9s ease-in-out infinite;
+}
+/* The letter flies off the hand now and then — the whole idea in one motion. */
+.sathi-letter {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sathi-letter 7s ease-in-out 2s infinite;
+}
+.sathi-avatar .sathi-letter,
+.sathi-avatar .sathi-arm {
+  animation: none;
+}
+
+.sathi-greet {
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px 16px 4px 16px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: var(--shadow-lift);
+  animation: sathi-greet-in 0.5s var(--ease-out) both;
+}
+.sathi-greet strong {
+  color: var(--brand-text, #ff8fa5);
+}
+
+/* The panel reuses the chat widget's frame (.chat-panel etc.). */
+.sathi-head-row {
+  align-items: center;
+}
+.sathi-avatar {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 38%, #2a3170 0%, #141838 70%);
+  box-shadow: 0 0 0 2px rgba(220, 20, 60, 0.5);
+}
+.sathi-avatar .sathi {
+  width: 100%;
+  height: 100%;
+  transform: translateY(3%);
+}
+.sathi-line {
+  animation: sathi-line-in 0.35s var(--ease-out) both;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.sathi-again {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+.sathi-input-row {
+  align-items: flex-end;
+}
+.sathi-textarea {
+  resize: none;
+  min-height: 44px;
+  max-height: 140px;
+  font: inherit;
+  line-height: 1.4;
+}
+.sathi-hp {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.sathi-privacy {
+  margin: 0;
+  padding: 0 14px 12px;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+.sathi-privacy a {
+  color: var(--brand-text, #ff8fa5);
+  font-weight: 600;
+}
+
+@keyframes sathi-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.5) rotate(-20deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes sathi-bob {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -4px;
+  }
+}
+@keyframes sathi-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(220, 20, 60, 0.5);
+  }
+  60%,
+  100% {
+    box-shadow: 0 0 0 14px rgba(220, 20, 60, 0);
+  }
+}
+@keyframes sathi-nod {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  20% {
+    transform: rotate(-5deg);
+  }
+  40% {
+    transform: rotate(4deg);
+  }
+  55% {
+    transform: rotate(0deg);
+  }
+}
+@keyframes sathi-topi {
+  0%,
+  100% {
+    transform: rotate(-4deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
+@keyframes sathi-blink {
+  0%,
+  44%,
+  48%,
+  100% {
+    transform: scaleY(1);
+  }
+  46% {
+    transform: scaleY(0.1);
+  }
+}
+@keyframes sathi-wave-idle {
+  0%,
+  60%,
+  100% {
+    transform: rotate(0deg);
+  }
+  66% {
+    transform: rotate(-22deg);
+  }
+  72% {
+    transform: rotate(6deg);
+  }
+  78% {
+    transform: rotate(-22deg);
+  }
+  84% {
+    transform: rotate(0deg);
+  }
+}
+@keyframes sathi-wave {
+  0%,
+  100% {
+    transform: rotate(4deg);
+  }
+  50% {
+    transform: rotate(-26deg);
+  }
+}
+@keyframes sathi-letter {
+  0%,
+  62% {
+    opacity: 0;
+    transform: translate(2px, 14px) scale(0.4) rotate(0deg);
+  }
+  68% {
+    opacity: 1;
+    transform: translate(0, 4px) scale(0.9) rotate(-8deg);
+  }
+  86% {
+    opacity: 1;
+    transform: translate(-6px, -14px) scale(1) rotate(10deg);
+  }
+  96%,
+  100% {
+    opacity: 0;
+    transform: translate(-10px, -24px) scale(0.7) rotate(16deg);
+  }
+}
+@keyframes sathi-greet-in {
+  from {
+    opacity: 0;
+    transform: translateX(14px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes sathi-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sathi-fab,
+  .sathi-fab::after,
+  .sathi-head,
+  .sathi-topi,
+  .sathi-eyes,
+  .sathi-arm,
+  .sathi.is-waving .sathi-arm,
+  .sathi-greet,
+  .sathi-line {
+    animation: none;
+  }
+  .sathi-letter {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* Above the consent banner it would otherwise sit under; while the banner is
+   open, step aside rather than cover its buttons. */
+body:has(.consent) .sathi-dock {
+  display: none;
+}
+
+@media print {
+  .sathi-dock,
+  .sathi-panel {
+    display: none !important;
+  }
+}

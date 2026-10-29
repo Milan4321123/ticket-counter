@@ -5,6 +5,7 @@ import { Sora } from 'next/font/google';
 import Analytics from '@/components/Analytics';
 import ConsentBanner from '@/components/ConsentBanner';
 import ContactBubble from '@/components/ContactBubble';
+import MessageBuddy from '@/components/MessageBuddy';
 import Logo from '@/components/Logo';
 import LogoMotion from '@/components/LogoMotion';
 import { getBaseUrl } from '@/lib/config';
@@ -20,6 +21,8 @@ import './globals.css';
 import './bazaar.css';
 // Cards, meetups, the help board, profiles, the inbox — see its header.
 import './community.css';
+// Sathi, the message-us character (components/MessageBuddy).
+import './buddy.css';
 import { INSTALL_PROMPT_CATCHER, InstallFooterLink, InstallNudge, ServiceWorkerRegistrar } from '@/components/AppInstall';
 import { Suspense } from 'react';
 import HeaderNav from '@/components/HeaderNav';
@@ -184,6 +187,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           photoUrl={contact.photoUrl}
           focus={contact.focus}
         />
+        {/* Sathi: tap, give an email, write a message — goes to the team's
+            contact inbox. Hides itself where another helper or money lives. */}
+        <MessageBuddy brand={PLATFORM_NAME} />
         <footer className="site-footer">
           <div className="container footer-grid">
             <div>
@@ -257,7 +263,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <Link href="/built">How it&rsquo;s built</Link>
                 </li>
                 <li>
-                  <Link href="/contact">Custom page design</Link>
+                  <Link href="/contact">Contact us · custom page design</Link>
                 </li>
                 <li>
                   <Link href="/portal/login">Organizer sign-in</Link>

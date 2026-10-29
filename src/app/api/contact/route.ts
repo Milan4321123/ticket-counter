@@ -73,8 +73,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    const name = typeof body?.name === 'string' ? body.name.trim() : '';
     const email = typeof body?.email === 'string' ? body.email.trim() : '';
+    // A plain message (the "Sathi" bubble asks only for an email and the
+    // message) may come without a name; the inbox and the reply then address
+    // them by the part of the address before the @.
+    const givenName = typeof body?.name === 'string' ? body.name.trim() : '';
+    const name = givenName || (body?.kind === 'general' && EMAIL_RE.test(email) ? email.split('@')[0].slice(0, 120) : '');
     const organization = typeof body?.organization === 'string' ? body.organization.trim() : '';
     const message = typeof body?.message === 'string' ? body.message.trim() : '';
     const kind: ContactRequestKind =
