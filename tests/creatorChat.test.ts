@@ -76,6 +76,12 @@ test('kind detection: "your site" is the platform, a website is a page request',
   assert.equal(detectKind('A website for our festival'), 'custom-design');
   assert.equal(detectKind('I want to sell momo'), 'organizer-account');
   assert.equal(detectKind('My order confirmation never came'), 'general');
+  // Video requests (the /contact?intent=video chips) are work to make, like a page.
+  assert.equal(detectKind('A promo video for my event'), 'custom-design');
+  assert.equal(detectKind('A walk-on intro for an artist'), 'custom-design');
+  assert.equal(detectKind('Visuals for the stage screen'), 'custom-design');
+  assert.equal(detectKind('मलाई भिडियो चाहियो'), 'custom-design');
+  assert.equal(detectKind('the video on your site does not work'), 'general');
   assert.equal(isIntentOnly('Can I pay at the door?', 'general'), false);
   assert.equal(isIntentOnly('the checkout does not load', 'general'), false);
   assert.equal(isIntentOnly('Something else', 'general'), true);

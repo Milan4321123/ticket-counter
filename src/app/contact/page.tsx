@@ -13,6 +13,11 @@ const DESIGN = {
   description:
     'Want something fancier than the self-service event page? Tell our team what you have in mind and we design your event page for you.',
 };
+const VIDEO = {
+  title: 'Want a video like this? Talk to us',
+  description:
+    'Promo videos for Reels, TikTok and WhatsApp status, walk-on intros for artists and visuals for the stage screen — tell us about your event.',
+};
 const ACCOUNT = {
   title: 'Apply to sell — free',
   description: 'Sell tickets, food, goods or bookings on your own page. Free, no commission — tell us what you sell.',
@@ -21,7 +26,8 @@ const ACCOUNT = {
 /** The same page answers two questions, so its title follows ?intent. */
 export async function generateMetadata({ searchParams }: { searchParams: Promise<{ intent?: string | string[] }> }) {
   const raw = (await searchParams).intent;
-  const m = (Array.isArray(raw) ? raw[0] : raw) === 'account' ? ACCOUNT : DESIGN;
+  const intent = Array.isArray(raw) ? raw[0] : raw;
+  const m = intent === 'account' ? ACCOUNT : intent === 'video' ? VIDEO : DESIGN;
   return {
     ...m,
     alternates: { canonical: '/contact' },
@@ -42,6 +48,8 @@ export default async function ContactPage({
 }) {
   const raw = (await searchParams).intent;
   const wantsAccount = (Array.isArray(raw) ? raw[0] : raw) === 'account';
+  // ?intent=video: arrived from a "want a video like this?" button on /studio.
+  const wantsVideo = (Array.isArray(raw) ? raw[0] : raw) === 'video';
   const contactEmail = platformContactEmail();
 
   if (!wantsAccount) {
@@ -52,14 +60,22 @@ export default async function ContactPage({
       <section className="section cc-page">
         <div className="container">
           <header className="cc-page-head">
-            <p className="feed-kicker anim-fade-up">Talk to the creator</p>
-            <h1 className="anim-fade-up anim-d1">Tell us what you want to build</h1>
+            <p className="feed-kicker anim-fade-up">{wantsVideo ? 'Videos · कुरा गरौं' : 'Talk to the creator'}</p>
+            <h1 className="anim-fade-up anim-d1">{wantsVideo ? 'Want a video like this?' : 'Tell us what you want to build'}</h1>
             <p className="feed-hero-sub anim-fade-up anim-d2">
-              A custom event page, a festival website, an app for your shop — or just a question. Chat below; the
-              request fills itself in and goes straight to Milan, who replies by email.
+              {wantsVideo
+                ? 'A promo for Reels, TikTok and WhatsApp status, a walk-on intro for your artist, or visuals for the stage screen. Tell us about your event below; the request fills itself in and goes straight to Milan, who replies by email.'
+                : 'A custom event page, a festival website, an app for your shop — or just a question. Chat below; the request fills itself in and goes straight to Milan, who replies by email.'}
             </p>
+            {wantsVideo && (
+              <p className="muted small anim-fade-up anim-d2" style={{ marginTop: 10 }}>
+                <Link href="/studio#videos" style={{ color: 'var(--brand-text)', fontWeight: 600 }}>
+                  ← See the videos we made
+                </Link>
+              </p>
+            )}
           </header>
-          <CreatorChat ai={geminiEnabled({ personal: true })} />
+          <CreatorChat ai={geminiEnabled({ personal: true })} topic={wantsVideo ? 'video' : undefined} />
           <div className="cc-under">
             <p className="muted small">
               The self-service page is free and already included —{' '}

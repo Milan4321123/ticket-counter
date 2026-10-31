@@ -3,6 +3,7 @@ import { currentLang, serverT } from '@/lib/i18nServer';
 import AskBar from '@/components/AskBar';
 import StoryPlayer from '@/components/StoryPlayer';
 import StoryDeck from '@/components/StoryDeck';
+import StudioRail from '@/components/StudioRail';
 import { ensureExampleBazaarOnce } from '@/lib/exampleBazaar';
 import { runSubscriptionSweep } from '@/lib/subscriptions';
 import ShopRail from '@/components/ShopRail';
@@ -357,6 +358,10 @@ export default async function HomePage() {
           the first thing between a visitor and the reason they came, and news
           about the site is never that. Someone who has scrolled the whole
           listing is the one it is actually for. */}
+      {/* Videos we made: the newest ads, and the way to ask for one. */}
+      <span id="videos" className="ab-anchor" aria-hidden="true" />
+      <StudioRail />
+
       {/* How it works, as videos you can swipe: the customer's first. */}
       <span id="watch" className="ab-anchor" aria-hidden="true" />
       <StoryDeck kicker="Watch · 1–2 min" title="See how it works" />

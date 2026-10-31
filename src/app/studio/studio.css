@@ -1,0 +1,251 @@
+/* ---------- Studio videos (/studio + the homepage "Videos we made" rail) ---------- */
+
+.stv-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.stv-grid-wide {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stv-item {
+  margin: 0;
+  min-width: 0;
+}
+
+.stv-player {
+  display: block;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  border-radius: 18px;
+  background: #000;
+  object-fit: cover;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 24px 50px -26px rgba(0, 0, 0, 0.9);
+}
+
+.stv-player.stv-wide {
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+}
+
+.stv-item figcaption {
+  display: grid;
+  gap: 2px;
+  margin-top: 10px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+
+.stv-item figcaption strong {
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.stv-lead {
+  margin: 6px 0 18px;
+  max-width: 62ch;
+}
+
+.stv-show-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 0 0 6px;
+}
+
+.stv-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--pink-soft);
+  color: var(--pink-text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.stv-sub {
+  margin: 26px 0 12px;
+  font-size: 1.05rem;
+}
+
+/* The way in: "Want a video like this?" */
+.stv-cta {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  gap: 14px;
+  padding: 34px 30px;
+  border-radius: 24px;
+  color: #fff;
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(220, 20, 60, 0.45), transparent 60%),
+    linear-gradient(135deg, #7c3aed 0%, #a33be0 45%, #ec4899 100%);
+  box-shadow: 0 30px 60px -30px rgba(124, 58, 237, 0.8);
+}
+
+.stv-cta-kicker {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  opacity: 0.9;
+}
+
+.stv-cta h2 {
+  margin: 0;
+  font-size: clamp(1.7rem, 4.6vw, 2.6rem);
+  line-height: 1.1;
+  color: #fff;
+}
+
+.stv-cta p {
+  margin: 0;
+  max-width: 56ch;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.stv-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 2px 0 4px;
+  padding: 0;
+  list-style: none;
+}
+
+.stv-chips li {
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.stv-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+}
+
+.stv-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 22px;
+  border-radius: 999px;
+  background: #fff;
+  color: #2a1250;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.stv-cta-btn:hover {
+  background: #f6f0ff;
+}
+
+.stv-cta-note {
+  font-size: 0.82rem;
+  opacity: 0.85;
+}
+
+/* Homepage rail: the newest ads, then the way in. */
+.stv-rail {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  padding: 4px max(16px, calc((100vw - 1100px) / 2)) 8px;
+  scroll-padding-inline: max(16px, calc((100vw - 1100px) / 2));
+}
+
+.stv-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.stv-rail .stv-item {
+  flex: 0 0 clamp(150px, 40vw, 200px);
+  scroll-snap-align: start;
+}
+
+.stv-rail .stv-player {
+  border-radius: 16px;
+}
+
+.stv-rail-cta {
+  flex: 0 0 clamp(150px, 40vw, 200px);
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 8px;
+  aspect-ratio: 9 / 16;
+  padding: 18px;
+  border-radius: 16px;
+  color: #fff;
+  text-decoration: none;
+  background:
+    radial-gradient(120% 80% at 100% 0%, rgba(220, 20, 60, 0.5), transparent 60%),
+    linear-gradient(160deg, #7c3aed, #ec4899);
+}
+
+.stv-rail-cta strong {
+  font-size: 1.25rem;
+  line-height: 1.15;
+}
+
+.stv-rail-cta span {
+  font-size: 0.86rem;
+  opacity: 0.92;
+}
+
+.stv-rail-cta em {
+  font-style: normal;
+  font-weight: 800;
+}
+
+@media (max-width: 760px) {
+  /* Phones: one swipeable row instead of a tall stack. */
+  .stv-grid {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 68%;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    padding-bottom: 6px;
+  }
+
+  .stv-grid-wide {
+    grid-auto-columns: 88%;
+  }
+
+  .stv-grid::-webkit-scrollbar {
+    display: none;
+  }
+
+  .stv-grid .stv-item {
+    scroll-snap-align: start;
+  }
+
+  .stv-cta {
+    padding: 26px 20px;
+    border-radius: 20px;
+  }
+}
+
+.stv-chips li span {
+  margin-right: 6px;
+}

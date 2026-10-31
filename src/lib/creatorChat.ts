@@ -97,7 +97,7 @@ export interface ChatTurn {
 type QKey = 'summary' | 'message' | 'sell' | 'shop' | 'event' | 'when' | 'name' | 'email' | 'emailReply' | 'ready';
 const Q: Record<AskLang, Record<QKey, string>> = {
   en: {
-    summary: 'What would you like us to make — a custom page for an event, a bigger festival site, an app, or something else? A sentence is enough.',
+    summary: 'What would you like us to make — a custom page for an event, a promo video, a bigger festival site, an app, or something else? A sentence is enough.',
     message: 'Of course — what would you like to ask or tell Milan? Write it in a sentence or two.',
     sell: 'Great — what would you like to sell here: tickets for an event, food, or things from your shop? A sentence is enough.',
     shop: 'And what is your shop, business or event called?',
@@ -109,7 +109,7 @@ const Q: Record<AskLang, Record<QKey, string>> = {
     ready: 'That is everything — check your request and send it. Milan replies by email.',
   },
   de: {
-    summary: 'Was dürfen wir für dich bauen — eine eigene Event-Seite, eine Festival-Website, eine App oder etwas anderes? Ein Satz reicht.',
+    summary: 'Was dürfen wir für dich bauen — eine eigene Event-Seite, ein Promo-Video, eine Festival-Website, eine App oder etwas anderes? Ein Satz reicht.',
     message: 'Gern — was möchtest du Milan fragen oder sagen? Ein, zwei Sätze reichen.',
     sell: 'Super — was möchtest du hier verkaufen: Tickets für ein Event, Essen oder Sachen aus deinem Geschäft? Ein Satz reicht.',
     shop: 'Und wie heißt dein Geschäft, dein Betrieb oder dein Event?',
@@ -121,7 +121,7 @@ const Q: Record<AskLang, Record<QKey, string>> = {
     ready: 'Das ist alles — prüfe die Anfrage und schick sie ab. Milan antwortet per E-Mail.',
   },
   ne: {
-    summary: 'हामीले के बनाइदिऊँ — कार्यक्रमको आफ्नै पेज, ठूलो फेस्टिभल साइट, एप, वा अरू केही? एक वाक्य पुग्छ।',
+    summary: 'हामीले के बनाइदिऊँ — कार्यक्रमको आफ्नै पेज, प्रोमो भिडियो, ठूलो फेस्टिभल साइट, एप, वा अरू केही? एक वाक्य पुग्छ।',
     message: 'हुन्छ — मिलनलाई के सोध्न वा भन्न चाहनुहुन्छ? एक-दुई वाक्य पुग्छ।',
     sell: 'राम्रो — यहाँ के बेच्न चाहनुहुन्छ: कार्यक्रमको टिकट, खाना, वा पसलको सामान? एक वाक्य पुग्छ।',
     shop: 'अनि तपाईंको पसल, व्यवसाय वा कार्यक्रमको नाम के हो?',
@@ -133,7 +133,7 @@ const Q: Record<AskLang, Record<QKey, string>> = {
     ready: 'सबै भयो — अनुरोध हेरेर पठाउनुहोस्। मिलनले इमेलमा जवाफ दिनुहुन्छ।',
   },
   rn: {
-    summary: 'Hamile ke banaidiun — event ko aafnai page, thulo festival site, app, wa aru kei? Euta sentence pugcha.',
+    summary: 'Hamile ke banaidiun — event ko aafnai page, promo video, thulo festival site, app, wa aru kei? Euta sentence pugcha.',
     message: 'Huncha — Milan lai ke sodhna wa bhanna chahanuhuncha? Ek-dui sentence pugcha.',
     sell: 'Ramro — yaha ke bechna chahanuhuncha: event ko ticket, khana, wa pasal ko saman? Euta sentence pugcha.',
     shop: 'Ani tapaiko pasal, business wa event ko naam ke ho?',
@@ -157,7 +157,7 @@ const Q: Record<AskLang, Record<QKey, string>> = {
 const PROBLEM_WORDS =
   /\b(problem|problems|issue|issues|error|bug|broken|not working|doesn'?t work|does not work|won'?t|can'?t|cannot|failed|wrong|fehler|kaputt|geht nicht|funktioniert nicht|kaam gardaina|chaldaina|samasya)\b|समस्या|चल्दैन|गर्दैन/i;
 const BUILD_WORDS =
-  /\b(page|pages|website|websites|web site|app|apps|design|webseite|homepage|landing ?page|portfolio)\b|(?<!\b(?:your|the|this|ur|on|eure[rn]?|deine[rn]?|tapaiko)\s)\bsite\b|पेज|वेबसाइट|एप/i;
+  /\b(page|pages|website|websites|web site|app|apps|design|webseite|homepage|landing ?page|portfolio|videos?|promo|reels?|trailer|walk-?on|backdrops?|visuals|motion graphics?)\b|(?<!\b(?:your|the|this|ur|on|eure[rn]?|deine[rn]?|tapaiko)\s)\bsite\b|पेज|वेबसाइट|एप|भिडियो/i;
 const SELL_WORDS =
   /\b(sell|selling|seller|account|sign ?up|register|open (a|my) (shop|store)|list my|verkaufen|verkäufer|konto|anmelden|registrieren|bechna|bechne|bechnu|khata)\b|बेच|खाता/i;
 /** Words that ANNOUNCE a question or a wish to sell, rather than being it. */
@@ -289,11 +289,12 @@ function contactFrom(messages: ChatTurn[], fields: CreatorFields): CreatorFields
 export async function aiTurn(messages: ChatTurn[], fields: CreatorFields, owner: string): Promise<{ reply: string; fields: CreatorFields } | null> {
   const raw = (await geminiJson(
     `You are ${owner}'s friendly assistant on MartNepali, a free platform for Nepali events and shops in Germany. ` +
-      `A visitor wants to reach ${owner} — usually to have a custom event page, a festival website or an app built, ` +
+      `A visitor wants to reach ${owner} — usually to have a custom event page, a festival website, an app or a promo video made ` +
+      '(9:16 ads for Reels/TikTok/WhatsApp status, an artist walk-on intro, stage-screen visuals), ' +
       'sometimes to get a seller account, sometimes something else. Talk like a warm, brief human: ask ONE short question ' +
       'at a time, and never ask for something they already told you. Chat like a person: answer greetings and small talk ' +
       '("k cha, sanchai xa?" → "Sanchai chu, hajur? …"), and answer general questions briefly — selling on MartNepali is free ' +
-      'and anyone can make their own page at /organizers; custom design, festival sites and apps are what ' +
+      'and anyone can make their own page at /organizers; custom design, festival sites, apps and videos are what ' +
       `${owner} talks through personally. Never mention prices, quotes, fees or budgets — the platform is free and ` +
       `${owner} does not sell services — then steer back with ONE question. ` +
       'Collect, in a natural order: what they want (summary), ' +
@@ -301,7 +302,7 @@ export async function aiTurn(messages: ChatTurn[], fields: CreatorFields, owner:
       'a deadline if they have one (budget), pages or looks they like (looks), then their name and email. ' +
       'Organization and phone only if offered. If they are a TICKET BUYER asking about an order, tell them kindly that ' +
       'their tickets are in their email and at /account, and that questions about an event go to its organizer on the ' +
-      'event page — kind "general". A seller account request is kind "organizer-account"; design/site/app work is ' +
+      'event page — kind "general". A seller account request is kind "organizer-account"; design/site/app/video work is ' +
       '"custom-design". Reply in the visitor’s language (English, German, Nepali in Devanagari, or Roman Nepali back in ' +
       'Roman Nepali). Email addresses and phone numbers in the conversation are shown to you as [email] and [phone]: ' +
       'they were received and noted — never repeat, guess or ask again for one that is already filled. ' +

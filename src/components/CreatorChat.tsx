@@ -53,6 +53,10 @@ const EMPTY: Fields = {
 const HELLO =
   'Namaste 🙏 I am Milan’s assistant. Want a custom page for your event, or to sell here — or do you have a question or a problem with the site? Just tell me, in any language.';
 const IDEAS = ['A custom page for my event', 'I want to sell here', 'A question or a problem', 'Something else'];
+/** Arriving from a "want a video like this?" button: open on videos, not pages. */
+const HELLO_VIDEO =
+  'Namaste 🙏 I am Milan’s assistant. Want a video like the ones on our Studio page — a promo for Reels and WhatsApp status, a walk-on intro for an artist, or visuals for the stage screen? Tell me about your event, in any language.';
+const IDEAS_VIDEO = ['A promo video for my event', 'A walk-on intro for an artist', 'Visuals for the stage screen', 'Something else'];
 const ROWS: { key: keyof Fields; label: string; icon: string }[] = [
   { key: 'summary', label: 'What you want', icon: '✨' },
   { key: 'eventName', label: 'Event or business', icon: '🎪' },
@@ -84,8 +88,22 @@ const ROWS_BY_KIND: Record<Fields['kind'], { key: keyof Fields; label: string; i
 };
 const STORE = 'creator:chat:v1';
 
-export default function CreatorChat({ owner = 'Milan', ai = false }: { owner?: string; /** Whether replies come from Gemini on this server (lib/gemini, personal). */ ai?: boolean }) {
-  const [turns, setTurns] = useState<Turn[]>([{ from: 'bot', text: HELLO }]);
+export default function CreatorChat({
+  owner = 'Milan',
+  ai = false,
+  topic,
+}: {
+  owner?: string;
+  /** Whether replies come from Gemini on this server (lib/gemini, personal). */
+  ai?: boolean;
+  /** 'video' when the visitor came from a video ("want one like this?"). */
+  topic?: 'video';
+}) {
+  const hello = topic === 'video' ? HELLO_VIDEO : HELLO;
+  const ideas = topic === 'video' ? IDEAS_VIDEO : IDEAS;
+  // Its own saved conversation, so the video greeting is not hidden behind an older chat.
+  const store = topic ? `${STORE}:${topic}` : STORE;
+  const [turns, setTurns] = useState<Turn[]>([{ from: 'bot', text: hello }]);
   const [fields, setFields] = useState<Fields>(EMPTY);
   const [ready, setReady] = useState(false);
   const [draft, setDraft] = useState('');
@@ -99,7 +117,7 @@ export default function CreatorChat({ owner = 'Milan', ai = false }: { owner?: s
   // The conversation survives a reload in this tab.
   useEffect(() => {
     try {
-      const saved = JSON.parse(sessionStorage.getItem(STORE) || 'null') as { turns: Turn[]; fields: Fields; ready: boolean } | null;
+      const saved = JSON.parse(sessionStorage.getItem(store) || 'null') as { turns: Turn[]; fields: Fields; ready: boolean } | null;
       if (saved?.turns?.length) {
         setTurns(saved.turns);
         setFields({ ...EMPTY, ...saved.fields });
@@ -108,14 +126,14 @@ export default function CreatorChat({ owner = 'Milan', ai = false }: { owner?: s
     } catch {
       /* private mode: start fresh */
     }
-  }, []);
+  }, [store]);
   useEffect(() => {
     try {
-      sessionStorage.setItem(STORE, JSON.stringify({ turns: turns.slice(-40), fields, ready }));
+      sessionStorage.setItem(store, JSON.stringify({ turns: turns.slice(-40), fields, ready }));
     } catch {
       /* fine */
     }
-  }, [turns, fields, ready]);
+  }, [turns, fields, ready, store]);
   useEffect(() => {
     log.current?.scrollTo({ top: log.current.scrollHeight, behavior: 'smooth' });
   }, [turns, busy]);
@@ -263,7 +281,7 @@ export default function CreatorChat({ owner = 'Milan', ai = false }: { owner?: s
               type="button"
               className="cc-new"
               onClick={() => {
-                setTurns([{ from: 'bot', text: HELLO }]);
+                setTurns([{ from: 'bot', text: hello }]);
                 setFields(EMPTY);
                 setReady(false);
               }}
@@ -299,7 +317,7 @@ export default function CreatorChat({ owner = 'Milan', ai = false }: { owner?: s
           )}
           {turns.length === 1 && (
             <div className="cc-ideas">
-              {IDEAS.map((idea) => (
+              {ideas.map((idea) => (
                 <button key={idea} type="button" onClick={() => void talk(idea)}>
                   {idea}
                 </button>
