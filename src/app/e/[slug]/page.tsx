@@ -1648,7 +1648,7 @@ export default async function EventPage({ params, searchParams }: Params) {
                 {inertCta}
               </span>
             )}
-            <Link href="/" className="btn">
+            <Link href="/events" className="btn">
               Browse more
             </Link>
           </div>

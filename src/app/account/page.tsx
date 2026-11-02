@@ -99,7 +99,7 @@ export default async function AccountPage({
 
       {/* Where a signed-in customer goes next — the same tiles as the homepage. */}
       <nav className="qt acc-go" aria-label="Go shopping">
-        <Link href="/" className="qt-tile qt-events">
+        <Link href="/events" className="qt-tile qt-events">
           <span className="qt-icon" aria-hidden="true">
             🎟
           </span>
@@ -138,7 +138,7 @@ export default async function AccountPage({
               Nothing yet. Orders you place with <span translate="no">{customer.email}</span> show up here.
             </p>
             <p>
-              <Link href="/" className="btn btn-sm">
+              <Link href="/events" className="btn btn-sm">
                 Browse events
               </Link>{' '}
               <Link href="/market" className="btn btn-sm">

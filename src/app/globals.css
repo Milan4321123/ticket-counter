@@ -9060,7 +9060,7 @@ html.tx-wait body {
   text-underline-offset: 3px;
 }
 
-/* Where the Ask chat's "/#events" links land — clear of the sticky header. */
+/* Where the Ask chat's "/events#events" links land — clear of the sticky header. */
 .ab-anchor {
   display: block;
   scroll-margin-top: 80px;

@@ -249,3 +249,932 @@
 .stv-chips li span {
   margin-right: 6px;
 }
+
+/* ======================================================================
+   Studio homepage (app/page.tsx) and the shared studio blocks
+   (components/studio/*). Prefix sh-. Dark, violet → pink, crimson accents.
+   ====================================================================== */
+
+.sh-hero {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  padding: 64px 0 40px;
+  background:
+    radial-gradient(60% 70% at 85% 10%, rgba(236, 72, 153, 0.22), transparent 70%),
+    radial-gradient(55% 60% at 10% 0%, rgba(124, 58, 237, 0.3), transparent 70%),
+    radial-gradient(40% 40% at 50% 100%, rgba(220, 20, 60, 0.12), transparent 70%);
+}
+
+.sh-hero::after {
+  /* A faint grid, fading out — the "studio floor". */
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(70% 80% at 50% 30%, #000 30%, transparent 80%);
+  -webkit-mask-image: radial-gradient(70% 80% at 50% 30%, #000 30%, transparent 80%);
+}
+
+.sh-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 40px;
+}
+
+.sh-hero-copy {
+  min-width: 0;
+}
+
+.sh-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 16px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  color: #e9d5ff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.sh-title {
+  margin: 0 0 16px;
+  font-size: clamp(2rem, 4.1vw, 3.05rem);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  color: #fff;
+}
+
+.sh-grad {
+  background: linear-gradient(100deg, #c4b5fd 0%, #f0abfc 45%, #fb7185 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.sh-lead {
+  max-width: 56ch;
+  margin: 0 0 24px;
+  color: var(--text-dim);
+  font-size: 1.06rem;
+  line-height: 1.6;
+}
+
+.sh-hero-cta,
+.sh-row-center {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sh-row-center {
+  justify-content: center;
+}
+
+.sh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 22px;
+  border-radius: 999px;
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.98rem;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  transition:
+    transform 0.15s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.sh-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.sh-btn:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+.sh-btn-main {
+  color: #fff;
+  background: linear-gradient(120deg, #7c3aed 0%, #c026d3 55%, #ec4899 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 14px 34px -14px rgba(236, 72, 153, 0.85);
+}
+
+.sh-btn-main:hover {
+  background: linear-gradient(120deg, #8b5cf6 0%, #d946ef 55%, #f472b6 100%);
+}
+
+.sh-made-for {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 26px 0 0;
+  padding: 0;
+  list-style: none;
+  color: rgba(238, 240, 246, 0.5);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.sh-made-for::before {
+  content: 'Recent work';
+  color: rgba(238, 240, 246, 0.32);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  align-self: center;
+}
+
+.sh-hero-reel {
+  min-width: 0;
+}
+
+.sh-reel {
+  position: relative;
+  border-radius: 20px;
+  padding: 6px;
+  background: linear-gradient(140deg, rgba(124, 58, 237, 0.65), rgba(236, 72, 153, 0.45) 60%, rgba(220, 20, 60, 0.4));
+  box-shadow: 0 40px 80px -36px rgba(124, 58, 237, 0.9);
+}
+
+.sh-reel .sh-reel-video {
+  border-radius: 15px;
+}
+
+.sh-reel-play {
+  position: absolute;
+  left: 20px;
+  bottom: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px 8px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(10, 11, 16, 0.72);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.2s ease;
+}
+
+.sh-reel-play:hover {
+  background: rgba(10, 11, 16, 0.88);
+}
+
+.sh-reel-play:active {
+  transform: scale(0.97);
+}
+
+.sh-reel-play > span:last-child {
+  display: grid;
+  line-height: 1.2;
+}
+
+.sh-reel-play strong {
+  font-size: 0.9rem;
+}
+
+.sh-reel-play span span {
+  font-size: 0.74rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.sh-reel-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #7c3aed, #ec4899);
+}
+
+.sh-reel-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: #fff;
+  margin-left: 2px;
+}
+
+/* In-page jump links under the hero. */
+.sh-jump {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.sh-jump::-webkit-scrollbar {
+  display: none;
+}
+
+.sh-jump-center {
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 22px;
+  overflow: visible;
+}
+
+.sh-jump a {
+  flex: none;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  color: rgba(238, 240, 246, 0.78);
+  font-size: 0.86rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sh-jump a:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.sh-jump .sh-jump-cta {
+  background: rgba(236, 72, 153, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(236, 72, 153, 0.35);
+  color: #fbcfe8;
+}
+
+.sh-section {
+  scroll-margin-top: 64px;
+}
+
+.sh-section[id],
+#videos,
+#make,
+#how {
+  scroll-margin-top: 64px;
+}
+
+.sh-h2 {
+  margin: 0 0 20px;
+  font-size: clamp(1.55rem, 3.4vw, 2.2rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.sh-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sh-more {
+  flex: none;
+  margin-bottom: 22px;
+  color: var(--accent-text);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.sh-more:hover {
+  color: #fff;
+}
+
+/* ---- What we make ---- */
+.sh-make {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.sh-make-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 24px 22px 22px;
+  border-radius: 20px;
+  background:
+    radial-gradient(120% 80% at 0% 0%, var(--sh-tint, rgba(124, 58, 237, 0.16)), transparent 60%),
+    var(--bg-card);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+    0 24px 50px -30px rgba(0, 0, 0, 0.9);
+}
+
+.sh-make-websites {
+  --sh-tint: rgba(59, 130, 246, 0.16);
+  --sh-ink: #93c5fd;
+}
+
+.sh-make-videos {
+  --sh-tint: rgba(236, 72, 153, 0.18);
+  --sh-ink: #f9a8d4;
+}
+
+.sh-make-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin-bottom: 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  color: var(--sh-ink, #c4b5fd);
+}
+
+.sh-make-icon svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sh-make-card h3 {
+  margin: 0 0 4px;
+  font-size: 1.3rem;
+}
+
+.sh-make-line {
+  margin: 0 0 14px;
+  color: var(--text-dim);
+  font-size: 0.92rem;
+}
+
+.sh-make-card ul,
+.sh-pc-points {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+}
+
+.sh-make-card li,
+.sh-pc-points li {
+  position: relative;
+  padding-left: 22px;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: rgba(238, 240, 246, 0.86);
+}
+
+.sh-make-card li::before,
+.sh-pc-points li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.42em;
+  width: 10px;
+  height: 6px;
+  border-left: 2px solid var(--sh-ink, #c4b5fd);
+  border-bottom: 2px solid var(--sh-ink, #c4b5fd);
+  transform: rotate(-45deg);
+}
+
+.sh-make-cta {
+  margin-top: auto;
+  color: var(--sh-ink, #c4b5fd);
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.sh-make-cta:hover {
+  color: #fff;
+}
+
+/* ---- Project cards ---- */
+.sh-projects {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.sh-pc {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--bg-card);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+    0 24px 50px -30px rgba(0, 0, 0, 0.9);
+  scroll-margin-top: 70px;
+}
+
+.sh-pc-cover {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #0d0e15;
+}
+
+.sh-pc-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sh-pc-cover-video .stv-player {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.sh-pc-phone {
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(70% 90% at 80% 0%, rgba(236, 72, 153, 0.45), transparent 65%),
+    radial-gradient(70% 90% at 10% 100%, rgba(124, 58, 237, 0.55), transparent 65%),
+    #120f1f;
+}
+
+.sh-pc-phone img {
+  /* A phone peeking up from the bottom edge. Absolute, so its height is a
+     share of the cover (a grid item's % height would fall back to auto). */
+  position: absolute;
+  left: 50%;
+  top: 12%;
+  width: auto;
+  height: 112%;
+  aspect-ratio: 9 / 16;
+  border-radius: 16px;
+  box-shadow:
+    0 0 0 3px #0a0b10,
+    0 0 0 4px rgba(255, 255, 255, 0.14),
+    0 26px 40px -16px rgba(0, 0, 0, 0.9);
+  transform: translateX(-50%) rotate(-4deg);
+  object-fit: cover;
+  object-position: top;
+}
+
+.sh-pc-art {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  place-content: center;
+  gap: 14px;
+  background:
+    radial-gradient(60% 90% at 20% 10%, rgba(220, 20, 60, 0.45), transparent 65%),
+    radial-gradient(60% 90% at 90% 100%, rgba(124, 58, 237, 0.55), transparent 65%),
+    #140f1c;
+}
+
+.sh-pc-art span {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  font-size: 1.7rem;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.sh-pc-art span:nth-child(even) {
+  transform: translateY(14px);
+}
+
+.sh-pc-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 16px 18px 18px;
+}
+
+.sh-pc-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.sh-tag {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  background: rgba(139, 92, 246, 0.16);
+  color: #c4b5fd;
+}
+
+.sh-tag-website {
+  background: rgba(59, 130, 246, 0.16);
+  color: #93c5fd;
+}
+
+.sh-tag-video {
+  background: rgba(236, 72, 153, 0.16);
+  color: #f9a8d4;
+}
+
+.sh-tag-example {
+  background: rgba(251, 191, 36, 0.14);
+  color: #fcd34d;
+}
+
+.sh-pc h3 {
+  margin: 0;
+  font-size: 1.12rem;
+  line-height: 1.3;
+}
+
+.sh-pc-client {
+  margin: 2px 0 10px;
+  color: rgba(238, 240, 246, 0.5);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.sh-pc-outcome {
+  margin: 0 0 12px;
+  font-size: 0.93rem;
+  line-height: 1.5;
+}
+
+.sh-pc-points {
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.sh-pc-points li {
+  font-size: 0.86rem;
+  color: var(--text-dim);
+}
+
+.sh-pc-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: auto;
+}
+
+.sh-pc-link {
+  color: var(--text-dim);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.sh-pc-link-main {
+  color: #f0abfc;
+}
+
+.sh-pc-link:hover {
+  color: #fff;
+}
+
+/* ---- Live on MartNepali ---- */
+.sh-live {
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
+.sh-live-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(238, 240, 246, 0.6);
+}
+
+.sh-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #34d399;
+  box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.18);
+}
+
+.sh-live-row {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+
+.sh-live-row::-webkit-scrollbar {
+  display: none;
+}
+
+.sh-live-item {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 2px;
+  max-width: 260px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: var(--bg-card);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.sh-live-item strong {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 0.92rem;
+}
+
+.sh-live-item span {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.sh-live-all strong {
+  color: #6ee7b7;
+}
+
+/* ---- Video tabs ---- */
+.sh-vt-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 0 14px;
+  padding: 2px 0 6px;
+}
+
+.sh-vt-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.sh-vt-tab {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  color: rgba(238, 240, 246, 0.72);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sh-vt-tab:hover {
+  color: #fff;
+}
+
+.sh-vt-tab[aria-selected='true'] {
+  color: #fff;
+  background: linear-gradient(120deg, rgba(124, 58, 237, 0.85), rgba(236, 72, 153, 0.75));
+  box-shadow: 0 10px 24px -14px rgba(236, 72, 153, 0.9);
+}
+
+.sh-vt-n {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 0.72rem;
+  line-height: 18px;
+  text-align: center;
+}
+
+.sh-vt-text {
+  margin: 0 0 16px;
+  max-width: 64ch;
+}
+
+.sh-vt-panel {
+  animation: fade-up 0.35s var(--ease-out) backwards;
+}
+
+.sh-grid-tall {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.sh-grid-after {
+  margin-top: 22px;
+}
+
+.sh-silent {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  font-weight: 600;
+  vertical-align: 2px;
+}
+
+.sh-video-ask {
+  margin: 22px 0 0;
+}
+
+.sh-video-ask a {
+  color: #f0abfc;
+  font-weight: 700;
+}
+
+/* ---- How it works ---- */
+.sh-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+
+.sh-step {
+  position: relative;
+  padding: 22px;
+  border-radius: 20px;
+  background: var(--bg-card);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.sh-step-n {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  margin-bottom: 14px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #7c3aed, #ec4899);
+  color: #fff;
+  font-family: var(--font-display, var(--font));
+  font-weight: 800;
+}
+
+.sh-step h3 {
+  margin: 0 0 6px;
+  font-size: 1.12rem;
+}
+
+.sh-step p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.93rem;
+  line-height: 1.55;
+}
+
+/* ---- Also on MartNepali ---- */
+.sh-also {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.sh-also-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.sh-also-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sh-also-item > span:first-child {
+  grid-row: span 2;
+  font-size: 1.4rem;
+}
+
+.sh-also-item strong {
+  font-size: 0.95rem;
+}
+
+.sh-also-item > span:last-child {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+/* ---- Final CTA extras ---- */
+.sh-cta-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sh-cta-pick a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.sh-cta-pick a:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+@media (max-width: 960px) {
+  .sh-hero-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 30px;
+  }
+
+  .sh-projects {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sh-grid-tall {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .sh-also {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .sh-hero {
+    padding: 36px 0 24px;
+  }
+
+  .sh-make,
+  .sh-steps,
+  .sh-projects {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Phones: the tall grid becomes one swipeable row (see .stv-grid above). */
+  .sh-grid-tall {
+    grid-template-columns: none;
+  }
+
+  .sh-hero-cta .sh-btn {
+    flex: 1 1 100%;
+  }
+
+  .sh-reel-play {
+    left: 14px;
+    bottom: 14px;
+  }
+
+  .sh-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .sh-more {
+    margin: -10px 0 16px;
+  }
+}
+
+@media (max-width: 420px) {
+  .sh-also {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.sh-cta .stv-cta-btn {
+  min-height: 48px;
+  padding: 10px 22px;
+  text-align: center;
+  line-height: 1.3;
+}

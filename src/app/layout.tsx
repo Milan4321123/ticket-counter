@@ -157,6 +157,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <Logo size={22} />
             </Link>
             <HeaderNav
+              studio={tr('nav.studio')}
+              contact={tr('nav.contact')}
               events={tr('nav.events')}
               bazaar={tr('nav.bazaar.short')}
               organizer={tr('nav.organizer')}
@@ -195,11 +197,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <div>
               <Logo size={30} />
               <p className="footer-about">
-                A little corner of Nepal, wherever you have landed — concerts, cultural
-                nights, festivals and community events from organizers you know, and a
-                bazaar of Nepali sellers: momo to pre-order, sweets, crafts. You pay each
-                seller directly, and your QR tickets and collection codes come straight
-                to your inbox.
+                A studio for the Nepali community: we build apps, websites and ad videos —
+                and run this platform, where organizers sell tickets and Nepali shops sell
+                momo, sweets and crafts. You pay each seller directly, and your QR tickets
+                and collection codes come straight to your inbox.
               </p>
               {/* The language switch lives here on phones, where the header has
                   no room for it (see .lang-switch-header in globals.css). */}
@@ -214,7 +215,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <p className="footer-heading">Explore</p>
               <ul className="footer-links">
                 <li>
-                  <Link href="/">Browse events</Link>
+                  <Link href="/">Studio · apps, websites, videos</Link>
+                </li>
+                <li>
+                  <Link href="/studio">Our work · projects &amp; videos</Link>
+                </li>
+                <li>
+                  <Link href="/events">Browse events</Link>
                 </li>
                 <li>
                   <Link href="/digest">
@@ -254,16 +261,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <Link href="/organizers">For organizers</Link>
                 </li>
                 <li>
-                  <Link href="/studio">What we build · Studio</Link>
-                </li>
-                <li>
                   <Link href="/showcase">Features</Link>
                 </li>
                 <li>
                   <Link href="/built">How it&rsquo;s built</Link>
                 </li>
                 <li>
-                  <Link href="/contact">Contact us · custom page design</Link>
+                  <Link href="/contact">Contact us · kura garau</Link>
                 </li>
                 <li>
                   <Link href="/portal/login">Organizer sign-in</Link>
@@ -304,7 +308,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </nav>
           </div>
           <div className="container footer-bottom">
-            <p className="footer-main">{PLATFORM_NAME} — find your next night out</p>
+            <p className="footer-main">{PLATFORM_NAME} — apps, websites &amp; ad videos for the Nepali community</p>
             <p className="footer-sub">
               Made with love for the Nepali community · Tickets and collection codes
               arrive by email as QR codes — see you at the show, or at the counter.

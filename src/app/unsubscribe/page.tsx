@@ -73,7 +73,7 @@ export default async function UnsubscribePage({ searchParams }: Params) {
             and we will.
           </p>
           <p style={{ marginBottom: 0 }}>
-            <Link href="/" className="btn">
+            <Link href="/events" className="btn">
               Browse events
             </Link>
           </p>

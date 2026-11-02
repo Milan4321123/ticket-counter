@@ -138,7 +138,7 @@ function Player({ story, start, end, onClose }: { story: Story; start?: number; 
             <div className="sp-cta">
               {story.audience === 'buyer' ? (
                 <>
-                  <Link href="/#events" className="btn btn-brand" onClick={onClose}>
+                  <Link href="/events#events" className="btn btn-brand" onClick={onClose}>
                     🎟 Upcoming events
                   </Link>
                   <Link href="/market" className="btn" onClick={onClose}>

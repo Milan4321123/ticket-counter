@@ -449,7 +449,7 @@ export function runFilters(f: AskFilters): FilterRun {
         };
       }), ...offers.slice(0, 6).map(offerCard)],
       total: list.length,
-      link: list.length > 6 ? { label: 'All upcoming events', href: '/#events', icon: '🎟' } : null,
+      link: list.length > 6 ? { label: 'All upcoming events', href: '/events#events', icon: '🎟' } : null,
       relaxed,
       said: describeEvents(ev),
     };

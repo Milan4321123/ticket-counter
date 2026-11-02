@@ -9,25 +9,63 @@ import { geminiEnabled } from '@/lib/gemini';
 export const dynamic = 'force-dynamic';
 
 const DESIGN = {
-  title: 'Talk to us about a custom-designed page',
+  title: 'Talk to us — apps, websites & ad videos',
   description:
-    'Want something fancier than the self-service event page? Tell our team what you have in mind and we design your event page for you.',
+    'Need an app, a website or an advertisement video for your event, association, restaurant or shop? Tell the MartNepali team what you have in mind — kura garau.',
 };
 const VIDEO = {
   title: 'Want a video like this? Talk to us',
   description:
     'Promo videos for Reels, TikTok and WhatsApp status, walk-on intros for artists and visuals for the stage screen — tell us about your event.',
 };
+const APP = {
+  title: 'Want an app? Talk to us',
+  description:
+    'Tickets with QR check-in, order-ahead with a kitchen board, a shop with collection codes — tell us what your app should do.',
+};
+const WEBSITE = {
+  title: 'Want a website? Talk to us',
+  description:
+    'A website for your association, business or festival — in Deutsch, English and Nepali. Tell us who it is for.',
+};
 const ACCOUNT = {
   title: 'Apply to sell — free',
   description: 'Sell tickets, food, goods or bookings on your own page. Free, no commission — tell us what you sell.',
 };
 
-/** The same page answers two questions, so its title follows ?intent. */
+type Topic = 'video' | 'app' | 'website';
+const TOPICS: Record<Topic, typeof DESIGN> = { video: VIDEO, app: APP, website: WEBSITE };
+const isTopic = (x: string | undefined): x is Topic => x === 'video' || x === 'app' || x === 'website';
+
+/** What the page opens on, per ?intent: kicker, heading, intro. */
+const HEAD: Record<Topic | 'any', { kicker: string; title: string; text: string }> = {
+  any: {
+    kicker: 'MartNepali Studio · कुरा गरौं',
+    title: 'Tell us what you need',
+    text: 'An app, a website, an ad video for your event — or just a question. Chat below in any language; the request fills itself in and goes straight to Milan, who replies by email.',
+  },
+  app: {
+    kicker: 'Apps · कुरा गरौं',
+    title: 'Want an app like ours?',
+    text: 'Tickets and door scanning, order-ahead with a kitchen board, a shop with collection codes — or something new. Tell us what it should do; the request goes straight to Milan, who replies by email.',
+  },
+  website: {
+    kicker: 'Websites · कुरा गरौं',
+    title: 'Want a website?',
+    text: 'For your association, your business or your festival — in Deutsch, English and नेपाली, made for the phone. Tell us who it is for; the request goes straight to Milan, who replies by email.',
+  },
+  video: {
+    kicker: 'Videos · कुरा गरौं',
+    title: 'Want a video like this?',
+    text: 'A promo for Reels, TikTok and WhatsApp status, a walk-on intro for your artist, or visuals for the stage screen. Tell us about your event below; the request fills itself in and goes straight to Milan, who replies by email.',
+  },
+};
+
+/** The same page answers several questions, so its title follows ?intent. */
 export async function generateMetadata({ searchParams }: { searchParams: Promise<{ intent?: string | string[] }> }) {
   const raw = (await searchParams).intent;
   const intent = Array.isArray(raw) ? raw[0] : raw;
-  const m = intent === 'account' ? ACCOUNT : intent === 'video' ? VIDEO : DESIGN;
+  const m = intent === 'account' ? ACCOUNT : isTopic(intent) ? TOPICS[intent] : DESIGN;
   return {
     ...m,
     alternates: { canonical: '/contact' },
@@ -47,9 +85,11 @@ export default async function ContactPage({
   searchParams: Promise<{ intent?: string | string[] }>;
 }) {
   const raw = (await searchParams).intent;
-  const wantsAccount = (Array.isArray(raw) ? raw[0] : raw) === 'account';
-  // ?intent=video: arrived from a "want a video like this?" button on /studio.
-  const wantsVideo = (Array.isArray(raw) ? raw[0] : raw) === 'video';
+  const intent = Array.isArray(raw) ? raw[0] : raw;
+  const wantsAccount = intent === 'account';
+  // ?intent=video|app|website: arrived from a studio button ("want one like this?").
+  const topic = isTopic(intent) ? intent : undefined;
+  const head = HEAD[topic ?? 'any'];
   const contactEmail = platformContactEmail();
 
   if (!wantsAccount) {
@@ -60,25 +100,19 @@ export default async function ContactPage({
       <section className="section cc-page">
         <div className="container">
           <header className="cc-page-head">
-            <p className="feed-kicker anim-fade-up">{wantsVideo ? 'Videos · कुरा गरौं' : 'Talk to the creator'}</p>
-            <h1 className="anim-fade-up anim-d1">{wantsVideo ? 'Want a video like this?' : 'Tell us what you want to build'}</h1>
-            <p className="feed-hero-sub anim-fade-up anim-d2">
-              {wantsVideo
-                ? 'A promo for Reels, TikTok and WhatsApp status, a walk-on intro for your artist, or visuals for the stage screen. Tell us about your event below; the request fills itself in and goes straight to Milan, who replies by email.'
-                : 'A custom event page, a festival website, an app for your shop — or just a question. Chat below; the request fills itself in and goes straight to Milan, who replies by email.'}
+            <p className="feed-kicker anim-fade-up">{head.kicker}</p>
+            <h1 className="anim-fade-up anim-d1">{head.title}</h1>
+            <p className="feed-hero-sub anim-fade-up anim-d2">{head.text}</p>
+            <p className="muted small anim-fade-up anim-d2" style={{ marginTop: 10 }}>
+              <Link href={topic === 'video' ? '/studio#videos' : '/studio'} style={{ color: 'var(--brand-text)', fontWeight: 600 }}>
+                {topic === 'video' ? '← See the videos we made' : '← See our work'}
+              </Link>
             </p>
-            {wantsVideo && (
-              <p className="muted small anim-fade-up anim-d2" style={{ marginTop: 10 }}>
-                <Link href="/studio#videos" style={{ color: 'var(--brand-text)', fontWeight: 600 }}>
-                  ← See the videos we made
-                </Link>
-              </p>
-            )}
           </header>
-          <CreatorChat ai={geminiEnabled({ personal: true })} topic={wantsVideo ? 'video' : undefined} />
+          <CreatorChat ai={geminiEnabled({ personal: true })} topic={topic} />
           <div className="cc-under">
             <p className="muted small">
-              The self-service page is free and already included —{' '}
+              Just selling tickets or food? An event or shop page on MartNepali is free and self-service —{' '}
               <Link href="/organizers" style={{ color: 'var(--brand-text)', fontWeight: 600 }}>
                 build it yourself in minutes
               </Link>

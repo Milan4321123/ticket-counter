@@ -501,7 +501,7 @@ export default async function MarketPage({ searchParams }: Props) {
                 <Link href="/organizers" className="btn btn-brand">
                   Open your shop — it&rsquo;s free
                 </Link>{' '}
-                <Link href="/" className="btn" style={{ marginLeft: 8 }}>
+                <Link href="/events" className="btn" style={{ marginLeft: 8 }}>
                   What&rsquo;s on instead →
                 </Link>
               </p>

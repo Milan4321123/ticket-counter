@@ -97,7 +97,7 @@ export interface ChatTurn {
 type QKey = 'summary' | 'message' | 'sell' | 'shop' | 'event' | 'when' | 'name' | 'email' | 'emailReply' | 'ready';
 const Q: Record<AskLang, Record<QKey, string>> = {
   en: {
-    summary: 'What would you like us to make — a custom page for an event, a promo video, a bigger festival site, an app, or something else? A sentence is enough.',
+    summary: 'What would you like us to make — an app, a website, an ad or stage video, a custom event page, or something else? A sentence is enough.',
     message: 'Of course — what would you like to ask or tell Milan? Write it in a sentence or two.',
     sell: 'Great — what would you like to sell here: tickets for an event, food, or things from your shop? A sentence is enough.',
     shop: 'And what is your shop, business or event called?',
@@ -109,7 +109,7 @@ const Q: Record<AskLang, Record<QKey, string>> = {
     ready: 'That is everything — check your request and send it. Milan replies by email.',
   },
   de: {
-    summary: 'Was dürfen wir für dich bauen — eine eigene Event-Seite, ein Promo-Video, eine Festival-Website, eine App oder etwas anderes? Ein Satz reicht.',
+    summary: 'Was dürfen wir für dich bauen — eine App, eine Website, ein Werbe- oder Bühnenvideo, eine eigene Event-Seite oder etwas anderes? Ein Satz reicht.',
     message: 'Gern — was möchtest du Milan fragen oder sagen? Ein, zwei Sätze reichen.',
     sell: 'Super — was möchtest du hier verkaufen: Tickets für ein Event, Essen oder Sachen aus deinem Geschäft? Ein Satz reicht.',
     shop: 'Und wie heißt dein Geschäft, dein Betrieb oder dein Event?',
@@ -121,7 +121,7 @@ const Q: Record<AskLang, Record<QKey, string>> = {
     ready: 'Das ist alles — prüfe die Anfrage und schick sie ab. Milan antwortet per E-Mail.',
   },
   ne: {
-    summary: 'हामीले के बनाइदिऊँ — कार्यक्रमको आफ्नै पेज, प्रोमो भिडियो, ठूलो फेस्टिभल साइट, एप, वा अरू केही? एक वाक्य पुग्छ।',
+    summary: 'हामीले के बनाइदिऊँ — एप, वेबसाइट, विज्ञापन वा स्टेज भिडियो, कार्यक्रमको आफ्नै पेज, वा अरू केही? एक वाक्य पुग्छ।',
     message: 'हुन्छ — मिलनलाई के सोध्न वा भन्न चाहनुहुन्छ? एक-दुई वाक्य पुग्छ।',
     sell: 'राम्रो — यहाँ के बेच्न चाहनुहुन्छ: कार्यक्रमको टिकट, खाना, वा पसलको सामान? एक वाक्य पुग्छ।',
     shop: 'अनि तपाईंको पसल, व्यवसाय वा कार्यक्रमको नाम के हो?',
@@ -133,7 +133,7 @@ const Q: Record<AskLang, Record<QKey, string>> = {
     ready: 'सबै भयो — अनुरोध हेरेर पठाउनुहोस्। मिलनले इमेलमा जवाफ दिनुहुन्छ।',
   },
   rn: {
-    summary: 'Hamile ke banaidiun — event ko aafnai page, promo video, thulo festival site, app, wa aru kei? Euta sentence pugcha.',
+    summary: 'Hamile ke banaidiun — app, website, ad wa stage video, event ko aafnai page, wa aru kei? Euta sentence pugcha.',
     message: 'Huncha — Milan lai ke sodhna wa bhanna chahanuhuncha? Ek-dui sentence pugcha.',
     sell: 'Ramro — yaha ke bechna chahanuhuncha: event ko ticket, khana, wa pasal ko saman? Euta sentence pugcha.',
     shop: 'Ani tapaiko pasal, business wa event ko naam ke ho?',

@@ -15,8 +15,8 @@ import SpeechInput, { useVoiceTyping } from './SpeechInput';
 import StoryPlayer from './StoryPlayer';
 import { blurOnTouch, focusUnlessTouch, scrollChat } from '@/lib/chatScroll';
 
-/** "/#watch" in an answer is the customer's story video, played right here. */
-const isWatch = (href: string) => href === '/#watch';
+/** "/events#watch" in an answer is the customer's story video, played right here. */
+const isWatch = (href: string) => href === '/events#watch';
 
 interface AskLink { label: string; href: string; icon: string }
 interface AskResult { kind: 'event' | 'shop' | 'item' | 'offer'; title: string; sub: string; href: string; image: string | null }

@@ -30,7 +30,7 @@ export default function CardClosedPage() {
           else.
         </p>
         <p style={{ marginBottom: 0 }}>
-          <Link href="/" className="btn">
+          <Link href="/events" className="btn">
             Browse what is on
           </Link>
         </p>

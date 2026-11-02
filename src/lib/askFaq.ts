@@ -23,16 +23,16 @@ type Answers = Record<AskLang, string>;
 export const ABOUT: Answers = {
   en:
     'MartNepali is where Nepali events and Nepali shops in Germany meet their people: buy tickets for concerts and festivals, and order momo, sweets, groceries and crafts to collect with a QR code. ' +
-    'Browse [upcoming events](/#events) or [the bazaar](/market) — or, if you organize events or run a shop, [sell with us for free](/organizers). The [1-minute video](/organizers#video) shows it all.',
+    'Browse [upcoming events](/events#events) or [the bazaar](/market) — or, if you organize events or run a shop, [sell with us for free](/organizers). The [1-minute video](/organizers#video) shows it all.',
   de:
     'MartNepali bringt nepalesische Events und Läden in Deutschland zusammen: Tickets für Konzerte und Feste kaufen, Momo, Süßes, Lebensmittel und Handwerk bestellen und mit QR-Code abholen. ' +
-    'Schau dir [kommende Events](/#events) oder [den Basar](/market) an — oder, wenn du Events veranstaltest oder einen Laden hast, [verkaufe kostenlos bei uns](/organizers). Das [1-Minuten-Video](/organizers#video) zeigt alles.',
+    'Schau dir [kommende Events](/events#events) oder [den Basar](/market) an — oder, wenn du Events veranstaltest oder einen Laden hast, [verkaufe kostenlos bei uns](/organizers). Das [1-Minuten-Video](/organizers#video) zeigt alles.',
   ne:
     'MartNepali जर्मनीका नेपाली कार्यक्रम र नेपाली पसलहरूको ठाउँ हो: कन्सर्ट र चाडपर्वका टिकट किन्नुहोस्, मम, मिठाई, किराना र हस्तकला अर्डर गरेर QR कोडले लिनुहोस्। ' +
-    '[आउँदा कार्यक्रम](/#events) वा [बजार](/market) हेर्नुहोस् — कार्यक्रम वा पसल चलाउनुहुन्छ भने [निःशुल्क बेच्नुहोस्](/organizers)। [१ मिनेटको भिडियो](/organizers#video) ले सबै देखाउँछ।',
+    '[आउँदा कार्यक्रम](/events#events) वा [बजार](/market) हेर्नुहोस् — कार्यक्रम वा पसल चलाउनुहुन्छ भने [निःशुल्क बेच्नुहोस्](/organizers)। [१ मिनेटको भिडियो](/organizers#video) ले सबै देखाउँछ।',
   rn:
     'MartNepali Germany ka Nepali event ra Nepali pasal haru ko thau ho: concert ra chadparva ko ticket kinna, ani momo, mithai, kirana ra hastakala order garera QR code le lina milcha. ' +
-    '[Aauna lageka event](/#events) wa [bazaar](/market) hernus — event wa pasal chalaunu huncha bhane [free ma bechnus](/organizers). [1 minute ko video](/organizers#video) le sabai dekhaucha.',
+    '[Aauna lageka event](/events#events) wa [bazaar](/market) hernus — event wa pasal chalaunu huncha bhane [free ma bechnus](/organizers). [1 minute ko video](/organizers#video) le sabai dekhaucha.',
 };
 
 const FREE: Answers = {
@@ -53,16 +53,16 @@ const FREE: Answers = {
 const HOW: Answers = {
   en:
     'Pick an event or a shop, choose your tickets or items, and pay the seller directly — bank transfer, PayPal or card, whatever they offer. Your QR code arrives by email: show it at the door, or when you collect your order. ' +
-    '[Watch it in 1½ minutes](/#watch) — or, if you sell, see [the seller side](/organizers#video).',
+    '[Watch it in 1½ minutes](/events#watch) — or, if you sell, see [the seller side](/organizers#video).',
   de:
     'Wähle ein Event oder einen Laden, such dir Tickets oder Artikel aus und bezahle direkt beim Verkäufer — Überweisung, PayPal oder Karte, je nach Angebot. Dein QR-Code kommt per E-Mail: am Einlass zeigen oder beim Abholen. ' +
-    '[In 1½ Minuten ansehen](/#watch) — oder, wenn du verkaufst, [die Verkäuferseite](/organizers#video).',
+    '[In 1½ Minuten ansehen](/events#watch) — oder, wenn du verkaufst, [die Verkäuferseite](/organizers#video).',
   ne:
     'कार्यक्रम वा पसल छान्नुहोस्, टिकट वा सामान रोज्नुहोस्, र बेच्नेलाई सिधै तिर्नुहोस् — बैंक ट्रान्सफर, PayPal वा कार्ड, जे उपलब्ध छ। QR कोड इमेलमा आउँछ: ढोकामा वा सामान लिँदा देखाउनुहोस्। ' +
-    '[१½ मिनेटमा हेर्नुहोस्](/#watch) — बेच्नुहुन्छ भने [बेच्नेको भाग](/organizers#video)।',
+    '[१½ मिनेटमा हेर्नुहोस्](/events#watch) — बेच्नुहुन्छ भने [बेच्नेको भाग](/organizers#video)।',
   rn:
     'Event wa pasal channus, ticket wa saman rojnus, ani bechne lai sidhai tirnus — bank transfer, PayPal wa card, je cha. QR code email ma aaucha: dhoka ma wa saman lina jada dekhaunus. ' +
-    '[1½ minute ma hernus](/#watch) — bechnu huncha bhane [bechne ko bhag](/organizers#video).',
+    '[1½ minute ma hernus](/events#watch) — bechnu huncha bhane [bechne ko bhag](/organizers#video).',
 };
 
 const SELL: Answers = {
@@ -98,25 +98,25 @@ const PAY: Answers = {
 const HELP: Answers = {
   en:
     'No problem — here is what you can do here:\n' +
-    '🎟 **Go out** — [upcoming Nepali events](/#events): concerts, Dashain and Tihar nights, tickets straight to your phone.\n' +
+    '🎟 **Go out** — [upcoming Nepali events](/events#events): concerts, Dashain and Tihar nights, tickets straight to your phone.\n' +
     '🥟 **Eat & shop** — [the bazaar](/market): momo, sweets, groceries and crafts to collect with a QR code. Try “items under 10 euro”.\n' +
     '🚀 **Sell** — put your own event, shop or restaurant here, free: [try the demo](/organizers).\n' +
-    '▶ Or [watch how it all works](/#watch) in 1½ minutes. Just tell me which one — or ask anything.',
+    '▶ Or [watch how it all works](/events#watch) in 1½ minutes. Just tell me which one — or ask anything.',
   de:
     'Kein Problem — das kannst du hier machen:\n' +
-    '🎟 **Ausgehen** — [kommende nepalesische Events](/#events): Konzerte, Dashain- und Tihar-Abende, Tickets direkt aufs Handy.\n' +
+    '🎟 **Ausgehen** — [kommende nepalesische Events](/events#events): Konzerte, Dashain- und Tihar-Abende, Tickets direkt aufs Handy.\n' +
     '🥟 **Essen & einkaufen** — [der Basar](/market): Momo, Süßes, Lebensmittel und Handwerk, abholen mit QR-Code. Probier „Artikel unter 10 Euro“.\n' +
     '🚀 **Verkaufen** — dein eigenes Event, deinen Laden oder dein Restaurant hier, kostenlos: [Demo ausprobieren](/organizers).\n' +
     'Sag einfach, was davon — oder frag irgendwas.',
   ne:
     'कुनै समस्या छैन — यहाँ यी गर्न सकिन्छ:\n' +
-    '🎟 **घुम्न** — [आउँदा नेपाली कार्यक्रम](/#events): कन्सर्ट, दशैं-तिहार साँझ, टिकट सिधै फोनमा।\n' +
+    '🎟 **घुम्न** — [आउँदा नेपाली कार्यक्रम](/events#events): कन्सर्ट, दशैं-तिहार साँझ, टिकट सिधै फोनमा।\n' +
     '🥟 **खान र किन्न** — [बजार](/market): मम, मिठाई, किराना र हस्तकला, QR कोडले लिनुहोस्।\n' +
     '🚀 **बेच्न** — आफ्नो कार्यक्रम, पसल वा रेस्टुरेन्ट यहाँ निःशुल्क: [डेमो चलाउनुहोस्](/organizers)।\n' +
     'कुन चाहिन्छ भन्नुहोस् — वा जे पनि सोध्नुहोस्।',
   rn:
     'Kei samasya chaina — yaha yo garna sakincha:\n' +
-    '🎟 **Ghumna** — [aauna lageka Nepali event](/#events): concert, Dashain-Tihar saanjh, ticket sidhai phone ma.\n' +
+    '🎟 **Ghumna** — [aauna lageka Nepali event](/events#events): concert, Dashain-Tihar saanjh, ticket sidhai phone ma.\n' +
     '🥟 **Khana ra kinna** — [bazaar](/market): momo, mithai, kirana ra hastakala, QR code le linus. “10 euro bhanda sasto khaja” lekhnus.\n' +
     '🚀 **Bechna** — aafno event, pasal wa restaurant yaha free ma: [demo chalaunus](/organizers).\n' +
     'Kun chahincha bhannus — wa je pani sodhnus.',

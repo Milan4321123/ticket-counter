@@ -163,7 +163,7 @@ export default function FestivalPage({ festival }: { festival: Festival }) {
             <Link href="/organizers" className="btn btn-brand">
               List your {festival.name} event — free
             </Link>{' '}
-            <Link href="/" className="btn" style={{ marginLeft: 8 }}>
+            <Link href="/events" className="btn" style={{ marginLeft: 8 }}>
               All events →
             </Link>
           </p>

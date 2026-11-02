@@ -33,7 +33,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const events = listPublishedEvents();
 
   const staticPages: MetadataRoute.Sitemap = [
-    { url: base, changeFrequency: 'daily', priority: 1 },
+    { url: base, changeFrequency: 'weekly', priority: 1 },
+    // The events & bazaar feed (it was the homepage until Nov 2026).
+    { url: `${base}/events`, changeFrequency: 'daily', priority: 0.9 },
     { url: `${base}/organizers`, changeFrequency: 'monthly', priority: 0.8 },
     // The bazaar: every item every published shop sells, on one page. Daily —
     // a shop's shelves turn over (and sell out) far faster than the list of
@@ -68,7 +70,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/kalakar`, changeFrequency: 'weekly', priority: 0.7 },
     { url: `${base}/card`, changeFrequency: 'weekly', priority: 0.7 },
     { url: `${base}/nepali-in`, changeFrequency: 'weekly', priority: 0.6 },
-    { url: `${base}/studio`, changeFrequency: 'monthly', priority: 0.7 },
+    { url: `${base}/studio`, changeFrequency: 'weekly', priority: 0.8 },
     { url: `${base}/contact`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/privacy`, changeFrequency: 'yearly', priority: 0.3 },
     // The other public legal pages. Low priority — nobody searches for them —

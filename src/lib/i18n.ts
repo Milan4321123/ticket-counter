@@ -24,6 +24,8 @@ const D = {
   'nav.browse': { en: 'Browse events', de: 'Events entdecken', ne: 'कार्यक्रमहरू' },
   'nav.browse.short': { en: 'Browse', de: 'Events', ne: 'कार्यक्रम' },
   'nav.events': { en: 'Events', de: 'Events', ne: 'कार्यक्रम' },
+  'nav.studio': { en: 'Studio', de: 'Studio', ne: 'स्टुडियो' },
+  'nav.contact': { en: 'Talk to us', de: 'Sprich mit uns', ne: 'कुरा गरौं' },
   'nav.basket': { en: 'Basket', de: 'Warenkorb', ne: 'टोकरी' },
   'nav.account': { en: 'Your account', de: 'Dein Konto', ne: 'तपाईंको खाता' },
   'nav.search': { en: 'Search the bazaar', de: 'Basar durchsuchen', ne: 'बजारमा खोज्नुहोस्' },

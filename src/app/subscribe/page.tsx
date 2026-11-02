@@ -62,7 +62,7 @@ export default async function SubscribeConfirmPage({ searchParams }: Params) {
             new — at most one email per new listing, each with its own unsubscribe button.
           </p>
           <p style={{ marginBottom: 0 }}>
-            <Link href="/" className="btn">
+            <Link href="/events" className="btn">
               Browse events
             </Link>
           </p>

@@ -51,12 +51,25 @@ const EMPTY: Fields = {
 };
 
 const HELLO =
-  'Namaste 🙏 I am Milan’s assistant. Want a custom page for your event, or to sell here — or do you have a question or a problem with the site? Just tell me, in any language.';
-const IDEAS = ['A custom page for my event', 'I want to sell here', 'A question or a problem', 'Something else'];
+  'Namaste 🙏 I am Milan’s assistant. Need an app, a website or an ad video — or do you want to sell here, or have a question? Just tell me, in any language.';
+const IDEAS = ['An app', 'A website', 'An ad or stage video', 'I want to sell here', 'A question or a problem'];
 /** Arriving from a "want a video like this?" button: open on videos, not pages. */
 const HELLO_VIDEO =
-  'Namaste 🙏 I am Milan’s assistant. Want a video like the ones on our Studio page — a promo for Reels and WhatsApp status, a walk-on intro for an artist, or visuals for the stage screen? Tell me about your event, in any language.';
+  'Namaste 🙏 I am Milan’s assistant. Want a video like the ones in our work — a promo for Reels and WhatsApp status, a walk-on intro for an artist, or visuals for the stage screen? Tell me about your event, in any language.';
 const IDEAS_VIDEO = ['A promo video for my event', 'A walk-on intro for an artist', 'Visuals for the stage screen', 'Something else'];
+/** From "Talk to us about an app". */
+const HELLO_APP =
+  'Namaste 🙏 I am Milan’s assistant. Thinking of an app — ordering for your restaurant, tickets for your events, a shop, or something new? Tell me what it should do, in any language.';
+const IDEAS_APP = ['An ordering app for my restaurant', 'A ticket app for my events', 'An app for my shop', 'Something else'];
+/** From "Talk to us about a website". */
+const HELLO_WEBSITE =
+  'Namaste 🙏 I am Milan’s assistant. Want a website — for your association, your business or your festival, like the NPJOE site in our work? Tell me who it is for, in any language.';
+const IDEAS_WEBSITE = ['A website for our association', 'A website for my business', 'A festival or event website', 'Something else'];
+const OPENERS: Record<'video' | 'app' | 'website', { hello: string; ideas: string[] }> = {
+  video: { hello: HELLO_VIDEO, ideas: IDEAS_VIDEO },
+  app: { hello: HELLO_APP, ideas: IDEAS_APP },
+  website: { hello: HELLO_WEBSITE, ideas: IDEAS_WEBSITE },
+};
 const ROWS: { key: keyof Fields; label: string; icon: string }[] = [
   { key: 'summary', label: 'What you want', icon: '✨' },
   { key: 'eventName', label: 'Event or business', icon: '🎪' },
@@ -86,7 +99,8 @@ const ROWS_BY_KIND: Record<Fields['kind'], { key: keyof Fields; label: string; i
     { key: 'email', label: 'Email', icon: '✉️' },
   ],
 };
-const STORE = 'creator:chat:v1';
+// v2: the studio greeting (Nov 2026) — an older saved chat would hide it.
+const STORE = 'creator:chat:v2';
 
 export default function CreatorChat({
   owner = 'Milan',
@@ -96,11 +110,11 @@ export default function CreatorChat({
   owner?: string;
   /** Whether replies come from Gemini on this server (lib/gemini, personal). */
   ai?: boolean;
-  /** 'video' when the visitor came from a video ("want one like this?"). */
-  topic?: 'video';
+  /** What the visitor came from: a video, an app or a website ("want one like this?"). */
+  topic?: 'video' | 'app' | 'website';
 }) {
-  const hello = topic === 'video' ? HELLO_VIDEO : HELLO;
-  const ideas = topic === 'video' ? IDEAS_VIDEO : IDEAS;
+  const hello = topic ? OPENERS[topic].hello : HELLO;
+  const ideas = topic ? OPENERS[topic].ideas : IDEAS;
   // Its own saved conversation, so the video greeting is not hidden behind an older chat.
   const store = topic ? `${STORE}:${topic}` : STORE;
   const [turns, setTurns] = useState<Turn[]>([{ from: 'bot', text: hello }]);

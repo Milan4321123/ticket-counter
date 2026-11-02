@@ -146,7 +146,7 @@ export default function BasketPage({ customer }: { customer: { name: string; ema
             <Link href="/market" className="btn btn-brand">
               Shop the bazaar
             </Link>{' '}
-            <Link href="/" className="btn">
+            <Link href="/events" className="btn">
               Browse events
             </Link>
           </p>
