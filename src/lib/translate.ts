@@ -36,6 +36,15 @@ const PARALLEL = 3;
  */
 export const PII_PURGE_MARKER = 'migration:translations_pii_purge_v1';
 
+/**
+ * Second one-time purge. On 3 Nov 2026 three studio demos (/work/build, card,
+ * booth) went live without translate="no", so what DE/NE visitors typed there
+ * reached this cache keystroke by keystroke until the fix that afternoon.
+ * Everything cached from the first of those deploys on is dropped once.
+ */
+export const DEMO_LEAK_PURGE_MARKER = 'migration:translations_demo_leak_purge_v2';
+const DEMO_LEAK_SINCE = '2026-11-03 05:40:00'; // UTC, as created_at is stored
+
 let ready = false;
 function db() {
   const d = getDb();
@@ -54,6 +63,11 @@ function db() {
       if (d.prepare(`SELECT 1 FROM kv WHERE key = ?`).get(PII_PURGE_MARKER)) return;
       d.exec(`DELETE FROM translations`);
       d.prepare(`INSERT INTO kv (key, value) VALUES (?, ?)`).run(PII_PURGE_MARKER, new Date().toISOString());
+    })();
+    d.transaction(() => {
+      if (d.prepare(`SELECT 1 FROM kv WHERE key = ?`).get(DEMO_LEAK_PURGE_MARKER)) return;
+      d.prepare(`DELETE FROM translations WHERE created_at >= ?`).run(DEMO_LEAK_SINCE);
+      d.prepare(`INSERT INTO kv (key, value) VALUES (?, ?)`).run(DEMO_LEAK_PURGE_MARKER, new Date().toISOString());
     })();
     ready = true;
   }

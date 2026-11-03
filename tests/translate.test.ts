@@ -2,7 +2,7 @@
 // and the one-time purge of a cache that held names from before the marks.
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { MAX_BATCH, MAX_TEXT_LEN, PII_PURGE_MARKER, pageTextsToTranslate, translateTexts } from '../src/lib/translate.ts';
+import { DEMO_LEAK_PURGE_MARKER, MAX_BATCH, MAX_TEXT_LEN, PII_PURGE_MARKER, pageTextsToTranslate, translateTexts } from '../src/lib/translate.ts';
 import { db } from './helpers.ts';
 
 delete process.env.GEMINI_API_KEY;
@@ -20,6 +20,7 @@ describe('translation cache purge', () => {
     assert.deepEqual(await translateTexts('de', ['Ram Sharma']), {}, 'the leaked row is gone before anything is read');
     assert.equal((db().prepare(`SELECT COUNT(*) AS n FROM translations`).get() as { n: number }).n, 0);
     assert.ok(db().prepare(`SELECT 1 FROM kv WHERE key = ?`).get(PII_PURGE_MARKER), 'the purge is recorded');
+    assert.ok(db().prepare(`SELECT 1 FROM kv WHERE key = ?`).get(DEMO_LEAK_PURGE_MARKER), 'the demo-leak purge is recorded');
 
     // Anything cached after the purge stays.
     const hash = (await import('node:crypto')).createHash('sha1').update('Collect on Saturdays').digest('hex');
