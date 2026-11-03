@@ -127,6 +127,17 @@
 .qz button {
   font-family: inherit;
 }
+/* German runs long: let words break at syllables instead of spilling out of a button or tile. */
+.qz[lang='de'] {
+  -webkit-hyphens: auto;
+  hyphens: auto;
+  overflow-wrap: break-word;
+}
+/* …but not in headings, names and short labels, which wrap between words. */
+.qz[lang='de'] :is(h1, h2, h3) {
+  -webkit-hyphens: manual;
+  hyphens: manual;
+}
 .qz-c0 {
   --c: var(--qz-c0);
   --ink: #fff;

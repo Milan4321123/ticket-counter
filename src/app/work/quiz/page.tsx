@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import DemoNav from '@/components/studio/DemoNav';
 import { Baloo_2 } from 'next/font/google';
+import { currentLang } from '@/lib/i18nServer';
 import QuizGame from './QuizGame';
+import { asQuizLang } from './content';
 import '@/app/studio/studio.css';
 import './quiz.css';
 
@@ -13,18 +15,19 @@ import './quiz.css';
 //
 // Same thin MartNepali frame as /work/wedding and /work/artist: the "Demo
 // project" strip above and "want one like this?" below are ordinary site copy;
-// the quiz in between is translate="no" and switches English / नेपाली itself.
+// the quiz in between is translate="no" and has its own English, Deutsch and
+// नेपाली — it starts in the site's language.
 //
 // No prices, quotes or packages anywhere: the operator is a student and the
 // studio is offered free while it grows (see app/studio/page.tsx).
 
-// Baloo 2 is drawn for Devanagari and Latin alike, so both languages share one
+// Baloo 2 is drawn for Devanagari and Latin alike, so every language shares one
 // round, game-show face (and its Devanagari digits are real ones).
 const baloo = Baloo_2({ weight: ['500', '600', '700', '800'], subsets: ['devanagari', 'latin'], display: 'swap', variable: '--qz-font' });
 
 const title = 'Live event quiz — demo project';
 const description =
-  'A live quiz for a community night, built by MartNepali as a demo: a big-screen host view with a QR code to join, players answering on their phones, countdowns, answer charts, an animated leaderboard and a podium — in English and नेपाली.';
+  'A live quiz for a community night, built by MartNepali as a demo: a big-screen host view with a QR code to join, players answering on their phones, countdowns, answer charts, an animated leaderboard and a podium — in English, Deutsch and नेपाली.';
 const cover = { url: '/media/studio/projects/quiz.jpg', width: 1200, height: 800, alt: 'A live quiz demo: a big screen with a Nepali culture question beside a phone with four answer buttons' };
 
 export const metadata = {
@@ -35,7 +38,8 @@ export const metadata = {
   twitter: { card: 'summary_large_image', title, description, images: [cover.url] },
 };
 
-export default function QuizDemoPage() {
+export default async function QuizDemoPage() {
+  const lang = asQuizLang(await currentLang());
   return (
     <div className={`qz-page ${baloo.variable}`}>
       <div className="qz-frame-top">
@@ -48,7 +52,7 @@ export default function QuizDemoPage() {
         </div>
       </div>
 
-      <QuizGame />
+      <QuizGame initialLang={lang} />
 
       <section className="qz-frame-end" aria-labelledby="qz-end-h">
         <div className="qz-frame-end-inner">

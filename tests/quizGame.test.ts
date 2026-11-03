@@ -16,11 +16,17 @@ function run(s: QuizState, ms: number): QuizState {
   return s;
 }
 
-test('every question has four answers in both languages and a valid right answer', () => {
+test('every question has four answers in every language and a valid right answer', () => {
   assert.ok(QUESTIONS.length >= 8 && QUESTIONS.length <= 10);
   for (const q of QUESTIONS) {
     assert.equal(q.en.a.length, 4);
+    assert.equal(q.de.a.length, 4);
     assert.equal(q.ne.a.length, 4);
+    for (const l of ['en', 'de', 'ne'] as const) {
+      assert.ok(q[l].cat && q[l].q && q[l].fact, `${l}: category, question and fact are written`);
+      assert.equal(new Set(q[l].a).size, 4, `${l}: four different answers`);
+    }
+    assert.notEqual(q.de.q, q.en.q, 'the Deutsch question is not the English one');
     assert.ok(q.correct >= 0 && q.correct < 4);
     assert.ok(/[ऀ-ॿ]/.test(q.ne.q), 'the नेपाली question is in Devanagari');
   }

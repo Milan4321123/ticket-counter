@@ -7,7 +7,9 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import QRCode from 'qrcode';
-import { COPY, MY_AVATARS, QUESTIONS, num, toNeDigits, type QuizCopy, type QuizLang } from './content';
+import { useRouter } from 'next/navigation';
+import { setSiteLangCookie } from '@/components/studio/siteLang';
+import { COPY, LANGS, MY_AVATARS, QUESTIONS, num, toNeDigits, type QuizCopy, type QuizLang } from './content';
 import {
   BOARD_SLIDE_AT,
   QUESTION_MS,
@@ -25,7 +27,6 @@ import { QuizSfx } from './sound';
 
 type View = 'auto' | 'big' | 'phone' | 'both';
 
-const LANG_KEY = 'mn-demo:quiz-lang';
 const MUTE_KEY = 'mn-demo:quiz-mute';
 const NICK_KEY = 'mn-demo:quiz-nick';
 const SITE = 'https://www.martnepali.com';
@@ -74,7 +75,7 @@ function Avatar({ p, big }: { p: Pick<Player, 'avatar' | 'hue'>; big?: boolean }
   );
 }
 
-function Qr({ text }: { text: string }) {
+function Qr({ text, label }: { text: string; label: string }) {
   const path = useMemo(() => {
     const qr = QRCode.create(text, { errorCorrectionLevel: 'M' });
     const n = qr.modules.size;
@@ -83,7 +84,7 @@ function Qr({ text }: { text: string }) {
     return { d, n: n + 4 };
   }, [text]);
   return (
-    <svg className="qz-qr" viewBox={`0 0 ${path.n} ${path.n}`} role="img" aria-label="QR code" shapeRendering="crispEdges">
+    <svg className="qz-qr" viewBox={`0 0 ${path.n} ${path.n}`} role="img" aria-label={label} shapeRendering="crispEdges">
       <rect width={path.n} height={path.n} fill="#fff" />
       <path d={path.d} fill="#140c2e" />
     </svg>
@@ -192,7 +193,7 @@ function BigScreen({ s, lang }: { s: QuizState; lang: QuizLang }) {
         <div className="qz-lobby-join">
           <p className="qz-event">{t.eventName}</p>
           <div className="qz-qr-card">
-            <Qr text={url} />
+            <Qr text={url} label={t.qrLabel} />
             <div>
               <p className="qz-scan">{t.scan}</p>
               <p className="qz-room-label">{t.room}</p>
@@ -618,8 +619,10 @@ function Phone({ s, lang, onJoin, onAnswer, onStart, onAgain, tap }: PhoneProps)
 
 // ---------- the page ----------
 
-export default function QuizGame() {
-  const [lang, setLang] = useState<QuizLang>('en');
+export default function QuizGame({ initialLang }: { initialLang: QuizLang }) {
+  // The site's language (its EN · DE · ने switch) is the quiz's language.
+  const [lang, setLang] = useState<QuizLang>(initialLang);
+  const router = useRouter();
   const [view, setView] = useState<View>('auto');
   const [wide, setWide] = useState(true);
   const [muted, setMuted] = useState(false);
@@ -629,8 +632,6 @@ export default function QuizGame() {
 
   // Saved choices, the screen width, and a #phone link (that is where the QR code points).
   useEffect(() => {
-    const l = load(LANG_KEY);
-    if (l === 'en' || l === 'ne') setLang(l);
     if (load(MUTE_KEY) === '1') setMuted(true);
     if (location.hash === '#phone' || new URLSearchParams(location.search).get('view') === 'phone') setView('phone');
     const mq = window.matchMedia('(min-width: 900px)');
@@ -694,7 +695,8 @@ export default function QuizGame() {
   const pickLang = (l: QuizLang) => {
     unlock();
     setLang(l);
-    save(LANG_KEY, l);
+    setSiteLangCookie(l);
+    router.refresh();
   };
   const toggleMute = () => {
     unlock();
@@ -717,7 +719,7 @@ export default function QuizGame() {
   const over = s.phase === 'podium';
 
   return (
-    <div className={`qz qz-lang-${lang}`} lang={lang === 'ne' ? 'ne' : 'en'} translate="no" data-qz-phase={s.phase}>
+    <div className={`qz qz-lang-${lang}`} lang={lang} translate="no" data-qz-phase={s.phase}>
       <div className="qz-top">
         <div className="qz-top-text">
           <h1 className="qz-title">{t.demoTitle}</h1>
@@ -740,13 +742,12 @@ export default function QuizGame() {
               </button>
             ))}
           </div>
-          <div className="qz-seg qz-seg-lang" role="group" aria-label="Language / भाषा">
-            <button type="button" aria-pressed={lang === 'en'} onClick={() => pickLang('en')}>
-              EN
-            </button>
-            <button type="button" aria-pressed={lang === 'ne'} onClick={() => pickLang('ne')} lang="ne">
-              नेपाली
-            </button>
+          <div className="qz-seg qz-seg-lang" role="group" aria-label={t.langLabel}>
+            {LANGS.map((x) => (
+              <button key={x.id} type="button" aria-pressed={lang === x.id} onClick={() => pickLang(x.id)} lang={x.id} aria-label={x.label}>
+                {x.short}
+              </button>
+            ))}
           </div>
         </div>
       </div>

@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import DemoNav from '@/components/studio/DemoNav';
 import { Mukta, Rozha_One, Syne } from 'next/font/google';
+import { currentLang } from '@/lib/i18nServer';
 import ArtistPage from './ArtistPage';
+import { asArtistLang } from './content';
 import '@/app/studio/studio.css';
 import './artist.css';
 
@@ -13,7 +15,8 @@ import './artist.css';
 //
 // Same thin MartNepali frame as /work/wedding: the "Demo project" strip above
 // and "want one like this?" below are ordinary site copy; the artist page in
-// between is translate="no" and switches between English and नेपाली itself.
+// between is translate="no" and has its own English, Deutsch and नेपाली — it
+// starts in the site's language.
 //
 // No prices, quotes or packages anywhere: the operator is a student and the
 // studio is offered free while it grows (see app/studio/page.tsx).
@@ -24,7 +27,7 @@ const devaBody = Mukta({ weight: ['400', '600'], subsets: ['devanagari', 'latin'
 
 const title = 'Artist page & press kit — demo project';
 const description =
-  'An artist website for a touring Nepali singer, built by MartNepali as a demo: a live music player, tour dates with ticket links, bio and press, a downloadable press kit and a booking form — in English and नेपाली.';
+  'An artist website for a touring Nepali singer, built by MartNepali as a demo: a live music player, tour dates with ticket links, bio and press, a downloadable press kit and a booking form — in English, Deutsch and नेपाली.';
 const cover = { url: '/media/studio/projects/artist.jpg', width: 1200, height: 800, alt: 'Rimjhim Tara — a demo artist page with music player and tour dates' };
 
 export const metadata = {
@@ -35,7 +38,8 @@ export const metadata = {
   twitter: { card: 'summary_large_image', title, description, images: [cover.url] },
 };
 
-export default function ArtistDemoPage() {
+export default async function ArtistDemoPage() {
+  const lang = asArtistLang(await currentLang());
   return (
     <div className={`ar-page ${display.variable} ${deva.variable} ${devaBody.variable}`}>
       <div className="ar-frame-top">
@@ -48,7 +52,7 @@ export default function ArtistDemoPage() {
         </div>
       </div>
 
-      <ArtistPage />
+      <ArtistPage initialLang={lang} />
 
       <section className="ar-frame-end" aria-labelledby="ar-end-h">
         <div className="ar-frame-end-inner">

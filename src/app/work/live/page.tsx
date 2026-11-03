@@ -1,30 +1,33 @@
 import Link from 'next/link';
 import DemoNav from '@/components/studio/DemoNav';
 import { Mukta } from 'next/font/google';
+import { currentLang } from '@/lib/i18nServer';
 import LiveDashboard from './LiveDashboard';
+import { asLiveLang } from './content';
 import '@/app/studio/studio.css';
 import './live.css';
 
 // Studio demo #4: a venue live dashboard (lib/projects.ts → "Live event
 // dashboard") — what an organizer watches on the night of a concert and what
 // can go up on the hall screen. The evening is simulated in sim.ts and runs in
-// the visitor's browser (no server, nothing sent or stored beyond the language
-// choice). It shows ticket and people COUNTS only.
+// the visitor's browser (no server, nothing sent or stored; the language is the
+// site's own cookie). It shows ticket and people COUNTS only.
 //
 // Same thin MartNepali frame as the other demos: the "Demo project" strip above
 // and "want one like this?" below are ordinary site copy; the dashboard in
-// between is translate="no" and switches English / नेपाली itself.
+// between is translate="no" and has its own English, Deutsch and नेपाली — it
+// starts in the site's language.
 //
 // No prices, quotes or packages anywhere: the operator is a student and the
 // studio is offered free while it grows (see app/studio/page.tsx).
 
-// Mukta is drawn for Devanagari and Latin alike, so both languages read the
+// Mukta is drawn for Devanagari and Latin alike, so every language reads the
 // same at projector size.
 const mukta = Mukta({ weight: ['400', '500', '600', '700', '800'], subsets: ['devanagari', 'latin'], display: 'swap', variable: '--lv-font' });
 
 const title = 'Live event dashboard — demo project';
 const description =
-  'A venue big-screen dashboard for a concert night, built by MartNepali as a demo: live check-ins against capacity, arrivals per 10 minutes, door queues, ticket types, a check-in feed, a shout-out wall and a now-on-stage timeline — in English and नेपाली.';
+  'A venue big-screen dashboard for a concert night, built by MartNepali as a demo: live check-ins against capacity, arrivals per 10 minutes, door queues, ticket types, a check-in feed, a shout-out wall and a now-on-stage timeline — in English, Deutsch and नेपाली.';
 const cover = {
   url: '/media/studio/projects/live.jpg',
   width: 1200,
@@ -40,7 +43,8 @@ export const metadata = {
   twitter: { card: 'summary_large_image', title, description, images: [cover.url] },
 };
 
-export default function LiveDemoPage() {
+export default async function LiveDemoPage() {
+  const lang = asLiveLang(await currentLang());
   return (
     <div className={`lv-page ${mukta.variable}`}>
       <div className="lv-frame-top">
@@ -53,7 +57,7 @@ export default function LiveDemoPage() {
         </div>
       </div>
 
-      <LiveDashboard />
+      <LiveDashboard initialLang={lang} />
 
       <section className="lv-frame-end" aria-labelledby="lv-end-h">
         <div className="lv-frame-end-inner">
@@ -66,7 +70,7 @@ export default function LiveDemoPage() {
           <ul>
             <li>Live check-ins and door queues</li>
             <li>A screen for the hall</li>
-            <li>English and नेपाली</li>
+            <li>English, Deutsch and नेपाली</li>
           </ul>
           <div className="lv-frame-ctas">
             <Link href="/contact?intent=app" className="btn btn-brand">

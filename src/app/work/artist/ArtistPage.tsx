@@ -1,36 +1,20 @@
 'use client';
 
 // The demo artist page itself: hero, music player, tour, about + press, stage
-// videos, press kit and a booking enquiry, in English or नेपाली. Everything
+// videos, press kit and a booking enquiry, in English, Deutsch or नेपाली. Everything
 // runs in the browser — the songs are composed and played live (synth.ts),
 // the press kit is drawn on the spot (presskit.ts), and the booking form only
 // checks what is typed: it sends nothing and stores nothing.
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type MutableRefObject } from 'react';
+import { useRouter } from 'next/navigation';
 import StudioPlayer from '@/components/StudioPlayer';
+import { setSiteLangCookie } from '@/components/studio/siteLang';
 import { videoById, type StudioVideo } from '@/lib/studioVideos';
 import { Cover, Hills, Portrait } from './art';
-import { BOOKING_EMAIL, COPY, TOUR, showDate, toNeDigits, type ArtistLang } from './content';
+import { BOOKING_EMAIL, COPY, LANGS, TOUR, fmtNum, showDate, toNeDigits, type ArtistLang } from './content';
 import { bioText, contactCard, oneSheet, saveBlob } from './presskit';
 import { DemoSynth, TRACKS, trackLength } from './synth';
-
-const LANG_KEY = 'mn-demo:artist-lang';
-
-function readLang(): ArtistLang | null {
-  try {
-    const v = localStorage.getItem(LANG_KEY);
-    return v === 'en' || v === 'ne' ? v : null;
-  } catch {
-    return null;
-  }
-}
-function writeLang(l: ArtistLang) {
-  try {
-    localStorage.setItem(LANG_KEY, l);
-  } catch {
-    /* private window: it just forgets */
-  }
-}
 
 function prefersLessMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -430,11 +414,11 @@ function Stats({ lang }: { lang: ArtistLang }) {
   return (
     <dl className="ar-stats" ref={ref}>
       {t.stats.map((s) => {
-        const v = (s.value * k).toFixed(s.decimals) + s.suffix;
+        const v = fmtNum((s.value * k).toFixed(s.decimals), lang) + s.suffix;
         return (
           <div key={s.label}>
             <dt>{s.label}</dt>
-            <dd>{lang === 'ne' ? toNeDigits(v) : v}</dd>
+            <dd>{v}</dd>
           </div>
         );
       })}
@@ -454,7 +438,7 @@ function PressKit({ lang, rootRef }: { lang: ArtistLang; rootRef: MutableRefObje
 
   const get = async (id: KitId) => {
     if (busy) return;
-    const suffix = lang === 'ne' ? '-ne' : '';
+    const suffix = lang === 'en' ? '' : `-${lang}`;
     if (id === 'bio') {
       saveBlob(new Blob([bioText(lang)], { type: 'text/plain;charset=utf-8' }), `rimjhim-tara-bio${suffix}.txt`);
       mark(id);
@@ -581,7 +565,7 @@ function Booking({ lang }: { lang: ArtistLang }) {
         <dl className="ar-thanks-sum">
           <dt>{t.thanksSummary}</dt>
           <dd>
-            {t.types[sent.type]} · {sent.city} · {d.day} {d.month} {d.year} · {t.sizes[sent.size]}
+            {t.types[sent.type]} · {sent.city} · {d.full} · {t.sizes[sent.size]}
             {sent.org ? ` · ${sent.org}` : ''}
           </dd>
         </dl>
@@ -681,21 +665,22 @@ function Booking({ lang }: { lang: ArtistLang }) {
 
 const STAGE_VIDEOS = ['stage-dance'].map((id) => videoById(id)).filter((v): v is StudioVideo => Boolean(v));
 
-export default function ArtistPage() {
-  const [lang, setLang] = useState<ArtistLang>('en');
+export default function ArtistPage({ initialLang }: { initialLang: ArtistLang }) {
+  // The site's language (its EN · DE · ने switch) is the page's language.
+  const [lang, setLang] = useState<ArtistLang>(initialLang);
+  const router = useRouter();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const startRef = useRef<(() => void) | null>(null);
   const t = COPY[lang];
 
-  useEffect(() => {
-    const saved = readLang();
-    if (saved) setLang(saved);
-  }, []);
-
-  const pick = useCallback((l: ArtistLang) => {
-    setLang(l);
-    writeLang(l);
-  }, []);
+  const pick = useCallback(
+    (l: ArtistLang) => {
+      setLang(l);
+      setSiteLangCookie(l);
+      router.refresh();
+    },
+    [router]
+  );
 
   // The sticky bar sits under the site header, whatever its height.
   useEffect(() => {
@@ -734,7 +719,7 @@ export default function ArtistPage() {
   };
 
   return (
-    <div ref={rootRef} className={`ar ar-lang-${lang}`} lang={lang === 'ne' ? 'ne' : 'en'} translate="no">
+    <div ref={rootRef} className={`ar ar-lang-${lang}`} lang={lang} translate="no">
       <div className="ar-bar">
         <a href="#ar-top" className="ar-mono" aria-label={t.artist}>
           {lang === 'ne' ? 'रि·ता' : 'R·T'}
@@ -746,13 +731,12 @@ export default function ArtistPage() {
           <a href="#ar-kit">{t.nav.kit}</a>
           <a href="#ar-booking">{t.nav.booking}</a>
         </nav>
-        <div className="ar-lang" role="group" aria-label="Language / भाषा">
-          <button type="button" aria-pressed={lang === 'en'} onClick={() => pick('en')}>
-            EN
-          </button>
-          <button type="button" aria-pressed={lang === 'ne'} onClick={() => pick('ne')} lang="ne">
-            नेपाली
-          </button>
+        <div className="ar-lang" role="group" aria-label={t.langLabel}>
+          {LANGS.map((x) => (
+            <button key={x.id} type="button" aria-pressed={lang === x.id} onClick={() => pick(x.id)} lang={x.id} aria-label={x.label}>
+              {x.short}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -863,7 +847,7 @@ export default function ArtistPage() {
           <div className="ar-videos">
             {STAGE_VIDEOS.map((v, i) => (
               <figure key={v.id} className="ar-video" data-reveal translate="no">
-                <StudioPlayer video={v} />
+                <StudioPlayer video={v} title={t.videoTitles[i]} playLabel={t.videoPlay(t.videoTitles[i])} />
                 <figcaption>{t.videoCaptions[i]}</figcaption>
               </figure>
             ))}

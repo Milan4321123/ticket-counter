@@ -1,8 +1,17 @@
-// Every word of the demo invitation, in English and नेपाली. The couple, the
+// Every word of the demo invitation, in English, Deutsch and नेपाली. The couple, the
 // families and the venue are made up — this is a studio demo, not anybody's
 // real wedding. Dates: 19–20 Feb 2027 = फागुन ७–८, २०८३ (lib/patro).
 
-export type InviteLang = 'en' | 'ne';
+export type InviteLang = 'en' | 'de' | 'ne';
+
+export const LANGS: { id: InviteLang; label: string; short: string }[] = [
+  { id: 'en', label: 'English', short: 'EN' },
+  { id: 'de', label: 'Deutsch', short: 'DE' },
+  { id: 'ne', label: 'नेपाली', short: 'नेपाली' },
+];
+export function asInviteLang(v: unknown): InviteLang {
+  return v === 'de' || v === 'ne' ? v : 'en';
+}
 
 export type ProgrammeItem = {
   id: 'mehendi' | 'janti' | 'bihe' | 'reception';
@@ -32,6 +41,8 @@ export const VENUE = {
 
 type Copy = {
   langName: string;
+  langLabel: string;
+  navLabel: string;
   demo: string;
   invocation: string;
   kicker: string;
@@ -78,6 +89,8 @@ type Copy = {
   yes: string;
   no: string;
   fGuests: string;
+  fewer: string;
+  more: string;
   fWhich: string;
   fFood: string;
   veg: string;
@@ -108,6 +121,8 @@ type Copy = {
 export const COPY: Record<InviteLang, Copy> = {
   en: {
     langName: 'English',
+    langLabel: 'Language',
+    navLabel: 'Invitation',
     demo: 'Demo',
     invocation: '॥ श्री गणेशाय नमः ॥',
     kicker: 'Shubha Vivaha · You are invited',
@@ -181,6 +196,8 @@ export const COPY: Record<InviteLang, Copy> = {
     yes: 'Joyfully, yes',
     no: 'Sadly, no',
     fGuests: 'How many of you?',
+    fewer: 'One guest fewer',
+    more: 'One guest more',
     fWhich: 'Which programmes?',
     fFood: 'Food',
     veg: 'Vegetarian',
@@ -222,8 +239,130 @@ export const COPY: Record<InviteLang, Copy> = {
     footer: 'With love, Aarati & Sujan',
     icsTitle: 'Aarati & Sujan',
   },
+  de: {
+    langName: 'Deutsch',
+    langLabel: 'Sprache',
+    navLabel: 'Einladung',
+    demo: 'Demo',
+    invocation: '॥ श्री गणेशाय नमः ॥',
+    kicker: 'Shubha Vivaha · Du bist eingeladen',
+    bride: 'Aarati',
+    groom: 'Sujan',
+    invite: 'freuen sich von Herzen auf dich, wenn sie ihren gemeinsamen Weg beginnen',
+    dateLine: 'Samstag · 20. Februar 2027',
+    bsLine: '8. Falgun 2083 (Bikram Sambat)',
+    cityLine: 'Frankfurt am Main',
+    rsvpCta: 'Auf die Einladung antworten',
+    scroll: 'Nach unten',
+    nav: { programme: 'Programm', venue: 'Ort', rsvp: 'Zusage', faq: 'FAQ' },
+    welcomeTitle: 'Namaste, liebe Freundinnen und Freunde',
+    welcome:
+      'Zwei Familien, zwei Städte, ein großes nepalesisches Fest. Mit dem Segen unserer Eltern und Großeltern möchten wir dich gern dabeihaben — beim Henna, bei der Janti, bei der Trauung und in einer langen Nacht voller Tanz.',
+    families: 'Von Herzen, die Familien Bhandari & Karki',
+    countdownTitle: 'Bis zur Trauung',
+    units: ['Tage', 'Stunden', 'Minuten', 'Sekunden'],
+    countdownDone: 'Heute wird gefeiert!',
+    programmeTitle: 'Programm',
+    programmeSub: 'Zwei Tage, vier Momente. Komm zu so vielen, wie du kannst.',
+    events: {
+      mehendi: {
+        name: 'Mehendi',
+        day: 'Freitag, 19. Feb.',
+        time: '17:00',
+        text: 'Henna, Lieder und Tanz mit der Familie der Braut. Komm früh, bleib lange.',
+      },
+      janti: {
+        name: 'Swayambar & Janti',
+        day: 'Samstag, 20. Feb.',
+        time: '09:30',
+        text: 'Der Zug des Bräutigams kommt mit Panche Baja an, der traditionellen Hochzeitsmusik, und das Paar tauscht die Blumengirlanden.',
+      },
+      bihe: {
+        name: 'Bihe — die Trauung',
+        day: 'Samstag, 20. Feb.',
+        time: '11:00',
+        text: 'Rund um das heilige Feuer: Sindoor, Pote (die Hochzeitskette) und die sieben gemeinsamen Schritte.',
+      },
+      reception: {
+        name: 'Abendfeier',
+        day: 'Samstag, 20. Feb.',
+        time: '18:30',
+        text: 'Abendessen, ein paar kurze Reden und eine Tanzfläche bis spät in die Nacht.',
+      },
+    },
+    places: { home: 'Elternhaus · Offenbach (Adresse kommt mit deiner Antwort)', hall: 'Rhein-Main Festsaal' },
+    addOne: 'In den Kalender',
+    addAll: 'Alle vier in den Kalender',
+    venueTitle: 'Ort',
+    venueDemo: 'Demo-Ort — die Karte öffnet Frankfurt',
+    venueNotes: ['5 Minuten zu Fuß von der S-Bahn', 'Parkplätze direkt hinter dem Saal', 'Stufenloser Eingang, Aufzug zum Saal'],
+    openMap: 'Karte öffnen',
+    dressTitle: 'Dresscode',
+    dressText:
+      'Festlich und farbenfroh: Daura-Suruwal mit Dhaka-Topi, Saris, Kurtas und Lehengas sind herzlich willkommen — dein schönster Anzug genauso.',
+    dressAvoid: 'Bitte nicht ganz in Weiß und nicht ganz in Schwarz.',
+    dressWarm: 'Es ist Februar in Frankfurt — bring für die Janti draußen ein warmes Tuch mit.',
+    swatches: ['Sindoor-Rot', 'Tagetes', 'Gold', 'Blattgrün', 'Rani-Pink'],
+    galleryTitle: 'Galerie',
+    gallerySub: 'Nach der Hochzeit erscheinen hier die Fotos vom großen Tag.',
+    tiles: ['Tagetes', 'Dhaka', 'Diya', 'Mandala', 'Himal', 'Pote'],
+    close: 'Schließen',
+    rsvpTitle: 'Feierst du mit uns?',
+    rsvpSub: 'Eine kurze Antwort hilft uns beim Planen von Essen, Plätzen und Tanzfläche.',
+    rsvpBy: 'Bitte antworte bis zum 20. Januar 2027',
+    fName: 'Dein Name',
+    fNamePh: 'z. B. Maya Gurung',
+    fComing: 'Kommst du?',
+    yes: 'Ja, sehr gern',
+    no: 'Leider nein',
+    fGuests: 'Wie viele seid ihr?',
+    fewer: 'Ein Gast weniger',
+    more: 'Ein Gast mehr',
+    fWhich: 'Zu welchen Programmpunkten?',
+    fFood: 'Essen',
+    veg: 'Vegetarisch',
+    nonveg: 'Mit Fleisch',
+    fMessage: 'Ein Wunsch für das Paar (optional)',
+    fMessagePh: 'Schreib ein paar Worte…',
+    send: 'Antwort senden',
+    needName: 'Bitte schreib deinen Namen.',
+    demoNote: 'Demo: Deine Antwort bleibt nur in diesem Browser — nichts wird verschickt.',
+    thanksYes: (n) => `Dhanyabad, ${n}!`,
+    thanksNo: (n) => `Wir werden dich vermissen, ${n}`,
+    thanksYesText: 'Dein Platz ist reserviert. Wir freuen uns riesig, mit dir zu feiern.',
+    thanksNoText: 'Danke, dass du Bescheid gibst. Wir schicken dir Fotos vom Tag.',
+    summaryGuests: (n) => (n === 1 ? '1 Gast' : `${n} Gäste`),
+    edit: 'Antwort ändern',
+    faqTitle: 'Gut zu wissen',
+    faq: [
+      {
+        q: 'Zum ersten Mal auf einer nepalesischen Hochzeit — was passiert da?',
+        a: 'Janti ist der Zug des Bräutigams mit Musik, beim Swayambar werden Blumengirlanden getauscht, und Bihe ist die eigentliche Trauung. Komm einfach, iss gut und tanz mit — den Rest erklärt dir gern jemand.',
+      },
+      { q: 'Darf ich die Kinder mitbringen?', a: 'Natürlich — Kinder gehören zu jeder nepalesischen Hochzeit. Zähl sie in deiner Antwort einfach mit.' },
+      {
+        q: 'Gibt es vegetarisches Essen?',
+        a: 'Ja: Dal Bhat, Sel Roti, Aloo Dum und vieles mehr. Wähl es in deiner Antwort aus, dann sorgen wir dafür, dass genug da ist.',
+      },
+      {
+        q: 'Und Geschenke?',
+        a: 'Dass du da bist, ist das schönste Geschenk. Wenn du magst, ist ein kleiner Umschlag (Shagun) für das Paar eine schöne Tradition.',
+      },
+      { q: 'Wann sollte ich da sein?', a: 'Etwa 15 Minuten vor jedem Programmpunkt — die Janti wartet auf niemanden!' },
+    ],
+    shareTitle: 'Einladung teilen',
+    shareText: 'Schick sie an Familie und Freunde — sie öffnet sich auf jedem Handy.',
+    whatsapp: 'Per WhatsApp senden',
+    copy: 'Link kopieren',
+    copied: 'Link kopiert',
+    waMessage: 'Du bist eingeladen! Aarati & Sujan — 20. Februar 2027, Frankfurt (eine Demo-Einladung von MartNepali):',
+    footer: 'Von Herzen, Aarati & Sujan',
+    icsTitle: 'Aarati & Sujan',
+  },
   ne: {
     langName: 'नेपाली',
+    langLabel: 'भाषा',
+    navLabel: 'निम्तो',
     demo: 'डेमो',
     invocation: '॥ श्री गणेशाय नमः ॥',
     kicker: 'शुभ विवाह · हार्दिक निमन्त्रणा',
@@ -296,6 +435,8 @@ export const COPY: Record<InviteLang, Copy> = {
     yes: 'अवश्य आउँछु',
     no: 'आउन सक्दिनँ',
     fGuests: 'कति जना?',
+    fewer: 'एक जना घटाउनुहोस्',
+    more: 'एक जना थप्नुहोस्',
     fWhich: 'कुन कार्यक्रममा?',
     fFood: 'खाना',
     veg: 'शाकाहारी',

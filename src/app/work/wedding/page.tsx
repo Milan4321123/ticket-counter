@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import DemoNav from '@/components/studio/DemoNav';
 import { Cormorant_Garamond, Mukta, Rozha_One } from 'next/font/google';
+import { currentLang } from '@/lib/i18nServer';
 import WeddingInvite from './WeddingInvite';
+import { asInviteLang } from './content';
 import './wedding.css';
 
 // Studio demo #1: a Nepali wedding invitation website (lib/projects.ts →
@@ -10,8 +12,8 @@ import './wedding.css';
 //
 // The thin MartNepali frame — the "Demo project" strip above and the "want one
 // like this?" block below — is ordinary site copy (translatable, links into the
-// studio); the invitation in between is marked translate="no" and switches
-// between English and नेपाली by itself.
+// studio); the invitation in between is marked translate="no" and has its
+// own English, Deutsch and नेपाली — it starts in the site's language.
 //
 // No prices, quotes or packages anywhere: the operator is a student and the
 // studio is offered free while it grows (see app/studio/page.tsx).
@@ -28,7 +30,7 @@ const devaBody = Mukta({ weight: ['400', '600'], subsets: ['devanagari', 'latin'
 
 const title = 'Wedding invitation website — demo project';
 const description =
-  'A Nepali wedding invitation website, built by MartNepali as a demo: countdown, programme, venue map, RSVP, add to calendar and WhatsApp sharing — in English and नेपाली.';
+  'A Nepali wedding invitation website, built by MartNepali as a demo: countdown, programme, venue map, RSVP, add to calendar and WhatsApp sharing — in English, Deutsch and नेपाली.';
 const cover = { url: '/media/studio/projects/wedding.jpg', width: 1200, height: 800, alt: 'Aarati & Sujan — a demo wedding invitation website' };
 
 export const metadata = {
@@ -39,7 +41,8 @@ export const metadata = {
   twitter: { card: 'summary_large_image', title, description, images: [cover.url] },
 };
 
-export default function WeddingDemoPage() {
+export default async function WeddingDemoPage() {
+  const lang = asInviteLang(await currentLang());
   return (
     <div className={`wd-page ${serif.variable} ${deva.variable} ${devaBody.variable}`}>
       <div className="wd-frame-top">
@@ -54,7 +57,7 @@ export default function WeddingDemoPage() {
         </div>
       </div>
 
-      <WeddingInvite />
+      <WeddingInvite initialLang={lang} />
 
       <section className="wd-frame-end" aria-labelledby="wd-end-h">
         <div className="wd-frame-end-inner">

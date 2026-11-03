@@ -1,10 +1,19 @@
-// Every word of the demo artist page, in English and नेपाली. The artist, the
+// Every word of the demo artist page, in English, Deutsch and नेपाली. The artist, the
 // band, the songs, the venues, the numbers and the press lines are all made up
 // — this is a studio demo, not a real singer's page. The "songs" are short
 // original melodies the browser plays live (see synth.ts); no recording of any
 // real song is used.
 
-export type ArtistLang = 'en' | 'ne';
+export type ArtistLang = 'en' | 'de' | 'ne';
+
+export const LANGS: { id: ArtistLang; label: string; short: string }[] = [
+  { id: 'en', label: 'English', short: 'EN' },
+  { id: 'de', label: 'Deutsch', short: 'DE' },
+  { id: 'ne', label: 'नेपाली', short: 'नेपाली' },
+];
+export function asArtistLang(v: unknown): ArtistLang {
+  return v === 'de' || v === 'ne' ? v : 'en';
+}
 
 export type TrackId = 'kuhiro' | 'saanjh' | 'taara' | 'ghar';
 
@@ -38,10 +47,15 @@ const NE_DIGITS = ['०', '१', '२', '३', '४', '५', '६', '७', '८'
 export function toNeDigits(s: string | number): string {
   return String(s).replace(/[0-9]/g, (d) => NE_DIGITS[Number(d)]);
 }
+/** "4.2" as each language writes it: "4.2" / "4,2" / "४.२". */
+export function fmtNum(s: string, lang: ArtistLang): string {
+  return lang === 'ne' ? toNeDigits(s) : lang === 'de' ? s.replace('.', ',') : s;
+}
 
 type Stat = { value: number; decimals: number; suffix: string; label: string };
 
 type Copy = {
+  langLabel: string;
   demo: string;
   artist: string;
   band: string;
@@ -90,6 +104,8 @@ type Copy = {
   videosTitle: string;
   videosSub: string;
   videoCaptions: [string, string];
+  videoTitles: [string, string];
+  videoPlay: (title: string) => string;
   // kit
   kitTitle: string;
   kitSub: string;
@@ -140,6 +156,7 @@ type Copy = {
 
 export const COPY: Record<ArtistLang, Copy> = {
   en: {
+    langLabel: 'Language',
     demo: 'demo',
     artist: 'Rimjhim Tara',
     band: 'Kuhiro Collective',
@@ -215,6 +232,8 @@ export const COPY: Record<ArtistLang, Copy> = {
       'Stage visuals we made — the dance backdrop from a real concert night in Frankfurt, Oct 2026.',
       'Stage visuals we made — neon beat bars for the after-party DJ set, same night.',
     ],
+    videoTitles: ['Stage screen · Dance', 'Stage screen · After party'],
+    videoPlay: (title) => `Play: ${title}`,
     kitTitle: 'Press kit',
     kitSub: 'Everything a promoter or a journalist asks for, ready to download. Made right here in your browser.',
     kitSheet: 'One-sheet',
@@ -261,7 +280,134 @@ export const COPY: Record<ArtistLang, Copy> = {
     formNote: 'Demo form: it checks what you type, but sends nothing and saves nothing.',
     footer: 'Rimjhim Tara & the Kuhiro Collective — a made-up artist for a MartNepali demo.',
   },
+  de: {
+    langLabel: 'Sprache',
+    demo: 'Demo',
+    artist: 'Rimjhim Tara',
+    band: 'Kuhiro Collective',
+    withBand: 'mit dem Kuhiro Collective',
+    kicker: 'Kuhiro Europa-Tour · 2027',
+    oneLine: 'Bansuri-Flöte, Madal-Trommel und eine Stimme aus den Bergen — nepalesischer Folk-Pop, auf Tour durch Europa.',
+    listen: 'Reinhören',
+    book: 'Auftritt anfragen',
+    scroll: 'Weiter zur Musik',
+    nav: { music: 'Musik', tour: 'Tour', about: 'Über sie', kit: 'Pressekit', booking: 'Booking' },
+    musicTitle: 'Musik',
+    musicSub: 'Vier kurze Stücke aus dem neuen Album Kuhiro.',
+    demoMelodies:
+      'Demo-Melodien: eigene Stücke, nur für diese Seite erfunden und live von deinem Browser gespielt — eine Trommel wie die Madal, eine Flöte wie die Bansuri und ein tiefer Halteton. Keine Aufnahme.',
+    nowPlaying: 'Läuft gerade',
+    tapToPlay: 'Zum Starten auf ▶ tippen',
+    play: 'Abspielen',
+    pause: 'Pause',
+    prev: 'Vorheriger Song',
+    next: 'Nächster Song',
+    seek: 'Position im Song',
+    iphoneHint: 'Kein Ton auf dem iPhone? Schalte den Stummmodus aus.',
+    noAudio: 'Dieser Browser kann die Demo-Melodien nicht abspielen.',
+    tracks: {
+      kuhiro: { title: 'Kuhiro', meaning: 'Nebel', mood: 'Langsam · ein Morgen in den Bergen' },
+      saanjh: { title: 'Saanjh Bato', meaning: 'Abendweg', mood: 'Wiegend · 6/8' },
+      taara: { title: 'Taara Bagaicha', meaning: 'Sternengarten', mood: 'Verträumt · Nachthimmel' },
+      ghar: { title: 'Ghar Tira', meaning: 'Richtung Heimat', mood: 'Tanz · die Zugabe' },
+    },
+    tourTitle: 'Tour 2027',
+    tourSub: 'Acht Städte, eine Band, die Berge in jedem Saal.',
+    status: { onsale: 'Im Verkauf', few: 'Nur noch wenige', soldout: 'Ausverkauft' },
+    stops: {
+      berlin: { city: 'Berlin', country: 'Deutschland', venue: 'Spreehalle Ost' },
+      hamburg: { city: 'Hamburg', country: 'Deutschland', venue: 'Elbkante Saal' },
+      amsterdam: { city: 'Amsterdam', country: 'Niederlande', venue: 'De Lichtzaal' },
+      brussels: { city: 'Brüssel', country: 'Belgien', venue: 'Atelier Midi' },
+      paris: { city: 'Paris', country: 'Frankreich', venue: 'Salle des Lanternes' },
+      london: { city: 'London', country: 'Großbritannien', venue: 'Riverside Lantern Hall' },
+      frankfurt: { city: 'Frankfurt', country: 'Deutschland', venue: 'Mainufer Bühne' },
+      vienna: { city: 'Wien', country: 'Österreich', venue: 'Donaulicht Saal' },
+    },
+    tickets: 'Tickets',
+    ticketsNote:
+      'Auf einer echten Künstlerseite öffnet dieser Button die MartNepali-Eventseite der Show — mit Tickets, Saalplan und QR-Einlass an der Tür. Diese Show ist erfunden, darum erklärt er hier nur.',
+    ticketsLink: 'Echte Events ansehen →',
+    close: 'Schließen',
+    tourDemo: 'Demo: Säle, Termine und Ticketstatus sind erfunden.',
+    months: ['Jan.', 'Feb.', 'März', 'Apr.', 'Mai', 'Juni', 'Juli', 'Aug.', 'Sept.', 'Okt.', 'Nov.', 'Dez.'],
+    weekdays: ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'],
+    aboutTitle: 'Über sie',
+    bio: [
+      'Rimjhim Tara ist zwischen Terrassenfeldern und einem Radio aufgewachsen, das nur Volkslieder spielte. Die Bansuri, eine Bambusflöte, lernte sie von ihrem Großvater, die Madal-Trommel von ihren Cousins und Cousinen — und mit fünfzehn schrieb sie ihre ersten eigenen Songs.',
+      'Mit dem Kuhiro Collective — fünf Freunden aus Pokhara, Kathmandu und Berlin — mischt sie alte Melodien aus den Bergen mit warmen Synths und einem tanzbaren Beat. Kuhiro, das neue Album, handelt vom Nebel: von dem, der die Berge versteckt, und von dem, der sich hebt, wenn man endlich nach Hause kommt.',
+    ],
+    stats: [
+      { value: 36, decimals: 0, suffix: '', label: 'Songs' },
+      { value: 4.2, decimals: 1, suffix: ' Mio.', label: 'Streams' },
+      { value: 2, decimals: 0, suffix: '', label: 'Alben' },
+      { value: 19, decimals: 0, suffix: '', label: 'Städte bespielt' },
+    ],
+    statsNote: 'Erfundene Zahlen für eine erfundene Künstlerin.',
+    pressTitle: 'Was die Presse sagt',
+    press: [
+      { line: 'Eine Bansuri, die klingt wie Bergluft in einer Winternacht.', outlet: 'Himal Beat Weekly' },
+      { line: 'Die Madal treibt, die Stimme schwebt — und der ganze Saal sang jeden Refrain mit.', outlet: 'Rhein Folk Notes' },
+      { line: 'Nepalesischer Folk-Pop mit der Geduld eines langen Heimwegs.', outlet: 'Lantern Radio Europe' },
+    ],
+    pressNote: 'Demo: Die Medien und ihre Worte sind erfunden.',
+    videosTitle: 'Auf der Leinwand',
+    videosSub: 'Eine Künstlerseite kann auch die Bühnenvisuals zeigen.',
+    videoCaptions: [
+      'Bühnenvisuals von uns — der Tanz-Hintergrund von einem echten Konzertabend in Frankfurt, Okt. 2026.',
+      'Bühnenvisuals von uns — Neon-Beat-Balken für das DJ-Set der Aftershow-Party, am selben Abend.',
+    ],
+    videoTitles: ['Bühnenleinwand · Tanz', 'Bühnenleinwand · Aftershow-Party'],
+    videoPlay: (title) => `Abspielen: ${title}`,
+    kitTitle: 'Pressekit',
+    kitSub: 'Alles, wonach Veranstalter oder Journalistinnen fragen, fertig zum Download. Direkt hier in deinem Browser erstellt.',
+    kitSheet: 'One-Sheet',
+    kitSheetText: 'Ein Bild mit Bio, Zahlen und Tourdaten (PNG).',
+    kitBio: 'Bio & Fakten',
+    kitBioText: 'Kurze und lange Bio als reiner Text (TXT).',
+    kitCard: 'Booking-Kontakt',
+    kitCardText: 'Eine Kontaktkarte für dein Handy (VCF).',
+    kitMaking: 'Wird erstellt…',
+    kitDone: 'Heruntergeladen ✓',
+    kitNote: 'Demo-Dateien über eine erfundene Künstlerin — nichts wird hochgeladen oder verschickt.',
+    sheetTour: 'Kuhiro Europa-Tour 2027',
+    sheetPress: 'Presse',
+    sheetBooking: 'Booking',
+    sheetDemo: 'DEMO · eine erfundene Künstlerin · gebaut von MartNepali',
+    bookTitle: 'Auftritt anfragen',
+    bookSub:
+      'Ein Festival, ein Konzert, ein Dashain- oder Tihar-Abend (die großen nepalesischen Feste im Herbst) für deine Community — erzähl der Band davon.',
+    fName: 'Dein Name',
+    fEmail: 'E-Mail',
+    fOrg: 'Organisation',
+    fOrgPh: 'Verein, Festival oder Veranstaltungsort',
+    fCity: 'Stadt',
+    fCityPh: 'z. B. München',
+    fDate: 'Wunschtermin',
+    fType: 'Art der Veranstaltung',
+    types: { concert: 'Konzert', festival: 'Festival', community: 'Community-Abend', other: 'Etwas anderes' },
+    fSize: 'Erwartetes Publikum',
+    sizes: { s: 'Bis 200', m: '200–500', l: '500–1.000', xl: 'Mehr als 1.000' },
+    fMessage: 'Sonst noch etwas?',
+    fMessagePh: 'Der Saal, die anderen Acts, die Idee für den Abend…',
+    send: 'Anfrage senden',
+    optional: 'optional',
+    errName: 'Bitte schreib deinen Namen.',
+    errEmail: 'Bitte prüf die E-Mail-Adresse.',
+    errCity: 'In welcher Stadt ist der Auftritt?',
+    errDate: 'Bitte wähl ein Datum.',
+    errDatePast: 'Dieses Datum ist schon vorbei.',
+    errFix: 'Ein paar Felder brauchen noch einen Blick — sie sind markiert.',
+    thanks: (first) => `Dhanyabad, ${first}!`,
+    thanksText:
+      'Auf einer echten Künstlerseite käme deine Anfrage jetzt beim Booking-Team an. Das hier ist eine Demo: Nichts wurde verschickt und nichts gespeichert — sie hat diese Seite nie verlassen.',
+    thanksSummary: 'Was du geschrieben hast',
+    another: 'Noch eine schreiben',
+    formNote: 'Demo-Formular: Es prüft, was du eingibst, verschickt aber nichts und speichert nichts.',
+    footer: 'Rimjhim Tara & das Kuhiro Collective — eine erfundene Künstlerin für eine MartNepali-Demo.',
+  },
   ne: {
+    langLabel: 'भाषा',
     demo: 'नमुना',
     artist: 'रिमझिम तारा',
     band: 'कुहिरो कलेक्टिभ',
@@ -337,6 +483,8 @@ export const COPY: Record<ArtistLang, Copy> = {
       'हामीले बनाएको स्टेज भिडियो — फ्र्याङ्कफर्टको साँच्चैको कन्सर्ट रात (अक्टोबर २०२६) को नृत्य ब्याकड्रप।',
       'हामीले बनाएको स्टेज भिडियो — सोही रातको आफ्टर-पार्टी DJ सेटका लागि नियोन बिट बार।',
     ],
+    videoTitles: ['स्टेज स्क्रिन · नृत्य', 'स्टेज स्क्रिन · आफ्टर-पार्टी'],
+    videoPlay: (title) => `बजाउनुहोस्: ${title}`,
     kitTitle: 'प्रेस किट',
     kitSub: 'आयोजक वा पत्रकारले माग्ने सबै कुरा, डाउनलोडका लागि तयार। यहीँ तपाईंको ब्राउजरमा बनिन्छ।',
     kitSheet: 'वान-सिट',
@@ -385,12 +533,22 @@ export const COPY: Record<ArtistLang, Copy> = {
   },
 };
 
-/** "Fri · 12 Mar 2027" (or in नेपाली), from a plain ISO date. */
-export function showDate(iso: string, lang: ArtistLang): { day: string; month: string; weekday: string; year: string } {
+/**
+ * The parts of a show date, from a plain ISO date, plus the whole of it the way
+ * each language writes it: "12 Mar 2027" / "12. März 2027" / "१२ मार्च २०२७"
+ * (`full`) and without the year (`short`).
+ */
+export function showDate(
+  iso: string,
+  lang: ArtistLang
+): { day: string; month: string; weekday: string; year: string; short: string; full: string } {
   const [y, m, d] = iso.split('-').map(Number);
   // Noon UTC so the weekday is the same in every time zone.
   const wd = new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay();
   const t = COPY[lang];
   const num = (n: number | string) => (lang === 'ne' ? toNeDigits(n) : String(n));
-  return { day: num(d), month: t.months[m - 1], weekday: t.weekdays[wd], year: num(y) };
+  const day = num(d);
+  const month = t.months[m - 1];
+  const short = lang === 'de' ? `${day}. ${month}` : `${day} ${month}`;
+  return { day, month, weekday: t.weekdays[wd], year: num(y), short, full: `${short} ${num(y)}` };
 }

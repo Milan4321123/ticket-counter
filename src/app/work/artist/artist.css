@@ -128,6 +128,17 @@
 .ar [id] {
   scroll-margin-top: calc(var(--ar-top) + 60px);
 }
+/* German runs long: let words break at syllables instead of spilling out of a button or tile. */
+.ar[lang='de'] {
+  -webkit-hyphens: auto;
+  hyphens: auto;
+  overflow-wrap: break-word;
+}
+/* …but not in headings, names and short labels, which wrap between words. */
+.ar[lang='de'] :is(h1, h2, h3, .ar-tracks-name) {
+  -webkit-hyphens: manual;
+  hyphens: manual;
+}
 .ar-lang-ne {
   font-family: var(--ar-deva-body), var(--font);
 }

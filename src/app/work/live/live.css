@@ -135,6 +135,17 @@
 .lv input {
   font-family: inherit;
 }
+/* German runs long: let words break at syllables instead of spilling out of a button or tile. */
+.lv[lang='de'] {
+  -webkit-hyphens: auto;
+  hyphens: auto;
+  overflow-wrap: break-word;
+}
+/* …but not in headings, names and short labels, which wrap between words. */
+.lv[lang='de'] :is(h1, h2, h3, .lv-feed-text, .lv-legend) {
+  -webkit-hyphens: manual;
+  hyphens: manual;
+}
 .lv-num {
   font-variant-numeric: tabular-nums;
 }

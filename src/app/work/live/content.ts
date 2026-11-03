@@ -1,17 +1,26 @@
-// Words for the /work/live dashboard in English and नेपाली. The event, the acts
+// Words for the /work/live dashboard in English, Deutsch and नेपाली. The event, the acts
 // and the guests are all made up. Counts of tickets and people only — no money.
 
 import type { Act, Channel, Door, LaneStatus, TicketType } from './sim';
 
-export type LiveLang = 'en' | 'ne';
+export type LiveLang = 'en' | 'de' | 'ne';
+
+export const LANGS: { id: LiveLang; label: string; short: string }[] = [
+  { id: 'en', label: 'English', short: 'EN' },
+  { id: 'de', label: 'Deutsch', short: 'DE' },
+  { id: 'ne', label: 'नेपाली', short: 'नेपाली' },
+];
+export function asLiveLang(v: unknown): LiveLang {
+  return v === 'de' || v === 'ne' ? v : 'en';
+}
 
 const NE_DIGITS = ['०', '१', '२', '३', '४', '५', '६', '७', '८', '९'];
 export function toNeDigits(s: string | number): string {
   return String(s).replace(/[0-9]/g, (d) => NE_DIGITS[Number(d)]);
 }
-/** A number the way the current language writes it (thousands separated, नेपाली digits). */
+/** A number the way the current language writes it: 1,234 / 1.234 / १,२३४. */
 export function num(n: number, lang: LiveLang): string {
-  const s = Math.round(n).toLocaleString('en-US');
+  const s = String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, lang === 'de' ? '.' : ',');
   return lang === 'ne' ? toNeDigits(s) : s;
 }
 export function digits(s: string, lang: LiveLang): string {
@@ -19,6 +28,7 @@ export function digits(s: string, lang: LiveLang): string {
 }
 
 type Copy = {
+  langLabel: string;
   title: string;
   intro: string;
   show: string;
@@ -104,6 +114,7 @@ type Copy = {
 
 export const COPY: Record<LiveLang, Copy> = {
   en: {
+    langLabel: 'Language',
     title: 'The night, live: an organizer’s dashboard',
     intro:
       'What an organizer watches on the night of a concert, and what can go up on the hall screen: who is in, which door is busy, what is on stage, and the guests’ shout-outs. The data here is simulated — speed it up to see the whole evening.',
@@ -197,7 +208,103 @@ export const COPY: Record<LiveLang, Copy> = {
       party: { name: 'After party', what: 'DJ Momo Beats' },
     },
   },
+  de: {
+    langLabel: 'Sprache',
+    title: 'Der Abend, live: das Dashboard für Veranstalter',
+    intro:
+      'Was Veranstalter am Konzertabend im Blick haben — und was auf die Leinwand im Saal kann: wer schon drin ist, an welchem Eingang es voll ist, wer gerade auf der Bühne steht und die Grüße der Gäste. Die Daten hier sind simuliert — dreh das Tempo hoch, um den ganzen Abend zu sehen.',
+    show: 'Tihar Night Live',
+    venue: 'Halle A · Hamburg',
+    doors: 'Einlass 18:00',
+    simulated: 'Simulierte Daten',
+    speed: 'Tempo',
+    pause: 'Pause',
+    play: 'Fortsetzen',
+    restart: 'Neustart',
+    bigScreen: 'Leinwand-Modus',
+    exitBig: 'Leinwand beenden',
+    escHint: 'Esc zum Beenden',
+    showOver: 'Das war der Abend. Kommt alle gut nach Hause.',
+    replay: 'Den Abend nochmal abspielen',
+
+    checkedIn: 'Eingecheckt',
+    ofCapacity: (cap) => `von ${cap} Plätzen`,
+    inHall: 'im Saal',
+    soldToday: 'Heute verkaufte Tickets',
+    onlineDoor: (o, d) => `${o} online · ${d} an der Abendkasse`,
+    onlineClosed: 'Online-Verkauf um 18:00 beendet — Abendkasse offen',
+    onlineOpen: 'Online-Verkauf endet um 18:00',
+    soldOf: (s, c) => `${s} von ${c} insgesamt verkauft`,
+    perMin: 'Einlässe pro Minute',
+    perMinUnit: 'pro Min.',
+    last30: 'letzte 30 Min.',
+    arrivals: 'Ankünfte pro 10 Minuten',
+    arrivalsSub: 'An beiden Eingängen gescannte Tickets, 18:00–22:00',
+    arrivalsBin: (f, t, n) => `${f}–${t} · ${n} Ankünfte`,
+    arrivalsNow: 'jetzt',
+    types: 'Ticketarten im Saal',
+    typesSub: 'Anteil der eingecheckten Tickets',
+    type: { standard: 'Standard', vip: 'VIP', family: 'Familie' },
+    doorsTile: 'Schlangen am Einlass',
+    door: (d) => `Eingang ${d}`,
+    waiting: (n) => `${n} warten`,
+    wait: (m) => `~${m} Min.`,
+    noWait: 'keine Wartezeit',
+    status: { flowing: 'Läuft', busy: 'Voll', long: 'Lange Schlange' },
+    table: 'Als Tabelle zeigen',
+
+    feed: 'Live-Feed',
+    feedSub: 'Check-ins und Verkäufe in Echtzeit',
+    inLine: (c, t, d) => `Ticket #${c} · ${t} · ${d}`,
+    dupLine: (c, d, f) => `Schon gescannt · #${c} · ${d} · zuerst drin um ${f}`,
+    saleLine: (c, t) => `Neues Ticket #${c} · ${t}`,
+    channel: { pre: 'Vorverkauf', online: 'Online', door: 'Abendkasse' },
+    noneLine: 'Alle mit Ticket sind schon drin',
+    you: 'du',
+
+    scanTitle: 'Probier den Einlass-Scanner',
+    scanSub: 'Dieselbe Prüfung, die MartNepali an echten Eingängen macht: Jedes Ticket kommt genau einmal rein.',
+    scan: 'Ticket scannen',
+    rescan: 'Dasselbe nochmal scannen',
+    dupsToday: (n) => `${n} doppelte Scans heute Abend gestoppt`,
+    scanOk: (c, d) => `✓ #${c} ist drin · ${d}`,
+    scanDup: (c) => `Schon gescannt: #${c} — kommt nicht zweimal rein`,
+
+    wall: 'Grüße',
+    wallSub: 'Nachrichten der Gäste für die Leinwand im Saal',
+    yourName: 'Dein Name',
+    yourShout: 'Dein Gruß',
+    namePh: 'z. B. Hamburg Didi',
+    shoutPh: 'Frohes Tihar euch allen!',
+    post: 'Posten',
+    guest: 'Gast',
+    shoutErr: {
+      empty: 'Schreib erst ein paar Worte.',
+      long: 'Etwas kürzer, bitte — es muss auf die Leinwand passen.',
+      rude: 'Lass uns die Leinwand familienfreundlich halten.',
+      link: 'Bitte keine Links auf der Leinwand.',
+    },
+    shoutOk: 'Ist auf der Leinwand!',
+    local: 'Bleibt in deinem Browser — nichts wird verschickt.',
+
+    programme: 'Programm',
+    nowOnStage: 'Jetzt auf der Bühne',
+    changeover: 'Umbau',
+    doorsOpen: 'Einlass läuft',
+    beforeDoors: 'Einlass beginnt gleich',
+    nextUp: 'Als Nächstes',
+    inMin: (m) => `in ${m} Min.`,
+    lastAct: 'Letzter Act des Abends',
+    quiet: { doors: 'Gäste kommen an', change: 'Bühnenumbau', end: 'Gute Nacht!' },
+    acts: {
+      opening: { name: 'Saathi Sound', what: 'Vorband' },
+      deusi: { name: 'Deusi-Bhailo', what: 'Tihar-Lieder mit der Jugendgruppe' },
+      star: { name: 'Mitho Sur', what: 'Star des Abends' },
+      party: { name: 'Aftershow-Party', what: 'DJ Momo Beats' },
+    },
+  },
   ne: {
+    langLabel: 'भाषा',
     title: 'आजको साँझ, लाइभ: आयोजकको ड्यासबोर्ड',
     intro:
       'कन्सर्टको रात आयोजकले हेर्ने र हलको स्क्रिनमा देखाउन मिल्ने सबै कुरा: को-को भित्र आइसके, कुन ढोकामा भीड छ, स्टेजमा को छ, र पाहुनाहरूका सन्देश। यहाँको डाटा नक्कली हो — पूरा साँझ हेर्न गति बढाउनुहोस्।',

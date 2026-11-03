@@ -2,11 +2,13 @@
 
 // The venue big-screen dashboard demo: what an organizer watches on the night
 // of a concert. The whole evening is simulated in sim.ts (seeded, pure) and the
-// page just moves its clock — nothing is fetched, sent or stored beyond the
-// language choice. The scan beep (sound.ts) only plays after the visitor taps.
+// page just moves its clock — nothing is fetched, sent or stored (the
+// language is the site's own cookie). The scan beep (sound.ts) only plays after the visitor taps.
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type FormEvent } from 'react';
-import { COPY, digits, num, type LiveLang } from './content';
+import { useRouter } from 'next/navigation';
+import { setSiteLangCookie } from '@/components/studio/siteLang';
+import { COPY, LANGS, digits, num, type LiveLang } from './content';
 import {
   BIN_COUNT,
   BIN_FROM,
@@ -36,22 +38,6 @@ import {
 } from './sim';
 import { ScanBeep } from './sound';
 
-const LANG_KEY = 'mn-demo:live-lang';
-
-function load(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-function save(key: string, v: string) {
-  try {
-    localStorage.setItem(key, v);
-  } catch {
-    /* private window: it just forgets */
-  }
-}
 function lessMotion(): boolean {
   return typeof window !== 'undefined' && Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
 }
@@ -347,12 +333,16 @@ function Feed({ feed, lang }: { feed: FeedItem[]; lang: LiveLang }) {
 function Wall({ wall, lang, max }: { wall: WallPost[]; lang: LiveLang; max: number }) {
   return (
     <ol className="lv-wall-list">
-      {wall.slice(-max).map((p) => (
-        <li key={p.id} className={p.mine ? 'is-mine' : undefined} lang={p.lang === 'ne' ? 'ne' : 'en'}>
-          <p>{p.text}</p>
-          <span>— {p.name}</span>
-        </li>
-      ))}
+      {wall.slice(-max).map((p) => {
+        // Seeded English shouts have a German twin for the Deutsch dashboard; the rest stay as written.
+        const m = lang === 'de' && p.de ? { ...p.de, lang: 'de' } : p;
+        return (
+          <li key={p.id} className={p.mine ? 'is-mine' : undefined} lang={m.lang}>
+            <p>{m.text}</p>
+            <span>— {m.name}</span>
+          </li>
+        );
+      })}
     </ol>
   );
 }
@@ -541,8 +531,10 @@ function Num({ value, lang }: { value: number; lang: LiveLang }) {
 
 // ---------- the page ----------
 
-export default function LiveDashboard() {
-  const [lang, setLang] = useState<LiveLang>('en');
+export default function LiveDashboard({ initialLang }: { initialLang: LiveLang }) {
+  // The site's language (its EN · DE · ने switch) is the dashboard's language.
+  const [lang, setLang] = useState<LiveLang>(initialLang);
+  const router = useRouter();
   const [s, dispatch] = useReducer(reduce, undefined, () => initialState());
   const [big, setBig] = useState(false);
   const beep = useRef<ScanBeep | null>(null);
@@ -550,8 +542,6 @@ export default function LiveDashboard() {
   const snap = useMemo(() => snapshot(s), [s]);
 
   useEffect(() => {
-    const l = load(LANG_KEY);
-    if (l === 'en' || l === 'ne') setLang(l);
     const b = new ScanBeep();
     beep.current = b;
     return () => b.close();
@@ -571,7 +561,8 @@ export default function LiveDashboard() {
 
   const pickLang = (l: LiveLang) => {
     setLang(l);
-    save(LANG_KEY, l);
+    setSiteLangCookie(l);
+    router.refresh();
   };
   const exitBig = useCallback(() => setBig(false), []);
   // Fullscreen has to be asked for inside the tap itself; the overlay is fixed,
@@ -600,19 +591,18 @@ export default function LiveDashboard() {
   const spark = snap.perMin;
 
   return (
-    <div className={`lv lv-lang-${lang}`} lang={lang === 'ne' ? 'ne' : 'en'} translate="no">
+    <div className={`lv lv-lang-${lang}`} lang={lang} translate="no">
       <div className="lv-top">
         <div className="lv-top-text">
           <h1 className="lv-title">{t.title}</h1>
           <p className="lv-intro">{t.intro}</p>
         </div>
-        <div className="lv-seg" role="group" aria-label="Language / भाषा">
-          <button type="button" aria-pressed={lang === 'en'} onClick={() => pickLang('en')}>
-            EN
-          </button>
-          <button type="button" aria-pressed={lang === 'ne'} onClick={() => pickLang('ne')} lang="ne">
-            नेपाली
-          </button>
+        <div className="lv-seg" role="group" aria-label={t.langLabel}>
+          {LANGS.map((x) => (
+            <button key={x.id} type="button" aria-pressed={lang === x.id} onClick={() => pickLang(x.id)} lang={x.id} aria-label={x.label}>
+              {x.short}
+            </button>
+          ))}
         </div>
       </div>
 

@@ -1,7 +1,7 @@
 // The press kit, made in the visitor's browser: a one-sheet PNG drawn on a
 // canvas, a plain-text bio and a .vcf booking card. Nothing goes to a server.
 
-import { BOOKING_EMAIL, COPY, TOUR, showDate, toNeDigits, type ArtistLang } from './content';
+import { BOOKING_EMAIL, COPY, TOUR, fmtNum, showDate, type ArtistLang } from './content';
 
 const PAGE_URL = 'https://www.martnepali.com/work/artist';
 
@@ -20,7 +20,6 @@ export function saveBlob(blob: Blob, name: string) {
 
 export function bioText(lang: ArtistLang): string {
   const t = COPY[lang];
-  const num = (s: string) => (lang === 'ne' ? toNeDigits(s) : s);
   const lines = [
     `${t.artist} — ${t.withBand}`,
     t.kicker,
@@ -30,14 +29,14 @@ export function bioText(lang: ArtistLang): string {
     t.oneLine,
     '',
     ...t.bio.flatMap((p) => [p, '']),
-    t.stats.map((s) => `${num(s.value.toFixed(s.decimals))}${s.suffix} ${s.label}`).join(' · '),
+    t.stats.map((s) => `${fmtNum(s.value.toFixed(s.decimals), lang)}${s.suffix} ${s.label}`).join(' · '),
     `(${t.statsNote})`,
     '',
     t.sheetTour,
     ...TOUR.map((stop) => {
       const d = showDate(stop.date, lang);
       const p = t.stops[stop.id];
-      return `  ${d.day} ${d.month} ${d.year} · ${p.city}, ${p.country} · ${p.venue} · ${t.status[stop.status]}`;
+      return `  ${d.full} · ${p.city}, ${p.country} · ${p.venue} · ${t.status[stop.status]}`;
     }),
     `(${t.tourDemo})`,
     '',
@@ -232,9 +231,17 @@ export async function oneSheet(lang: ArtistLang, root: HTMLElement): Promise<Blo
     ctx.fill();
     ctx.fillStyle = '#ffd27a';
     // Rozha One draws Devanagari digits like Latin ones, so नेपाली numbers use Mukta.
-    ctx.font = ne ? `600 50px ${body}` : `800 48px ${cssFont(root, '--ar-display', 'sans-serif')}`;
-    const v = s.value.toFixed(s.decimals) + s.suffix;
-    ctx.fillText(ne ? toNeDigits(v) : v, x + 22, sy + 62);
+    const statFont = (px: number) => (ne ? `600 ${px}px ${body}` : `800 ${px}px ${cssFont(root, '--ar-display', 'sans-serif')}`);
+    const v = fmtNum(s.value.toFixed(s.decimals), lang) + s.suffix;
+    // "4,2 Mio." runs wider than "4.2M": shrink to the cell rather than spill into the next one.
+    let px = ne ? 50 : 48;
+    ctx.font = statFont(px);
+    const room = cellW - 16 - 44;
+    if (ctx.measureText(v).width > room) {
+      px = Math.floor((px * room) / ctx.measureText(v).width);
+      ctx.font = statFont(px);
+    }
+    ctx.fillText(v, x + 22, sy + 62);
     ctx.fillStyle = '#d6d0f5';
     ctx.font = `500 21px ${body}`;
     ctx.fillText(s.label, x + 22, sy + 96);
@@ -254,8 +261,8 @@ export async function oneSheet(lang: ArtistLang, root: HTMLElement): Promise<Blo
     const ry = sy + 46 + (i % 4) * 48;
     ctx.fillStyle = '#fff7ea';
     ctx.font = `700 24px ${body}`;
-    ctx.fillText(`${d.day} ${d.month}`, x, ry);
-    const dw = ne ? 150 : 110;
+    ctx.fillText(d.short, x, ry);
+    const dw = ne ? 150 : lang === 'de' ? 132 : 110;
     ctx.fillStyle = '#d6d0f5';
     ctx.font = `400 23px ${body}`;
     ctx.fillText(`${p.city} · ${p.venue}`, x + dw, ry);

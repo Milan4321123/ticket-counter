@@ -1,15 +1,16 @@
 'use client';
 
 // The demo invitation itself: hero, countdown, programme, venue, dress code,
-// gallery, RSVP, FAQ and sharing, in English or नेपाली. Everything runs in the
+// gallery, RSVP, FAQ and sharing, in English, Deutsch or नेपाली. Everything runs in the
 // browser — the RSVP is kept in localStorage and never sent anywhere, and the
 // calendar file is built on the spot.
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
+import { setSiteLangCookie } from '@/components/studio/siteLang';
 import { ArtDefs, Arch, Diya, Mandala, MiniMap, ProgrammeIcon, TileArt, Toran } from './art';
-import { CEREMONY_AT, COPY, PROGRAMME, VENUE, toNeDigits, type InviteLang, type ProgrammeItem } from './content';
+import { CEREMONY_AT, COPY, LANGS, PROGRAMME, VENUE, toNeDigits, type InviteLang, type ProgrammeItem } from './content';
 
-const LANG_KEY = 'mn-demo:wedding-lang';
 const RSVP_KEY = 'mn-demo:wedding-rsvp';
 
 type Rsvp = {
@@ -237,11 +238,11 @@ function RsvpBlock({ lang }: { lang: InviteLang }) {
           <fieldset className="wd-field">
             <legend>{t.fGuests}</legend>
             <div className="wd-stepper">
-              <button type="button" aria-label="−" onClick={() => setForm({ ...form, guests: Math.max(1, form.guests - 1) })}>
+              <button type="button" aria-label={t.fewer} onClick={() => setForm({ ...form, guests: Math.max(1, form.guests - 1) })}>
                 −
               </button>
               <output aria-live="polite">{lang === 'ne' ? toNeDigits(form.guests) : form.guests}</output>
-              <button type="button" aria-label="+" onClick={() => setForm({ ...form, guests: Math.min(8, form.guests + 1) })}>
+              <button type="button" aria-label={t.more} onClick={() => setForm({ ...form, guests: Math.min(8, form.guests + 1) })}>
                 +
               </button>
             </div>
@@ -370,20 +371,21 @@ function Share({ lang }: { lang: InviteLang }) {
 
 // ---------- the page ----------
 
-export default function WeddingInvite() {
-  const [lang, setLang] = useState<InviteLang>('en');
+export default function WeddingInvite({ initialLang }: { initialLang: InviteLang }) {
+  // The site's language (its EN · DE · ने switch) is the invitation's language.
+  const [lang, setLang] = useState<InviteLang>(initialLang);
+  const router = useRouter();
   const rootRef = useRef<HTMLDivElement>(null);
   const t = COPY[lang];
 
-  useEffect(() => {
-    const saved = readStore<InviteLang>(LANG_KEY);
-    if (saved === 'ne' || saved === 'en') setLang(saved);
-  }, []);
-
-  const pick = useCallback((l: InviteLang) => {
-    setLang(l);
-    writeStore(LANG_KEY, l);
-  }, []);
+  const pick = useCallback(
+    (l: InviteLang) => {
+      setLang(l);
+      setSiteLangCookie(l);
+      router.refresh();
+    },
+    [router]
+  );
 
   // Sticky bar sits under the site header, whatever its height.
   useEffect(() => {
@@ -418,7 +420,7 @@ export default function WeddingInvite() {
   }, []);
 
   return (
-    <div ref={rootRef} className={`wd wd-lang-${lang}`} lang={lang === 'ne' ? 'ne' : 'en'} translate="no">
+    <div ref={rootRef} className={`wd wd-lang-${lang}`} lang={lang} translate="no">
       <ArtDefs />
 
       <div className="wd-bar">
@@ -427,19 +429,18 @@ export default function WeddingInvite() {
           <i>✦</i>
           <span>{lang === 'ne' ? 'सु' : 'S'}</span>
         </a>
-        <nav className="wd-bar-nav" aria-label="Invitation">
+        <nav className="wd-bar-nav" aria-label={t.navLabel}>
           <a href="#wd-programme">{t.nav.programme}</a>
           <a href="#wd-venue">{t.nav.venue}</a>
           <a href="#wd-rsvp">{t.nav.rsvp}</a>
           <a href="#wd-faq">{t.nav.faq}</a>
         </nav>
-        <div className="wd-lang" role="group" aria-label="Language / भाषा">
-          <button type="button" aria-pressed={lang === 'en'} onClick={() => pick('en')}>
-            EN
-          </button>
-          <button type="button" aria-pressed={lang === 'ne'} onClick={() => pick('ne')} lang="ne">
-            नेपाली
-          </button>
+        <div className="wd-lang" role="group" aria-label={t.langLabel}>
+          {LANGS.map((x) => (
+            <button key={x.id} type="button" aria-pressed={lang === x.id} onClick={() => pick(x.id)} lang={x.id} aria-label={x.label}>
+              {x.short}
+            </button>
+          ))}
         </div>
       </div>
 

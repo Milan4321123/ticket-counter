@@ -62,42 +62,46 @@ export const PROGRAMME: Act[] = [
   { id: 'party', start: 22 * H + 40 * M, end: END },
 ];
 
+/**
+ * A guest's message. The Nepali ones stay Nepali in every language; the
+ * English ones are written again in German for the Deutsch dashboard (a
+ * Hamburg hall writes in German too), so a missing German line fails tsc.
+ */
 export type Shout = {
   name: string;
   text: string;
-  lang: 'en' | 'ne';
   /** Not before this time (it talks about an act). */
   after?: number;
-};
+} & ({ lang: 'ne' } | { lang: 'en'; de: { name: string; text: string } });
 
 /** What the guests write on the wall — made-up nicknames, warm, a bit of home. */
 export const SHOUTS: Shout[] = [
-  { name: 'MomoKing', text: 'Happy Tihar, Hamburg! Bhai Tika tomorrow, dance tonight 🪔', lang: 'en' },
+  { name: 'MomoKing', text: 'Happy Tihar, Hamburg! Bhai Tika tomorrow, dance tonight 🪔', lang: 'en', de: { name: 'MomoKing', text: 'Frohes Tihar, Hamburg! Morgen Bhai Tika, heute wird getanzt 🪔' } },
   { name: 'Altona Didi', text: 'शुभ दीपावली सबैलाई! घर जस्तै लाग्यो आज 🙏', lang: 'ne' },
-  { name: 'Bremen Bhai', text: 'Drove 2 hours for this. Worth it already!', lang: 'en' },
-  { name: 'Sel Roti Fan', text: 'Who brought sel roti? Asking for the whole row 😄', lang: 'en' },
+  { name: 'Bremen Bhai', text: 'Drove 2 hours for this. Worth it already!', lang: 'en', de: { name: 'Bremen Bhai', text: 'Zwei Stunden hergefahren. Hat sich jetzt schon gelohnt!' } },
+  { name: 'Sel Roti Fan', text: 'Who brought sel roti? Asking for the whole row 😄', lang: 'en', de: { name: 'Sel-Roti-Fan', text: 'Wer hat Sel Roti dabei? Ich frage für die ganze Reihe 😄' } },
   { name: 'Kiel Kanchha', text: 'देउसी रे! भैलो रे! 🎶', lang: 'ne', after: 19 * H + 55 * M },
-  { name: 'Hamburg Hajur Ama', text: 'My grandchildren are dancing. I am crying. Happy Tihar!', lang: 'en', after: 19 * H + 10 * M },
-  { name: 'Lübeck Ladies', text: 'Front left corner — the loud ones are us 💃', lang: 'en' },
+  { name: 'Hamburg Hajur Ama', text: 'My grandchildren are dancing. I am crying. Happy Tihar!', lang: 'en', de: { name: 'Hamburg Hajur Ama', text: 'Meine Enkel tanzen. Ich weine. Frohes Tihar!' }, after: 19 * H + 10 * M },
+  { name: 'Lübeck Ladies', text: 'Front left corner — the loud ones are us 💃', lang: 'en', de: { name: 'Lübecker Mädels', text: 'Vorne links — die Lauten, das sind wir 💃' } },
   { name: 'DalBhatPower', text: 'दाल भात पावर, २४ घण्टा! 💪', lang: 'ne' },
-  { name: 'Student from Harburg', text: 'First Tihar away from home. Thank you for this night ❤️', lang: 'en' },
+  { name: 'Student from Harburg', text: 'First Tihar away from home. Thank you for this night ❤️', lang: 'en', de: { name: 'Studi aus Harburg', text: 'Mein erstes Tihar fern von zu Hause. Danke für diesen Abend ❤️' } },
   { name: 'Pokhareli in HH', text: 'फेवा ताल त छैन, तर एल्बे पनि राम्रो छ 😄', lang: 'ne' },
-  { name: 'Didi & Bhinaju', text: 'Anniversary + Tihar = best night out 🎉', lang: 'en' },
+  { name: 'Didi & Bhinaju', text: 'Anniversary + Tihar = best night out 🎉', lang: 'en', de: { name: 'Didi & Bhinaju', text: 'Jahrestag + Tihar = der beste Abend überhaupt 🎉' } },
   { name: 'Marigold Mala', text: 'सयपत्रीको माला लगाएर आएँ 🌼', lang: 'ne' },
-  { name: 'Kathmandu → Hamburg', text: 'Ten years here and this still feels like home.', lang: 'en' },
-  { name: 'Table 7', text: 'Table 7 says namaste to table 8 🙏', lang: 'en' },
-  { name: 'Momo Queen', text: 'Momo line is long but the momo are worth it', lang: 'en' },
+  { name: 'Kathmandu → Hamburg', text: 'Ten years here and this still feels like home.', lang: 'en', de: { name: 'Kathmandu → Hamburg', text: 'Zehn Jahre hier, und das fühlt sich immer noch wie Zuhause an.' } },
+  { name: 'Table 7', text: 'Table 7 says namaste to table 8 🙏', lang: 'en', de: { name: 'Tisch 7', text: 'Tisch 7 sagt Namaste zu Tisch 8 🙏' } },
+  { name: 'Momo Queen', text: 'Momo line is long but the momo are worth it', lang: 'en', de: { name: 'Momo-Königin', text: 'Die Momo-Schlange ist lang, aber die Momos lohnen sich' } },
   { name: 'Dharane Daju', text: 'धरानबाट हाम्बुर्गसम्म — जय होस्! 🔥', lang: 'ne' },
-  { name: 'Little Laxmi', text: 'I am 9 and I did the Deusi song!!! 🎤', lang: 'en', after: 20 * H + 40 * M },
-  { name: 'Uni Nepali Society', text: 'Our whole society is here. Group photo after the star! 📸', lang: 'en', after: 18 * H + 30 * M },
+  { name: 'Little Laxmi', text: 'I am 9 and I did the Deusi song!!! 🎤', lang: 'en', de: { name: 'Kleine Laxmi', text: 'Ich bin 9 und hab das Deusi-Lied gesungen!!! 🎤' }, after: 20 * H + 40 * M },
+  { name: 'Uni Nepali Society', text: 'Our whole society is here. Group photo after the star! 📸', lang: 'en', de: { name: 'Nepali-Hochschulgruppe', text: 'Unsere ganze Gruppe ist da. Gruppenfoto nach dem Star! 📸' }, after: 18 * H + 30 * M },
   { name: 'आमा र बुवा', text: 'छोराछोरी सँगै तिहार मनाउन पाउँदा खुसी लाग्यो', lang: 'ne' },
-  { name: 'Night Shift Nurse', text: 'Came straight from work. Best decision. 🙌', lang: 'en' },
-  { name: 'Altona Didi', text: 'Bhailo group, you were amazing!', lang: 'en', after: 20 * H + 40 * M },
+  { name: 'Night Shift Nurse', text: 'Came straight from work. Best decision. 🙌', lang: 'en', de: { name: 'Nachtschicht-Pflegerin', text: 'Direkt von der Arbeit gekommen. Beste Entscheidung. 🙌' } },
+  { name: 'Altona Didi', text: 'Bhailo group, you were amazing!', lang: 'en', de: { name: 'Altona Didi', text: 'Bhailo-Gruppe, ihr wart großartig!' }, after: 20 * H + 40 * M },
   { name: 'Tihar Tiger', text: 'लक्ष्मी पूजा पछि सिधै यहाँ 🪔✨', lang: 'ne' },
-  { name: 'Volunteer Crew', text: 'Thank you volunteers at Door A! Smooth entry 👏', lang: 'en', after: 18 * H + 30 * M },
-  { name: 'Kukur Tihar Fan', text: 'Left the dog at home with a tika and a mala 🐕', lang: 'en' },
+  { name: 'Volunteer Crew', text: 'Thank you volunteers at Door A! Smooth entry 👏', lang: 'en', de: { name: 'Helferteam', text: 'Danke an die Freiwilligen an Eingang A! Super entspannter Einlass 👏' }, after: 18 * H + 30 * M },
+  { name: 'Kukur Tihar Fan', text: 'Left the dog at home with a tika and a mala 🐕', lang: 'en', de: { name: 'Kukur-Tihar-Fan', text: 'Der Hund bleibt heute zu Hause — mit Tika und Blumenkette 🐕' } },
   { name: 'Himali Saathi', text: 'अर्को वर्ष फेरि भेटौँला! 🤗', lang: 'ne' },
-  { name: 'Rostock Crew', text: 'Rostock in the house! 🙋', lang: 'en' },
+  { name: 'Rostock Crew', text: 'Rostock in the house! 🙋', lang: 'en', de: { name: 'Rostock Crew', text: 'Rostock ist da! 🙋' } },
 ];
 
 // ---------- a seeded random source ----------
@@ -321,7 +325,15 @@ export type FeedItem =
   | { id: number; at: number; kind: 'sale'; code: string; type: TicketType; channel: Channel }
   | { id: number; at: number; kind: 'none'; mine?: boolean };
 
-export type WallPost = { id: number; name: string; text: string; lang: 'en' | 'ne'; mine?: boolean };
+export type WallPost = {
+  id: number;
+  name: string;
+  text: string;
+  lang: 'en' | 'de' | 'ne';
+  /** The same message in German, for the Deutsch dashboard (seeded English shouts only). */
+  de?: { name: string; text: string };
+  mine?: boolean;
+};
 
 export type LiveState = {
   ev: Evening;
@@ -360,7 +372,7 @@ function play(s: LiveState, from: number, to: number): LiveState {
     const e = events[i];
     if (e.kind === 'shout') {
       const sh = SHOUTS[e.s];
-      wall.push({ id: nextId++, name: sh.name, text: sh.text, lang: sh.lang });
+      wall.push({ id: nextId++, name: sh.name, text: sh.text, lang: sh.lang, de: sh.lang === 'en' ? sh.de : undefined });
       continue;
     }
     const tk = tickets[e.t];
@@ -405,7 +417,7 @@ export type LiveAction =
   | { type: 'restart'; seed: number }
   | { type: 'scan' }
   | { type: 'rescan' }
-  | { type: 'shout'; name: string; text: string; lang: 'en' | 'ne' };
+  | { type: 'shout'; name: string; text: string; lang: 'en' | 'de' | 'ne' };
 
 export function reduce(s: LiveState, a: LiveAction): LiveState {
   switch (a.type) {

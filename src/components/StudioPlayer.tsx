@@ -12,7 +12,7 @@ import type { StudioVideo } from '@/lib/studioVideos';
  * instead of the browser's control bar with its "0:00" over every card — and
  * the native controls appear once it plays.
  */
-export default function StudioPlayer({ video }: { video: StudioVideo }) {
+export default function StudioPlayer({ video, title, playLabel }: { video: StudioVideo; title?: string; playLabel?: string }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [started, setStarted] = useState(false);
 
@@ -35,7 +35,7 @@ export default function StudioPlayer({ video }: { video: StudioVideo }) {
         muted={video.loop}
         loop={video.loop}
         className={`stv-player${video.wide ? ' stv-wide' : ''}`}
-        aria-label={video.title}
+        aria-label={title ?? video.title}
         onPlay={(e) => {
           const me = e.currentTarget;
           setStarted(true);
@@ -45,7 +45,7 @@ export default function StudioPlayer({ video }: { video: StudioVideo }) {
         }}
       />
       {!started && (
-        <button type="button" className="stv-play" onClick={start} aria-label={`Play: ${video.title}`}>
+        <button type="button" className="stv-play" onClick={start} aria-label={playLabel ?? `Play: ${video.title}`}>
           <span className="stv-play-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24">
               <path d="M8 5v14l11-7L8 5Z" />
