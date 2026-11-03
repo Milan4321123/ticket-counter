@@ -224,6 +224,21 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
+    id: 'card',
+    title: 'Link page & business card maker',
+    client: 'For stalls, tutors, DJs and artists · demo',
+    tags: ['Website'],
+    outcome: 'One link for everything — a link-in-bio page with a live phone preview — and a digital business card that flips to its QR code.',
+    points: ['Four starter templates: momo stall, tutor, DJ, artist', 'Six themes, your colour, buttons and fonts', 'Flip card with QR, contact file (.vcf) and a pass-style picture', 'English, Deutsch and नेपाली'],
+    cover: { src: '/media/studio/projects/card.jpg', shape: 'wide', width: 1200, height: 800 },
+    example: true,
+    tryIt: 'Pick the momo stall template, add a link, flip the card and publish your page.',
+    links: [
+      { href: '/work/card', label: 'Make a link page' },
+      { href: '/contact?intent=website', label: 'Want one like this?' },
+    ],
+  },
+  {
     id: 'saput',
     title: 'Prakash Saput Live · Frankfurt',
     client: 'Concert night · 31 Oct 2026',

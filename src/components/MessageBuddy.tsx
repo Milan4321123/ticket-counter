@@ -36,6 +36,7 @@ const HIDDEN_ON = [
   /^\/work\/restaurant/, // the QR ordering demo: its cart bar and sheets sit at the bottom on phones
   /^\/work\/build/, // the idea builder: its sketch bar and the send button sit at the bottom on phones
   /^\/work\/kite/, // the kite game: a tap anywhere on the canvas pulls the string, the bubble would sit on it
+  /^\/work\/card/, // the link page maker: its live-preview dock sits at the bottom on phones
 ];
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

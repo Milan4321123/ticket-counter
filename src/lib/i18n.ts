@@ -176,6 +176,7 @@ const D = {
   'pj.samaj': { en: 'Association website kit', de: 'Website-Baukasten für Vereine', ne: 'संस्थाका लागि वेबसाइट किट' },
   'pj.tables': { en: 'QR table ordering', de: 'Bestellen per QR am Tisch', ne: 'टेबलबाट QR अर्डर' },
   'pj.kite': { en: 'Changa Chet! — a kite-fighting game', de: 'Changa Chet! — ein Drachenkampf-Spiel', ne: 'चङ्गा चेट! — चङ्गा लडाइँको खेल' },
+  'pj.card': { en: 'Link page & business card maker', de: 'Linkseite & Visitenkarte zum Selbermachen', ne: 'लिङ्क पेज र बिजनेस कार्ड मेकर' },
   'pj.saput': { en: 'Prakash Saput Live · Frankfurt', de: 'Prakash Saput Live · Frankfurt', ne: 'प्रकाश सपुत लाइभ · फ्रैंकफर्ट' },
   // project badges, the /studio filter, the demo strip, /work and demo prev / next
   'pb.demo': { en: 'Live demo', de: 'Live-Demo', ne: 'लाइभ डेमो' },
