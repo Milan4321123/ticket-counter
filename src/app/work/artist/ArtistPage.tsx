@@ -679,7 +679,7 @@ function Booking({ lang }: { lang: ArtistLang }) {
 
 // ---------- the page ----------
 
-const STAGE_VIDEOS = ['stage-dance', 'stage-dj'].map((id) => videoById(id)).filter((v): v is StudioVideo => Boolean(v));
+const STAGE_VIDEOS = ['stage-dance'].map((id) => videoById(id)).filter((v): v is StudioVideo => Boolean(v));
 
 export default function ArtistPage() {
   const [lang, setLang] = useState<ArtistLang>('en');
