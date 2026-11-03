@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import DemoNav from '@/components/studio/DemoNav';
 import { Cormorant_Garamond, Mukta, Rozha_One } from 'next/font/google';
 import WeddingInvite from './WeddingInvite';
 import './wedding.css';
@@ -47,8 +48,8 @@ export default function WeddingDemoPage() {
           <span className="wd-frame-text">
             Built by MartNepali · a made-up couple, nothing real is sent
           </span>
-          <Link href="/studio#projects" className="wd-frame-link">
-            ← Our work
+          <Link href="/work" className="wd-frame-link">
+            ← All demos
           </Link>
         </div>
       </div>
@@ -77,6 +78,7 @@ export default function WeddingDemoPage() {
             </Link>
           </div>
           <p className="wd-frame-free">Free while we grow.</p>
+          <DemoNav current="wedding" />
         </div>
       </section>
     </div>

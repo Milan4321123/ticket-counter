@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import DemoNav from '@/components/studio/DemoNav';
 import { Mukta, Rozha_One, Syne } from 'next/font/google';
 import ArtistPage from './ArtistPage';
 import '@/app/studio/studio.css';
@@ -41,8 +42,8 @@ export default function ArtistDemoPage() {
         <div className="ar-frame-inner">
           <span className="ar-frame-badge">Demo project</span>
           <span className="ar-frame-text">Built by MartNepali · a made-up artist, nothing real is sent</span>
-          <Link href="/studio#projects" className="ar-frame-link">
-            ← Our work
+          <Link href="/work" className="ar-frame-link">
+            ← All demos
           </Link>
         </div>
       </div>
@@ -71,6 +72,7 @@ export default function ArtistDemoPage() {
             </Link>
           </div>
           <p className="ar-frame-free">Free while we grow.</p>
+          <DemoNav current="artist" />
         </div>
       </section>
     </div>

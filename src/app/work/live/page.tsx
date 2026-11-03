@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import DemoNav from '@/components/studio/DemoNav';
 import { Mukta } from 'next/font/google';
 import LiveDashboard from './LiveDashboard';
 import '@/app/studio/studio.css';
@@ -46,8 +47,8 @@ export default function LiveDemoPage() {
         <div className="lv-frame-inner">
           <span className="lv-frame-badge">Demo project</span>
           <span className="lv-frame-text">Built by MartNepali · the evening is simulated, nothing is sent</span>
-          <Link href="/studio#projects" className="lv-frame-link">
-            ← Our work
+          <Link href="/work" className="lv-frame-link">
+            ← All demos
           </Link>
         </div>
       </div>
@@ -76,6 +77,7 @@ export default function LiveDemoPage() {
             </Link>
           </div>
           <p className="lv-frame-free">Free while we grow.</p>
+          <DemoNav current="live" />
         </div>
       </section>
     </div>

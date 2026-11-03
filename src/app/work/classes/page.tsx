@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import DemoNav from '@/components/studio/DemoNav';
 import { Mukta } from 'next/font/google';
 import ClassBooking from './ClassBooking';
 import '@/app/studio/studio.css';
@@ -45,8 +46,8 @@ export default function ClassesDemoPage() {
         <div className="cb-frame-inner">
           <span className="cb-frame-badge">Demo project</span>
           <span className="cb-frame-text">Built by MartNepali · a made-up school, nothing is sent</span>
-          <Link href="/studio#projects" className="cb-frame-link">
-            ← Our work
+          <Link href="/work" className="cb-frame-link">
+            ← All demos
           </Link>
         </div>
       </div>
@@ -75,6 +76,7 @@ export default function ClassesDemoPage() {
             </Link>
           </div>
           <p className="cb-frame-free">Free while we grow.</p>
+          <DemoNav current="classes" />
         </div>
       </section>
     </div>

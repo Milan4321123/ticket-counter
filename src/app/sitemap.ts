@@ -72,6 +72,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/nepali-in`, changeFrequency: 'weekly', priority: 0.6 },
     { url: `${base}/studio`, changeFrequency: 'weekly', priority: 0.8 },
     // Studio demo projects (lib/projects.ts links each one).
+    { url: `${base}/work`, changeFrequency: 'monthly', priority: 0.7 },
     { url: `${base}/work/wedding`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/work/artist`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/work/quiz`, changeFrequency: 'monthly', priority: 0.6 },

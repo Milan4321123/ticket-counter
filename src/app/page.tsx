@@ -3,9 +3,10 @@ import type { Metadata } from 'next';
 import Showreel from '@/components/studio/Showreel';
 import OldAnchors from '@/components/studio/OldAnchors';
 import ProjectGrid from '@/components/studio/ProjectGrid';
+import DemoStrip from '@/components/studio/DemoStrip';
 import VideoTabs from '@/components/studio/VideoTabs';
 import { HowItWorks, StudioCta, WhatWeMake } from '@/components/studio/StudioBlocks';
-import { PROJECTS } from '@/lib/projects';
+import { PROJECTS, isLiveDemo } from '@/lib/projects';
 import { ALL_VIDEOS, SHOWREEL, VIDEO_GROUPS } from '@/lib/studioVideos';
 import { listPublishedEvents } from '@/lib/events';
 import type { EventRow } from '@/lib/events';
@@ -42,6 +43,9 @@ export const metadata: Metadata = {
   openGraph: { type: 'website', title, description, url: '/', images: shareImages(STUDIO_SHARE_CARD) },
   twitter: { card: 'summary_large_image', title, description, images: [STUDIO_SHARE_CARD.url] },
 };
+
+/** The project cards leave out the live demos — they have their own strip above. */
+const HOME_PROJECTS = PROJECTS.filter((p) => !isLiveDemo(p));
 
 /** The tabs leave out the showreel — it already plays in the hero. */
 const TAB_GROUPS = VIDEO_GROUPS.map((g) => ({ ...g, videos: g.videos.filter((x) => x.id !== SHOWREEL.id) })).filter(
@@ -113,6 +117,7 @@ export default async function HomePage() {
 
       <nav className="container sh-jump" aria-label={tr('st.onPage')}>
         <a href="#make">{tr('st.make')}</a>
+        <a href="#demos">{tr('pf.demos')}</a>
         <a href="#work">{tr('st.projects')}</a>
         <a href="#videos">{tr('st.videos')}</a>
         <a href="#how">{tr('st.how')}</a>
@@ -132,6 +137,17 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* ---- Try a live demo (lib/projects.ts → LIVE_DEMOS) ---- */}
+      <section className="section sh-section" id="demos" aria-labelledby="demos-title">
+        <div className="container">
+          <DemoStrip lang={lang} />
+          <p className="sh-dr-note">
+            {tr('dm.note')}{' '}
+            <Link href="/work">{tr('pf.gallery')}</Link>
+          </p>
+        </div>
+      </section>
+
       {/* ---- Projects ---- */}
       <section className="section sh-section" id="work" aria-labelledby="work-title">
         <div className="container">
@@ -146,7 +162,7 @@ export default async function HomePage() {
               {tr('st.allWork')}
             </Link>
           </div>
-          <ProjectGrid projects={PROJECTS} lang={lang} />
+          <ProjectGrid projects={HOME_PROJECTS} lang={lang} />
         </div>
       </section>
 

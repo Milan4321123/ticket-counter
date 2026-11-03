@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import ProjectGrid from '@/components/studio/ProjectGrid';
+import ProjectFilter from '@/components/studio/ProjectFilter';
 import VideoGrid from '@/components/studio/VideoGrid';
 import { HowItWorks, StudioCta, WhatWeMake } from '@/components/studio/StudioBlocks';
-import { PROJECTS } from '@/lib/projects';
+import { PROJECTS, asProjectFilter, filterCounts } from '@/lib/projects';
 import { ALL_VIDEOS, VIDEO_GROUPS } from '@/lib/studioVideos';
 import { jsonLdScript, shareImages, STUDIO_SHARE_CARD, studioServicesJsonLd } from '@/lib/seo';
 import { serverT, currentLang } from '@/lib/i18nServer';
@@ -23,7 +24,7 @@ import './studio.css';
 
 const title = 'Our work — apps · websites · ad videos';
 const description =
-  'Our work: ticketing with QR check-in, restaurant ordering, online shops, the NPJOE e.V. website, and ads and stage screens for Prakash Saput Live.';
+  'Our work: ticketing with QR check-in, restaurant ordering, online shops, live demos you can try, the NPJOE e.V. website, and ads for Prakash Saput Live.';
 
 export const metadata = {
   title,
@@ -33,8 +34,11 @@ export const metadata = {
   twitter: { card: 'summary_large_image', title, description, images: [STUDIO_SHARE_CARD.url] },
 };
 
-export default async function StudioPage() {
+export default async function StudioPage({ searchParams }: { searchParams: Promise<{ tag?: string | string[] }> }) {
   const lang = await currentLang();
+  // ?tag=apps|websites|videos|demos — the project filter's linkable state.
+  const { tag } = await searchParams;
+  const initialFilter = asProjectFilter(Array.isArray(tag) ? tag[0] : tag);
   const tr = await serverT();
   return (
     <>
@@ -56,6 +60,7 @@ export default async function StudioPage() {
           </div>
           <nav className="sh-jump sh-jump-center" aria-label={tr('st.kinds')}>
             <a href="#projects">{tr('st.projects')}</a>
+            <Link href="/work">{tr('pf.demos')}</Link>
             {VIDEO_GROUPS.map((g) => (
               <a key={g.id} href={`#${g.id}`}>
                 {tMaybe(lang, `vg.${g.id}`, g.label)}
@@ -69,7 +74,9 @@ export default async function StudioPage() {
         <div className="container">
           <p className="feed-kicker">{tr('st.projects')}</p>
           <h2 className="sh-h2">{tr('st.built')}</h2>
-          <ProjectGrid projects={PROJECTS} lang={lang} />
+          <ProjectFilter counts={filterCounts(PROJECTS)} initial={initialFilter} films={ALL_VIDEOS.length} lang={lang}>
+            <ProjectGrid projects={PROJECTS} lang={lang} />
+          </ProjectFilter>
         </div>
       </section>
 

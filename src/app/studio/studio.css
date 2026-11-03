@@ -906,6 +906,446 @@
   color: #fff;
 }
 
+/* Badges: a try-it-yourself demo, and real client work. */
+.sh-tag-demo {
+  background: rgba(16, 185, 129, 0.16);
+  color: #6ee7b7;
+}
+
+.sh-tag-real {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f1f5f9;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+}
+
+.sh-tag-demo::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 5px 1px 0;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: middle;
+}
+
+a.sh-pc-cover-demo {
+  display: block;
+}
+
+a.sh-pc-cover-demo img {
+  transition: transform 0.35s ease;
+}
+
+a.sh-pc-cover-demo:hover img {
+  transform: scale(1.03);
+}
+
+/* Screen-reader-only text (the filter's "n projects shown"). */
+.sh-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---- /studio project filter (components/studio/ProjectFilter) ---- */
+.sh-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 0 0 18px;
+}
+
+.sh-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sh-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  color: rgba(238, 240, 246, 0.78);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sh-filter-chip:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.sh-filter-chip:focus-visible,
+.sh-dr-arrow:focus-visible,
+.sh-dr-card:focus-visible {
+  outline: 2px solid #f0abfc;
+  outline-offset: 2px;
+}
+
+.sh-filter-chip[aria-pressed='true'] {
+  color: #fff;
+  background: linear-gradient(120deg, rgba(124, 58, 237, 0.85), rgba(236, 72, 153, 0.75));
+  box-shadow: 0 10px 24px -14px rgba(236, 72, 153, 0.9);
+}
+
+.sh-filter-chip-demos[aria-pressed='false'] {
+  color: #6ee7b7;
+  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.35);
+}
+
+.sh-filter-n {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 0.72rem;
+  line-height: 18px;
+  text-align: center;
+}
+
+.sh-filter-gallery {
+  color: #6ee7b7;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.sh-filter-gallery:hover {
+  color: #fff;
+}
+
+.sh-filter[data-filter='apps'] .sh-pc:not([data-f~='apps']),
+.sh-filter[data-filter='websites'] .sh-pc:not([data-f~='websites']),
+.sh-filter[data-filter='videos'] .sh-pc:not([data-f~='videos']),
+.sh-filter[data-filter='demos'] .sh-pc:not([data-f~='demos']) {
+  display: none;
+}
+
+.sh-filter-films {
+  margin: 16px 0 0;
+  font-weight: 700;
+}
+
+.sh-filter-films a {
+  color: #f9a8d4;
+}
+
+/* ---- Homepage "Try a live demo" strip (components/studio/DemoStrip + DemoRail) ---- */
+.sh-dr-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sh-dr-title {
+  min-width: 0;
+}
+
+.sh-dr-arrows {
+  display: flex;
+  flex: none;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.sh-dr-arrow {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  color: #fff;
+  cursor: pointer;
+}
+
+.sh-dr-arrow:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.sh-dr-arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.sh-dr-arrow svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sh-dr-track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: calc((100% - 2 * 16px) / 3);
+  gap: 16px;
+  margin: 0;
+  padding: 2px 0 10px;
+  list-style: none;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+}
+
+.sh-dr-track::-webkit-scrollbar {
+  display: none;
+}
+
+.sh-dr-item {
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
+.sh-dr-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 18px;
+  background: var(--bg-card);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+  color: inherit;
+  transition: box-shadow 0.2s ease;
+}
+
+.sh-dr-card:hover {
+  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.45);
+}
+
+.sh-dr-cover {
+  position: relative;
+  display: block;
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  background: #0d0e15;
+}
+
+.sh-dr-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.35s ease;
+}
+
+.sh-dr-card:hover .sh-dr-cover img {
+  transform: scale(1.03);
+}
+
+.sh-dr-cover .sh-tag {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  background: rgba(6, 40, 30, 0.82);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.sh-dr-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px 16px;
+}
+
+.sh-dr-body strong {
+  font-size: 1.02rem;
+  line-height: 1.3;
+}
+
+.sh-dr-line {
+  color: var(--text-dim);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.sh-dr-try {
+  margin-top: auto;
+  padding-top: 4px;
+  color: #6ee7b7;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.sh-dr-note {
+  margin: 10px 0 0;
+  color: var(--text-dim);
+  font-size: 0.86rem;
+}
+
+.sh-dr-note a {
+  color: #6ee7b7;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ---- /work gallery (app/work/page.tsx) ---- */
+.wk-note {
+  margin: 14px auto 0;
+  color: #6ee7b7;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.wk-list {
+  display: grid;
+  gap: 26px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wk-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 22px;
+  background: var(--bg-card);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+    0 24px 50px -30px rgba(0, 0, 0, 0.9);
+  scroll-margin-top: 70px;
+}
+
+.wk-card:nth-child(even) .wk-cover {
+  order: 2;
+}
+
+/* The cover is a framed screenshot at its own 3:2 — never cropped to the
+   text column's height (that cut the demos' headings off). */
+.wk-cover {
+  display: block;
+  align-self: center;
+  padding: 16px;
+}
+
+.wk-cover img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 2;
+  border-radius: 14px;
+  object-fit: cover;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 18px 40px -24px rgba(0, 0, 0, 0.9);
+  transition: transform 0.35s ease;
+}
+
+.wk-cover:hover img {
+  transform: scale(1.015);
+}
+
+.wk-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 22px 24px 24px;
+}
+
+.wk-n {
+  margin: 0 0 8px;
+  color: rgba(238, 240, 246, 0.5);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.wk-body h2 {
+  margin: 0;
+  font-size: clamp(1.3rem, 2.6vw, 1.6rem);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.wk-body h2 a {
+  color: inherit;
+}
+
+.wk-body h2 a:hover {
+  color: #6ee7b7;
+}
+
+.wk-outcome {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.wk-tryit {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(16, 185, 129, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.25);
+  color: #a7f3d0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.wk-try-h {
+  margin: 0 0 8px;
+  color: rgba(238, 240, 246, 0.6);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.wk-body .sh-pc-points {
+  margin-bottom: 18px;
+}
+
+.wk-ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.wk-real {
+  margin: 28px 0 0;
+  text-align: center;
+  font-weight: 700;
+}
+
+.wk-real a {
+  color: var(--accent-text);
+}
+
+.wk-real a:hover {
+  color: #fff;
+}
+
 /* ---- Live on MartNepali ---- */
 .sh-live {
   margin-top: 4px;
@@ -1183,6 +1623,10 @@
   .sh-also {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .sh-dr-track {
+    grid-auto-columns: calc((100% - 16px) / 2.15);
+  }
 }
 
 @media (max-width: 760px) {
@@ -1236,6 +1680,55 @@
   .sh-more {
     margin: -10px 0 16px;
   }
+
+  /* Phones: swipe the demo strip, the next card peeks in; no arrows. */
+  .sh-dr-arrows {
+    display: none;
+  }
+
+  .sh-dr-track {
+    grid-auto-columns: 80%;
+    gap: 12px;
+  }
+
+  .wk-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wk-card:nth-child(even) .wk-cover {
+    order: 0;
+  }
+
+  .wk-cover {
+    padding: 12px 12px 0;
+  }
+
+  .wk-body {
+    padding: 16px 18px 20px;
+  }
+
+  .wk-ctas .sh-btn {
+    flex: 1 1 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-dr-track {
+    scroll-behavior: auto;
+  }
+
+  .sh-dr-cover img,
+  .wk-cover img,
+  a.sh-pc-cover-demo img,
+  .sh-dr-card {
+    transition: none;
+  }
+
+  .sh-dr-card:hover .sh-dr-cover img,
+  .wk-cover:hover img,
+  a.sh-pc-cover-demo:hover img {
+    transform: none;
+  }
 }
 
 @media (max-width: 420px) {
@@ -1255,7 +1748,8 @@
    (हामी → ह ा म ी). Plain spacing for them in Nepali. */
 html:lang(ne) .feed-kicker,
 html:lang(ne) .sh-live-title,
-html:lang(ne) .sh-made-for::before {
+html:lang(ne) .sh-made-for::before,
+html:lang(ne) .wk-try-h {
   letter-spacing: 0.01em;
   text-transform: none;
 }

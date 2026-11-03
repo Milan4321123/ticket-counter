@@ -1,0 +1,85 @@
+/* components/studio/DemoNav — prev / all / next under every /work demo. It
+   sits on the demos' shared dark frame (var(--bg)), so plain white-on-dark. */
+.dnav {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: 10px;
+  max-width: 720px;
+  margin: 36px auto 0;
+  text-align: left;
+}
+
+.dnav-link,
+.dnav-all {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 56px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  color: rgba(238, 240, 246, 0.92);
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.dnav-link:hover,
+.dnav-all:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.dnav-link:focus-visible,
+.dnav-all:focus-visible {
+  outline: 2px solid #f0abfc;
+  outline-offset: 2px;
+}
+
+.dnav-next {
+  text-align: right;
+}
+
+.dnav-dir {
+  color: rgba(238, 240, 246, 0.6);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.dnav-name {
+  overflow: hidden;
+  font-size: 0.95rem;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.dnav-all {
+  align-items: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Phones: previous and next side by side, "all demos" under them. */
+@media (max-width: 560px) {
+  .dnav {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .dnav-all {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dnav-link,
+  .dnav-all {
+    transition: none;
+  }
+}

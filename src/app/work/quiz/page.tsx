@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import DemoNav from '@/components/studio/DemoNav';
 import { Baloo_2 } from 'next/font/google';
 import QuizGame from './QuizGame';
 import '@/app/studio/studio.css';
@@ -41,8 +42,8 @@ export default function QuizDemoPage() {
         <div className="qz-frame-inner">
           <span className="qz-frame-badge">Demo project</span>
           <span className="qz-frame-text">Built by MartNepali · the other players are simulated, nothing is sent</span>
-          <Link href="/studio#projects" className="qz-frame-link">
-            ← Our work
+          <Link href="/work" className="qz-frame-link">
+            ← All demos
           </Link>
         </div>
       </div>
@@ -71,6 +72,7 @@ export default function QuizDemoPage() {
             </Link>
           </div>
           <p className="qz-frame-free">Free while we grow.</p>
+          <DemoNav current="quiz" />
         </div>
       </section>
     </div>
