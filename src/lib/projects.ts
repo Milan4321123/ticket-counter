@@ -118,6 +118,20 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
+    id: 'quiz',
+    title: 'Live event quiz',
+    client: 'Dashain Sanjh Quiz Night · a made-up event · demo',
+    tags: ['App'],
+    outcome: 'A quiz for the break between acts: questions on the projector, the whole hall answering on their phones.',
+    points: ['Join with a QR code and a nickname', 'Countdown, answer chart and live leaderboard', 'Podium with confetti at the end', 'English and नेपाली, one toggle'],
+    cover: { src: '/media/studio/projects/quiz.jpg', shape: 'wide' },
+    example: true,
+    links: [
+      { href: '/work/quiz', label: 'Play the quiz' },
+      { href: '/contact?intent=app', label: 'Want one like this?' },
+    ],
+  },
+  {
     id: 'saput',
     title: 'Prakash Saput Live · Frankfurt',
     client: 'Concert night · 31 Oct 2026',
