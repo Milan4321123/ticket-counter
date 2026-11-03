@@ -239,6 +239,21 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
+    id: 'booth',
+    title: 'Event photo booth',
+    client: 'For festivals, concerts and weddings · demo',
+    tags: ['App'],
+    outcome: 'What an organizer puts on a QR code at the door: guests take a selfie, get it in a festive frame with stickers, and share it — photos never leave the phone.',
+    points: ['Camera with a 3-2-1 countdown, a photo, or a drawn sample', 'Six frames: Dashain, Tihar, Teej, New Year, concert, wedding', 'Stickers you drag, pinch and turn; filters; square, story, 4×6 print, photo strip', 'Organizer side: logo, QR poster for the door, live wall preview'],
+    cover: { src: '/media/studio/projects/booth.jpg', shape: 'wide', width: 1200, height: 800 },
+    example: true,
+    tryIt: 'Use the sample photo, try the Tihar frame, add a dhaka topi and download a story.',
+    links: [
+      { href: '/work/booth', label: 'Open the photo booth' },
+      { href: '/contact?intent=app', label: 'Want one like this?' },
+    ],
+  },
+  {
     id: 'saput',
     title: 'Prakash Saput Live · Frankfurt',
     client: 'Concert night · 31 Oct 2026',
