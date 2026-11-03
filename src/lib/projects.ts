@@ -132,6 +132,20 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
+    id: 'live',
+    title: 'Live event dashboard',
+    client: 'Tihar Night Live · a made-up concert · demo',
+    tags: ['App'],
+    outcome: 'The night on one screen: who is in, which door is busy, what is on stage — and the guests’ shout-outs for the hall.',
+    points: ['Live check-ins against capacity', 'Arrivals chart and door queues', 'Shout-out wall and big screen mode', 'English and नेपाली, one toggle'],
+    cover: { src: '/media/studio/projects/live.jpg', shape: 'wide' },
+    example: true,
+    links: [
+      { href: '/work/live', label: 'Open the dashboard' },
+      { href: '/contact?intent=app', label: 'Want one like this?' },
+    ],
+  },
+  {
     id: 'saput',
     title: 'Prakash Saput Live · Frankfurt',
     client: 'Concert night · 31 Oct 2026',
