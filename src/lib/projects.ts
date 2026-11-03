@@ -314,6 +314,22 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
+    id: 'shop',
+    title: 'Online shop + owner dashboard',
+    client: 'Dhaka & Dal, Leipzig · a made-up Nepali shop · demo',
+    tags: ['App'],
+    outcome: 'Customers order spices, dal, achar and dhaka topi from the phone and pick up with a QR code; the owner sees orders, stock, regulars and the rush before Dashain and Tihar on one dashboard.',
+    points: ['Storefront with search, sizes and “only 3 left”', 'Pickup codes, delivery slots, a scan at the counter', 'Orders per day, top products, a weekday × hour heatmap', 'Stock with reorder levels, CSV export, a product editor'],
+    cover: { src: '/media/studio/projects/shop.jpg', shape: 'wide', width: 1200, height: 800 },
+    example: true,
+    tryIt: 'Put timur and a dhaka topi in the bag and pick a pickup time, then pack, ready and scan your order in the owner dashboard.',
+    links: [
+      { href: '/work/shop', label: 'Open the shop + dashboard' },
+      { href: '/contact?intent=app', label: 'Want one like this?' },
+      { href: '/demo?to=shop', label: 'The shop tools on MartNepali' },
+    ],
+  },
+  {
     id: 'saput',
     title: 'Prakash Saput Live · Frankfurt',
     client: 'Concert night · 31 Oct 2026',

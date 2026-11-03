@@ -182,6 +182,7 @@ const D = {
   'pj.cup': { en: 'Futsal tournament app', de: 'App fürs Futsal-Turnier', ne: 'फुटसल प्रतियोगिता एप' },
   'pj.abc': { en: 'Kids’ Nepali alphabet app', de: 'Nepali-ABC-App für Kinder', ne: 'बालबालिकाका लागि नेपाली वर्णमाला एप' },
   'pj.radio': { en: 'Nepali radio + podcast site', de: 'Website für Nepali-Radio + Podcast', ne: 'नेपाली रेडियो र पोडकास्ट वेबसाइट' },
+  'pj.shop': { en: 'Online shop + owner dashboard', de: 'Online-Shop + Inhaber-Dashboard', ne: 'अनलाइन पसल र साहुको ड्यासबोर्ड' },
   'pj.saput': { en: 'Prakash Saput Live · Frankfurt', de: 'Prakash Saput Live · Frankfurt', ne: 'प्रकाश सपुत लाइभ · फ्रैंकफर्ट' },
   // project badges, the /studio filter, the demo strip, /work and demo prev / next
   'pb.demo': { en: 'Live demo', de: 'Live-Demo', ne: 'लाइभ डेमो' },

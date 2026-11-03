@@ -50,6 +50,7 @@ const ROUTES = [
   '/work/cup',
   '/work/abc',
   '/work/radio',
+  '/work/shop',
   '/work/build',
 ];
 const LANGS = ['de', 'ne'];
@@ -104,6 +105,12 @@ try {
         try {
           if (location.pathname === '/work/abc' && !localStorage.getItem('mn-demo:abc')) {
             localStorage.setItem('mn-demo:abc', JSON.stringify({ v: 1, name: mark + 'kid' }));
+          }
+        } catch {}
+        // The shop demo: start with something in the bag, so the crawl reaches the checkout's name field.
+        try {
+          if (location.pathname === '/work/shop' && !localStorage.getItem('mn-demo:shop')) {
+            localStorage.setItem('mn-demo:shop', JSON.stringify({ v: 1, cart: [{ p: 'timur', v: '50g', q: 1 }] }));
           }
         } catch {}
       }, MARK);

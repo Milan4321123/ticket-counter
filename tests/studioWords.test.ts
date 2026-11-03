@@ -51,6 +51,9 @@ const ALLOW: Record<string, string> = {
   'momo/content.ts: Prices hidden in this demo': 'says prices are hidden',
   'momo/content.ts: Preise sind in dieser Demo ausgeblendet': 'says prices are hidden',
   'momo/content.ts: यो डेमोमा मूल्य लुकाइएको छ': 'says prices are hidden',
+  'shop/content.ts: Prices hidden in this demo': 'says prices are hidden',
+  'shop/content.ts: Preise sind in dieser Demo ausgeblendet': 'says prices are hidden',
+  'shop/content.ts: यो डेमोमा मूल्य लुकाइएको छ': 'says prices are hidden',
   // A guest at the made-up restaurant's table asks the waiter for the bill
   // ("Bill, please" in English) — the restaurant's dinner, not the studio's.
   'restaurant/content.ts: Rechnung bitte': 'a table asks for its bill',
@@ -109,7 +112,7 @@ function studioI18nStrings(): { key: string; text: string }[] {
 const demos = fs.readdirSync(WORK).filter((d) => fs.statSync(path.join(WORK, d)).isDirectory());
 
 test('the scan finds every demo and plenty of text', () => {
-  for (const d of ['wedding', 'artist', 'quiz', 'live', 'classes', 'samaj', 'restaurant', 'build', 'kite', 'card', 'booth', 'momo', 'cup', 'abc', 'radio']) {
+  for (const d of ['wedding', 'artist', 'quiz', 'live', 'classes', 'samaj', 'restaurant', 'build', 'kite', 'card', 'booth', 'momo', 'cup', 'abc', 'radio', 'shop']) {
     assert.ok(demos.includes(d), `${d} is under src/app/work`);
     assert.ok(fs.existsSync(path.join(WORK, d, 'content.ts')), `${d} has a content.ts`);
   }

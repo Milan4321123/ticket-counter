@@ -42,6 +42,7 @@ const HIDDEN_ON = [
   /^\/work\/cup/, // the futsal cup: goal notes and the referee's pickers sit at the bottom on phones
   /^\/work\/abc/, // the kids' alphabet app: a chat bubble has no place on a page for small children, and it would sit on the tracing pad
   /^\/work\/radio/, // the radio site: its live player is fixed to the bottom of the screen
+  /^\/work\/shop/, // the shop demo: its bag bar and sheets sit at the bottom on phones
 ];
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
