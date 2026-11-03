@@ -193,6 +193,22 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
+    id: 'tables',
+    title: 'QR table ordering',
+    client: 'Himalayan Chulo, Köln · a made-up restaurant · demo',
+    tags: ['App'],
+    outcome: 'Guests scan the code on their table and order from the phone; the kitchen board and the waiter see every order the moment it is sent.',
+    points: ['Menu with options, allergens and search', 'Live order tracker, call waiter, order summary', 'Kitchen board with timers and stations', 'Floor plan, sold-out switch, table QR codes'],
+    cover: { src: '/media/studio/projects/restaurant-demo.jpg', shape: 'wide', width: 1200, height: 800 },
+    example: true,
+    tryIt: 'Order momo at table 7, cook them on the kitchen board, then call the waiter.',
+    links: [
+      { href: '/work/restaurant', label: 'Open the restaurant' },
+      { href: '/contact?intent=app', label: 'Want one like this?' },
+      { href: '/demo?to=tools-shop', label: 'The restaurant pack on MartNepali' },
+    ],
+  },
+  {
     id: 'saput',
     title: 'Prakash Saput Live · Frankfurt',
     client: 'Concert night · 31 Oct 2026',
