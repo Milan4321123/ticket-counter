@@ -180,6 +180,7 @@ const D = {
   'pj.booth': { en: 'Event photo booth', de: 'Fotobox fürs Event', ne: 'कार्यक्रमको फोटो बुथ' },
   'pj.momo': { en: 'Momo food-truck app', de: 'App für den Momo-Foodtruck', ne: 'मःम फुड-ट्रक एप' },
   'pj.cup': { en: 'Futsal tournament app', de: 'App fürs Futsal-Turnier', ne: 'फुटसल प्रतियोगिता एप' },
+  'pj.abc': { en: 'Kids’ Nepali alphabet app', de: 'Nepali-ABC-App für Kinder', ne: 'बालबालिकाका लागि नेपाली वर्णमाला एप' },
   'pj.saput': { en: 'Prakash Saput Live · Frankfurt', de: 'Prakash Saput Live · Frankfurt', ne: 'प्रकाश सपुत लाइभ · फ्रैंकफर्ट' },
   // project badges, the /studio filter, the demo strip, /work and demo prev / next
   'pb.demo': { en: 'Live demo', de: 'Live-Demo', ne: 'लाइभ डेमो' },

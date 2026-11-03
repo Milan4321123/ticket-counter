@@ -284,6 +284,21 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
+    id: 'abc',
+    title: 'Kids’ Nepali alphabet app',
+    client: 'For Nepali Saturday schools, language classes and families · demo',
+    tags: ['App'],
+    outcome: 'Children of Nepali families growing up in Europe learn to read and write क ख ग: every letter with a drawn picture word and its sound, tracing with a finger for stars, little games and a sticker book — helper text in English, Deutsch or नेपाली.',
+    points: ['All 13 vowels and 36 consonants, each with a picture word', 'Trace the real letter with a finger, 1–3 stars', 'Balloon, picture-matching and word-building games', 'Sticker book, day streak and a parent corner — nothing leaves the device'],
+    cover: { src: '/media/studio/projects/abc.jpg', shape: 'wide', width: 1200, height: 800 },
+    example: true,
+    tryIt: 'Tap क to hear it, trace it for three stars, then pop the right balloon and build the word घर.',
+    links: [
+      { href: '/work/abc', label: 'Open the alphabet app' },
+      { href: '/contact?intent=app', label: 'Want one like this?' },
+    ],
+  },
+  {
     id: 'saput',
     title: 'Prakash Saput Live · Frankfurt',
     client: 'Concert night · 31 Oct 2026',
