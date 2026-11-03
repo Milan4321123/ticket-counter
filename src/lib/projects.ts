@@ -269,6 +269,21 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
+    id: 'cup',
+    title: 'Futsal tournament app',
+    client: 'For tournaments, clubs and sports days · demo',
+    tags: ['App'],
+    outcome: 'A one-day futsal cup in a hall: fans follow live scores and tables on their phones, the referee’s table keeps the score with big buttons, and the hall TV shows what is on now and next.',
+    points: ['Live scores with a minute clock, goals, cards and subs', 'Group tables that sort themselves, with every tie-breaker', 'Knockout bracket that fills in, shoot-outs as ✓ ✗ dots', 'Referee desk, top scorers, fair play and a big screen for the hall'],
+    cover: { src: '/media/studio/projects/cup.jpg', shape: 'wide', width: 1200, height: 800 },
+    example: true,
+    tryIt: 'Follow a team, switch to 60× and watch the table reorder — then take a match over at the referee desk and score a goal.',
+    links: [
+      { href: '/work/cup', label: 'Open the tournament app' },
+      { href: '/contact?intent=app', label: 'Want one like this?' },
+    ],
+  },
+  {
     id: 'saput',
     title: 'Prakash Saput Live · Frankfurt',
     client: 'Concert night · 31 Oct 2026',

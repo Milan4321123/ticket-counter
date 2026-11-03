@@ -39,6 +39,7 @@ const HIDDEN_ON = [
   /^\/work\/card/, // the link page maker: its live-preview dock sits at the bottom on phones
   /^\/work\/booth/, // the photo booth: the camera's shutter bar and the save buttons sit at the bottom on phones
   /^\/work\/momo/, // the momo truck app: its tab bar sits at the bottom on phones
+  /^\/work\/cup/, // the futsal cup: goal notes and the referee's pickers sit at the bottom on phones
 ];
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
