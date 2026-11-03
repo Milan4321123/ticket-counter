@@ -31,6 +31,7 @@ const HIDDEN_ON = [
   /^\/offline/,
   /^\/inbox/,
   /^\/bhetghat\/m\//, // the meetup's group chat has its own input at the bottom
+  /^\/work\/classes/, // the class booking demo has its own bottom tab bar on phones
 ];
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

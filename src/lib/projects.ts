@@ -146,6 +146,20 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
+    id: 'classes',
+    title: 'Class booking app',
+    client: 'Aangan Pathshala · a made-up Nepali school · demo',
+    tags: ['App'],
+    outcome: 'Nepali, dance, madal and harmonium classes booked from the phone — with a waitlist that moves by itself and a register on the teacher’s phone.',
+    points: ['Classes, filters and a weekly timetable', 'Trial or term booking with a QR pass', 'Waitlist, reminders and add to calendar', 'Teacher view: register, QR scan, class notes'],
+    cover: { src: '/media/studio/projects/classes.jpg', shape: 'wide' },
+    example: true,
+    links: [
+      { href: '/work/classes', label: 'Open the app' },
+      { href: '/contact?intent=app', label: 'Want one like this?' },
+    ],
+  },
+  {
     id: 'saput',
     title: 'Prakash Saput Live · Frankfurt',
     client: 'Concert night · 31 Oct 2026',
