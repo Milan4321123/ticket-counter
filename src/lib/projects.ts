@@ -104,6 +104,20 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
+    id: 'artist',
+    title: 'Artist page & press kit',
+    client: 'Rimjhim Tara · a made-up singer · demo',
+    tags: ['Website'],
+    outcome: 'One page for a touring artist: music that plays, tour dates with tickets, a press kit to download.',
+    points: ['A music player with a live visualizer', 'Tour dates linked to ticket pages', 'Press kit: one-sheet, bio, contact card', 'English and नेपाली, one toggle'],
+    cover: { src: '/media/studio/projects/artist.jpg', shape: 'wide' },
+    example: true,
+    links: [
+      { href: '/work/artist', label: 'Open the artist page' },
+      { href: '/contact?intent=website', label: 'Want one like this?' },
+    ],
+  },
+  {
     id: 'saput',
     title: 'Prakash Saput Live · Frankfurt',
     client: 'Concert night · 31 Oct 2026',
