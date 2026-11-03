@@ -10029,6 +10029,61 @@ html.tx-wait body {
 .cc-ideas button:hover {
   background: rgba(139, 92, 246, 0.24);
 }
+/* A brief from /work/build: the visitor's message, written in but NOT sent. */
+.cc-pending {
+  display: grid;
+  gap: 8px;
+  width: 92%;
+  max-width: 92%;
+  background: rgba(225, 29, 72, 0.1);
+  box-shadow: inset 0 0 0 1.5px rgba(236, 72, 153, 0.55);
+  white-space: normal;
+}
+.cc-pending-note {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #f9a8d4;
+}
+.cc-pending textarea {
+  width: 100%;
+  min-height: 110px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.45;
+  resize: vertical;
+}
+.cc-pending-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.cc-pending-actions button {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.cc-pending-send {
+  color: #fff;
+  background: linear-gradient(135deg, #e11d48, #9333ea);
+}
+.cc-pending-send:disabled {
+  opacity: 0.55;
+}
+.cc-pending-x {
+  color: inherit;
+  background: rgba(255, 255, 255, 0.08);
+}
 .cc-input {
   display: flex;
   align-items: center;

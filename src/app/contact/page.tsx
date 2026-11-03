@@ -4,6 +4,7 @@ import { platformContactEmail } from '@/lib/platform';
 import ContactForm from './ContactForm';
 import CreatorChat from '@/components/CreatorChat';
 import { geminiEnabled } from '@/lib/gemini';
+import { cleanBrief } from '@/lib/ideaBrief';
 
 // The contact address comes from an env var — read it fresh.
 export const dynamic = 'force-dynamic';
@@ -82,15 +83,19 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
 export default async function ContactPage({
   searchParams,
 }: {
-  searchParams: Promise<{ intent?: string | string[] }>;
+  searchParams: Promise<{ intent?: string | string[]; brief?: string | string[] }>;
 }) {
-  const raw = (await searchParams).intent;
+  const sp = await searchParams;
+  const raw = sp.intent;
   const intent = Array.isArray(raw) ? raw[0] : raw;
   const wantsAccount = intent === 'account';
   // ?intent=video|app|website: arrived from a studio button ("want one like this?").
   const topic = isTopic(intent) ? intent : undefined;
   const head = HEAD[topic ?? 'any'];
   const contactEmail = platformContactEmail();
+  // ?brief=: an idea from /work/build, written into the chat as an unsent,
+  // editable message — never sent until the visitor presses send.
+  const brief = cleanBrief(sp.brief);
 
   if (!wantsAccount) {
     // "Talk to the creator": a conversation instead of a form. The assistant
@@ -109,7 +114,7 @@ export default async function ContactPage({
               </Link>
             </p>
           </header>
-          <CreatorChat ai={geminiEnabled({ personal: true })} topic={topic} />
+          <CreatorChat ai={geminiEnabled({ personal: true })} topic={topic} brief={brief || undefined} />
           <div className="cc-under">
             <p className="muted small">
               Just selling tickets or food? An event or shop page on MartNepali is free and self-service —{' '}

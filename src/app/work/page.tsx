@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { StudioCta } from '@/components/studio/StudioBlocks';
+import BuildIdeaCard from '@/components/studio/BuildIdeaCard';
 import { LIVE_DEMOS, demoHref } from '@/lib/projects';
 import { shareImages, STUDIO_SHARE_CARD } from '@/lib/seo';
 import { currentLang } from '@/lib/i18nServer';
@@ -40,6 +41,12 @@ export default async function WorkIndex() {
           <h1 className="anim-fade-up anim-d1">{t(lang, 'wk.h1')}</h1>
           <p className="feed-hero-sub anim-fade-up anim-d2">{t(lang, 'wk.sub', { n })}</p>
           <p className="wk-note anim-fade-up anim-d2">{t(lang, 'dm.note')}</p>
+        </div>
+      </section>
+
+      <section className="section sh-section wk-build">
+        <div className="container">
+          <BuildIdeaCard lang={lang} />
         </div>
       </section>
 

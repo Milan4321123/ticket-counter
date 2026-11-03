@@ -234,6 +234,16 @@ export const PROJECTS: Project[] = [
   },
 ];
 
+/**
+ * The idea builder (/work/build) is a tool, not a project: it is not in
+ * PROJECTS (so not a "Live demo" card, not in the filters or prev / next).
+ * /work, /studio and the homepage's demo strip link to it from here.
+ */
+export const IDEA_BUILDER = {
+  href: '/work/build',
+  cover: { src: '/media/studio/projects/build.jpg', width: 1200, height: 800 },
+} as const;
+
 // ---- Live demos, filters, prev / next (pure — tests/projects.test.ts) ----
 
 /** The project's try-it-yourself page (/work/<demo>), if it has one. */

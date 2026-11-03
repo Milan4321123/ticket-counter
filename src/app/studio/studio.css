@@ -1753,3 +1753,140 @@ html:lang(ne) .wk-try-h {
   letter-spacing: 0.01em;
   text-transform: none;
 }
+
+/* ---- The idea builder's way in (components/studio/BuildIdeaCard, DemoStrip) ---- */
+.bi-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(236, 72, 153, 0.26), transparent 55%),
+    radial-gradient(circle at 90% 100%, rgba(124, 58, 237, 0.3), transparent 60%),
+    var(--bg-card);
+  box-shadow:
+    inset 0 0 0 1px rgba(236, 72, 153, 0.35),
+    0 24px 60px -34px rgba(236, 72, 153, 0.7);
+}
+
+.bi-body {
+  padding: 28px 8px 28px 28px;
+}
+
+.bi-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.14);
+  color: var(--amber);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.bi-title {
+  margin: 10px 0 8px;
+  font-size: clamp(1.5rem, 3vw, 2.1rem);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.bi-title a {
+  color: inherit;
+}
+
+.bi-text {
+  margin: 0;
+  color: var(--text-dim);
+  line-height: 1.55;
+}
+
+.bi-ctas {
+  margin-top: 18px;
+}
+
+.bi-free {
+  margin: 12px 0 0;
+  color: #6ee7b7;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.bi-cover {
+  display: block;
+  padding: 16px 16px 16px 0;
+}
+
+.bi-cover img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 2;
+  border-radius: 16px;
+  object-fit: cover;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 18px 40px -24px rgba(0, 0, 0, 0.9);
+  transition: transform 0.35s ease;
+}
+
+.bi-card:hover .bi-cover img {
+  transform: scale(1.015);
+}
+
+.wk-build {
+  padding-bottom: 0;
+}
+
+.bi-studio {
+  margin: 0 0 26px;
+}
+
+.sh-dr-build {
+  box-shadow: inset 0 0 0 1px rgba(236, 72, 153, 0.45);
+  background:
+    radial-gradient(circle at 0% 100%, rgba(236, 72, 153, 0.2), transparent 60%),
+    var(--bg-card);
+}
+
+.sh-dr-build:hover {
+  box-shadow: inset 0 0 0 1px rgba(236, 72, 153, 0.8);
+}
+
+.sh-dr-build .sh-dr-try {
+  color: #f9a8d4;
+}
+
+.sh-tag-build {
+  background: rgba(40, 10, 30, 0.82) !important;
+  color: #fde68a;
+}
+
+@media (max-width: 760px) {
+  .bi-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bi-body {
+    padding: 22px 20px 4px;
+  }
+
+  .bi-cover {
+    order: -1;
+    padding: 14px 14px 0;
+  }
+
+  .bi-ctas .sh-btn {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bi-cover img {
+    transition: none;
+  }
+}

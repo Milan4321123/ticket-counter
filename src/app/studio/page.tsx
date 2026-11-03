@@ -2,6 +2,7 @@ import Link from 'next/link';
 import ProjectGrid from '@/components/studio/ProjectGrid';
 import ProjectFilter from '@/components/studio/ProjectFilter';
 import VideoGrid from '@/components/studio/VideoGrid';
+import BuildIdeaCard from '@/components/studio/BuildIdeaCard';
 import { HowItWorks, StudioCta, WhatWeMake } from '@/components/studio/StudioBlocks';
 import { PROJECTS, asProjectFilter, filterCounts } from '@/lib/projects';
 import { ALL_VIDEOS, VIDEO_GROUPS } from '@/lib/studioVideos';
@@ -74,6 +75,7 @@ export default async function StudioPage({ searchParams }: { searchParams: Promi
         <div className="container">
           <p className="feed-kicker">{tr('st.projects')}</p>
           <h2 className="sh-h2">{tr('st.built')}</h2>
+          <BuildIdeaCard lang={lang} className="bi-studio" />
           <ProjectFilter counts={filterCounts(PROJECTS)} initial={initialFilter} films={ALL_VIDEOS.length} lang={lang}>
             <ProjectGrid projects={PROJECTS} lang={lang} />
           </ProjectFilter>

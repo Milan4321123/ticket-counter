@@ -1,12 +1,14 @@
 import Link from 'next/link';
 import DemoRail from './DemoRail';
-import { LIVE_DEMOS, demoHref } from '@/lib/projects';
+import { IDEA_BUILDER, LIVE_DEMOS, demoHref } from '@/lib/projects';
 import { t, tMaybe, type Lang } from '@/lib/i18n';
 
 /**
  * The homepage's "Try a live demo" strip: every /work demo from lib/projects
  * (cover, one line, "Try it →") in a swipeable row. Demos only — each card says
- * "Live demo", and the line under the row says the names are made up.
+ * "Live demo", and the line under the row says the names are made up. The
+ * first card is special: the idea builder (/work/build), a tool rather than a
+ * demo, so it is labelled "Idea builder" instead.
  */
 export default function DemoStrip({ lang = 'en' }: { lang?: Lang }) {
   return (
@@ -23,6 +25,20 @@ export default function DemoStrip({ lang = 'en' }: { lang?: Lang }) {
         </div>
       }
     >
+      <li className="sh-dr-item">
+        <Link href={IDEA_BUILDER.href} className="sh-dr-card sh-dr-build">
+          <span className="sh-dr-cover">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={IDEA_BUILDER.cover.src} alt="" width={IDEA_BUILDER.cover.width} height={IDEA_BUILDER.cover.height} loading="lazy" decoding="async" />
+            <span className="sh-tag sh-tag-build">✨ {t(lang, 'bd.badge')}</span>
+          </span>
+          <span className="sh-dr-body">
+            <strong>{t(lang, 'bd.title')}</strong>
+            <span className="sh-dr-line">{t(lang, 'bd.line')}</span>
+            <span className="sh-dr-try">{t(lang, 'bd.cta')}</span>
+          </span>
+        </Link>
+      </li>
       {LIVE_DEMOS.map((p) => (
         <li key={p.id} className="sh-dr-item">
           <Link href={demoHref(p)!} className="sh-dr-card">

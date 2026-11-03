@@ -34,6 +34,7 @@ const HIDDEN_ON = [
   /^\/work\/classes/, // the class booking demo has its own bottom tab bar on phones
   /^\/work\/samaj/, // the association site demo: the bubble sat on its hero and forms on phones
   /^\/work\/restaurant/, // the QR ordering demo: its cart bar and sheets sit at the bottom on phones
+  /^\/work\/build/, // the idea builder: its sketch bar and the send button sit at the bottom on phones
 ];
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

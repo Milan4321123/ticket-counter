@@ -213,6 +213,21 @@ const D = {
     de: 'Echte Projekte — die Website von NPJOE e.V., Prakash Saput Live und mehr — findest du bei unserer Arbeit →',
     ne: 'वास्तविक परियोजना — NPJOE e.V. को वेबसाइट, प्रकाश सपुत लाइभ र अरू — हाम्रो काम पेजमा छन् →',
   },
+  // the idea builder (/work/build) — its card on /work, /studio and the homepage strip
+  'bd.badge': { en: 'Idea builder', de: 'Ideen-Baukasten', ne: 'विचार बिल्डर' },
+  'bd.title': { en: 'Build your idea', de: 'Bau deine Idee', ne: 'आफ्नो विचार बनाउनुहोस्' },
+  'bd.text': {
+    en: 'Pick what you are, a name, a colour and what it should do — a phone sketch builds itself as you go. Then send it to us in one tap.',
+    de: 'Wähle, was du bist, einen Namen, eine Farbe und was es können soll — eine Handy-Skizze baut sich dabei selbst. Dann schick sie uns mit einem Tipp.',
+    ne: 'तपाईं को हुनुहुन्छ, नाम, रङ र के-के गर्नुपर्छ छान्नुहोस् — फोनको स्केच आफैं बन्दै जान्छ। अनि एक ट्यापमा हामीलाई पठाउनुहोस्।',
+  },
+  'bd.line': {
+    en: 'Sketch your own app or website and watch it build itself.',
+    de: 'Skizziere deine eigene App oder Website und sieh zu, wie sie entsteht.',
+    ne: 'आफ्नै एप वा वेबसाइटको स्केच बनाउनुहोस् र बन्दै गरेको हेर्नुहोस्।',
+  },
+  'bd.cta': { en: 'Build your idea →', de: 'Idee bauen →', ne: 'विचार बनाउनुहोस् →' },
+  'bd.free': { en: 'Free while we grow · nothing is sent until you say so', de: 'Kostenlos, solange wir wachsen · nichts wird verschickt, bis du es willst', ne: 'हामी बढ्दै गर्दा निःशुल्क · तपाईंले नभनेसम्म केही पठाइँदैन' },
   'dn.label': { en: 'More demos', de: 'Weitere Demos', ne: 'थप डेमो' },
   'dn.prev': { en: '← Previous demo', de: '← Vorherige Demo', ne: '← अघिल्लो डेमो' },
   'dn.next': { en: 'Next demo →', de: 'Nächste Demo →', ne: 'अर्को डेमो →' },

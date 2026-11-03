@@ -101,17 +101,26 @@ const ROWS_BY_KIND: Record<Fields['kind'], { key: keyof Fields; label: string; i
 };
 // v2: the studio greeting (Nov 2026) — an older saved chat would hide it.
 const STORE = 'creator:chat:v2';
+/** Above a brief brought from the idea builder (/work/build): it is not sent yet. */
+const BRIEF_NOTE = 'Your idea from the builder — not sent yet. Change anything you like, then send it.';
 
 export default function CreatorChat({
   owner = 'Milan',
   ai = false,
   topic,
+  brief,
 }: {
   owner?: string;
   /** Whether replies come from Gemini on this server (lib/gemini, personal). */
   ai?: boolean;
   /** What the visitor came from: a video, an app or a website ("want one like this?"). */
   topic?: 'video' | 'app' | 'website';
+  /**
+   * A first message brought from /work/build (?brief=, cleaned by
+   * lib/ideaBrief on the page). It is only PREFILLED — shown as an editable,
+   * unsent message — and goes out like anything typed when the visitor sends it.
+   */
+  brief?: string;
 }) {
   const hello = topic ? OPENERS[topic].hello : HELLO;
   const ideas = topic ? OPENERS[topic].ideas : IDEAS;
@@ -124,6 +133,7 @@ export default function CreatorChat({
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+  const [pending, setPending] = useState<string | null>(brief?.trim() ? brief : null);
   const log = useRef<HTMLDivElement>(null);
   const mobileCard = useRef<HTMLDivElement>(null);
   const speechBase = useRef('');
@@ -140,7 +150,12 @@ export default function CreatorChat({
     } catch {
       /* private mode: start fresh */
     }
-  }, [store]);
+    try {
+      if (brief && sessionStorage.getItem(`${store}:brief`) === brief) setPending(null);
+    } catch {
+      /* fine */
+    }
+  }, [store, brief]);
   useEffect(() => {
     try {
       sessionStorage.setItem(store, JSON.stringify({ turns: turns.slice(-40), fields, ready }));
@@ -150,7 +165,7 @@ export default function CreatorChat({
   }, [turns, fields, ready, store]);
   useEffect(() => {
     log.current?.scrollTo({ top: log.current.scrollHeight, behavior: 'smooth' });
-  }, [turns, busy]);
+  }, [turns, busy, pending]);
   // Phone: the request is always shown, BELOW the chat at full height (people
   // did not find it behind a tap-to-open strip). Once it is ready to send,
   // bring it into view so the send button is right there.
@@ -329,7 +344,44 @@ export default function CreatorChat({
               <i />
             </div>
           )}
-          {turns.length === 1 && (
+          {pending !== null && !sent && (
+            <div className="cc-msg cc-me cc-pending" translate="no">
+              <span className="cc-pending-note" translate="yes">
+                {BRIEF_NOTE}
+              </span>
+              <textarea
+                value={pending}
+                onChange={(e) => setPending(e.target.value)}
+                maxLength={600}
+                rows={5}
+                aria-label="Your idea — not sent yet"
+                disabled={busy}
+              />
+              <span className="cc-pending-actions">
+                <button
+                  type="button"
+                  className="cc-pending-send"
+                  disabled={busy || !pending.trim()}
+                  onClick={() => {
+                    const text = pending;
+                    setPending(null);
+                    try {
+                      if (brief) sessionStorage.setItem(`${store}:brief`, brief);
+                    } catch {
+                      /* fine */
+                    }
+                    void talk(text);
+                  }}
+                >
+                  Send this ↑
+                </button>
+                <button type="button" className="cc-pending-x" onClick={() => setPending(null)}>
+                  Remove
+                </button>
+              </span>
+            </div>
+          )}
+          {turns.length === 1 && pending === null && (
             <div className="cc-ideas">
               {ideas.map((idea) => (
                 <button key={idea} type="button" onClick={() => void talk(idea)}>
