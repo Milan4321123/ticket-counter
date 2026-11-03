@@ -207,8 +207,11 @@
   gap: 10px;
   min-width: 0;
 }
-.cb-brand b {
+.cb-brand b,
+.cb-brand-h {
   display: block;
+  margin: 0;
+  font-family: inherit;
   font-size: 1.12rem;
   font-weight: 800;
   line-height: 1.1;

@@ -53,7 +53,7 @@ export default async function CupDemoPage() {
   const fonts = `${mukta.variable} ${barlow.variable}`;
   return (
     <div className={`cu-page ${fonts}`}>
-      <div className="cu-frame-top">
+      <div className="cu-frame-top" translate="no">
         <div className="cu-frame-inner">
           <span className="cu-frame-badge">{f.badge}</span>
           <span className="cu-frame-text">{f.text}</span>
@@ -65,7 +65,7 @@ export default async function CupDemoPage() {
 
       <CupApp initialLang={lang} fontClass={fonts} />
 
-      <section className="cu-frame-end" aria-labelledby="cu-end-h">
+      <section className="cu-frame-end" aria-labelledby="cu-end-h" translate="no">
         <div className="cu-frame-end-inner">
           <p className="cu-frame-kicker">{f.kicker}</p>
           <h2 id="cu-end-h">{f.endH}</h2>

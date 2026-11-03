@@ -226,6 +226,7 @@
   filter: drop-shadow(0 6px 14px rgba(251, 191, 36, 0.35));
 }
 .cu-brand-name {
+  margin: 0;
   font-family: var(--cu-display);
   font-weight: 800;
   font-size: 1.7rem;

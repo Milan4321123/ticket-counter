@@ -980,7 +980,7 @@ export default function PhotoBooth({ initialLang, fonts }: { initialLang: Lang; 
   );
 
   return (
-    <div className={`pb${calm ? ' is-calm' : ''}`} lang={lang === 'ne' ? 'ne' : lang}>
+    <div className={`pb${calm ? ' is-calm' : ''}`} lang={lang === 'ne' ? 'ne' : lang} translate="no">
       <div className="pb-top">
         <div className="pb-brand">
           <h1 className="pb-title">{t.title}</h1>

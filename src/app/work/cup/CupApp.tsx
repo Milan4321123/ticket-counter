@@ -1285,7 +1285,7 @@ export default function CupApp({ initialLang, fontClass = '' }: { initialLang: L
           <div className="cu-brand">
             <Trophy className="cu-brand-mark" />
             <div>
-              <p className="cu-brand-name">{t.name}</p>
+              <h1 className="cu-brand-name">{t.name}</h1>
               <p className="cu-brand-tag">{t.tagline}</p>
             </div>
           </div>

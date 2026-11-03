@@ -163,6 +163,8 @@
   flex: none;
 }
 .mt-brand-name {
+  margin: 0 0 16px;
+  letter-spacing: normal;
   font-family: var(--mt-display);
   font-weight: 800;
   font-size: 1.5rem;
@@ -1833,10 +1835,10 @@
   margin-top: auto;
 }
 .mt-go.is-placed {
-  background: var(--mt-gold-2);
+  background: #b45309; /* --mt-gold-2, darker under white text */
 }
 .mt-go.is-steaming {
-  background: #16a34a;
+  background: #15803d;
 }
 .mt-go.is-ready {
   background: var(--mt-teal-2);

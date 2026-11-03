@@ -1275,9 +1275,9 @@ export default function RestaurantDemo({ initialLang, fontClass = '' }: { initia
           <div className="rq-brand">
             <ChuloMark className="rq-brand-mark" />
             <div>
-              <p className="rq-brand-name">
+              <h1 className="rq-brand-name">
                 {t.name} <span>· {t.city}</span>
-              </p>
+              </h1>
               <p className="rq-brand-tag">{t.tagline}</p>
             </div>
           </div>

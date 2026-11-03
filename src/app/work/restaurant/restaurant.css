@@ -209,6 +209,8 @@
   filter: drop-shadow(0 4px 10px rgba(138, 47, 27, 0.25));
 }
 .rq-brand-name {
+  font-family: inherit;
+  letter-spacing: normal;
   font-size: 1.35rem;
   font-weight: 800;
   line-height: 1.1;
@@ -1610,7 +1612,7 @@
   justify-self: end;
   font-size: 0.74rem;
   font-weight: 800;
-  color: #fff;
+  color: #1f140d; /* dark on the amber / orange / green state colours (white was 2–3:1) */
   background: var(--kc);
   border-radius: 999px;
   padding: 1px 9px;

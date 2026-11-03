@@ -855,7 +855,7 @@ export default function CardMaker({ initialLang, fonts }: { initialLang: Lang; f
   );
 
   return (
-    <div className="cm" lang={lang} style={{ '--cm-mukta': fonts.mukta, '--cm-baloo': fonts.baloo } as CSSProperties}>
+    <div className="cm" lang={lang} translate="no" style={{ '--cm-mukta': fonts.mukta, '--cm-baloo': fonts.baloo } as CSSProperties}>
       <div className="cm-top">
         <div className="cm-brand">
           <h1 className="cm-title">{t.title}</h1>

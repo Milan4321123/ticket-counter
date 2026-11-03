@@ -1597,7 +1597,7 @@ export default function ClassBooking() {
             <div className="cb-brand">
               <SchoolMark size={40} />
               <div>
-                <b>Aangan Pathshala</b>
+                <h1 className="cb-brand-h">Aangan Pathshala</h1>
                 <span>Frankfurt</span>
               </div>
             </div>
@@ -1658,7 +1658,7 @@ export default function ClassBooking() {
           <div className="cb-brand">
             <SchoolMark size={40} />
             <div>
-              <b>{t.school}</b>
+              <h1 className="cb-brand-h">{t.school}</h1>
               <span>
                 {t.city} · {t.tagline}
               </span>

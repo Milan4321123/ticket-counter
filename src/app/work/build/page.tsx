@@ -17,6 +17,11 @@ import './build.css';
 // their demos); /work, /studio and the homepage's demo strip link to it
 // through components/studio/BuildIdeaCard and DemoStrip.
 //
+// The builder is translate="no": it carries its own English / Deutsch /
+// नेपाली, and the idea's name and tagline a visitor types must never reach
+// the site's auto-translator (components/AutoTranslate → /api/translate).
+// tools/qa/translate-leak.mjs checks every /work route.
+//
 // An idea sketch only: no prices, estimates, budgets, timelines or packages
 // anywhere — the operator is a student and the studio is free while it grows.
 

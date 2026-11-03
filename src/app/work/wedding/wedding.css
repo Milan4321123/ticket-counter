@@ -1009,7 +1009,7 @@
   letter-spacing: 0.16em;
   font-size: 0.74rem;
   font-weight: 700;
-  color: var(--wd-gold);
+  color: #8a6417; /* --wd-gold darkened: small text on ivory needs 4.5:1 */
   margin: 0 0 4px;
 }
 .wd-lang-ne .wd-card-kicker {
@@ -1288,7 +1288,7 @@
   text-align: center;
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--wd-gold);
+  color: #8a6417; /* --wd-gold darkened for contrast */
   margin-top: -18px;
 }
 .wd-form {

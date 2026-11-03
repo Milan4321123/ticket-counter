@@ -19,6 +19,11 @@ import './booth.css';
 // localStorage under one key ("Reset demo"). Rules in booth.ts (with tests),
 // words in content.ts, every picture drawn in draw.ts — no bundled images.
 //
+// The demo (and its localized frame) is translate="no": it carries its own
+// English / Deutsch / नेपाली, and what a visitor types into it — the event name, a greeting, a hashtag —
+// must never reach the site's auto-translator (components/AutoTranslate →
+// /api/translate). tools/qa/translate-leak.mjs checks every /work route.
+//
 // No prices, packages or "hire" wording anywhere — the operator is a student
 // and the studio is free while it grows.
 
@@ -48,7 +53,7 @@ export default async function BoothDemoPage() {
   const f = FRAME[lang];
   return (
     <div className={`pb-page ${mukta.variable} ${baloo.variable}`}>
-      <div className="pb-frame-top">
+      <div className="pb-frame-top" translate="no">
         <div className="pb-frame-inner">
           <span className="pb-frame-badge">{f.badge}</span>
           <span className="pb-frame-text">{f.text}</span>
@@ -60,7 +65,7 @@ export default async function BoothDemoPage() {
 
       <PhotoBooth initialLang={lang} fonts={{ mukta: mukta.style.fontFamily, baloo: baloo.style.fontFamily }} />
 
-      <section className="pb-frame-end" aria-labelledby="pb-end-h">
+      <section className="pb-frame-end" aria-labelledby="pb-end-h" translate="no">
         <div className="pb-frame-end-inner">
           <p className="pb-frame-kicker">{f.kicker}</p>
           <h2 id="pb-end-h">{f.endH}</h2>

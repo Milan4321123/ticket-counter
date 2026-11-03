@@ -655,7 +655,7 @@ export default function BuildIdea({ initialLang, font }: { initialLang: Lang; fo
   );
 
   return (
-    <div className="bd" style={vars}>
+    <div className="bd" lang={lang} translate="no" style={vars}>
       <div className="bd-grid">
         <div className="bd-stage" ref={stage} aria-label={t.mock.sketchLabel} role="region">
           {idea.make === 'both' && !wide && (

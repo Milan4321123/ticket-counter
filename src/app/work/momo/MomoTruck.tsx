@@ -1635,7 +1635,7 @@ export default function MomoTruck({ initialLang, fontClass = '' }: { initialLang
           <div className="mt-brand">
             <GaadiMark className="mt-brand-mark" />
             <div>
-              <p className="mt-brand-name">{t.name}</p>
+              <h1 className="mt-brand-name">{t.name}</h1>
               <p className="mt-brand-tag">{t.tagline}</p>
             </div>
           </div>

@@ -53,7 +53,7 @@ export default async function MomoDemoPage() {
   const fonts = `${mukta.variable} ${baloo.variable}`;
   return (
     <div className={`mt-page ${fonts}`}>
-      <div className="mt-frame-top">
+      <div className="mt-frame-top" translate="no">
         <div className="mt-frame-inner">
           <span className="mt-frame-badge">{f.badge}</span>
           <span className="mt-frame-text">{f.text}</span>
@@ -65,7 +65,7 @@ export default async function MomoDemoPage() {
 
       <MomoTruck initialLang={lang} fontClass={fonts} />
 
-      <section className="mt-frame-end" aria-labelledby="mt-end-h">
+      <section className="mt-frame-end" aria-labelledby="mt-end-h" translate="no">
         <div className="mt-frame-end-inner">
           <p className="mt-frame-kicker">{f.kicker}</p>
           <h2 id="mt-end-h">{f.endH}</h2>

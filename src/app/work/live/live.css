@@ -185,7 +185,7 @@
   min-height: 34px;
 }
 .lv-seg button[aria-pressed='true'] {
-  background: var(--lv-blue);
+  background: #2b6fc2; /* --lv-blue, darker under white text (5:1) */
   color: #fff;
 }
 .lv-seg button:focus-visible,
@@ -216,12 +216,12 @@
   cursor: default;
 }
 .lv-btn-go {
-  background: var(--lv-blue);
+  background: #2b6fc2; /* --lv-blue, darker under white text (5:1) */
   border-color: transparent;
   color: #fff;
 }
 .lv-btn-go:hover:not(:disabled) {
-  background: #4b95ec;
+  background: var(--lv-blue);
 }
 .lv-btn-icon {
   min-width: 38px;
