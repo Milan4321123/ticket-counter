@@ -90,6 +90,20 @@ export const PROJECTS: Project[] = [
     links: [{ href: '/studio#v-web-npjoe', label: 'Watch the promo' }],
   },
   {
+    id: 'wedding',
+    title: 'Wedding invitation website',
+    client: 'Aarati & Sujan · a made-up couple · demo',
+    tags: ['Website'],
+    outcome: 'A Nepali wedding invitation that guests open on any phone — and answer in one tap.',
+    points: ['English and नेपाली, one toggle', 'Live countdown and programme', 'RSVP, calendar and venue map', 'Share on WhatsApp'],
+    cover: { src: '/media/studio/projects/wedding.jpg', shape: 'wide' },
+    example: true,
+    links: [
+      { href: '/work/wedding', label: 'Open the invitation' },
+      { href: '/contact?intent=website', label: 'Want one like this?' },
+    ],
+  },
+  {
     id: 'saput',
     title: 'Prakash Saput Live · Frankfurt',
     client: 'Concert night · 31 Oct 2026',

@@ -71,6 +71,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/card`, changeFrequency: 'weekly', priority: 0.7 },
     { url: `${base}/nepali-in`, changeFrequency: 'weekly', priority: 0.6 },
     { url: `${base}/studio`, changeFrequency: 'weekly', priority: 0.8 },
+    // Studio demo projects (lib/projects.ts links each one).
+    { url: `${base}/work/wedding`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/contact`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/privacy`, changeFrequency: 'yearly', priority: 0.3 },
     // The other public legal pages. Low priority — nobody searches for them —
