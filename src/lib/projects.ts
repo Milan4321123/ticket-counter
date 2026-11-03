@@ -209,6 +209,21 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
+    id: 'kite',
+    title: 'Changa Chet! — a kite-fighting game',
+    client: 'An original Dashain game · demo',
+    tags: ['App'],
+    outcome: 'A small browser game about Dashain kite season: fly from a Kathmandu rooftop and cut the other flyers’ strings — “Chet!”',
+    points: ['One-tap controls on the phone, keyboard on the laptop', 'Design your own kite: colours and patterns', 'Combos, best score and a share-your-score picture', 'English, Deutsch and नेपाली'],
+    cover: { src: '/media/studio/projects/kite.jpg', shape: 'wide', width: 1200, height: 800 },
+    example: true,
+    tryIt: 'Paint your kite, then cut as many strings as you can in 75 seconds.',
+    links: [
+      { href: '/work/kite', label: 'Play the game' },
+      { href: '/contact?intent=app', label: 'Want one like this?' },
+    ],
+  },
+  {
     id: 'saput',
     title: 'Prakash Saput Live · Frankfurt',
     client: 'Concert night · 31 Oct 2026',
