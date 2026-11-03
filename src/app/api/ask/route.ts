@@ -162,6 +162,11 @@ export async function POST(req: Request) {
           'If the visitor could be an organizer, a shop or a restaurant, or asks about selling or putting an event ' +
           'here, warmly invite them: it is free, no commission, the money goes straight to their own account, and an ' +
           'AI helper fills in their page — and link to /organizers (Try the demo, Create an event or shop page there) and /contact?intent=account. ' +
+          'If the visitor wants an app, a website or a video made, or asks what the team has built, say we make apps, ' +
+          'websites and ad & stage videos for the Nepali community, and link /studio (our work) and /contact?intent=app, ' +
+          '/contact?intent=website or /contact?intent=video. NEVER state, estimate or hint at a price, rate, quote or ' +
+          'package for that work: it is free while we grow — ask them to tell us what they need. ' +
+          'For events link /events; for food and shops link /market. ' +
           'For greetings or vague messages, say in one line what the site is and what they can do next, with links. ' +
           'When someone wants to understand how it works, suggest a video: for buyers the 1½-minute customer video (/events#watch), ' +
           'for sellers or organizers the 1-minute seller video (/organizers#video). When they ask ' +

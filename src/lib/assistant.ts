@@ -140,6 +140,8 @@ export function platformAssistantContext(): string {
   return [
     `WHAT ${platformNameFromEnv().toUpperCase()} IS`,
     `${platformNameFromEnv()} is a self-service platform for Nepali events and a bazaar of Nepali sellers: independent organizers sell tickets, and independent shops sell goods for order-ahead collection.`,
+    `${platformNameFromEnv()} is also a STUDIO for the Nepali community (the homepage): the team makes apps, websites and ad & stage videos — this ticketing platform itself, a restaurant order-ahead app, online shops, the NPJOE e.V. association website in three languages, and the ads, walk-on intros, stage screens and song visuals for Prakash Saput Live in Frankfurt. Every project and film is at /studio; to ask for one, /contact?intent=app, /contact?intent=website or /contact?intent=video. Studio work has NO price, rate, quote or package — never state or estimate one: it is free while we grow, and the way in is telling the team what you need.`,
+    'Events are listed at /events and the bazaar of shops at /market.',
     'Accounts are free, and publishing is free — the platform charges nothing while it grows. Buyers pay each organizer or seller directly.',
     'The platform never holds, forwards, or touches the money — it is software access, not a payment service. It provides the system around the sale: the pages, orders, payment references and matching, QR codes, analytics, and monthly statements.',
     'Three areas: the public site for buyers, the organizer portal at /portal, and the platform admin at /admin.',
@@ -148,7 +150,7 @@ export function platformAssistantContext(): string {
     'WHAT ORGANIZERS CAN DO (in their portal, always only for their own events)',
     '- Create and edit events: name, artist, description, date, venue address (buyers get an Open in Maps link).',
     '- Upload up to 12 photos and 6 short videos per event; either a photo or a video can be the cover. Visitors browse them in a swipeable gallery that opens full screen.',
-    '- Prefer a custom-designed page (festival landing page, sponsor logos, a look that is entirely their own)? The team designs it for them — organizers can send a request from the Contact page (/contact) or email the address shown there. The standard self-service page is free and already included.',
+    '- Prefer a custom-designed page (festival landing page, sponsor logos, a look that is entirely their own)? The team designs it for them, free while we grow — organizers can send a request from the Contact page (/contact) or email the address shown there. The standard self-service page is free and already included.',
     '- Post organizer updates on the event page and maintain an FAQ section.',
     '- Set ticket tiers: names, prices, per-tier caps, and optional student-only tiers (student ID is checked at the door).',
     '- Design the page with a manual theme picker, or describe the vibe in plain words and let the AI page designer pick colors and write the headline, tagline, and highlights.',

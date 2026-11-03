@@ -13,7 +13,9 @@ import { readListingName } from '@/lib/exampleShop';
 import { ensureExampleBazaarOnce } from '@/lib/exampleBazaar';
 import { runSubscriptionSweep } from '@/lib/subscriptions';
 import { runBuyerDataRetentionSweep } from '@/lib/retention';
-import { shareImages } from '@/lib/seo';
+import { jsonLdScript, shareImages, STUDIO_SHARE_CARD, studioServicesJsonLd } from '@/lib/seo';
+import { currentLang } from '@/lib/i18nServer';
+import { translator } from '@/lib/i18n';
 import '@/app/studio/studio.css';
 
 // The homepage: MartNepali as a STUDIO — apps, websites and ad videos for the
@@ -28,17 +30,23 @@ import '@/app/studio/studio.css';
 // The small "Live on MartNepali" strip reads the published events.
 export const dynamic = 'force-dynamic';
 
-const title = 'MartNepali Studio — apps, websites & ad videos for the Nepali community';
+const title = 'MartNepali Studio — apps · websites · ad videos for the Nepali community';
+// ≤ 155 characters, so a search result shows all of it.
 const description =
-  'We build apps, websites and advertisement videos for Nepali organizers, associations, restaurants and shops — ticketing with QR check-in, order-ahead, association websites, event ads, walk-on intros and stage screens. Kura garau: tell us what you need.';
+  'Apps, websites and ad videos for Nepali organizers, associations, restaurants and shops — ticketing, order-ahead, stage screens. Tell us what you need.';
 
 export const metadata: Metadata = {
   title: { absolute: title },
   description,
   alternates: { canonical: '/' },
-  openGraph: { type: 'website', title, description, url: '/', images: shareImages() },
-  twitter: { card: 'summary_large_image', title, description },
+  openGraph: { type: 'website', title, description, url: '/', images: shareImages(STUDIO_SHARE_CARD) },
+  twitter: { card: 'summary_large_image', title, description, images: [STUDIO_SHARE_CARD.url] },
 };
+
+/** The tabs leave out the showreel — it already plays in the hero. */
+const TAB_GROUPS = VIDEO_GROUPS.map((g) => ({ ...g, videos: g.videos.filter((x) => x.id !== SHOWREEL.id) })).filter(
+  (g) => g.videos.length > 0
+);
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -56,69 +64,71 @@ function liveEvents(events: EventRow[]): EventRow[] {
     .slice(0, 4);
 }
 
-export default function HomePage() {
+export default async function HomePage() {
   // The housekeeping the old feed armed on every visit: self-throttled, cheap.
   ensureExampleBazaarOnce();
   void runSubscriptionSweep().catch((e) => console.error('Subscription sweep failed:', e));
   runBuyerDataRetentionSweep();
   const live = liveEvents(listPublishedEvents());
+  const lang = await currentLang();
+  const tr = translator(lang);
 
   return (
     <>
       <OldAnchors />
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(studioServicesJsonLd())} />
 
       {/* ---- Hero ---- */}
       <section className="sh-hero">
         <div className="container sh-hero-grid">
           <div className="sh-hero-copy">
             <p className="sh-kicker anim-fade-up">
-              MartNepali Studio · <span lang="ne">कुरा गरौं</span>
+              {tr('st.kicker')} · <span lang="ne" translate="no">कुरा गरौं</span>
             </p>
             <h1 className="sh-title anim-fade-up anim-d1">
-              Apps, websites &amp; ad videos — <span className="sh-grad">made for the Nepali community.</span>
+              {tr('st.title1')} <span className="sh-grad">{tr('st.title2')}</span>
             </h1>
             <p className="sh-lead anim-fade-up anim-d2">
-              We built the ticketing platform you are on, a website for a Nepali youth association, and the ads and stage
-              screens for a Frankfurt concert night. Tell us what you need — we make it with you, free while we grow.
+              {tr('st.lead')}
             </p>
             <div className="sh-hero-cta anim-fade-up anim-d2">
               <Link href="/contact" className="sh-btn sh-btn-main">
-                Kura garau — tell us what you need
+                {tr('st.cta')}
               </Link>
               <a href="#work" className="sh-btn">
-                See our work
+                {tr('st.seeWork')}
               </a>
             </div>
-            <ul className="sh-made-for anim-fade-up anim-d2" aria-label="Recent work">
+            <ul className="sh-made-for anim-fade-up anim-d2" aria-label={tr('st.recent')} data-label={tr('st.recent')}>
               <li>NPJOE e.V.</li>
               <li>Prakash Saput Live</li>
               <li>The Untitled Nepal</li>
             </ul>
           </div>
           <div className="sh-hero-reel anim-fade-up anim-d1">
-            <Showreel video={SHOWREEL} />
+            <Showreel video={SHOWREEL} lang={lang} />
           </div>
         </div>
       </section>
 
-      <nav className="container sh-jump" aria-label="On this page">
-        <a href="#make">What we make</a>
-        <a href="#work">Projects</a>
-        <a href="#videos">Videos</a>
-        <a href="#how">How it works</a>
+      <nav className="container sh-jump" aria-label={tr('st.onPage')}>
+        <a href="#make">{tr('st.make')}</a>
+        <a href="#work">{tr('st.projects')}</a>
+        <a href="#videos">{tr('st.videos')}</a>
+        <a href="#how">{tr('st.how')}</a>
         <Link href="/contact" className="sh-jump-cta">
-          Contact
+          {tr('st.contact')}
         </Link>
       </nav>
 
       {/* ---- What we make ---- */}
       <section className="section sh-section" id="make" aria-labelledby="make-title">
         <div className="container">
-          <p className="feed-kicker">What we make</p>
+          <p className="feed-kicker">{tr('st.make')}</p>
           <h2 id="make-title" className="sh-h2">
-            Three things, done properly
+            {tr('st.make.title')}
           </h2>
-          <WhatWeMake />
+          <WhatWeMake lang={lang} />
         </div>
       </section>
 
@@ -127,16 +137,16 @@ export default function HomePage() {
         <div className="container">
           <div className="sh-head">
             <div>
-              <p className="feed-kicker">Projects</p>
+              <p className="feed-kicker">{tr('st.projects')}</p>
               <h2 id="work-title" className="sh-h2">
-                We can make one like this for you
+                {tr('st.work.title')}
               </h2>
             </div>
             <Link href="/studio" className="sh-more">
-              All our work →
+              {tr('st.allWork')}
             </Link>
           </div>
-          <ProjectGrid projects={PROJECTS} />
+          <ProjectGrid projects={PROJECTS} lang={lang} />
         </div>
       </section>
 
@@ -144,7 +154,7 @@ export default function HomePage() {
       {live.length > 0 && (
         <section className="container sh-live" aria-labelledby="live-title">
           <p id="live-title" className="sh-live-title">
-            <span className="sh-live-dot" aria-hidden="true" /> Live on MartNepali
+            <span className="sh-live-dot" aria-hidden="true" /> {tr('st.live')}
           </p>
           <div className="sh-live-row">
             {live.map((e) => (
@@ -154,8 +164,8 @@ export default function HomePage() {
               </Link>
             ))}
             <Link href="/events" className="sh-live-item sh-live-all">
-              <strong>All events →</strong>
-              <span>Tickets &amp; the bazaar</span>
+              <strong>{tr('st.allEvents')}</strong>
+              <span>{tr('st.allEventsSub')}</span>
             </Link>
           </div>
         </section>
@@ -166,18 +176,18 @@ export default function HomePage() {
         <div className="container">
           <div className="sh-head">
             <div>
-              <p className="feed-kicker">Video work · {ALL_VIDEOS.length} films</p>
+              <p className="feed-kicker">{tr('st.videos.kicker', { n: ALL_VIDEOS.length })}</p>
               <h2 id="videos-title" className="sh-h2">
-                Ads, walk-ons &amp; stage screens
+                {tr('st.videos.title')}
               </h2>
             </div>
             <Link href="/studio#videos" className="sh-more">
-              See them all →
+              {tr('st.seeAll')}
             </Link>
           </div>
-          <VideoTabs groups={VIDEO_GROUPS} />
+          <VideoTabs groups={TAB_GROUPS} lang={lang} />
           <p className="sh-video-ask">
-            <Link href="/contact?intent=video">Want a video like this? Talk to us →</Link>
+            <Link href="/contact?intent=video">{tr('st.videoAsk')}</Link>
           </p>
         </div>
       </section>
@@ -185,42 +195,42 @@ export default function HomePage() {
       {/* ---- How it works ---- */}
       <section className="section sh-section" id="how" aria-labelledby="how-title">
         <div className="container">
-          <p className="feed-kicker">How it works</p>
+          <p className="feed-kicker">{tr('st.how')}</p>
           <h2 id="how-title" className="sh-h2">
-            From a few lines to live
+            {tr('st.how.title')}
           </h2>
-          <HowItWorks />
+          <HowItWorks lang={lang} />
         </div>
       </section>
 
       {/* ---- Also on MartNepali: the platform itself stays one tap away ---- */}
-      <section className="container sh-also" aria-label="Also on MartNepali">
+      <section className="container sh-also" aria-label={tr('st.also')}>
         <Link href="/events" className="sh-also-item">
           <span aria-hidden="true">🎟</span>
-          <strong>Events</strong>
-          <span>Concerts &amp; festival nights</span>
+          <strong>{tr('nav.events')}</strong>
+          <span>{tr('st.also.eventsSub')}</span>
         </Link>
         <Link href="/market" className="sh-also-item">
           <span aria-hidden="true">🛍</span>
-          <strong>Bazaar</strong>
-          <span>Nepali shops &amp; kitchens</span>
+          <strong>{tr('nav.bazaar.short')}</strong>
+          <span>{tr('st.also.bazaarSub')}</span>
         </Link>
         <Link href="/community" className="sh-also-item">
           <span aria-hidden="true">🤝</span>
-          <strong>Community</strong>
-          <span>Meetups &amp; help board</span>
+          <strong>{tr('st.also.community')}</strong>
+          <span>{tr('st.also.communitySub')}</span>
         </Link>
         <Link href="/organizers" className="sh-also-item">
           <span aria-hidden="true">🏪</span>
-          <strong>Sell with us</strong>
-          <span>Free for organizers &amp; shops</span>
+          <strong>{tr('qt.sell')}</strong>
+          <span>{tr('qt.sellSub')}</span>
         </Link>
       </section>
 
       {/* ---- Final CTA ---- */}
       <section className="section sh-section" id="talk">
         <div className="container">
-          <StudioCta />
+          <StudioCta lang={lang} />
         </div>
       </section>
     </>

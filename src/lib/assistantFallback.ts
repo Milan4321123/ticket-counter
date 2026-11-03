@@ -19,10 +19,24 @@ interface Topic {
   key: string;
   /** Lower-case fragments; any ONE matching counts. Checked as substrings. */
   words: string[];
+  /** A further test for questions the fragments cannot catch on their own. */
+  also?: (q: string) => boolean;
   answer: (brand: string) => string;
 }
 
 const TOPICS: Topic[] = [
+  {
+    // The studio: "can you make a website for us?", "what have you built?".
+    // Never a price for that work — free while we grow (the operator is a
+    // student; see app/studio/page.tsx).
+    key: 'studio',
+    also: (q) =>
+      /\b(websites?|webseite|apps?|videos?|promo)\b/.test(q) && /\b(cost|costs|price|prices|pricing|how much|rates?|quote|budget|kostet|kosten|preis\w*|kati)\b/.test(q),
+    words: ['make a website', 'build a website', 'a website for', 'need a website', 'website for my', 'webseite', 'make an app', 'build an app', 'an app for', 'need an app', 'promo video', 'ad video', 'video for my', 'video for our', 'walk-on', 'stage screen', 'portfolio', 'your work', 'what have you built', 'what have you made', 'studio', 'website banau', 'video banau', 'app banau'],
+    answer: () =>
+      'Yes — the team makes apps, websites and ad & stage videos for the Nepali community: ticketing with QR check-in, restaurant order-ahead, shops, association websites, Reels ads, walk-on intros and stage screens. ' +
+      'It is free while we grow. See every project at /studio, and tell us what you need at /contact (or /contact?intent=app, ?intent=website, ?intent=video).',
+  },
   {
     key: 'cost',
     words: ['cost', 'price of using', 'fee', 'free', 'charge', 'commission', 'how much does', 'kosten', 'gebühr', 'kati parcha', 'paisa lagcha', 'pricing'],
@@ -69,15 +83,18 @@ const TOPICS: Topic[] = [
     key: 'what',
     words: ['what is this', 'what is martnepali', 'what is the site', 'what do you do', 'what can you do', 'about this site', 'who are you', 'k ho', 'was ist'],
     answer: (b) =>
-      `${b} is a free home for Nepali events and a bazaar of Nepali sellers in Germany: buy tickets for concerts and cultural nights, ` +
-      'or order momo, sweets, spices and crafts to collect. You always pay the organizer or seller directly and get a QR code by email.',
+      `${b} is a studio for the Nepali community — we make apps, websites and ad videos (see /studio) — and a free home for Nepali events and a bazaar of Nepali sellers in Germany: buy tickets for concerts and cultural nights at /events, ` +
+      'or order momo, sweets, spices and crafts to collect at /market. You always pay the organizer or seller directly and get a QR code by email.',
   },
 ];
 
 /** The canned answer for this question, or null when no topic clearly matches. */
 export function fallbackAnswer(question: string): string | null {
   const q = question.toLowerCase().normalize('NFC');
-  const hits = TOPICS.filter((t) => t.words.some((w) => q.includes(w)));
+  let hits = TOPICS.filter((t) => t.words.some((w) => q.includes(w)) || t.also?.(q));
+  // "How much does a website cost?" — the studio answer already says it is
+  // free; the platform's fee answer next to it would only blur that.
+  if (hits[0]?.key === 'studio') hits = hits.filter((t) => t.key !== 'cost' && t.key !== 'sell');
   if (hits.length === 0) return null;
   // Several topics at once ("how do I pay, and can I get a refund?") — answer
   // the first two rather than pick one and ignore the other.

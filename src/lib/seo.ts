@@ -38,7 +38,7 @@ export const SITE_NAME = platformNameFromEnv();
  * here because they are what the site genuinely is.
  */
 export const SITE_DESCRIPTION =
-  'Nepali concerts, cultural nights, festivals and community events across Europe, plus a bazaar of Nepali sellers — momo, sweets, crafts. Reserve or order in one click, pay the organizer or seller directly, and your QR tickets or collection codes arrive by email.';
+  'A studio that makes apps, websites and ad videos for the Nepali community — and a home for Nepali concerts, cultural nights and festivals across Europe, plus a bazaar of Nepali sellers. Pay the organizer or seller directly; QR tickets and collection codes arrive by email.';
 
 /**
  * The same site, in the length a search result actually shows.
@@ -463,6 +463,19 @@ export const SHARE_CARD = {
 } as const;
 
 /**
+ * The studio's card (homepage, /studio, /contact): "Apps · websites · ad
+ * videos". Pre-rendered from ogCardSvg into public/media/studio — never
+ * rasterised on the server (the small Render instance has crashed on image
+ * work before), and Latin-only for the same reason as the card above.
+ */
+export const STUDIO_SHARE_CARD = {
+  url: '/media/studio/og-studio.jpg',
+  width: OG_WIDTH,
+  height: OG_HEIGHT,
+  alt: `${SITE_NAME} Studio — apps, websites and ad videos for the Nepali community`,
+} as const;
+
+/**
  * The og:image list for a page: its own picture if it has one, the site card
  * if it does not. Never an empty array — an empty `images` is the grey box
  * this whole thing exists to stop.
@@ -579,6 +592,47 @@ export function siteJsonLd(): Record<string, unknown> {
     url: getBaseUrl(),
     description: SITE_DESCRIPTION,
     logo: absoluteUrl('/icon.svg'),
+  };
+}
+
+/**
+ * What the studio makes, as three Service nodes provided by the site's
+ * Organization. Deliberately NO offers, prices or price ranges: the work is
+ * free while the platform grows and is never priced in public (the operator is
+ * a student whose permit does not allow self-employment — app/studio/page.tsx).
+ */
+export function studioServicesJsonLd(): Record<string, unknown> {
+  const provider = { '@type': 'Organization', name: SITE_NAME, url: getBaseUrl() };
+  const audience = { '@type': 'Audience', audienceType: 'Nepali organizers, associations, restaurants and shops' };
+  const services = [
+    {
+      name: 'Apps',
+      serviceType: 'App development',
+      description: 'Ticketing with QR check-in and door scanning, restaurant order-ahead with a kitchen board, and online shops with collection codes.',
+      url: absoluteUrl('/contact?intent=app'),
+    },
+    {
+      name: 'Websites',
+      serviceType: 'Website design',
+      description: 'Websites for associations, businesses and festivals — in Deutsch, English and Nepali, made for the phone.',
+      url: absoluteUrl('/contact?intent=website'),
+    },
+    {
+      name: 'Ad & stage videos',
+      serviceType: 'Video production',
+      description: '9:16 ads for Reels, TikTok and WhatsApp status, walk-on intros for artists, stage-screen loops and song visuals.',
+      url: absoluteUrl('/contact?intent=video'),
+    },
+  ];
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: `${SITE_NAME} Studio — what we make`,
+    itemListElement: services.map((svc, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      item: { '@type': 'Service', ...svc, provider, audience, areaServed: { '@type': 'Country', name: 'Germany' } },
+    })),
   };
 }
 

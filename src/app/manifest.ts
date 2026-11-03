@@ -10,9 +10,9 @@ import { platformNameFromEnv } from '@/lib/platform';
 export default function manifest(): MetadataRoute.Manifest {
   const name = platformNameFromEnv();
   return {
-    name: `${name} — Nepali events & bazaar`,
+    name: `${name} — apps, websites, events & bazaar`,
     short_name: name,
-    description: 'Nepali concerts, cultural nights and a bazaar of Nepali sellers across Germany. Tickets and orders with a QR code.',
+    description: 'Apps, websites and ad videos for the Nepali community — plus Nepali events and a bazaar of Nepali sellers across Germany, with QR tickets and orders.',
     start_url: '/?source=pwa',
     scope: '/',
     display: 'standalone',

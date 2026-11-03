@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { StudioVideo } from '@/lib/studioVideos';
+import { t, type Lang } from '@/lib/i18n';
 
 /**
  * The homepage showreel. Poster first and preload="none": nothing downloads on
@@ -11,7 +12,7 @@ import type { StudioVideo } from '@/lib/studioVideos';
  * Playing it with sound pauses any other studio video (and vice versa — it
  * carries the same `stv-player` class StudioPlayer looks for).
  */
-export default function Showreel({ video }: { video: StudioVideo }) {
+export default function Showreel({ video, lang = 'en' }: { video: StudioVideo; lang?: Lang }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [withSound, setWithSound] = useState(false);
 
@@ -65,8 +66,8 @@ export default function Showreel({ video }: { video: StudioVideo }) {
             </svg>
           </span>
           <span>
-            <strong>Watch the showreel</strong>
-            <span>36 s · sound on</span>
+            <strong>{t(lang, 'reel.watch')}</strong>
+            <span>{t(lang, 'reel.sound')}</span>
           </span>
         </button>
       )}

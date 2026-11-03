@@ -35,6 +35,7 @@ const INTENTS: { re: RegExp; link: AskLink }[] = [
   { re: /\b(demo|try (it|the app)|ausprobieren|testen)\b|डेमो/i, link: { label: 'Try the demo', href: '/organizers', icon: '▶' } },
   { re: /\b(bazaar|bazar|market|basar|groceries|grocery|food|essen|khana|khaja)\b|बजार|खाना/i, link: { label: 'The bazaar', href: '/market', icon: '🛍' } },
   { re: /\b(portal|seller (login|hub)|organi[sz]er (login|sign))\b/i, link: { label: 'Seller sign-in', href: '/portal/login', icon: '🔑' } },
+  { re: /\b(studio|portfolio|showreel|your work|our work|unsere arbeit|eure arbeit|hamro kaam)\b|हाम्रो काम/i, link: { label: 'Our work', href: '/studio', icon: '🎬' } },
   { re: /\b(contact|support|help me|human|person|kontakt|hilfe|sampark)\b|सम्पर्क/i, link: { label: 'Talk to a person', href: '/contact', icon: '💬' } },
   { re: /\b(privacy|datenschutz|gdpr|dsgvo)\b/i, link: { label: 'Privacy', href: '/privacy', icon: '🔒' } },
 ];
@@ -132,7 +133,7 @@ function pictureOf(e: EventRow): string | null {
  * links ONLY to these (anything else is dropped before it reaches the page).
  */
 export const SITE_PAGES: { path: string; what: string }[] = [
-  { path: '/', what: 'the homepage: MartNepali Studio — we build apps, websites and ad videos for the Nepali community; our projects and videos' },
+  { path: '/', what: 'the homepage: MartNepali Studio — we make apps, websites and ad & stage videos for the Nepali community; our projects and videos' },
   { path: '/events', what: 'upcoming Nepali events, restaurants, shops and popular items — the events & bazaar feed' },
   { path: '/events#events', what: 'the events page section with upcoming events (swipe through them)' },
   { path: '/events#shops', what: 'the events page section with Nepali shops you can order from' },
@@ -151,6 +152,9 @@ export const SITE_PAGES: { path: string; what: string }[] = [
   { path: '/patro', what: 'Nepali calendar (patro) with festival dates' },
   { path: '/festivals', what: 'Nepali festivals — Dashain, Tihar, Holi, Teej and more — with events for each' },
   { path: '/contact', what: 'talk to the team; ask for an app, a website, a custom event page or an ad / stage video' },
+  { path: '/contact?intent=app', what: 'ask the team for an app (tickets, order-ahead, a shop, something new) — free while we grow' },
+  { path: '/contact?intent=website', what: 'ask the team for a website (association, business, festival; in three languages) — free while we grow' },
+  { path: '/contact?intent=video', what: 'ask the team for a video: Reels / WhatsApp ads, walk-on intros, stage screens — free while we grow' },
   { path: '/studio', what: 'our work: every project (ticketing, restaurant ordering, shops, the NPJOE website) and every video (ads, walk-on intros, stage screens) — free while we grow' },
   { path: '/community', what: 'the Nepali community: meetups and invitations, the help board, artists to book' },
   { path: '/bhetghat', what: 'swipe through events and members\' meetups (karaoke, futsal, laser tag) near you' },
@@ -180,6 +184,9 @@ const BUTTON: Record<string, { icon: string; label: string }> = {
   '/patro': { icon: '📅', label: 'Nepali calendar' },
   '/festivals': { icon: '🪔', label: 'Festivals' },
   '/contact': { icon: '💬', label: 'Talk to us' },
+  '/contact?intent=app': { icon: '📱', label: 'Ask for an app' },
+  '/contact?intent=website': { icon: '🌐', label: 'Ask for a website' },
+  '/contact?intent=video': { icon: '🎬', label: 'Ask for a video' },
   '/studio': { icon: '🎬', label: 'Our work' },
   '/community': { icon: '🤝', label: 'Community' },
   '/bhetghat': { icon: '👋', label: 'Meetups' },

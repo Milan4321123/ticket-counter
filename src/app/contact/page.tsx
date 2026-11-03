@@ -1,4 +1,4 @@
-import { shareImages } from '@/lib/seo';
+import { shareImages, STUDIO_SHARE_CARD } from '@/lib/seo';
 import Link from 'next/link';
 import { platformContactEmail } from '@/lib/platform';
 import ContactForm from './ContactForm';
@@ -69,7 +69,7 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
   return {
     ...m,
     alternates: { canonical: '/contact' },
-    openGraph: { type: 'website', ...m, url: '/contact', images: shareImages() },
+    openGraph: { type: 'website', ...m, url: '/contact', images: shareImages(intent === 'account' ? null : STUDIO_SHARE_CARD) },
   };
 }
 

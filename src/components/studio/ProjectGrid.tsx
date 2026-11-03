@@ -2,6 +2,7 @@ import Link from 'next/link';
 import StudioPlayer from '@/components/StudioPlayer';
 import type { Project } from '@/lib/projects';
 import { videoById } from '@/lib/studioVideos';
+import { t, tMaybe, type Lang } from '@/lib/i18n';
 
 function Cover({ p }: { p: Project }) {
   const video = p.videoId ? videoById(p.videoId) : undefined;
@@ -40,8 +41,8 @@ function Cover({ p }: { p: Project }) {
   );
 }
 
-/** The project cards (lib/projects.ts). */
-export default function ProjectGrid({ projects }: { projects: Project[] }) {
+/** The project cards (lib/projects.ts). Titles and tags follow the language; the body stays English. */
+export default function ProjectGrid({ projects, lang = 'en' }: { projects: Project[]; lang?: Lang }) {
   return (
     <div className="sh-projects">
       {projects.map((p) => (
@@ -49,14 +50,14 @@ export default function ProjectGrid({ projects }: { projects: Project[] }) {
           <Cover p={p} />
           <div className="sh-pc-body">
             <div className="sh-pc-tags">
-              {p.tags.map((t) => (
-                <span key={t} className={`sh-tag sh-tag-${t.toLowerCase()}`}>
-                  {t}
+              {p.tags.map((tag) => (
+                <span key={tag} className={`sh-tag sh-tag-${tag.toLowerCase()}`}>
+                  {t(lang, `tag.${tag}`)}
                 </span>
               ))}
-              {p.example && <span className="sh-tag sh-tag-example">Example project</span>}
+              {p.example && <span className="sh-tag sh-tag-example">{t(lang, 'pj.example')}</span>}
             </div>
-            <h3>{p.title}</h3>
+            <h3>{tMaybe(lang, `pj.${p.id}`, p.title)}</h3>
             <p className="sh-pc-client">{p.client}</p>
             <p className="sh-pc-outcome">{p.outcome}</p>
             <ul className="sh-pc-points">

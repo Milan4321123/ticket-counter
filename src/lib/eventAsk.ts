@@ -48,7 +48,7 @@ type Intent = 'custom' | 'organizer' | 'refund' | 'arrive' | 'buy' | 'price' | '
 const INTENTS: [Intent, RegExp][] = [
   [
     'custom',
-    /\b(my own (event|page|shop|website|site)|own (event|page|shop|website)|sell\w* (my|our|tickets|here|on)|(want|like) to sell|how (do|can) (i|we) sell|organi[sz]e (my|an|our)|website|promo ?video|video for|advert\w*|marketing|custom (page|design|site)|design (a|my)|eigene\w* (seite|event|veranstaltung)|werbung|webseite|afno|aafno|bechna|bechne)\b/i,
+    /\b(my own (event|page|shop|website|site)|own (event|page|shop|website)|sell\w* (my|our|tickets|here|on)|(want|like) to sell|how (do|can) (i|we) sell|organi[sz]e (my|an|our)|website|promo ?video|video for|(make|build|create) (me |us )?(an? |my |our )?(app|video)|an app (for|like)|walk-?on|stage ?screen|advert\w*|marketing|custom (page|design|site|app)|design (a|my)|eigene\w* (seite|event|veranstaltung)|werbung|webseite|afno|aafno|bechna|bechne)\b/i,
   ],
   [
     'organizer',
@@ -156,7 +156,7 @@ const TICKETS_LINK = (input: EventAskInput): QuickLink[] =>
 
 const CUSTOM_LINKS: QuickLink[] = [
   { label: 'Talk to us', href: '/contact' },
-  { label: 'What we build', href: '/studio' },
+  { label: 'Our work', href: '/studio' },
 ];
 
 function join(...parts: string[]): string {
@@ -201,10 +201,10 @@ export function instantEventAnswer(input: EventAskInput, question: string): Even
     case 'custom':
       return {
         answer: {
-          en: 'Want a page like this for your own event or shop — or a promo video for Reels and WhatsApp? It is free on MartNepali: tell us what you need and we set it up with you.',
-          de: 'Du möchtest so eine Seite für dein eigenes Event oder deinen Laden — oder ein Promo-Video für Reels und WhatsApp? Bei MartNepali ist das kostenlos: sag uns, was du brauchst.',
-          ne: 'आफ्नै कार्यक्रम वा पसलका लागि यस्तै पेज, वा Reels/WhatsApp का लागि प्रमो भिडियो चाहनुहुन्छ? MartNepali मा निःशुल्क छ — हामीलाई भन्नुहोस्।',
-          rn: 'Aafno event wa pasal ko lagi yesto page, wa Reels/WhatsApp ko lagi promo video chahiyo? MartNepali ma free ho — hamilai bhannus, sangai setup garchau.',
+          en: 'Want a page like this for your own event or shop — or an app, a website, or an ad video for Reels and WhatsApp? We make them for the Nepali community, free while we grow: tell us what you need and we make it with you.',
+          de: 'Du möchtest so eine Seite für dein eigenes Event oder deinen Laden — oder eine App, eine Website oder ein Werbevideo für Reels und WhatsApp? Wir machen das für die nepalesische Community, kostenlos, solange wir wachsen: sag uns, was du brauchst.',
+          ne: 'आफ्नै कार्यक्रम वा पसलका लागि यस्तै पेज, वा एप, वेबसाइट, Reels/WhatsApp का लागि विज्ञापन भिडियो चाहनुहुन्छ? हामी बढ्दै गर्दा निःशुल्क बनाइदिन्छौं — हामीलाई भन्नुहोस्।',
+          rn: 'Aafno event wa pasal ko lagi yesto page, wa app, website, Reels/WhatsApp ko lagi ad video chahiyo? Ahile free ma banaidinchau — hamilai bhannus, sangai banauchau.',
         }[lang],
         links: CUSTOM_LINKS,
       };

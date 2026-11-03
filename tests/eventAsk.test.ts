@@ -79,4 +79,19 @@ describe('homepage Ask', () => {
   it('points custom work to the team', () => {
     assert.match(quickAnswer('can you make a website for my restaurant?')!, /\(\/contact\)/);
   });
+
+  it('answers the studio questions — and never with a price', () => {
+    for (const q of ['can you make an app for me?', 'Könnt ihr uns eine Website machen?', 'video banaidinus', 'हाम्रो लागि वेबसाइट बनाइदिनुहुन्छ?']) {
+      assert.match(quickAnswer(q)!, /\(\/studio\)/, q);
+      assert.match(quickAnswer(q)!, /\(\/contact\?intent=video\)/, q);
+    }
+    assert.match(quickAnswer('what have you built?')!, /NPJOE/);
+    for (const q of ['how much does a website cost?', 'Was kostet ein Video?', 'app ko kati parcha?', 'वेबसाइटको कति लाग्छ?']) {
+      const a = quickAnswer(q)!;
+      assert.match(a, /free|kostenlos|निःशुल्क/i, q);
+      assert.doesNotMatch(a, /\d|€|euro|price|preis|quote|rate\b/i, q);
+    }
+    // "What is this website?" is about the site, not a request for one.
+    assert.match(quickAnswer('What is this website?')!, /\(\/events\)/);
+  });
 });

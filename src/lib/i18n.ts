@@ -2,7 +2,8 @@
 // नेपाली. Client-safe (no server imports) — the server reads the choice from
 // the `lang` cookie (lib/i18nServer), client components receive it as a prop.
 //
-// Scope, stated honestly: the header, footer links, the homepage band, the
+// Scope, stated honestly: the header, footer links, the studio homepage's
+// headings and buttons (and /studio's), the events band, the
 // bazaar's controls, the checkout's headings and buttons, and the seller hub's
 // navigation and home screen. Long explanatory copy elsewhere stays English
 // for now; a missing key always falls back to English, never to a blank.
@@ -68,6 +69,106 @@ const D = {
   'bb.tickets': { en: 'Get tickets', de: 'Tickets holen', ne: 'टिकट लिनुहोस्' },
   'bb.order': { en: 'Order now', de: 'Jetzt bestellen', ne: 'अहिले अर्डर गर्नुहोस्' },
 
+  // the studio homepage (app/page.tsx), /studio and components/studio
+  'st.kicker': { en: 'MartNepali Studio', de: 'MartNepali Studio', ne: 'MartNepali स्टुडियो' },
+  'st.title1': { en: 'Apps, websites & ad videos —', de: 'Apps, Websites & Werbevideos —', ne: 'एप, वेबसाइट र विज्ञापन भिडियो —' },
+  'st.title2': { en: 'made for the Nepali community.', de: 'gemacht für die nepalesische Community.', ne: 'नेपाली समुदायका लागि बनाइएका।' },
+  'st.lead': {
+    en: 'We built the ticketing platform you are on, a website for a Nepali youth association, and the ads and stage screens for a Frankfurt concert night. Tell us what you need — we make it with you, free while we grow.',
+    de: 'Wir haben die Ticket-Plattform gebaut, auf der du gerade bist, eine Website für einen nepalesischen Jugendverein und die Werbung und Bühnen-Screens für einen Konzertabend in Frankfurt. Sag uns, was du brauchst — wir machen es mit dir, kostenlos, solange wir wachsen.',
+    ne: 'तपाईं अहिले हेर्दै गरेको टिकटिङ प्लेटफर्म, एउटा नेपाली युवा संस्थाको वेबसाइट, र फ्रैंकफर्टको कन्सर्टका विज्ञापन र स्टेज स्क्रिन हामीले बनाएका हौं। के चाहिन्छ भन्नुहोस् — हामी तपाईंसँगै बनाउँछौं, हामी बढ्दै गर्दा निःशुल्क।',
+  },
+  'st.cta': { en: 'Kura garau — tell us what you need', de: 'Kura garau — sag uns, was du brauchst', ne: 'कुरा गरौं — के चाहिन्छ भन्नुहोस्' },
+  'st.seeWork': { en: 'See our work', de: 'Unsere Arbeit ansehen', ne: 'हाम्रो काम हेर्नुहोस्' },
+  'st.recent': { en: 'Recent work', de: 'Aktuelle Arbeiten', ne: 'हालका काम' },
+  'st.onPage': { en: 'On this page', de: 'Auf dieser Seite', ne: 'यस पृष्ठमा' },
+  'st.make': { en: 'What we make', de: 'Was wir machen', ne: 'हामी के बनाउँछौं' },
+  'st.projects': { en: 'Projects', de: 'Projekte', ne: 'परियोजना' },
+  'st.videos': { en: 'Videos', de: 'Videos', ne: 'भिडियो' },
+  'st.how': { en: 'How it works', de: 'So funktioniert’s', ne: 'कसरी हुन्छ' },
+  'st.contact': { en: 'Contact', de: 'Kontakt', ne: 'सम्पर्क' },
+  'st.make.title': { en: 'Three things, done properly', de: 'Drei Dinge, richtig gemacht', ne: 'तीन कुरा, राम्ररी' },
+  'st.work.title': { en: 'We can make one like this for you', de: 'So etwas machen wir auch für dich', ne: 'यस्तै तपाईंका लागि पनि बनाउन सक्छौं' },
+  'st.allWork': { en: 'All our work →', de: 'Alle Arbeiten →', ne: 'हाम्रा सबै काम →' },
+  'st.live': { en: 'Live on MartNepali', de: 'Jetzt auf MartNepali', ne: 'MartNepali मा अहिले' },
+  'st.allEvents': { en: 'All events →', de: 'Alle Events →', ne: 'सबै कार्यक्रम →' },
+  'st.allEventsSub': { en: 'Tickets & the bazaar', de: 'Tickets & der Basar', ne: 'टिकट र बजार' },
+  'st.videos.kicker': { en: 'Video work · {n} films', de: 'Videoarbeit · {n} Filme', ne: 'भिडियो काम · {n} फिल्म' },
+  'st.videos.title': { en: 'Ads, walk-ons & stage screens', de: 'Werbung, Walk-ons & Bühnen-Screens', ne: 'विज्ञापन, वाक-अन र स्टेज स्क्रिन' },
+  'st.seeAll': { en: 'See them all →', de: 'Alle ansehen →', ne: 'सबै हेर्नुहोस् →' },
+  'st.videoAsk': { en: 'Want a video like this? Talk to us →', de: 'So ein Video für dich? Sprich mit uns →', ne: 'यस्तो भिडियो चाहिन्छ? हामीसँग कुरा गर्नुहोस् →' },
+  'st.how.title': { en: 'From a few lines to live', de: 'Von ein paar Zeilen bis live', ne: 'केही लाइनदेखि लाइभसम्म' },
+  'st.also': { en: 'Also on MartNepali', de: 'Außerdem auf MartNepali', ne: 'MartNepali मा अरू पनि' },
+  'st.also.eventsSub': { en: 'Concerts & festival nights', de: 'Konzerte & Festabende', ne: 'कन्सर्ट र चाडपर्वका साँझ' },
+  'st.also.bazaarSub': { en: 'Nepali shops & kitchens', de: 'Nepalesische Läden & Küchen', ne: 'नेपाली पसल र भान्सा' },
+  'st.also.community': { en: 'Community', de: 'Community', ne: 'समुदाय' },
+  'st.also.communitySub': { en: 'Meetups & help board', de: 'Treffen & Hilfe-Brett', ne: 'भेटघाट र सहयोग बोर्ड' },
+  'st.h1': { en: 'Apps, websites & ad videos', de: 'Apps, Websites & Werbevideos', ne: 'एप, वेबसाइट र विज्ञापन भिडियो' },
+  'st.ourWork': { en: 'MartNepali Studio · Our work', de: 'MartNepali Studio · Unsere Arbeit', ne: 'MartNepali स्टुडियो · हाम्रो काम' },
+  'st.studioSub': {
+    en: '{p} projects and {v} films, made for the Nepali community in Germany. Want one like these? Tell us — free while we grow.',
+    de: '{p} Projekte und {v} Filme, gemacht für die nepalesische Community in Deutschland. So etwas für dich? Sag es uns — kostenlos, solange wir wachsen.',
+    ne: 'जर्मनीको नेपाली समुदायका लागि बनाइएका {p} परियोजना र {v} फिल्म। यस्तै चाहिन्छ? भन्नुहोस् — हामी बढ्दै गर्दा निःशुल्क।',
+  },
+  'st.watchVideos': { en: 'Watch the videos', de: 'Videos ansehen', ne: 'भिडियो हेर्नुहोस्' },
+  'st.kinds': { en: 'Kinds of video', de: 'Arten von Videos', ne: 'भिडियोका प्रकार' },
+  'st.built': { en: 'What we have built', de: 'Was wir gebaut haben', ne: 'हामीले बनाएका' },
+  'st.makeAll': { en: 'Apps, websites and videos', de: 'Apps, Websites und Videos', ne: 'एप, वेबसाइट र भिडियो' },
+  'mk.apps': { en: 'Apps', de: 'Apps', ne: 'एप' },
+  'mk.apps.line': { en: 'For organizers, restaurants and shops.', de: 'Für Veranstalter, Restaurants und Läden.', ne: 'आयोजक, रेस्टुरेन्ट र पसलका लागि।' },
+  'mk.apps.cta': { en: 'Talk to us about an app', de: 'Sprich mit uns über eine App', ne: 'एपबारे कुरा गरौं' },
+  'mk.websites': { en: 'Websites', de: 'Websites', ne: 'वेबसाइट' },
+  'mk.websites.line': { en: 'For associations, businesses and festivals.', de: 'Für Vereine, Unternehmen und Festivals.', ne: 'संस्था, व्यवसाय र महोत्सवका लागि।' },
+  'mk.websites.cta': { en: 'Talk to us about a website', de: 'Sprich mit uns über eine Website', ne: 'वेबसाइटबारे कुरा गरौं' },
+  'mk.videos': { en: 'Ad & stage videos', de: 'Werbe- & Bühnenvideos', ne: 'विज्ञापन र स्टेज भिडियो' },
+  'mk.videos.line': { en: 'For the sale, the stage and the screen.', de: 'Für den Verkauf, die Bühne und den Screen.', ne: 'बिक्री, स्टेज र स्क्रिनका लागि।' },
+  'mk.videos.cta': { en: 'Talk to us about a video', de: 'Sprich mit uns über ein Video', ne: 'भिडियोबारे कुरा गरौं' },
+  'how.1': { en: 'Tell us', de: 'Erzähl uns davon', ne: 'भन्नुहोस्' },
+  'how.1.text': {
+    en: 'A few lines in the chat — in Nepali, English or German. What it is for, who it is for, and when you need it.',
+    de: 'Ein paar Zeilen im Chat — auf Nepali, Englisch oder Deutsch. Wofür, für wen und bis wann.',
+    ne: 'च्याटमा केही लाइन — नेपाली, अंग्रेजी वा जर्मनमा। केका लागि, कसका लागि र कहिलेसम्म चाहिन्छ।',
+  },
+  'how.2': { en: 'We make it with you', de: 'Wir machen es mit dir', ne: 'हामी तपाईंसँगै बनाउँछौं' },
+  'how.2.text': {
+    en: 'You see the first screens or the first cut early, and say what to change. Your photos, your songs, your words.',
+    de: 'Du siehst früh die ersten Screens oder den ersten Schnitt und sagst, was anders werden soll. Deine Fotos, deine Songs, deine Worte.',
+    ne: 'पहिलो स्क्रिन वा पहिलो कट चाँडै देख्नुहुन्छ, र के बदल्ने भन्नुहुन्छ। तपाईंकै फोटो, गीत र शब्द।',
+  },
+  'how.3': { en: 'It goes live', de: 'Es geht live', ne: 'लाइभ हुन्छ' },
+  'how.3.text': {
+    en: 'Share it in your groups, on the big screen, on your phone — and we keep improving it with you.',
+    de: 'Teile es in deinen Gruppen, auf der großen Leinwand, auf dem Handy — und wir verbessern es weiter mit dir.',
+    ne: 'आफ्ना समूहमा, ठूलो स्क्रिनमा, फोनमा सेयर गर्नुहोस् — र हामी तपाईंसँगै सुधार्दै जान्छौं।',
+  },
+  'cta.title': { en: 'Need an app, a website or an ad video?', de: 'Brauchst du eine App, eine Website oder ein Werbevideo?', ne: 'एप, वेबसाइट वा विज्ञापन भिडियो चाहिन्छ?' },
+  'cta.titleMore': { en: 'Want one like these?', de: 'So etwas für dich?', ne: 'यस्तै चाहिन्छ?' },
+  'cta.text': {
+    en: 'Tell us what you have in mind — we make it with you, free while we grow. A real person reads every message.',
+    de: 'Sag uns, was du vorhast — wir machen es mit dir, kostenlos, solange wir wachsen. Jede Nachricht liest ein echter Mensch.',
+    ne: 'मनमा के छ भन्नुहोस् — हामी तपाईंसँगै बनाउँछौं, हामी बढ्दै गर्दा निःशुल्क। हरेक सन्देश एक जना मान्छेले पढ्छ।',
+  },
+  'cta.app': { en: 'An app', de: 'Eine App', ne: 'एप' },
+  'cta.website': { en: 'A website', de: 'Eine Website', ne: 'वेबसाइट' },
+  'cta.video': { en: 'A video', de: 'Ein Video', ne: 'भिडियो' },
+  'cta.note': { en: 'Milan replies by email.', de: 'Milan antwortet per E-Mail.', ne: 'Milan ले इमेलमा जवाफ दिनुहुन्छ।' },
+  'reel.watch': { en: 'Watch the showreel', de: 'Showreel ansehen', ne: 'शोरिल हेर्नुहोस्' },
+  'reel.sound': { en: '36 s · sound on', de: '36 s · mit Ton', ne: '३६ सेकेन्ड · आवाजसहित' },
+  'pj.example': { en: 'Example project', de: 'Beispielprojekt', ne: 'उदाहरण परियोजना' },
+  'pj.ticketing': { en: 'MartNepali ticketing platform', de: 'MartNepali Ticket-Plattform', ne: 'MartNepali टिकटिङ प्लेटफर्म' },
+  'pj.restaurant': { en: 'Restaurant ordering app', de: 'Bestell-App fürs Restaurant', ne: 'रेस्टुरेन्ट अर्डर एप' },
+  'pj.bazaar': { en: 'Online shops & the bazaar', de: 'Online-Shops & der Basar', ne: 'अनलाइन पसल र बजार' },
+  'pj.npjoe': { en: 'NPJOE e.V. website', de: 'Website von NPJOE e.V.', ne: 'NPJOE e.V. को वेबसाइट' },
+  'pj.community': { en: 'Community features', de: 'Community-Funktionen', ne: 'समुदायका सुविधा' },
+  'tag.App': { en: 'App', de: 'App', ne: 'एप' },
+  'tag.Website': { en: 'Website', de: 'Website', ne: 'वेबसाइट' },
+  'tag.Video': { en: 'Video', de: 'Video', ne: 'भिडियो' },
+  'vg.brand': { en: 'MartNepali ads', de: 'MartNepali-Werbung', ne: 'MartNepali विज्ञापन' },
+  'vg.event': { en: 'Event ads', de: 'Event-Werbung', ne: 'कार्यक्रम विज्ञापन' },
+  'vg.walkon': { en: 'Walk-on intros', de: 'Walk-on-Intros', ne: 'वाक-अन इन्ट्रो' },
+  'vg.stage': { en: 'Stage screens & song visuals', de: 'Bühnen-Screens & Song-Visuals', ne: 'स्टेज स्क्रिन र गीत भिजुअल' },
+  'vg.web': { en: 'Website promos', de: 'Website-Promos', ne: 'वेबसाइट प्रमो' },
+
   // bazaar
   'bz.kicker': { en: 'The bazaar', de: 'Der Basar', ne: 'बजार' },
   'bz.title': { en: 'Everything in one bazaar — event tickets, restaurant food and Nepali goods', de: 'Alles in einem Basar — Eventtickets, Essen aus Restaurants und nepalesische Waren', ne: 'सबै एउटै बजारमा — कार्यक्रमका टिकट, रेस्टुरेन्टको खाना र नेपाली सामान' },
@@ -129,6 +230,15 @@ export function t(lang: Lang, key: I18nKey, vars?: Record<string, string | numbe
   let s = entry[lang] ?? entry.en;
   if (vars) for (const [k, v] of Object.entries(vars)) s = s.replace(`{${k}}`, String(v));
   return s;
+}
+
+/**
+ * For keys built at run time (`pj.${project.id}`): the phrase when the
+ * dictionary has it, `fallback` (usually the English source) when it does not.
+ */
+export function tMaybe(lang: Lang, key: string, fallback: string): string {
+  const entry = (D as Record<string, Record<Lang, string> | undefined>)[key];
+  return entry?.[lang] ?? fallback;
 }
 
 /** A bound translator: const tr = translator(lang); tr('nav.bazaar'). */
