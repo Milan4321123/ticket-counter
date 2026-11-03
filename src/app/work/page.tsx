@@ -20,7 +20,7 @@ import '@/app/studio/studio.css';
 
 const title = 'Live demos — apps & websites you can try';
 const description =
-  'Try our demo apps and websites in your browser: a wedding invitation, an artist page, a live event quiz, a venue dashboard, a class booking app, a website kit for associations, QR table ordering for restaurants, a Dashain kite-fighting game, a link page and business card maker and an event photo booth.';
+  'Try our demo apps and websites in your browser: a wedding invitation, an artist page, a live event quiz, a venue dashboard, a class booking app, a website kit for associations, QR table ordering for restaurants, a Dashain kite-fighting game, a link page and business card maker, an event photo booth and a momo food-truck app.';
 
 export const metadata: Metadata = {
   title,

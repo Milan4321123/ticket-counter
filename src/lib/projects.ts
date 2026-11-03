@@ -254,6 +254,21 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
+    id: 'momo',
+    title: 'Momo food-truck app',
+    client: 'For food trucks and market stalls · demo',
+    tags: ['App'],
+    outcome: 'A momo truck on the move: customers see where it is today on a live map, order ahead into a pickup slot and follow their number in the queue — the crew runs the queue board from a tablet.',
+    points: ['Live route map with the truck driving between stops', 'Pickup slots that fill up, a pickup number and QR code, “3 orders ahead of you”', 'Crew board: steamers, scan to hand over, pause, sold out, next stop', '“Now serving” screen for the truck window and a stamp card'],
+    cover: { src: '/media/studio/projects/momo.jpg', shape: 'wide', width: 1200, height: 800 },
+    example: true,
+    tryIt: 'Order two plates of jhol momo for the next slot, then switch to the crew view and hand them over.',
+    links: [
+      { href: '/work/momo', label: 'Open the momo truck app' },
+      { href: '/contact?intent=app', label: 'Want one like this?' },
+    ],
+  },
+  {
     id: 'saput',
     title: 'Prakash Saput Live · Frankfurt',
     client: 'Concert night · 31 Oct 2026',
