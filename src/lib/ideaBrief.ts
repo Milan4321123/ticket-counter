@@ -1,5 +1,5 @@
-// The "brief" a visitor brings to /contact from the idea builder (/work/build):
-// /contact?intent=app&brief=<text>. Client-safe and pure (tests/ideaBrief.test.ts).
+// The "brief" a visitor brings to /contact from the idea builder (/work/build)
+// or the 10-second website (/work/instant): /contact?intent=app&brief=<text>. Client-safe and pure (tests/ideaBrief.test.ts).
 //
 // It only ever PREFILLS the chat (components/CreatorChat shows it as an
 // unsent, editable message) — the visitor still presses send, and the chat's
@@ -11,8 +11,8 @@
 /** The chat's input takes 600 characters; a brief never needs more. */
 export const BRIEF_MAX = 600;
 
-/** The one kind of link a brief may carry: the builder's own sketch, as a path. */
-const OWN_LINK = /^\/work\/build(?:[?#][^\s]*)?$/;
+/** The one kind of link a brief may carry: our own sketch or draft (/work/build, /work/instant), as a path. */
+const OWN_LINK = /^\/work\/(?:build|instant)(?:[?#][^\s]*)?$/;
 
 /**
  * A brief from a query string (string, array or nothing) → safe text, or ''.

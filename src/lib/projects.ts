@@ -330,6 +330,21 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
+    id: 'instant',
+    title: 'Your website in 10 seconds',
+    client: 'Any name you type · a website generator · demo',
+    tags: ['Website'],
+    outcome: 'Type a name, pick what you are and watch a complete landing page write, draw and lay itself out — then shuffle the style, reorder the sections, share it or download it.',
+    points: ['Eight design styles, every one easy to read', 'Menu, hours, team, dates, questions and a map', 'Desktop, tablet and phone widths', 'A share link and an offline .html file'],
+    cover: { src: '/media/studio/projects/instant.jpg', shape: 'wide', width: 1200, height: 800 },
+    example: true,
+    tryIt: 'Type your restaurant’s or your Verein’s name, watch it build itself, then press “Shuffle style” six times.',
+    links: [
+      { href: '/work/instant', label: 'Build a website in 10 seconds' },
+      { href: '/contact?intent=website', label: 'Want one like this?' },
+    ],
+  },
+  {
     id: 'saput',
     title: 'Prakash Saput Live · Frankfurt',
     client: 'Concert night · 31 Oct 2026',

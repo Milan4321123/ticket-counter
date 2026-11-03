@@ -206,6 +206,12 @@ export type EmblemInput = {
   look: LookId;
   /** Prefix for the ids inside the SVG, so two emblems on one page do not clash. */
   idPrefix?: string;
+  /**
+   * Another palette's colours instead of the look's (the /work/instant site
+   * generator draws its logos with this helper in its own styles).
+   * `inner` is the disc behind the motif, `light` the initials on it.
+   */
+  colors?: { primary: string; onPrimary: string; accent: string; inner: string; light: string };
 };
 
 function motif(shape: EmblemShape, accent: string, light: string): string {
@@ -250,19 +256,26 @@ function motif(shape: EmblemShape, accent: string, light: string): string {
  * exactly the same picture.
  */
 export function emblemSvg(input: EmblemInput, size = 200): string {
-  const c = LOOKS[input.look].colors;
+  const lc = LOOKS[input.look].colors;
+  const c = input.colors ?? {
+    primary: lc.primary,
+    onPrimary: lc.onPrimary,
+    accent: lc.accent,
+    inner: input.look === 'modern' ? lc.surface : lc.heroFrom,
+    light: input.look === 'modern' ? '#ffffff' : '#fdf7ec',
+  };
   const ini = cleanInitials(input.initials) || 'SS';
   const n = graphemes(ini).length;
   const fs = n <= 1 ? 50 : n === 2 ? 44 : 34;
   const ring = escapeXml(cleanRing(input.ring).toUpperCase());
   const id = `${(input.idPrefix ?? 'sj').replace(/[^a-z0-9-]/gi, '')}-ring`;
-  const light = input.look === 'modern' ? '#ffffff' : '#fdf7ec';
+  const light = c.light;
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="${size}" height="${size}" role="img" aria-label="${escapeXml(ini)}">` +
     `<defs><path id="${id}" d="M100 100 m-80 0 a80 80 0 1 1 160 0 a80 80 0 1 1 -160 0"/></defs>` +
     `<circle cx="100" cy="100" r="98" fill="${c.primary}"/>` +
     `<circle cx="100" cy="100" r="92" fill="none" stroke="${c.onPrimary}" stroke-opacity="0.35" stroke-width="1.5"/>` +
-    `<circle cx="100" cy="100" r="68" fill="${input.look === 'modern' ? c.surface : c.heroFrom}"/>` +
+    `<circle cx="100" cy="100" r="68" fill="${c.inner}"/>` +
     `<circle cx="100" cy="100" r="68" fill="none" stroke="${c.accent}" stroke-width="2.5"/>` +
     (ring
       ? `<text font-family="Mukta, 'Noto Sans Devanagari', system-ui, sans-serif" font-size="12.5" font-weight="700" letter-spacing="1.5" fill="${c.onPrimary}">` +

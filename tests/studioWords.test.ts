@@ -6,7 +6,9 @@
  * hire. Each demo has its own stricter test (cardMaker, momoTruck, abcLetters,
  * …); this one is the net under all of them, including the demos without one.
  * It reads every string literal and JSX text in src/app/work/<demo>/content.ts
- * and page.tsx (the frame around each demo, the metadata) and the studio's
+ * and page.tsx (the frame around each demo, the metadata), the website
+ * generator's templates.ts (the words INSIDE the sites /work/instant writes —
+ * and every page it generates, for every kind and language) and the studio's
  * i18n keys (pj.* project names, dn.* prev / next, wk.* / dm.* / pf.* gallery
  * lines) — in English, Deutsch and नेपाली.
  *
@@ -18,6 +20,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
+import { KIND_IDS, LANG_IDS, STYLES, newSite, poolOf, siteHtml } from '../src/app/work/instant/instant.ts';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const WORK = path.join(ROOT, 'src/app/work');
@@ -112,7 +115,7 @@ function studioI18nStrings(): { key: string; text: string }[] {
 const demos = fs.readdirSync(WORK).filter((d) => fs.statSync(path.join(WORK, d)).isDirectory());
 
 test('the scan finds every demo and plenty of text', () => {
-  for (const d of ['wedding', 'artist', 'quiz', 'live', 'classes', 'samaj', 'restaurant', 'build', 'kite', 'card', 'booth', 'momo', 'cup', 'abc', 'radio', 'shop']) {
+  for (const d of ['wedding', 'artist', 'quiz', 'live', 'classes', 'samaj', 'restaurant', 'build', 'kite', 'card', 'booth', 'momo', 'cup', 'abc', 'radio', 'shop', 'instant']) {
     assert.ok(demos.includes(d), `${d} is under src/app/work`);
     assert.ok(fs.existsSync(path.join(WORK, d, 'content.ts')), `${d} has a content.ts`);
   }
@@ -134,7 +137,7 @@ test('no money or hire words in any demo’s content, frame or studio i18n key',
   const hits: Hit[] = [];
   const used = new Set<string>();
   for (const d of demos) {
-    for (const f of ['content.ts', 'page.tsx']) {
+    for (const f of ['content.ts', 'page.tsx', 'templates.ts']) {
       const file = path.join(WORK, d, f);
       if (!fs.existsSync(file)) continue;
       for (const text of stringsIn(file)) {
@@ -156,4 +159,27 @@ test('no money or hire words in any demo’s content, frame or studio i18n key',
   assert.deepEqual(hits, [], hits.map((h) => `${h.where} [${h.word}] ${h.text}`).join('\n'));
   // A stale allowlist line hides nothing, but should go.
   assert.deepEqual(Object.keys(ALLOW).filter((k) => !used.has(k)), [], 'unused allowlist entries');
+});
+
+test('the 10-second website never writes a price into a generated site, in any language', () => {
+  const file = path.join(WORK, 'instant', 'templates.ts');
+  assert.ok(stringsIn(file).length > 900, 'the generator’s templates are scanned');
+  const hits: string[] = [];
+  for (const lang of LANG_IDS) {
+    for (const kind of KIND_IDS) {
+      for (let words = 0; words < 4; words++) {
+        // Every section of the kind switched on, so nothing hides.
+        const site = { ...newSite('Chiya Ghar', kind, 'Mainz'), words, off: [], style: words % STYLES.length };
+        const text = siteHtml(site, lang)
+          .replace(/<style>[\s\S]*?<\/style>/, ' ')
+          .replace(/<svg[\s\S]*?<\/svg>/g, ' ')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&[a-z#0-9]+;/gi, ' ');
+        const m = text.match(WORDS);
+        if (m) hits.push(`${lang} ${kind} [${m[0]}] …${text.slice(Math.max(0, (m.index ?? 0) - 40), (m.index ?? 0) + 40)}…`);
+      }
+      assert.ok(poolOf(kind).length >= 6);
+    }
+  }
+  assert.deepEqual(hits, [], hits.join('\n'));
 });

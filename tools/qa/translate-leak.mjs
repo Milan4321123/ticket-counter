@@ -51,6 +51,7 @@ const ROUTES = [
   '/work/abc',
   '/work/radio',
   '/work/shop',
+  '/work/instant',
   '/work/build',
 ];
 const LANGS = ['de', 'ne'];
@@ -105,6 +106,12 @@ try {
         try {
           if (location.pathname === '/work/abc' && !localStorage.getItem('mn-demo:abc')) {
             localStorage.setItem('mn-demo:abc', JSON.stringify({ v: 1, name: mark + 'kid' }));
+          }
+        } catch {}
+        // The 10-second website: start with a built site, so the crawl reaches the heading fields too.
+        try {
+          if (location.pathname === '/work/instant' && !localStorage.getItem('mn-demo:instant') && !location.hash) {
+            localStorage.setItem('mn-demo:instant', JSON.stringify({ v: 1, site: 'n=' + mark + '&k=restaurant&c=Mainz&s=0', device: 'desktop' }));
           }
         } catch {}
         // The shop demo: start with something in the bag, so the crawl reaches the checkout's name field.
