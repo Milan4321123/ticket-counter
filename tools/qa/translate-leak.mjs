@@ -49,6 +49,7 @@ const ROUTES = [
   '/work/momo',
   '/work/cup',
   '/work/abc',
+  '/work/radio',
   '/work/build',
 ];
 const LANGS = ['de', 'ne'];

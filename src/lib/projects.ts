@@ -299,6 +299,21 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
+    id: 'radio',
+    title: 'Nepali radio + podcast site',
+    client: 'For community radios, podcasts and culture groups · demo',
+    tags: ['Website'],
+    outcome: 'A made-up Nepali radio in Europe: a live player that keeps playing while you browse, the week’s programme with what is on now, podcast episodes with chapters and resume, and song requests — in English, Deutsch and नेपाली.',
+    points: ['Live player with ON AIR, ticker and lock-screen controls', 'Weekly programme with “on now” and Kathmandu time', 'Episodes with chapters, waveform, speed and resume', 'Song requests and shout-outs — nothing leaves the device'],
+    cover: { src: '/media/studio/projects/radio.jpg', shape: 'wide', width: 1200, height: 800 },
+    example: true,
+    tryIt: 'Tap “Listen live”, open the full player, then jump to a chapter of an episode at 1.5× and reload — it picks up where you left off.',
+    links: [
+      { href: '/work/radio', label: 'Open the radio site' },
+      { href: '/contact?intent=website', label: 'Want one like this?' },
+    ],
+  },
+  {
     id: 'saput',
     title: 'Prakash Saput Live · Frankfurt',
     client: 'Concert night · 31 Oct 2026',

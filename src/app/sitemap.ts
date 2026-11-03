@@ -86,6 +86,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/work/momo`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/work/cup`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/work/abc`, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${base}/work/radio`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/work/build`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/contact`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/privacy`, changeFrequency: 'yearly', priority: 0.3 },

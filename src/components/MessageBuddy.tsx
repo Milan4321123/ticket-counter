@@ -41,6 +41,7 @@ const HIDDEN_ON = [
   /^\/work\/momo/, // the momo truck app: its tab bar sits at the bottom on phones
   /^\/work\/cup/, // the futsal cup: goal notes and the referee's pickers sit at the bottom on phones
   /^\/work\/abc/, // the kids' alphabet app: a chat bubble has no place on a page for small children, and it would sit on the tracing pad
+  /^\/work\/radio/, // the radio site: its live player is fixed to the bottom of the screen
 ];
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

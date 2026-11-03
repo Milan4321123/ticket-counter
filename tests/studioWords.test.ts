@@ -109,7 +109,7 @@ function studioI18nStrings(): { key: string; text: string }[] {
 const demos = fs.readdirSync(WORK).filter((d) => fs.statSync(path.join(WORK, d)).isDirectory());
 
 test('the scan finds every demo and plenty of text', () => {
-  for (const d of ['wedding', 'artist', 'quiz', 'live', 'classes', 'samaj', 'restaurant', 'build', 'kite', 'card', 'booth', 'momo', 'cup', 'abc']) {
+  for (const d of ['wedding', 'artist', 'quiz', 'live', 'classes', 'samaj', 'restaurant', 'build', 'kite', 'card', 'booth', 'momo', 'cup', 'abc', 'radio']) {
     assert.ok(demos.includes(d), `${d} is under src/app/work`);
     assert.ok(fs.existsSync(path.join(WORK, d, 'content.ts')), `${d} has a content.ts`);
   }
