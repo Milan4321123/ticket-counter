@@ -173,6 +173,7 @@ const D = {
   'pj.quiz': { en: 'Live event quiz', de: 'Live-Quiz fürs Event', ne: 'कार्यक्रमको लाइभ क्विज' },
   'pj.live': { en: 'Live event dashboard', de: 'Live-Dashboard fürs Event', ne: 'कार्यक्रमको लाइभ ड्यासबोर्ड' },
   'pj.classes': { en: 'Class booking app', de: 'App zum Kurse-Buchen', ne: 'कक्षा बुकिङ एप' },
+  'pj.samaj': { en: 'Association website kit', de: 'Website-Baukasten für Vereine', ne: 'संस्थाका लागि वेबसाइट किट' },
   'pj.saput': { en: 'Prakash Saput Live · Frankfurt', de: 'Prakash Saput Live · Frankfurt', ne: 'प्रकाश सपुत लाइभ · फ्रैंकफर्ट' },
   // project badges, the /studio filter, the demo strip, /work and demo prev / next
   'pb.demo': { en: 'Live demo', de: 'Live-Demo', ne: 'लाइभ डेमो' },

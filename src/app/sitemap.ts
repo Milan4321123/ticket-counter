@@ -78,6 +78,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/work/quiz`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/work/live`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/work/classes`, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${base}/work/samaj`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/contact`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/privacy`, changeFrequency: 'yearly', priority: 0.3 },
     // The other public legal pages. Low priority — nobody searches for them —

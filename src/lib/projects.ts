@@ -178,6 +178,21 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
+    id: 'samaj',
+    title: 'Association website kit',
+    client: 'Saathi Samaj Main-Neckar e.V. · a made-up association · demo',
+    tags: ['Website'],
+    outcome: 'A whole website for a Nepali Verein — programme, news, membership and a members’ area — in three looks and three languages.',
+    points: ['Programme calendar with tickets on MartNepali', 'Membership form with a printable confirmation', 'Members’ area: QR card, RSVPs, minutes and polls', 'Switch the look and make a logo, live'],
+    cover: { src: '/media/studio/projects/samaj.jpg', shape: 'wide', width: 1200, height: 800 },
+    example: true,
+    tryIt: 'Switch the look, make a logo, become a member and vote in the members’ poll.',
+    links: [
+      { href: '/work/samaj', label: 'Open the website' },
+      { href: '/contact?intent=website', label: 'Want one like this?' },
+    ],
+  },
+  {
     id: 'saput',
     title: 'Prakash Saput Live · Frankfurt',
     client: 'Concert night · 31 Oct 2026',
