@@ -345,6 +345,21 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
+    id: 'trek',
+    title: 'Nepal trek & trip planner',
+    client: 'Yatri Treks · a made-up travel agency · demo',
+    tags: ['Website'],
+    outcome: 'Ready treks and family trips your visitors can change day by day, with the route on a drawn map of Nepal, an altitude profile, the best season and a packing list — in English, Deutsch and नेपाली.',
+    points: ['Everest, Annapurna, Poon Hill, Langtang, Chitwan, Lumbini', 'A drawn map you can pan and zoom', 'Altitude profile with an acclimatisation check', 'Season, festivals, packing list, print and calendar file'],
+    cover: { src: '/media/studio/projects/trek.jpg', shape: 'wide', width: 1200, height: 800 },
+    example: true,
+    tryIt: 'Pick Everest Base Camp, remove the rest day in Dingboche and watch the altitude check flag the climb — then put it back.',
+    links: [
+      { href: '/work/trek', label: 'Open the trip planner' },
+      { href: '/contact?intent=website', label: 'Want one like this?' },
+    ],
+  },
+  {
     id: 'saput',
     title: 'Prakash Saput Live · Frankfurt',
     client: 'Concert night · 31 Oct 2026',

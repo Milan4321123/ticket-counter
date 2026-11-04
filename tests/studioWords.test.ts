@@ -8,7 +8,9 @@
  * It reads every string literal and JSX text in src/app/work/<demo>/content.ts
  * and page.tsx (the frame around each demo, the metadata), the website
  * generator's templates.ts (the words INSIDE the sites /work/instant writes —
- * and every page it generates, for every kind and language) and the studio's
+ * and every page it generates, for every kind and language), every text the
+ * trek planner (/work/trek) builds from a trip — day cards, warnings, packing
+ * list, permits, the enquiry and the calendar file — and the studio's
  * i18n keys (pj.* project names, dn.* prev / next, wk.* / dm.* / pf.* gallery
  * lines) — in English, Deutsch and नेपाली.
  *
@@ -21,6 +23,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 import { KIND_IDS, LANG_IDS, STYLES, newSite, poolOf, siteHtml } from '../src/app/work/instant/instant.ts';
+import { TRIP_IDS, altitudeWarnings, dayInfos, packingList, permitsFor, removeDay, tripDays } from '../src/app/work/trek/trek.ts';
+import { COPY as TREK_COPY, PACK_TEXT, PERMIT_TEXT, TRIP_TEXT, dayFacts, dayHighlight, dayTitle, enquiryText, icsEvents, warningText } from '../src/app/work/trek/content.ts';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const WORK = path.join(ROOT, 'src/app/work');
@@ -115,7 +119,7 @@ function studioI18nStrings(): { key: string; text: string }[] {
 const demos = fs.readdirSync(WORK).filter((d) => fs.statSync(path.join(WORK, d)).isDirectory());
 
 test('the scan finds every demo and plenty of text', () => {
-  for (const d of ['wedding', 'artist', 'quiz', 'live', 'classes', 'samaj', 'restaurant', 'build', 'kite', 'card', 'booth', 'momo', 'cup', 'abc', 'radio', 'shop', 'instant']) {
+  for (const d of ['wedding', 'artist', 'quiz', 'live', 'classes', 'samaj', 'restaurant', 'build', 'kite', 'card', 'booth', 'momo', 'cup', 'abc', 'radio', 'shop', 'instant', 'trek']) {
     assert.ok(demos.includes(d), `${d} is under src/app/work`);
     assert.ok(fs.existsSync(path.join(WORK, d, 'content.ts')), `${d} has a content.ts`);
   }
@@ -180,6 +184,28 @@ test('the 10-second website never writes a price into a generated site, in any l
       }
       assert.ok(poolOf(kind).length >= 6);
     }
+  }
+  assert.deepEqual(hits, [], hits.join('\n'));
+});
+
+test('the trek planner never writes a price, fee or cost into a day, a list, an enquiry or a calendar', () => {
+  const hits: string[] = [];
+  const check = (where: string, text: string) => {
+    const m = text.match(WORDS);
+    if (m) hits.push(`${where} [${m[0]}] ${text.slice(0, 120)}`);
+  };
+  for (const lang of ['en', 'de', 'ne'] as const) {
+    for (const id of TRIP_IDS) {
+      for (const days of [tripDays(id), removeDay(tripDays(id), 1)]) {
+        dayInfos(days).forEach((x, i) => check(`${lang} ${id} day ${i + 1}`, [dayTitle(x, lang), ...dayFacts(x, lang), dayHighlight(x, lang)].join(' · ')));
+        for (const w of altitudeWarnings(days)) check(`${lang} ${id} warning`, warningText(w, days, lang));
+        for (let month = 1; month <= 12; month++) for (const p of packingList({ days, month })) check(`${lang} ${id} pack`, PACK_TEXT[p.id][lang]);
+        for (const p of permitsFor(days)) check(`${lang} ${id} permit`, `${PERMIT_TEXT[p].name[lang]} ${PERMIT_TEXT[p].line[lang]}`);
+        check(`${lang} ${id} enquiry`, enquiryText(days, TRIP_TEXT[id].name[lang], '2027-10-10', { name: 'Sita', contact: 'sita@example.com', note: 'Grandma joins', people: 4 }, altitudeWarnings(days), lang));
+        for (const e of icsEvents(days, '2027-10-10', lang)) check(`${lang} ${id} ics`, `${e.summary} ${e.description} ${e.location}`);
+      }
+    }
+    check(`${lang} trek copy`, JSON.stringify(TREK_COPY[lang]));
   }
   assert.deepEqual(hits, [], hits.join('\n'));
 });

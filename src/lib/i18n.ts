@@ -184,6 +184,7 @@ const D = {
   'pj.radio': { en: 'Nepali radio + podcast site', de: 'Website für Nepali-Radio + Podcast', ne: 'नेपाली रेडियो र पोडकास्ट वेबसाइट' },
   'pj.shop': { en: 'Online shop + owner dashboard', de: 'Online-Shop + Inhaber-Dashboard', ne: 'अनलाइन पसल र साहुको ड्यासबोर्ड' },
   'pj.instant': { en: 'Your website in 10 seconds', de: 'Deine Website in 10 Sekunden', ne: '१० सेकेन्डमा तपाईंको वेबसाइट' },
+  'pj.trek': { en: 'Nepal trek & trip planner', de: 'Nepal-Trek- & Reiseplaner', ne: 'नेपाल पदयात्रा र यात्रा योजनाकार' },
   'pj.saput': { en: 'Prakash Saput Live · Frankfurt', de: 'Prakash Saput Live · Frankfurt', ne: 'प्रकाश सपुत लाइभ · फ्रैंकफर्ट' },
   // project badges, the /studio filter, the demo strip, /work and demo prev / next
   'pb.demo': { en: 'Live demo', de: 'Live-Demo', ne: 'लाइभ डेमो' },

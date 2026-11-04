@@ -52,6 +52,7 @@ const ROUTES = [
   '/work/radio',
   '/work/shop',
   '/work/instant',
+  '/work/trek',
   '/work/build',
 ];
 const LANGS = ['de', 'ne'];
