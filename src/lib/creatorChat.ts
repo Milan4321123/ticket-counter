@@ -15,6 +15,7 @@
 // the request card. And it is only asked at all on Gemini's paid tier (lib/gemini
 // `personal`): a visitor's chat is personal data, and without the paid tier
 // the scripted questions run the whole conversation.
+import { chatAiJson, chatAiProvider } from './chatAi';
 import { geminiJson } from './gemini';
 import { askLang, type AskLang } from './askFaq';
 import { findPhones, redactContact } from './personalText';
@@ -94,10 +95,13 @@ export interface ChatTurn {
   text: string;
 }
 
-type QKey = 'summary' | 'message' | 'sell' | 'shop' | 'event' | 'when' | 'name' | 'email' | 'emailReply' | 'ready';
+type QKey = 'summary' | 'detailApp' | 'detailSite' | 'detailVideo' | 'message' | 'sell' | 'shop' | 'event' | 'when' | 'name' | 'email' | 'emailReply' | 'ready';
 const Q: Record<AskLang, Record<QKey, string>> = {
   en: {
     summary: 'What would you like us to make — an app, a website, an ad or stage video, a custom event page, or something else? A sentence is enough.',
+    detailApp: 'An app — nice! What should it do, and who will use it? For example tickets and check-in, a menu and ordering, bookings or a shop.',
+    detailSite: 'A website — nice! What is it for? For example your association, restaurant, shop, an event or a wedding.',
+    detailVideo: 'A video — nice! What kind, and for what? For example an ad for Reels or TikTok, a walk-on intro or stage-screen visuals for your event.',
     message: 'Of course — what would you like to ask or tell Milan? Write it in a sentence or two.',
     sell: 'Great — what would you like to sell here: tickets for an event, food, or things from your shop? A sentence is enough.',
     shop: 'And what is your shop, business or event called?',
@@ -110,6 +114,9 @@ const Q: Record<AskLang, Record<QKey, string>> = {
   },
   de: {
     summary: 'Was dürfen wir für dich bauen — eine App, eine Website, ein Werbe- oder Bühnenvideo, eine eigene Event-Seite oder etwas anderes? Ein Satz reicht.',
+    detailApp: 'Eine App — schön! Was soll sie können, und wer nutzt sie? Zum Beispiel Tickets und Einlass, Speisekarte und Bestellen, Buchungen oder ein Shop.',
+    detailSite: 'Eine Website — schön! Wofür? Zum Beispiel für deinen Verein, dein Restaurant, deinen Laden, ein Event oder eine Hochzeit.',
+    detailVideo: 'Ein Video — schön! Was für eins, und wofür? Zum Beispiel eine Werbung für Reels oder TikTok, ein Walk-on-Intro oder Bühnenvisuals für dein Event.',
     message: 'Gern — was möchtest du Milan fragen oder sagen? Ein, zwei Sätze reichen.',
     sell: 'Super — was möchtest du hier verkaufen: Tickets für ein Event, Essen oder Sachen aus deinem Geschäft? Ein Satz reicht.',
     shop: 'Und wie heißt dein Geschäft, dein Betrieb oder dein Event?',
@@ -122,6 +129,9 @@ const Q: Record<AskLang, Record<QKey, string>> = {
   },
   ne: {
     summary: 'हामीले के बनाइदिऊँ — एप, वेबसाइट, विज्ञापन वा स्टेज भिडियो, कार्यक्रमको आफ्नै पेज, वा अरू केही? एक वाक्य पुग्छ।',
+    detailApp: 'एप — राम्रो! यसले के गर्नुपर्छ, र कसले चलाउँछ? जस्तै टिकट र चेक-इन, मेनु र अर्डर, बुकिङ वा पसल।',
+    detailSite: 'वेबसाइट — राम्रो! केका लागि? जस्तै तपाईंको संस्था, रेस्टुरेन्ट, पसल, कार्यक्रम वा विवाह।',
+    detailVideo: 'भिडियो — राम्रो! कस्तो, र केका लागि? जस्तै Reels वा TikTok को विज्ञापन, वाक-अन इन्ट्रो वा कार्यक्रमको स्टेज भिजुअल।',
     message: 'हुन्छ — मिलनलाई के सोध्न वा भन्न चाहनुहुन्छ? एक-दुई वाक्य पुग्छ।',
     sell: 'राम्रो — यहाँ के बेच्न चाहनुहुन्छ: कार्यक्रमको टिकट, खाना, वा पसलको सामान? एक वाक्य पुग्छ।',
     shop: 'अनि तपाईंको पसल, व्यवसाय वा कार्यक्रमको नाम के हो?',
@@ -134,6 +144,9 @@ const Q: Record<AskLang, Record<QKey, string>> = {
   },
   rn: {
     summary: 'Hamile ke banaidiun — app, website, ad wa stage video, event ko aafnai page, wa aru kei? Euta sentence pugcha.',
+    detailApp: 'App — ramro! Yesle ke garnuparcha, ra kasle chalaucha? Jastai ticket ra check-in, menu ra order, booking wa pasal.',
+    detailSite: 'Website — ramro! Ke ko lagi? Jastai tapaiko sanstha, restaurant, pasal, event wa bihe.',
+    detailVideo: 'Video — ramro! Kasto, ra ke ko lagi? Jastai Reels wa TikTok ko ad, walk-on intro wa event ko stage visual.',
     message: 'Huncha — Milan lai ke sodhna wa bhanna chahanuhuncha? Ek-dui sentence pugcha.',
     sell: 'Ramro — yaha ke bechna chahanuhuncha: event ko ticket, khana, wa pasal ko saman? Euta sentence pugcha.',
     shop: 'Ani tapaiko pasal, business wa event ko naam ke ho?',
@@ -166,6 +179,13 @@ const META_WORDS =
 /** Exact "what kind" phrases — the chat's own chips among them. */
 const INTENT_ONLY =
   /^\W*(something else|anything else|other|(i have |just |a |some )*(general )?(question|questions)( or (a )?problem)?|(i )?(want|would like|like) to (ask|sell)( something| here)?|(just )?ask( general)?( questions?)?|sell here|etwas anderes|(eine )?frage|ich (habe|hab) (eine )?frage|ich möchte (etwas )?(fragen|verkaufen)|aru kei|prashna cha|sodhnu cha|bechna chahanchu)\W*$/i;
+
+/** Which kind of build a bare "app" / "website" / "video" names — the follow-up asks about THAT. */
+export function buildKind(text: string): 'detailApp' | 'detailSite' | 'detailVideo' {
+  if (/\b(videos?|promo|reels?|trailer|walk-?on|backdrops?|visuals|motion graphics?)\b|भिडियो/i.test(text)) return 'detailVideo';
+  if (/\b(apps?)\b|एप/i.test(text)) return 'detailApp';
+  return 'detailSite';
+}
 
 export function detectKind(text: string): CreatorFields['kind'] {
   if (PROBLEM_WORDS.test(text)) return 'general';
@@ -212,15 +232,27 @@ export function scriptedTurn(messages: ChatTurn[], fields: CreatorFields): { rep
   const asked = (k: QKey) => lastBot.endsWith(q[k]);
   // The opening greeting (or anything we did not ask) — the first real answer.
   const opening = !(Object.keys(q) as QKey[]).some(asked);
+  // A bare "app" / "website" / "video" names the kind: ask what it is for
+  // instead of repeating the first question (it used to loop on "app").
+  let detail: 'detailApp' | 'detailSite' | 'detailVideo' | null = null;
+  const askedDetail = (['detailApp', 'detailSite', 'detailVideo'] as const).find(asked);
   if (said && !email) {
     const words = said.split(/\s+/).length;
-    if (!f.summary && (opening || asked('summary'))) {
+    if (!f.summary && askedDetail) {
+      // "App" + "a menu for our momo shop" → one brief.
+      const bots = messages.map((m, i) => (m.from === 'bot' ? i : -1)).filter((i) => i >= 0);
+      const before = messages.slice(0, bots[bots.length - 1] ?? 0).reverse().find((m) => m.from === 'me')?.text.trim() ?? '';
+      const what = splitGreeting(before).rest;
+      if (said.length >= 2) f.summary = (what ? `${what}: ${said}` : said).slice(0, 600);
+      f.kind = 'custom-design';
+    } else if (!f.summary && (opening || asked('summary'))) {
       f.kind = detectKind(said);
       // "Something else", "I have a question", "I want to sell" is the intent,
       // not the message itself — ask for that next (isIntentOnly).
       if (!isIntentOnly(said, f.kind)) {
         // Only a real sentence says what they want — not "ok" or "hmm".
         if (words >= 3 || (f.kind === 'general' && said.length >= 10)) f.summary = said.slice(0, 600);
+        else if (f.kind === 'custom-design') detail = buildKind(said);
       }
     } else if (asked('message') || asked('sell')) {
       if (said.length >= 10 || words >= 3) f.summary = said.slice(0, 600);
@@ -235,7 +267,11 @@ export function scriptedTurn(messages: ChatTurn[], fields: CreatorFields): { rep
       ? q.message
       : f.kind === 'organizer-account'
         ? q.sell
-        : q.summary
+        : detail
+          ? q[detail]
+          : askedDetail
+            ? q[askedDetail]
+            : q.summary
     : design && !f.eventName
       ? q.event
       : design && !f.eventWhen
@@ -287,7 +323,7 @@ function contactFrom(messages: ChatTurn[], fields: CreatorFields): CreatorFields
 
 /** One turn with the AI: its reply, and every field it could fill so far. */
 export async function aiTurn(messages: ChatTurn[], fields: CreatorFields, owner: string): Promise<{ reply: string; fields: CreatorFields } | null> {
-  const raw = (await geminiJson(
+  const prompt =
     `You are ${owner}'s friendly assistant on MartNepali, a free platform for Nepali events and shops in Germany. ` +
       `A visitor wants to reach ${owner} — usually to have a custom event page, a festival website, an app or a promo video made ` +
       '(9:16 ads for Reels/TikTok/WhatsApp status, an artist walk-on intro, stage-screen visuals), ' +
@@ -315,11 +351,16 @@ export async function aiTurn(messages: ChatTurn[], fields: CreatorFields, owner:
       'change — an empty string for everything else, including every field that is already filled and unchanged. ' +
       'Put into the fields ONLY what the visitor said about their request — never greetings, small talk or questions; ' +
       'summary stays empty until they say what they want, then it is a clean 1-2 sentence brief of it for ' +
-      `${owner} (in the visitor’s language).`,
-    // A visitor's own words: personal — never to the unpaid tier. The first
-    // model is sometimes over quota; the next one needs a moment.
-    { personal: true, timeoutMs: 13000 }
-  ).catch(() => null)) as { reply?: unknown; fields?: unknown } | null;
+      `${owner} (in the visitor’s language).`;
+  // Grok / Groq when its key is set (lib/chatAi); otherwise Gemini — a
+  // visitor's own words are personal, so never its unpaid tier. The first
+  // Gemini model is sometimes over quota; the next one needs a moment.
+  const raw = ((chatAiProvider()
+    ? await chatAiJson(prompt, 12000)
+    : await geminiJson(prompt, { personal: true, timeoutMs: 13000 }).catch(() => null)) ?? null) as {
+    reply?: unknown;
+    fields?: unknown;
+  } | null;
   if (!raw || typeof raw.reply !== 'string' || !raw.reply.trim()) return null;
   // Only the fields the model may fill, and nothing that is a placeholder.
   const offered = (raw.fields && typeof raw.fields === 'object' ? raw.fields : {}) as Record<string, unknown>;

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { takeAiQuota } from '@/lib/aiQuota';
+import { chatAiProvider } from '@/lib/chatAi';
 import { aiTurn, cleanFields, isReady, requestMessage, scriptedTurn, type ChatTurn } from '@/lib/creatorChat';
 import { createContactRequest } from '@/lib/contact';
 import { sendContactRequestAck, sendContactRequestToTeam } from '@/lib/email';
@@ -55,10 +56,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  // The AI only where it may read a visitor's words (lib/gemini `personal`):
+  // The AI only where it may read a visitor's words (lib/chatAi, or lib/gemini `personal`):
   // otherwise the scripted questions, without spending the daily caps.
   let turn: { reply: string; fields: typeof fields } | null = null;
-  if (geminiEnabled({ personal: true }) && takeAiQuota([{ key: `creator-chat:ip:${ip}`, perDay: 40 }, { key: 'creator-chat:all', perDay: 1500 }])) {
+  if ((chatAiProvider() || geminiEnabled({ personal: true })) && takeAiQuota([{ key: `creator-chat:ip:${ip}`, perDay: 40 }, { key: 'creator-chat:all', perDay: 1500 }])) {
     turn = await aiTurn(messages, fields, owner);
   }
   // Busy, over the cap, or no AI on this server: the scripted questions.

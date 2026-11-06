@@ -13,6 +13,7 @@
  */
 import Link from 'next/link';
 import ConsentControl from '@/components/ConsentControl';
+import { chatAiProvider } from '@/lib/chatAi';
 import { TRANSFER_BASIS_DE, geminiMayProcessPersonalData } from '@/lib/legal';
 import { LegalSection as Sec, LegalSub as Sub, legalListStyle as ul } from './LegalSection';
 import type { PrivacyFacts } from './privacyFacts';
@@ -715,9 +716,12 @@ export default function PrivacyDe({ f }: { f: PrivacyFacts }) {
           nicht verloren geht, und leiten sie per E-Mail an uns selbst weiter.
         </p>
         <p>
-          Der <strong>Kontakt-Chat</strong> auf derselben Seite wird von Google Gemini beantwortet – nur unter
-          den Bedingungen der kostenpflichtigen Nutzung (Abschnitt 18); sonst antwortet er ohne KI. E-Mail-
-          Adressen und Telefonnummern werden vor der Übermittlung automatisch aus Ihrem Text entfernt.
+          Der <strong>Kontakt-Chat</strong> auf derselben Seite wird von{' '}
+          {chatAiProvider()
+            ? `${chatAiProvider()!.name} beantwortet (Abschnitt 18)`
+            : 'Google Gemini beantwortet – nur unter den Bedingungen der kostenpflichtigen Nutzung (Abschnitt 18)'}
+          ; sonst antwortet er ohne KI. E-Mail-Adressen und Telefonnummern werden vor der Übermittlung
+          automatisch aus Ihrem Text entfernt.
         </p>
         <p style={{ marginBottom: 0 }}>
           Verantwortlich sind wir. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO, soweit Ihre Anfrage auf
@@ -760,12 +764,24 @@ export default function PrivacyDe({ f }: { f: PrivacyFacts }) {
             beim Entwerfen von FAQ-Einträgen und der Seitengestaltung. Nach den kommerziellen Bedingungen von
             Anthropic werden über die Schnittstelle übermittelte Inhalte nicht zum Training verwendet.
           </li>
+          {chatAiProvider()?.id === 'xai' ? (
+            <li>
+              <strong>xAI Grok</strong> (X.AI LLC, Palo Alto, USA) beantwortet den Kontakt-Chat (Abschnitt 16).
+              Der Dienst erhält den Gesprächsverlauf ohne E-Mail-Adressen und Telefonnummern. Wir nutzen die
+              Schnittstelle ohne Teilnahme an einem Datenfreigabe-Programm.
+            </li>
+          ) : chatAiProvider()?.id === 'groq' ? (
+            <li>
+              <strong>Groq</strong> (Groq, Inc., Mountain View, USA) beantwortet den Kontakt-Chat (Abschnitt 16).
+              Der Dienst erhält den Gesprächsverlauf ohne E-Mail-Adressen und Telefonnummern.
+            </li>
+          ) : null}
           <li>
             Die KI trifft keine Entscheidungen über Sie; sie formuliert Antworten und Texte. Antworten können
             fehlerhaft sein – verbindlich sind die Angaben des Anbieters.
           </li>
         </ul>
-        <p style={{ marginBottom: 0 }}>Beide Dienste handeln als Auftragsverarbeiter. {TRANSFER_BASIS_DE}</p>
+        <p style={{ marginBottom: 0 }}>{chatAiProvider() ? 'Alle Dienste handeln' : 'Beide Dienste handeln'} als Auftragsverarbeiter. {TRANSFER_BASIS_DE}</p>
       </Sec>
 
       {/* Only when analytics is actually switched on. A privacy notice that

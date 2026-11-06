@@ -5,6 +5,7 @@
  */
 import Link from 'next/link';
 import ConsentControl from '@/components/ConsentControl';
+import { chatAiProvider } from '@/lib/chatAi';
 import { TRANSFER_BASIS_EN, geminiMayProcessPersonalData } from '@/lib/legal';
 import { LegalSection as Sec, LegalSub as Sub, legalListStyle as ul } from './LegalSection';
 import type { PrivacyFacts } from './privacyFacts';
@@ -670,9 +671,12 @@ export default function PrivacyEn({ f }: { f: PrivacyFacts }) {
           account. We store the request so it cannot be lost to an email outage, and email it to ourselves.
         </p>
         <p>
-          The <strong>contact chat</strong> on the same page is answered by Google Gemini – only under the
-          terms of paid use (section 18); otherwise it answers without AI. Email addresses and phone numbers
-          are removed from your text automatically before it is sent.
+          The <strong>contact chat</strong> on the same page is answered by{' '}
+          {chatAiProvider()
+            ? `${chatAiProvider()!.name} (section 18)`
+            : 'Google Gemini – only under the terms of paid use (section 18)'}
+          ; otherwise it answers without AI. Email addresses and phone numbers are removed from your text
+          automatically before it is sent.
         </p>
         <p style={{ marginBottom: 0 }}>
           We are the controller. The legal basis is Art. 6(1)(b) GDPR where your request is aimed at a
@@ -712,12 +716,24 @@ export default function PrivacyEn({ f }: { f: PrivacyFacts }) {
             design pages. Under Anthropic’s commercial terms, content sent through its API is not used for
             training.
           </li>
+          {chatAiProvider()?.id === 'xai' ? (
+            <li>
+              <strong>xAI Grok</strong> (X.AI LLC, Palo Alto, USA) answers the contact chat (section 16). It
+              receives the conversation with email addresses and phone numbers removed. We use the API without
+              opting in to any data-sharing programme.
+            </li>
+          ) : chatAiProvider()?.id === 'groq' ? (
+            <li>
+              <strong>Groq</strong> (Groq, Inc., Mountain View, USA) answers the contact chat (section 16). It
+              receives the conversation with email addresses and phone numbers removed.
+            </li>
+          ) : null}
           <li>
             The AI makes no decisions about you; it words answers and texts. Answers can be wrong – what the
             seller states is what counts.
           </li>
         </ul>
-        <p style={{ marginBottom: 0 }}>Both act as processors. {TRANSFER_BASIS_EN}</p>
+        <p style={{ marginBottom: 0 }}>{chatAiProvider() ? 'All of them act' : 'Both act'} as processors. {TRANSFER_BASIS_EN}</p>
       </Sec>
 
       {/* Only when analytics is actually switched on — see PrivacyDe.tsx. */}
