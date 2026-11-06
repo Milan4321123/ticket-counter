@@ -4,6 +4,8 @@
 // Which service is used depends only on which key is set:
 //   XAI_API_KEY  → xAI Grok   (https://api.x.ai/v1)
 //   GROQ_API_KEY → Groq       (https://api.groq.com/openai/v1, free tier)
+//   OPENROUTER_API_KEY → OpenRouter (https://openrouter.ai/api/v1), which
+//                  forwards to the model's own provider (":free" models too)
 // CHAT_AI_MODEL overrides the model name. Nothing set → this returns null and
 // the chat uses Gemini (paid tier) or its scripted questions, as before.
 //
@@ -12,7 +14,7 @@
 // and the privacy policy names the service whenever its key is set
 // (components/legal/Privacy*, chatAiProvider()).
 
-type Provider = { id: 'xai' | 'groq'; name: string; url: string; key: string; model: string };
+type Provider = { id: 'xai' | 'groq' | 'openrouter'; name: string; url: string; key: string; model: string };
 
 export function chatAiProvider(): Provider | null {
   const model = process.env.CHAT_AI_MODEL?.trim();
@@ -21,6 +23,15 @@ export function chatAiProvider(): Provider | null {
   const groq = process.env.GROQ_API_KEY?.trim();
   if (groq)
     return { id: 'groq', name: 'Groq', url: 'https://api.groq.com/openai/v1/chat/completions', key: groq, model: model || 'llama-3.3-70b-versatile' };
+  const openrouter = process.env.OPENROUTER_API_KEY?.trim();
+  if (openrouter)
+    return {
+      id: 'openrouter',
+      name: 'OpenRouter',
+      url: 'https://openrouter.ai/api/v1/chat/completions',
+      key: openrouter,
+      model: model || 'meta-llama/llama-3.3-70b-instruct:free',
+    };
   return null;
 }
 
@@ -43,7 +54,12 @@ export async function chatAiJson(prompt: string, timeoutMs = 12000): Promise<unk
   try {
     const res = await fetch(p.url, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${p.key}` },
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${p.key}`,
+        // OpenRouter's optional app attribution; ignored by the others.
+        ...(p.id === 'openrouter' ? { 'HTTP-Referer': 'https://www.martnepali.com', 'X-Title': 'MartNepali' } : {}),
+      },
       body: JSON.stringify({
         model: p.model,
         messages: [{ role: 'user', content: prompt }],

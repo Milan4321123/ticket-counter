@@ -727,6 +727,12 @@ export default function PrivacyEn({ f }: { f: PrivacyFacts }) {
               <strong>Groq</strong> (Groq, Inc., Mountain View, USA) answers the contact chat (section 16). It
               receives the conversation with email addresses and phone numbers removed.
             </li>
+          ) : chatAiProvider()?.id === 'openrouter' ? (
+            <li>
+              <strong>OpenRouter</strong> (OpenRouter, Inc., New York, USA) answers the contact chat (section 16)
+              by passing the conversation, with email addresses and phone numbers removed, to the provider of
+              the language model we have chosen.
+            </li>
           ) : null}
           <li>
             The AI makes no decisions about you; it words answers and texts. Answers can be wrong – what the

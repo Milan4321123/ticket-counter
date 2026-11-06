@@ -775,6 +775,12 @@ export default function PrivacyDe({ f }: { f: PrivacyFacts }) {
               <strong>Groq</strong> (Groq, Inc., Mountain View, USA) beantwortet den Kontakt-Chat (Abschnitt 16).
               Der Dienst erhält den Gesprächsverlauf ohne E-Mail-Adressen und Telefonnummern.
             </li>
+          ) : chatAiProvider()?.id === 'openrouter' ? (
+            <li>
+              <strong>OpenRouter</strong> (OpenRouter, Inc., New York, USA) beantwortet den Kontakt-Chat
+              (Abschnitt 16), indem es den Gesprächsverlauf ohne E-Mail-Adressen und Telefonnummern an den
+              Anbieter des von uns gewählten Sprachmodells weitergibt.
+            </li>
           ) : null}
           <li>
             Die KI trifft keine Entscheidungen über Sie; sie formuliert Antworten und Texte. Antworten können
