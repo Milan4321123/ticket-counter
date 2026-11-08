@@ -166,7 +166,7 @@ const D = {
   'vg.brand': { en: 'MartNepali ads', de: 'MartNepali-Werbung', ne: 'MartNepali विज्ञापन' },
   'vg.event': { en: 'Event ads', de: 'Event-Werbung', ne: 'कार्यक्रम विज्ञापन' },
   'vg.walkon': { en: 'Walk-on intros', de: 'Walk-on-Intros', ne: 'वाक-अन इन्ट्रो' },
-  'vg.stage': { en: 'Stage screens & song visuals', de: 'Bühnen-Screens & Song-Visuals', ne: 'स्टेज स्क्रिन र गीत भिजुअल' },
+  'vg.stage': { en: 'Stage screens', de: 'Bühnen-Screens', ne: 'स्टेज स्क्रिन' },
   'vg.web': { en: 'Website promos', de: 'Website-Promos', ne: 'वेबसाइट प्रमो' },
   'pj.wedding': { en: 'Wedding invitation website', de: 'Website für die Hochzeitseinladung', ne: 'विवाह निम्तो वेबसाइट' },
   'pj.artist': { en: 'Artist page & press kit', de: 'Künstlerseite & Pressemappe', ne: 'कलाकार पेज र प्रेस किट' },

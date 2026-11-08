@@ -620,7 +620,7 @@ export function studioServicesJsonLd(): Record<string, unknown> {
     {
       name: 'Ad & stage videos',
       serviceType: 'Video production',
-      description: '9:16 ads for Reels, TikTok and WhatsApp status, walk-on intros for artists, stage-screen loops and song visuals.',
+      description: '9:16 ads for Reels, TikTok and WhatsApp status, walk-on intros for artists, and stage-screen loops.',
       url: absoluteUrl('/contact?intent=video'),
     },
   ];

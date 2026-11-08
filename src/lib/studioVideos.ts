@@ -5,8 +5,8 @@
 // from public/media/studio with a poster each: nothing downloads until someone
 // presses play (preload="none").
 //
-// Song visuals carry the artist's songs, so only short SILENT excerpts are on
-// the site; the full versions ran on the concert screen.
+// The concert song visuals (the artist's own music videos) were taken off the
+// site on 8 Nov 2026 — do not add them back without the artist's written OK.
 
 export type StudioVideo = {
   id: string;
@@ -16,7 +16,7 @@ export type StudioVideo = {
   text: string;
   /** Landscape (16:9) films: stage screens, walk-on intros, promos. Default is 9:16. */
   wide?: boolean;
-  /** Silent loops (stage screens, song-visual excerpts): muted, looping. */
+  /** Silent loops (stage screens): muted, looping. */
   loop?: boolean;
 };
 
@@ -85,14 +85,6 @@ export const STAGE_SCREENS: StudioVideo[] = [
   v('stage-dj', 'Stage screen · After party', 'Neon and beat bars for the DJ set.', { wide: true, loop: true }),
 ];
 
-/** Lyric visuals for the concert screen — silent 20 s excerpts. */
-export const SONG_VISUALS: StudioVideo[] = [
-  v('song-bola-maya', 'Song visual · Bola Maya', 'Lyrics on the big screen, sung along by the hall. Silent excerpt.', { wide: true, loop: true }),
-  v('song-charara-barara', 'Song visual · Charara Barara', 'Line by line, timed to the song. Silent excerpt.', { wide: true, loop: true }),
-  v('song-pir', 'Song visual · Pir', 'A warm red grade under the lyrics. Silent excerpt.', { wide: true, loop: true }),
-  v('song-sakambari', 'Song visual · Sakambari', 'Violet light for the last song of the night. Silent excerpt.', { wide: true, loop: true }),
-];
-
 export const WEB_PROMOS: StudioVideo[] = [
   v('web-npjoe', 'Website promo · NPJOE e.V.', 'One website, everything NPJOE: three languages, programmes, join in minutes.', { wide: true }),
 ];
@@ -122,10 +114,10 @@ export const VIDEO_GROUPS: VideoGroup[] = [
   },
   {
     id: 'stage',
-    label: 'Stage screens & song visuals',
-    title: 'Stage screens & song visuals',
-    text: 'Looping backdrops behind every act, and lyric visuals for the concert screen.',
-    videos: [...STAGE_SCREENS, ...SONG_VISUALS],
+    label: 'Stage screens',
+    title: 'Stage screens',
+    text: 'Looping backdrops behind every act on the concert screen.',
+    videos: [...STAGE_SCREENS],
   },
   {
     id: 'web',

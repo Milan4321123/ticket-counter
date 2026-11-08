@@ -42,7 +42,7 @@ const MAKE = [
         <path d="m16.5 10 5-3v10l-5-3" />
       </svg>
     ),
-    points: ['9:16 ads for Reels, TikTok and WhatsApp status', 'Walk-on intros for artists', 'Stage-screen loops and song visuals', 'Promo films for a new website or app'],
+    points: ['9:16 ads for Reels, TikTok and WhatsApp status', 'Walk-on intros for artists', 'Stage-screen loops', 'Promo films for a new website or app'],
     href: '/contact?intent=video',
   },
 ];

@@ -364,8 +364,8 @@ export const PROJECTS: Project[] = [
     title: 'Prakash Saput Live · Frankfurt',
     client: 'Concert night · 31 Oct 2026',
     tags: ['Video', 'Website'],
-    outcome: 'The whole night on screen: ads for the sale, walk-on intros, stage screens and song visuals.',
-    points: ['Event ads for Reels and status', 'Walk-on intros for two acts', 'A stage screen for every act', 'Lyric visuals for the songs'],
+    outcome: 'The whole night on screen: ads for the sale, walk-on intros and stage screens.',
+    points: ['Event ads for Reels and status', 'Walk-on intros for two acts', 'A stage screen for every act'],
     cover: { src: '/media/studio/stage-saput.jpg', shape: 'wide', width: 960, height: 540 },
     real: true,
     links: [

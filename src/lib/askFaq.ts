@@ -145,16 +145,16 @@ const CUSTOM: Answers = {
 /** "What have you built?" — the projects, in one breath. */
 const WORK: Answers = {
   en:
-    'Our own ticketing platform (the one you are on — QR tickets, door scanning, seat maps), a restaurant order-ahead app and online shops, the NPJOE e.V. website in three languages, and for Prakash Saput Live in Frankfurt: event ads, walk-on intros, stage screens and song visuals. ' +
+    'Our own ticketing platform (the one you are on — QR tickets, door scanning, seat maps), a restaurant order-ahead app and online shops, the NPJOE e.V. website in three languages, and for Prakash Saput Live in Frankfurt: event ads, walk-on intros and stage screens. ' +
     'Every project and film is on [our work](/studio). Want one like these? [Talk to us](/contact).',
   de:
-    'Unsere eigene Ticket-Plattform (die, auf der du gerade bist — QR-Tickets, Einlass-Scan, Saalpläne), eine Vorbestell-App für Restaurants und Online-Shops, die dreisprachige Website von NPJOE e.V. und für Prakash Saput Live in Frankfurt: Event-Werbung, Walk-on-Intros, Bühnen-Screens und Song-Visuals. ' +
+    'Unsere eigene Ticket-Plattform (die, auf der du gerade bist — QR-Tickets, Einlass-Scan, Saalpläne), eine Vorbestell-App für Restaurants und Online-Shops, die dreisprachige Website von NPJOE e.V. und für Prakash Saput Live in Frankfurt: Event-Werbung, Walk-on-Intros und Bühnen-Screens. ' +
     'Alle Projekte und Filme: [unsere Arbeit](/studio). So etwas für dich? [Schreib uns](/contact).',
   ne:
-    'हाम्रो आफ्नै टिकटिङ प्लेटफर्म (तपाईं अहिले यसैमा हुनुहुन्छ — QR टिकट, ढोकामा स्क्यान, सिट नक्सा), रेस्टुरेन्टको अग्रिम अर्डर एप र अनलाइन पसल, तीन भाषामा NPJOE e.V. को वेबसाइट, र फ्रैंकफर्टको Prakash Saput Live का लागि विज्ञापन, वाक-अन इन्ट्रो, स्टेज स्क्रिन र गीतका भिजुअल। ' +
+    'हाम्रो आफ्नै टिकटिङ प्लेटफर्म (तपाईं अहिले यसैमा हुनुहुन्छ — QR टिकट, ढोकामा स्क्यान, सिट नक्सा), रेस्टुरेन्टको अग्रिम अर्डर एप र अनलाइन पसल, तीन भाषामा NPJOE e.V. को वेबसाइट, र फ्रैंकफर्टको Prakash Saput Live का लागि विज्ञापन, वाक-अन इन्ट्रो र स्टेज स्क्रिन। ' +
     'सबै काम [हाम्रो काम](/studio) मा छ। यस्तै चाहनुहुन्छ? [हामीलाई भन्नुहोस्](/contact)।',
   rn:
-    'Hamro aafnai ticketing platform (tapai ahile yasaimai hunuhuncha — QR ticket, dhoka ma scan, seat map), restaurant ko advance order app ra online pasal, tin bhasha ma NPJOE e.V. ko website, ani Frankfurt ko Prakash Saput Live ko lagi ad, walk-on intro, stage screen ra song visual. ' +
+    'Hamro aafnai ticketing platform (tapai ahile yasaimai hunuhuncha — QR ticket, dhoka ma scan, seat map), restaurant ko advance order app ra online pasal, tin bhasha ma NPJOE e.V. ko website, ani Frankfurt ko Prakash Saput Live ko lagi ad, walk-on intro ra stage screen. ' +
     'Sabai kaam [hamro kaam](/studio) ma cha. Yesto chahiyo? [Hamilai bhannus](/contact).',
 };
 
@@ -250,7 +250,7 @@ export function fallbackAnswer(q: string): string {
  * 14,000-character manual made every answer slow enough to time out.
  */
 export const ASK_CONTEXT = [
-  'MartNepali is a STUDIO for the Nepali community (the homepage): the team makes apps, websites and ad & stage videos. Work so far: this ticketing platform (QR tickets, door scanning, seat maps), a restaurant order-ahead app with a kitchen board, online shops and the bazaar, the NPJOE e.V. association website (Deutsch, English, नेपाली), and for Prakash Saput Live (Frankfurt, 31 Oct 2026) event ads for Reels/TikTok/WhatsApp, walk-on intros, stage-screen loops and song visuals. Every project and film: /studio.',
+  'MartNepali is a STUDIO for the Nepali community (the homepage): the team makes apps, websites and ad & stage videos. Work so far: this ticketing platform (QR tickets, door scanning, seat maps), a restaurant order-ahead app with a kitchen board, online shops and the bazaar, the NPJOE e.V. association website (Deutsch, English, नेपाली), and for Prakash Saput Live (Frankfurt, 31 Oct 2026) event ads for Reels/TikTok/WhatsApp, walk-on intros and stage-screen loops. Every project and film: /studio.',
   'To ask for an app, a website or a video: /contact?intent=app, /contact?intent=website or /contact?intent=video (or /contact). A real person (Milan) reads every message and replies by email.',
   'Studio cost: NEVER state or estimate a price, rate, quote or package. It is free while we grow — ask them to tell us what they need (/contact).',
   'MartNepali also runs Nepali events (/events) and a bazaar of Nepali shops (/market) in Germany (Berlin, Frankfurt, Munich, Hamburg, Darmstadt and more).',
